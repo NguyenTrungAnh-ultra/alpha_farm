@@ -39,6 +39,7 @@ from agent.gemini_client import GeminiChat, extract_json
 from agent.prompts import build_idea_prompt, build_code_prompt, build_fix_prompt
 from agent.validator import validate_strategy, extract_code
 from agent.portfolio import PortfolioManager
+from agent.auto_submit import run_auto_submit
 
 
 def load_cookies(filepath: str = None) -> str:
@@ -102,6 +103,7 @@ def run_pipeline(
     # Portfolio criteria overrides
     max_correlation: float = None,
     verbose: bool = True,
+    auto_submit: bool = True,
 ):
     """
     Run the full strategy generation pipeline.
@@ -394,6 +396,13 @@ def run_pipeline(
             if accepted:
                 stats['accepted'] += 1
                 print(f"  🎉 {reason}")
+                if auto_submit:
+                    print(f"  🚀 [AutoSubmit] Attempting to submit strategy {name} ({tf}) to XNOQuant...")
+                    submit_success = run_auto_submit(code, timeframe=tf, params=best_params)
+                    if submit_success:
+                        print(f"  ✅ [AutoSubmit] Strategy {name} submitted successfully to XNOQuant!")
+                    else:
+                        print(f"  ❌ [AutoSubmit] Strategy {name} submission failed.")
             else:
                 if 'correlation' in reason:
                     stats['rejected_correlation'] += 1
