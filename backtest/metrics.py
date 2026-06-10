@@ -68,22 +68,21 @@ def compute_metrics(result: BacktestResult) -> dict:
     # Unrealized PnL (nếu có vị thế mở cuối backtest)
     unrealized_pnl = net_equity - initial - sum(pnls) if n_completed > 0 else net_equity - initial
 
-    # Initial Capital display (XNO trừ phí bar 0 nếu có)
-    displayed_initial = initial
-    if n_completed > 0 and trades[0].entry_bar == 0:
-        # Trade xảy ra ở bar đầu tiên -> trừ phí opening
-        first_open_fee = trades[0].contracts * 6000  # fee_per_contract
-        displayed_initial = initial - first_open_fee
+    # Initial Capital display (XNO trừ phí mở lệnh đầu tiên)
+    displayed_initial = initial - result.first_trade_open_fee
+
+    # Resample equity to daily frequency (last bar of each trading day)
+    daily_equity = equity.resample('D').last().dropna()
+    daily_returns = daily_equity.pct_change().fillna(0.0)
+    daily_returns = daily_returns.replace([np.inf, -np.inf], 0)
 
     # === PERFORMANCE METRICS ===
     cumulative_return = total_profit_pct
 
-    # CAGR
-    if len(equity) > 1:
-        n_bars = len(equity)
-        # Ước tính số năm từ index
-        total_seconds = (equity.index[-1] - equity.index[0]).total_seconds()
-        years = total_seconds / (365.25 * 24 * 3600)
+    # CAGR (calculated using calendar years between first and last daily bar)
+    if len(daily_equity) > 1:
+        calendar_days = (daily_equity.index[-1] - daily_equity.index[0]).days
+        years = max(calendar_days, 1) / 365.0
         if years > 0 and net_equity > 0:
             cagr = (net_equity / initial) ** (1 / years) - 1
         else:
@@ -99,34 +98,26 @@ def compute_metrics(result: BacktestResult) -> dict:
     gross_loss = abs(sum(losses)) if losses else 0
     profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
 
-    # Returns series (bar-by-bar)
-    returns = equity.pct_change().dropna()
-    returns = returns.replace([np.inf, -np.inf], 0)
-
-    # Sharpe Ratio (annualized)
-    if len(returns) > 1 and returns.std() > 0:
-        # Tính bars per year dựa trên timeframe
-        bars_per_day = _estimate_bars_per_day(equity.index)
-        trading_days_per_year = 252
-        bars_per_year = bars_per_day * trading_days_per_year
-        sharpe = returns.mean() / returns.std() * np.sqrt(bars_per_year)
+    # Sharpe Ratio (annualized using daily returns and population standard deviation ddof=0)
+    if len(daily_returns) > 1 and daily_returns.std(ddof=0) > 0:
+        sharpe = daily_returns.mean() / daily_returns.std(ddof=0) * np.sqrt(252)
     else:
         sharpe = 0.0
 
     # Sortino Ratio
-    if len(returns) > 1:
-        downside = returns[returns < 0]
-        downside_std = downside.std() if len(downside) > 0 else 0
+    if len(daily_returns) > 1:
+        downside = daily_returns[daily_returns < 0]
+        downside_std = downside.std(ddof=0) if len(downside) > 0 else 0
         if downside_std > 0:
-            sortino = returns.mean() / downside_std * np.sqrt(bars_per_year)
+            sortino = daily_returns.mean() / downside_std * np.sqrt(252)
         else:
-            sortino = float('inf') if returns.mean() > 0 else 0.0
+            sortino = float('inf') if daily_returns.mean() > 0 else 0.0
     else:
         sortino = 0.0
 
-    # Max Drawdown
-    rolling_max = equity.cummax()
-    drawdown = (equity - rolling_max) / rolling_max
+    # Max Drawdown (calculated on the daily equity series)
+    rolling_max = daily_equity.cummax()
+    drawdown = (daily_equity - rolling_max) / rolling_max
     max_drawdown = drawdown.min() * 100
 
     # Calmar Ratio
@@ -135,56 +126,59 @@ def compute_metrics(result: BacktestResult) -> dict:
     # Payoff Ratio
     payoff = abs(avg_win / avg_loss) if avg_loss != 0 else float('inf')
 
-    # Volatility (annualized std of returns)
-    if len(returns) > 1:
-        volatility = returns.std() * np.sqrt(bars_per_year)
+    # Volatility (annualized std of daily returns using ddof=0)
+    if len(daily_returns) > 1:
+        volatility = daily_returns.std(ddof=0) * np.sqrt(252)
     else:
         volatility = 0.0
 
     # === ADVANCED METRICS ===
 
-    # Recovery Factor
+    # Recovery Factor (total net profit divided by absolute max drawdown cash value)
     if max_drawdown != 0:
         max_dd_abs = abs(drawdown.min()) * initial
-        recovery_factor = sum(pnls) / max_dd_abs if max_dd_abs > 0 else 0.0
+        net_profit = net_equity - initial
+        recovery_factor = net_profit / max_dd_abs if max_dd_abs > 0 else 0.0
     else:
         recovery_factor = 0.0
 
     # Kelly Criterion
     if n_completed > 0:
         win_prob = len(wins) / n_completed
-        if avg_loss != 0:
-            kelly = win_prob - (1 - win_prob) / abs(avg_win / avg_loss) if avg_win != 0 else 0
+        win_loss_ratio = abs(avg_win / avg_loss) if avg_loss != 0 else 0.0
+        if win_loss_ratio > 0:
+            kelly = win_prob - (1 - win_prob) / win_loss_ratio
         else:
             kelly = win_prob
     else:
         kelly = 0.0
 
-    # Omega Ratio (threshold = 0)
-    if len(returns) > 0:
-        gains = returns[returns > 0].sum()
-        losses_sum = abs(returns[returns < 0].sum())
+    # Omega Ratio (threshold = 0) on daily returns
+    if len(daily_returns) > 0:
+        gains = daily_returns[daily_returns > 0].sum()
+        losses_sum = abs(daily_returns[daily_returns < 0].sum())
         omega = gains / losses_sum if losses_sum > 0 else float('inf')
     else:
         omega = 0.0
 
-    # Ulcer Index
-    if len(equity) > 0:
-        dd_pct = ((equity - rolling_max) / rolling_max * 100)
-        ulcer_index = np.sqrt((dd_pct ** 2).mean())
+    # Ulcer Index on daily drawdown (as ratio)
+    if len(daily_equity) > 0:
+        ulcer_index = np.sqrt((drawdown ** 2).mean())
     else:
         ulcer_index = 0.0
 
     # VaR (5%, parametric)
-    if len(returns) > 1:
-        var_95 = np.percentile(returns, 5) * 100
+    if len(daily_returns) > 1:
+        # Parametric VaR: mean - 1.6448536 * std (ddof=0)
+        var_95 = (daily_returns.mean() - 1.6448536269514722 * daily_returns.std(ddof=0)) * 100
     else:
         var_95 = 0.0
 
-    # CVaR (Expected Shortfall)
-    if len(returns) > 1:
-        threshold = np.percentile(returns, 5)
-        cvar = returns[returns <= threshold].mean() * 100 if len(returns[returns <= threshold]) > 0 else 0.0
+    # CVaR (historical Expected Shortfall on daily returns)
+    if len(daily_returns) > 1:
+        # Historical CVaR threshold (5th percentile of daily returns)
+        hist_var_threshold = np.percentile(daily_returns, 5)
+        cvar = daily_returns[daily_returns <= hist_var_threshold].mean() * 100
     else:
         cvar = 0.0
 
@@ -249,42 +243,69 @@ def print_report(result: BacktestResult) -> None:
 
     # Transaction Analysis
     print()
-    print("  ┌─── Transaction Analysis ──────────────────────────────────┐")
-    print(f"  │  Initial Capital     {m['initial_capital']:>20,.0f} đ       │")
-    print(f"  │  Net Equity          {m['net_equity']:>20,.0f} đ       │")
-    print(f"  │  Total Profit        {m['total_profit_pct']:>+19.2f} %       │")
-    print(f"  │  Total Fees          {m['total_fees_pct']:>+19.2f} %       │")
-    print(f"  │  Total Trades        {m['total_trades']:>20}         │")
-    print(f"  │  Largest Win         {m['largest_win_pct']:>+19.2f} %       │")
-    print(f"  │  Largest Loss        {m['largest_loss_pct']:>+19.2f} %       │")
-    print(f"  │  Avg Win             {m['avg_win_pct']:>+19.2f} %       │")
-    print(f"  │  Avg Loss            {m['avg_loss_pct']:>+19.2f} %       │")
-    print(f"  │  Unrealized PnL      {m['unrealized_pnl']:>20,.0f} đ       │")
-    print("  └──────────────────────────────────────────────────────────┘")
+    print("  +--- Transaction Analysis ----------------------------------+")
+    print(f"  |  Initial Capital     {m['initial_capital']:>20,.0f} d       |")
+    print(f"  |  Net Equity          {m['net_equity']:>20,.0f} d       |")
+    print(f"  |  Total Profit        {m['total_profit_pct']:>+19.2f} %       |")
+    print(f"  |  Total Fees          {m['total_fees_pct']:>+19.2f} %       |")
+    print(f"  |  Total Trades        {m['total_trades']:>20}         |")
+    print(f"  |  Largest Win         {m['largest_win_pct']:>+19.2f} %       |")
+    print(f"  |  Largest Loss        {m['largest_loss_pct']:>+19.2f} %       |")
+    print(f"  |  Avg Win             {m['avg_win_pct']:>+19.2f} %       |")
+    print(f"  |  Avg Loss            {m['avg_loss_pct']:>+19.2f} %       |")
+    print(f"  |  Unrealized PnL      {m['unrealized_pnl']:>20,.0f} d       |")
+    print("  +-----------------------------------------------------------+")
 
     # Performance Metrics
     print()
-    print("  ┌─── Performance Metrics ───────────────────────────────────┐")
-    print(f"  │  Cumulative Return   {m['cumulative_return_pct']:>+19.2f} %       │")
-    print(f"  │  CAGR                {m['cagr_pct']:>+19.2f} %       │")
-    print(f"  │  Win Rate            {m['win_rate_pct']:>+19.2f} %       │")
-    print(f"  │  Profit Factor       {m['profit_factor']:>20.2f}         │")
-    print(f"  │  Sharpe Ratio        {m['sharpe_ratio']:>20.2f}         │")
-    print(f"  │  Sortino Ratio       {m['sortino_ratio']:>20.2f}         │")
-    print(f"  │  Calmar Ratio        {m['calmar_ratio']:>20.2f}         │")
-    print(f"  │  Payoff Ratio        {m['payoff_ratio']:>20.2f}         │")
-    print(f"  │  Volatility          {m['volatility']:>20.2f}         │")
-    print(f"  │  Max Drawdown        {m['max_drawdown_pct']:>+19.2f} %       │")
-    print("  └──────────────────────────────────────────────────────────┘")
+    print("  +--- Performance Metrics -----------------------------------+")
+    print(f"  |  Cumulative Return   {m['cumulative_return_pct']:>+19.2f} %       |")
+    print(f"  |  CAGR                {m['cagr_pct']:>+19.2f} %       |")
+    print(f"  |  Win Rate            {m['win_rate_pct']:>+19.2f} %       |")
+    print(f"  |  Profit Factor       {m['profit_factor']:>20.2f}         |")
+    print(f"  |  Sharpe Ratio        {m['sharpe_ratio']:>20.2f}         |")
+    print(f"  |  Sortino Ratio       {m['sortino_ratio']:>20.2f}         |")
+    print(f"  |  Calmar Ratio        {m['calmar_ratio']:>20.2f}         |")
+    print(f"  |  Payoff Ratio        {m['payoff_ratio']:>20.2f}         |")
+    print(f"  |  Volatility          {m['volatility']:>20.2f}         |")
+    print(f"  |  Max Drawdown        {m['max_drawdown_pct']:>+19.2f} %       |")
+    print("  +-----------------------------------------------------------+")
 
     # Advanced Metrics
     print()
-    print("  ┌─── Advanced Metrics ──────────────────────────────────────┐")
-    print(f"  │  Recovery Factor     {m['recovery_factor']:>20.2f}         │")
-    print(f"  │  Kelly Criterion     {m['kelly_criterion_pct']:>+19.2f} %       │")
-    print(f"  │  Omega Ratio         {m['omega_ratio']:>20.2f}         │")
-    print(f"  │  Ulcer Index         {m['ulcer_index']:>20.2f}         │")
-    print(f"  │  VaR                 {m['var_95_pct']:>+19.2f} %       │")
-    print(f"  │  CVaR                {m['cvar_95_pct']:>+19.2f} %       │")
-    print("  └──────────────────────────────────────────────────────────┘")
+    print("  +--- Advanced Metrics --------------------------------------+")
+    print(f"  |  Recovery Factor     {m['recovery_factor']:>20.2f}         |")
+    print(f"  |  Kelly Criterion     {m['kelly_criterion_pct']:>+19.2f} %       |")
+    print(f"  |  Omega Ratio         {m['omega_ratio']:>20.2f}         |")
+    print(f"  |  Ulcer Index         {m['ulcer_index']:>20.2f}         |")
+    print(f"  |  VaR                 {m['var_95_pct']:>+19.2f} %       |")
+    print(f"  |  CVaR                {m['cvar_95_pct']:>+19.2f} %       |")
+    print("  +-----------------------------------------------------------+")
     print()
+
+def validate_metrics(metrics: dict, min_sharpe: float = 0.5, max_mdd: float = 20.0, min_trades: int = 10) -> bool:
+    """
+    Kiểm tra xem các chỉ số hiệu suất có vượt qua bộ lọc Failed Metrics của web hay không.
+    Trả về True nếu pass, ném ngoại lệ ValueError nếu fail.
+    """
+    import logging
+    logger = logging.getLogger("xno_sdk.validator")
+    
+    errors = []
+    
+    if metrics['sharpe_ratio'] < min_sharpe:
+        errors.append(f"Sharpe Ratio quá thấp ({metrics['sharpe_ratio']:.2f} < {min_sharpe})")
+        
+    if abs(metrics['max_drawdown_pct']) > max_mdd:
+        errors.append(f"Max Drawdown quá cao ({abs(metrics['max_drawdown_pct']):.2f}% > {max_mdd}%)")
+        
+    if metrics['total_trades'] < min_trades:
+        errors.append(f"Số lượng giao dịch quá ít ({metrics['total_trades']} < {min_trades})")
+        
+    if errors:
+        error_msg = "FAILED METRICS - Chiến lược bị loại do không đạt tiêu chuẩn XNOQuant:\n  - " + "\n  - ".join(errors)
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+        
+    logger.info("PASSED METRICS - Chiến lược đạt chuẩn hiệu suất cơ bản.")
+    return True

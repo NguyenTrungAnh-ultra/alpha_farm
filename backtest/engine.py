@@ -54,6 +54,7 @@ class BacktestResult:
     final_equity: float
     total_fees: float
     total_trades: int
+    first_trade_open_fee: float = 0.0
 
 
 class XNOBacktestEngine:
@@ -128,6 +129,7 @@ class XNOBacktestEngine:
         current_entry_bar = 0      # Bar vào lệnh
         current_equity = self.initial_capital
         unrealized_pnl = 0.0
+        first_trade_open_fee = 0.0
 
         # XNOQuant dùng số HĐ CỐ ĐỊNH: tính 1 lần từ initial capital + giá bar đầu tiên
         # N = round(|pos| * initial_capital / (first_price * MULTIPLIER * margin_rate))
@@ -176,6 +178,7 @@ class XNOBacktestEngine:
                     # Tính base_contracts 1 lần duy nhất (từ bar đầu tiên có trade)
                     if base_contracts is None:
                         base_contracts = self.calc_contracts(1.0, self.initial_capital, price)
+                        first_trade_open_fee = round(abs(target_pos) * base_contracts) * self.fee_per_contract
 
                     # N = round(|target_pos| * base_contracts)
                     new_contracts = round(abs(target_pos) * base_contracts)
@@ -213,6 +216,7 @@ class XNOBacktestEngine:
             final_equity=final_equity,
             total_fees=total_fees,
             total_trades=xno_trade_count,
+            first_trade_open_fee=first_trade_open_fee,
         )
 
 

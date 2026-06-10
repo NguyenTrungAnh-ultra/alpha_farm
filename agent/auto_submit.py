@@ -1,9 +1,36 @@
 import re
 import time
 import logging
+import os
 from playwright.sync_api import sync_playwright
 
 logger = logging.getLogger(__name__)
+
+def load_credentials_from_arch() -> tuple:
+    """
+    Read email and password credentials from ARCH.md in the project root.
+    """
+    try:
+        # ARCH.md is in the project root (parent directory of agent)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        arch_path = os.path.join(project_root, "ARCH.md")
+        account = None
+        password = None
+        if os.path.exists(arch_path):
+            with open(arch_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                acc_match = re.search(r"account:\s*(\S+)", content)
+                pwd_match = re.search(r"password:\s*(\S+)", content)
+                if acc_match:
+                    account = acc_match.group(1).strip()
+                if pwd_match:
+                    password = pwd_match.group(1).strip()
+        return account, password
+    except Exception as e:
+        logger.error(f"[AutoSubmit] Failed to load credentials from ARCH.md: {e}")
+        return None, None
+
 
 def inject_params_to_code(code: str, params: dict) -> str:
     """
@@ -24,7 +51,7 @@ def format_code_for_xno(code: str, params: dict = None) -> str:
     1. Strip all lines starting with import or from.
     2. Rename the strategy class to CustomStrategy.
     3. Strip the __init__ method entirely.
-    4. Inject optimized parameters at the top of __algorithm__(self):
+    4. Replace getattr(self, 'param', default) with the actual parameter value.
     5. Clean up any unallowed numpy (np) and pandas (pd) references.
     """
     # 1. Strip imports
@@ -47,15 +74,22 @@ def format_code_for_xno(code: str, params: dict = None) -> str:
     if re.search(init_pattern, clean_code):
         clean_code = re.sub(init_pattern, "def __algorithm__(self):", clean_code)
         
-    # 4. Inject parameter attributes at the top of __algorithm__
+    # 4. Replace getattr parameter expressions or inject self.param = value
     if params:
-        assignments = []
+        remaining_params = params.copy()
         for name, val in params.items():
-            assignments.append(f"        self.{name} = {repr(val)}")
-        assignments_str = "\n".join(assignments)
-        
-        # Inject right after def __algorithm__(self):
-        clean_code = clean_code.replace("def __algorithm__(self):", f"def __algorithm__(self):\n{assignments_str}\n")
+            pattern = rf"getattr\(\s*self\s*,\s*['\"]{name}['\"]\s*,\s*[^)]+\)"
+            if re.search(pattern, clean_code):
+                clean_code = re.sub(pattern, repr(val), clean_code)
+                remaining_params.pop(name)
+                
+        # If any parameters were not replaced, inject them at the top of __algorithm__
+        if remaining_params:
+            assignments = []
+            for name, val in remaining_params.items():
+                assignments.append(f"        self.{name} = {repr(val)}")
+            assignments_str = "\n".join(assignments)
+            clean_code = clean_code.replace("def __algorithm__(self):", f"def __algorithm__(self):\n{assignments_str}\n")
         
     # 5. Clean up np/pd references to only use Series methods
     clean_code = re.sub(
@@ -89,7 +123,6 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
     bool
         True if successfully submitted, False otherwise.
     """
-    strategy_code = inject_params_to_code(strategy_code, params)
     strategy_code = format_code_for_xno(strategy_code, params)
 
     
@@ -110,14 +143,51 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
         
     try:
         with sync_playwright() as p:
-            logger.info("[AutoSubmit] Connecting to Chrome CDP on localhost:9222...")
-            browser = p.chromium.connect_over_cdp("http://localhost:9222")
-            context = browser.contexts[0]
-            page = context.new_page()
-            
-            logger.info("[AutoSubmit] Navigating to build page...")
-            page.goto("https://alpha.xnoquant.io/build")
-            page.wait_for_selector("button.shrink-0.w-14.border-r")
+            browser = None
+            try:
+                logger.info("[AutoSubmit] Connecting to Chrome CDP on localhost:9222...")
+                browser = p.chromium.connect_over_cdp("http://localhost:9222")
+                context = browser.contexts[0]
+                page = context.new_page()
+                logger.info("[AutoSubmit] Navigating to build page...")
+                page.goto("https://alpha.xnoquant.io/build")
+                page.wait_for_selector("button.shrink-0.w-14.border-r", timeout=5000)
+            except Exception as cdp_err:
+                logger.warning(f"[AutoSubmit] CDP connection failed or not logged in: {cdp_err}. Launching local browser instead...")
+                if browser:
+                    try:
+                        browser.close()
+                    except:
+                        pass
+                
+                # Launch a new Chromium browser
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context()
+                page = context.new_page()
+                
+                # Load credentials from ARCH.md
+                account, password = load_credentials_from_arch()
+                if not account or not password:
+                    logger.error("[AutoSubmit] Could not find account credentials in ARCH.md")
+                    return False
+                
+                logger.info("[AutoSubmit] Navigating to build page...")
+                page.goto("https://alpha.xnoquant.io/build")
+                page.wait_for_timeout(3000)
+                
+                if "dang-nhap" in page.url or page.locator("input[type='password']").count() > 0:
+                    logger.info("[AutoSubmit] Login page detected. Performing automated login...")
+                    page.fill("input[type='text']", account)
+                    page.fill("input[type='password']", password)
+                    page.click("button:has-text('Login')")
+                    page.wait_for_timeout(3000)
+                    
+                    logger.info("[AutoSubmit] Navigating back to build page after login...")
+                    page.goto("https://alpha.xnoquant.io/build")
+                    page.wait_for_timeout(2000)
+                
+                # Wait for page to load
+                page.wait_for_selector("button.shrink-0.w-14.border-r", timeout=15000)
             
             logger.info("[AutoSubmit] Adding new strategy tab...")
             page.evaluate("() => document.querySelector('button.shrink-0.w-14.border-r').click()")
@@ -196,7 +266,7 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
                     let badges = Array.from(toolbar.querySelectorAll('span, div'));
                     let statusBadge = badges.find(b => {
                         let text = b.textContent.trim().toLowerCase();
-                        return ['draft', 'simulating', 'completed', 'published', 'failed'].includes(text);
+                        return ['draft', 'simulating', 'completed', 'published', 'failed', 'error'].includes(text);
                     });
                     return statusBadge ? statusBadge.textContent.trim() : 'Unknown';
                 }""")
@@ -209,7 +279,7 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
                     logger.error("[AutoSubmit] Simulation completed but did not publish (failed metrics).")
                     page.close()
                     return False
-                elif status_text.lower() == "failed":
+                elif status_text.lower() in ["failed", "error"]:
                     logger.error("[AutoSubmit] Simulation failed (compilation/runtime error).")
                     page.close()
                     return False
@@ -264,25 +334,18 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
             
             # Click three-dots menu in details panel
             logger.info("[AutoSubmit] Clicking details action menu...")
-            page.evaluate("""() => {
-                let menuBtn = document.querySelector('button[aria-haspopup="menu"].size-8.flex.items-center');
-                if (menuBtn) menuBtn.click();
-            }""")
+            page.wait_for_selector('button[aria-haspopup="menu"].size-8')
+            page.click('button[aria-haspopup="menu"].size-8')
             page.wait_for_timeout(1000)
             
             # Click Submit Alpha
             logger.info("[AutoSubmit] Clicking Submit Alpha...")
-            has_submit = page.evaluate("""() => {
-                let item = Array.from(document.querySelectorAll('[role="menuitem"]')).find(el => el.innerText.trim() === 'Submit Alpha');
-                if (item) {
-                    item.click();
-                    return true;
-                }
-                return false;
-            }""")
-            
-            if not has_submit:
-                logger.error("[AutoSubmit] Submit Alpha option not found in menu.")
+            submit_item_selector = 'div[role="menuitem"]:has-text("Submit Alpha")'
+            try:
+                page.wait_for_selector(submit_item_selector, timeout=5000)
+                page.click(submit_item_selector)
+            except Exception as e:
+                logger.error("[AutoSubmit] Submit Alpha option not found in menu or timed out.")
                 page.close()
                 return False
                 
@@ -290,26 +353,23 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
             
             # Click competition selection and confirm
             logger.info("[AutoSubmit] Confirming VQC 2026 event submission...")
-            submission_result = page.evaluate("""async () => {
-                const wait = ms => new Promise(r => setTimeout(r, ms));
+            try:
+                comp_selector = 'button:has-text("Data Science Talent Competition")'
+                page.wait_for_selector(comp_selector, timeout=5000)
+                page.click(comp_selector)
+                page.wait_for_timeout(500)
                 
-                // Find VQC competition button
-                let compBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Data Science Talent Competition'));
-                if (!compBtn) return 'Competition option not found';
-                compBtn.click();
-                await wait(500);
-                
-                // Click Confirm submission
-                let confirmBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === 'Confirm submission');
-                if (!confirmBtn) return 'Confirm button not found';
-                confirmBtn.click();
-                await wait(1000);
-                return 'Submitted';
-            }""")
+                confirm_selector = 'button:has-text("Confirm submission")'
+                page.wait_for_selector(confirm_selector, timeout=5000)
+                page.click(confirm_selector)
+                page.wait_for_timeout(1000)
+                submission_result = 'Submitted'
+            except Exception as e:
+                logger.error(f"[AutoSubmit] Failed during confirmation: {e}")
+                page.close()
+                return False
             
             logger.info(f"[AutoSubmit] Result: {submission_result}")
-            page.wait_for_timeout(1000)
-            
             page.close()
             return submission_result == 'Submitted'
             
