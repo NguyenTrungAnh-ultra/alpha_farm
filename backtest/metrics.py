@@ -73,18 +73,24 @@ def compute_metrics(result: BacktestResult) -> dict:
 
     # Resample equity to daily frequency (last bar of each trading day)
     daily_equity = equity.resample('D').last().dropna()
-    daily_returns = daily_equity.pct_change().fillna(0.0)
-    daily_returns = daily_returns.replace([np.inf, -np.inf], 0)
+    
+    # XNOQuant computes rolling returns for Volatility, Sortino, VaR, CVaR, etc.
+    daily_returns_rolling = daily_equity.pct_change().fillna(0.0)
+    daily_returns_rolling = daily_returns_rolling.replace([np.inf, -np.inf], 0)
+    
+    # XNOQuant computes constant capital returns specifically for the Sharpe Ratio:
+    # returns_const = pnl_change / initial_capital (where initial_capital = 1,000,000,000)
+    daily_pnl_change = daily_equity.diff().fillna(0.0)
+    daily_returns_const = daily_pnl_change / result.initial_capital
 
     # === PERFORMANCE METRICS ===
     cumulative_return = total_profit_pct
 
-    # CAGR (calculated using calendar years between first and last daily bar)
-    if len(daily_equity) > 1:
-        calendar_days = (daily_equity.index[-1] - daily_equity.index[0]).days
-        years = max(calendar_days, 1) / 365.0
+    # CAGR (calculated using trading days / 252 as years, with initial capital as base)
+    if len(daily_equity) > 0:
+        years = len(daily_equity) / 252.0
         if years > 0 and net_equity > 0:
-            cagr = (net_equity / initial) ** (1 / years) - 1
+            cagr = (net_equity / result.initial_capital) ** (1 / years) - 1
         else:
             cagr = 0.0
     else:
@@ -98,20 +104,19 @@ def compute_metrics(result: BacktestResult) -> dict:
     gross_loss = abs(sum(losses)) if losses else 0
     profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
 
-    # Sharpe Ratio (annualized using daily returns and population standard deviation ddof=0)
-    if len(daily_returns) > 1 and daily_returns.std(ddof=0) > 0:
-        sharpe = daily_returns.mean() / daily_returns.std(ddof=0) * np.sqrt(252)
+    # Sharpe Ratio (annualized using constant returns and population standard deviation ddof=0)
+    if len(daily_returns_const) > 1 and daily_returns_const.std(ddof=0) > 0:
+        sharpe = daily_returns_const.mean() / daily_returns_const.std(ddof=0) * np.sqrt(252)
     else:
         sharpe = 0.0
 
-    # Sortino Ratio
-    if len(daily_returns) > 1:
-        downside = daily_returns[daily_returns < 0]
-        downside_std = downside.std(ddof=0) if len(downside) > 0 else 0
-        if downside_std > 0:
-            sortino = daily_returns.mean() / downside_std * np.sqrt(252)
+    # Sortino Ratio (annualized using rolling returns and standard downside deviation)
+    if len(daily_returns_rolling) > 1:
+        downside_dev = np.sqrt(np.mean(np.minimum(0, daily_returns_rolling) ** 2))
+        if downside_dev > 0:
+            sortino = daily_returns_rolling.mean() / downside_dev * np.sqrt(252)
         else:
-            sortino = float('inf') if daily_returns.mean() > 0 else 0.0
+            sortino = float('inf') if daily_returns_rolling.mean() > 0 else 0.0
     else:
         sortino = 0.0
 
@@ -126,9 +131,9 @@ def compute_metrics(result: BacktestResult) -> dict:
     # Payoff Ratio
     payoff = abs(avg_win / avg_loss) if avg_loss != 0 else float('inf')
 
-    # Volatility (annualized std of daily returns using ddof=0)
-    if len(daily_returns) > 1:
-        volatility = daily_returns.std(ddof=0) * np.sqrt(252)
+    # Volatility (annualized std of rolling returns using ddof=1)
+    if len(daily_returns_rolling) > 1:
+        volatility = daily_returns_rolling.std(ddof=1) * np.sqrt(252)
     else:
         volatility = 0.0
 
@@ -136,8 +141,8 @@ def compute_metrics(result: BacktestResult) -> dict:
 
     # Recovery Factor (total net profit divided by absolute max drawdown cash value)
     if max_drawdown != 0:
-        max_dd_abs = abs(drawdown.min()) * initial
-        net_profit = net_equity - initial
+        max_dd_abs = abs(drawdown.min()) * result.initial_capital
+        net_profit = net_equity - result.initial_capital
         recovery_factor = net_profit / max_dd_abs if max_dd_abs > 0 else 0.0
     else:
         recovery_factor = 0.0
@@ -153,10 +158,10 @@ def compute_metrics(result: BacktestResult) -> dict:
     else:
         kelly = 0.0
 
-    # Omega Ratio (threshold = 0) on daily returns
-    if len(daily_returns) > 0:
-        gains = daily_returns[daily_returns > 0].sum()
-        losses_sum = abs(daily_returns[daily_returns < 0].sum())
+    # Omega Ratio (threshold = 0) on rolling returns
+    if len(daily_returns_rolling) > 0:
+        gains = daily_returns_rolling[daily_returns_rolling > 0].sum()
+        losses_sum = abs(daily_returns_rolling[daily_returns_rolling < 0].sum())
         omega = gains / losses_sum if losses_sum > 0 else float('inf')
     else:
         omega = 0.0
@@ -167,18 +172,16 @@ def compute_metrics(result: BacktestResult) -> dict:
     else:
         ulcer_index = 0.0
 
-    # VaR (5%, parametric)
-    if len(daily_returns) > 1:
-        # Parametric VaR: mean - 1.6448536 * std (ddof=0)
-        var_95 = (daily_returns.mean() - 1.6448536269514722 * daily_returns.std(ddof=0)) * 100
+    # VaR (5%, parametric on rolling returns with ddof=1)
+    if len(daily_returns_rolling) > 1:
+        var_95 = (daily_returns_rolling.mean() - 1.6448536269514722 * daily_returns_rolling.std(ddof=1)) * 100
     else:
         var_95 = 0.0
 
-    # CVaR (historical Expected Shortfall on daily returns)
-    if len(daily_returns) > 1:
-        # Historical CVaR threshold (5th percentile of daily returns)
-        hist_var_threshold = np.percentile(daily_returns, 5)
-        cvar = daily_returns[daily_returns <= hist_var_threshold].mean() * 100
+    # CVaR (historical Expected Shortfall on rolling returns)
+    if len(daily_returns_rolling) > 1:
+        hist_var_threshold = np.percentile(daily_returns_rolling, 5)
+        cvar = daily_returns_rolling[daily_returns_rolling <= hist_var_threshold].mean() * 100
     else:
         cvar = 0.0
 

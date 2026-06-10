@@ -36,11 +36,12 @@ Dự án sinh chiến lược tự động.
 
 ### Core Engine (`backtest/`)
 
-- `engine.py` → `XNOBacktestEngine.run()`: Nhận vector vị thế (`strategy.run_algorithm`). Duyệt từng bar. Đóng/Mở hợp đồng. Trừ phí (`fee_per_contract`). Trả `BacktestResult`.
+- `engine.py` → `XNOBacktestEngine.run()`: Nhận vector vị thế (`strategy.run_algorithm`). Duyệt từng bar. Đóng/Mở hợp đồng. Trừ phí (`fee_per_contract`). Trả `BacktestResult`. Mở vị thế đầu tiên sẽ tự động trừ phí mở và được cập nhật vào vốn ban đầu hiển thị.
 - `engine.py` → `load_data()`: Load CSV.
 - `data_pipeline.py` → `prepare()`: Gộp `load()`, `clean()`, `tag_sessions()`. Cắt bar rỗng. Phân loại sáng/chiều.
 - `optimizer.py` → `Optimizer.run()`: Bayesian search (Optuna) tìm tham số ngon.
-- `metrics.py` / `reporting.py`: In bảng. Vẽ biểu đồ equity.
+- `metrics.py` → `compute_metrics()`: Tính toán toàn bộ chỉ số hiệu năng (Sharpe dùng constant capital ddof=0, Volatility dùng rolling returns ddof=1, Sortino dùng standard downside dev, VaR ddof=1, CAGR dùng Trading Days/252, Recovery Factor và Ulcer Index dùng daily drawdown) đảm bảo đồng bộ hoàn toàn với thuật toán trên Web của XNOQuant.
+- `reporting.py`: In bảng. Vẽ biểu đồ equity.
 
 ### Tương tác CLI (`run_backtest.py` & `runner.py`)
 

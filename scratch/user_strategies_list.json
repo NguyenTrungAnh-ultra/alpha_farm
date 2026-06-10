@@ -1,0 +1,15 @@
+{
+  "success": false,
+  "status_code": 500,
+  "message": "internal server error",
+  "data": null,
+  "total": 0,
+  "page": 0,
+  "limit": 0,
+  "pagination": {
+    "total_items": 0,
+    "total_pages": 0,
+    "current_page": 0,
+    "page_size": 0
+  }
+}
