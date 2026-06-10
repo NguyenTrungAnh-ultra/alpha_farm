@@ -1,0 +1,284 @@
+=== All short text snippets ===
+- +0%
+- +143.73%
+- +151.65%
+- +172.53%
+- +185.78%
+- +246.66%
+- +33.79%
+- +334.31%
+- +349.47%
+- +45.36%
+- +51.83%
+- +547.94%
+- +689.71%
+- +86.29%
+- -
+- -0.45
+- -0.57%
+- -10.33%
+- -100.00%
+- -11.88%
+- -16.17%
+- -2.42
+- -26.14%
+- -28.42%
+- -30.48%
+- -40.25%
+- -40.93%
+- -56.44%
+- -57.28%
+- -6.22%
+- -6.76%
+- 0
+- 0%
+- 0.37
+- 0.48
+- 0.79
+- 0.84
+- 0.92
+- 0.99
+- 1
+- 1.14
+- 1.18
+- 1.21
+- 1.27
+- 1.30
+- 1.40
+- 1.42
+- 1.61
+- 1.63
+- 1.81
+- 1.83
+- 123
+- 15
+- 2
+- 2.06
+- 2.11
+- 2.16
+- 2.80
+- 2020
+- 20200.48+45.36%-57.28%1.180.79
+- 2021
+- 20211.61+185.78%-26.14%1.427.11
+- 2022
+- 20222.80+349.47%-16.17%1.8121.61
+- 2023
+- 20230.37+33.79%-40.25%1.140.84
+- 2024
+- 20241.21+86.29%-40.93%1.272.11
+- 2025
+- 20250+0%0%00
+- 2026-06-10 00:03:44
+- 2026-06-10 00:33:00
+- 2026-06-10 00:33:33
+- 2026-06-10 00:33:57
+- 2026-06-10 00:34:14
+- 2026-06-10 12:33:05
+- 2026-06-10 12:39:59
+- 2026-06-10 12:57:28
+- 2026-06-10 13:04:43
+- 21.61
+- 26
+- 3
+- 5
+- 5Nguyễn Trung Anhtoinguyen15102004@gmail.com
+- 60D left
+- 7.11
+- Advanced Metrics
+- Aggregate Data
+- Analysis
+- Back
+- Back123Next
+- CAGR
+- CAGR+51.83%
+- Calmar
+- Calmar0.92
+- Close
+- Code
+- CodeResults
+- Competitions
+- Create Strategy
+- Data
+- Drawdown
+- Drawdown-56.44%
+- Hide Drafts
+- Live
+- Live Perf.
+- Loading evaluations...
+- Market
+- Market Allocation
+- Max Drawdown
+- Next
+- Nguyễn Trung Anh
+- Nguyễn Trung Anhtoinguyen15102004@gmail.com
+- Only Published
+- Only PublishedHide Drafts
+- Overview
+- OverviewPerformanceAnalysis
+- PNLs
+- PNLsDrawdownSharpeReturns
+- Performance
+- Performance Metrics
+- Portfolio Performance (All)
+- Profit Factor
+- Profit Factor1.30
+- Published: 15
+- Results
+- Return
+- Returns
+- Select charts:
+- Select charts:Select data...
+- Select data...
+- Sharpe
+- Sharpe1.40
+- Simulate
+- Stage:
+- Stage:TrainTestSimulateLive
+- Status
+- Strategy List
+- Strategy Name
+- Strategy Pipeline (1 month)
+- Strategy Pipeline (1 month)Total: 26Published: 15
+- Submitted (1)
+- Test
+- Total: 26
+- Total: 26Published: 15
+- Train
+- Transaction Analysis
+- Tutorial
+- Universe
+- Untitled 20
+- Untitled 20Submitted (1)
+- Untitled 27
+- Untitled 27errorVietnam FutureVN30F1M-30MIN000-
+- Untitled 28
+- Untitled 28Submitted (1)
+- Untitled 29
+- Untitled 29Submitted (1)
+- Untitled 30
+- Untitled 31
+- Untitled 32
+- Untitled 33
+- Untitled 33Submitted (1)
+- Untitled 34
+- Untitled 36
+- Untitled 36+689.71%
+- VN30F1M-10MIN
+- VN30F1M-30MIN
+- Vietnam Future
+- Vietnam FutureVN30F1M-10MIN
+- Year
+- YearSharpeCAGRMax DrawdownProfit FactorCalmar
+- completed
+- completed2026-06-10 00:33:57
+- completed2026-06-10 00:34:14
+- completed2026-06-10 12:33:05
+- completed2026-06-10 12:57:28
+- completed2026-06-10 13:04:43
+- completedVietnam FutureVN30F1M-10MIN
+- error
+- published
+- published2026-06-10 00:03:44
+- published2026-06-10 00:33:00
+- published2026-06-10 00:33:33
+- published2026-06-10 12:39:59
+- toinguyen15102004@gmail.com
+
+=== Clickable elements / tabs ===
+- +143.73%
+- +151.65%
+- +172.53%
+- +246.66%
+- +334.31%
+- +547.94%
+- +689.71%
+- -
+- -0.45
+- -0.57%
+- -10.33%
+- -100.00%
+- -11.88%
+- -2.42
+- -28.42%
+- -30.48%
+- -56.44%
+- -6.22%
+- -6.76%
+- 0
+- 0.99
+- 1
+- 1.40
+- 1.63
+- 1.81
+- 1.83
+- 2
+- 2.06
+- 2.16
+- 2026-06-10 00:03:44
+- 2026-06-10 00:33:00
+- 2026-06-10 00:33:33
+- 2026-06-10 00:33:57
+- 2026-06-10 00:34:14
+- 2026-06-10 12:33:05
+- 2026-06-10 12:39:59
+- 2026-06-10 12:57:28
+- 2026-06-10 13:04:43
+- 3
+- 5
+- 60D left
+- Analysis
+- Back
+- Close
+- Code
+- Competitions
+- Create Strategy
+- Data
+- Market
+- Max Drawdown
+- Next
+- Nguyễn Trung Anh
+- Overview
+- Performance
+- Results
+- Return
+- Select data...
+- Sharpe
+- Simulate
+- Status
+- Strategy List
+- Strategy Name
+- Test
+- Train
+- Tutorial
+- Universe
+- Untitled 20
+- Untitled 20Submitted (1)
+- Untitled 27
+- Untitled 28
+- Untitled 28Submitted (1)
+- Untitled 29
+- Untitled 29Submitted (1)
+- Untitled 30
+- Untitled 31
+- Untitled 32
+- Untitled 33
+- Untitled 33Submitted (1)
+- Untitled 34
+- Untitled 36
+- VN30F1M-10MIN
+- VN30F1M-30MIN
+- Vietnam Future
+- completed
+- completed2026-06-10 00:33:57
+- completed2026-06-10 00:34:14
+- completed2026-06-10 12:33:05
+- completed2026-06-10 12:57:28
+- completed2026-06-10 13:04:43
+- error
+- published
+- published2026-06-10 00:03:44
+- published2026-06-10 00:33:00
+- published2026-06-10 00:33:33
+- published2026-06-10 12:39:59
+- toinguyen15102004@gmail.com

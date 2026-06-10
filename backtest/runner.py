@@ -11,8 +11,12 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backtest.engine import XNOBacktestEngine, load_data
-from backtest.strategy import SimpleAlgorithm
-from backtest.metrics import print_report, compute_metrics
+from xno_sdk.engine import SimpleAlgorithm
+from backtest.metrics import print_report, compute_metrics, validate_metrics
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("xno_sdk.runner")
 
 
 # =============================================================================
@@ -109,6 +113,8 @@ class SMA_3_1000_LF(SimpleAlgorithm):
 # MAIN
 # =============================================================================
 
+from strategies.alpha_42 import CustomStrategy as Alpha42
+
 STRATEGIES = {
     'buy_hold': BuyAndHold,
     'buy_hold_half': BuyAndHoldHalf,
@@ -117,6 +123,7 @@ STRATEGIES = {
     'sma_channel': SMA_Channel,
     'sma5_20': SMA_5_20_SAR,
     'sma3_1000': SMA_3_1000_LF,
+    'alpha_42': Alpha42,
 }
 
 
@@ -173,9 +180,9 @@ def run_verification():
     df = load_data('10m')
 
     for name, StrategyClass in STRATEGIES.items():
-        print(f"\n{'─' * 75}")
+        print(f"\n{'-' * 75}")
         print(f"  Strategy: {name}")
-        print(f"{'─' * 75}")
+        print(f"{'-' * 75}")
 
         strategy = StrategyClass()
         result = engine.run(strategy, df)
@@ -184,35 +191,35 @@ def run_verification():
         ref = xno_ref.get(name, {})
 
         print(f"  {'Metric':<25} {'Local':>18} {'XNO':>18} {'Match':>8}")
-        print(f"  {'─' * 69}")
+        print(f"  {'-' * 69}")
 
         if 'total_trades' in ref:
-            match = '✓' if m['total_trades'] == ref['total_trades'] else '✗'
+            match = 'OK' if m['total_trades'] == ref['total_trades'] else 'ERR'
             print(f"  {'Total Trades':<25} {m['total_trades']:>18} {ref['total_trades']:>18} {match:>8}")
 
         if 'total_fees_pct' in ref:
             err = abs(m['total_fees_pct'] - ref['total_fees_pct'])
-            match = '✓' if err < 1.0 else f'Δ{err:.1f}'
+            match = 'OK' if err < 1.0 else f'D{err:.1f}'
             print(f"  {'Total Fees %':<25} {m['total_fees_pct']:>17.2f}% {ref['total_fees_pct']:>17.2f}% {match:>8}")
 
         if 'cumulative_return' in ref:
             err = abs(m['cumulative_return_pct'] - ref['cumulative_return'])
-            match = '✓' if err < 5.0 else f'Δ{err:.1f}'
+            match = 'OK' if err < 5.0 else f'D{err:.1f}'
             print(f"  {'Cumulative Return':<25} {m['cumulative_return_pct']:>17.2f}% {ref['cumulative_return']:>17.2f}% {match:>8}")
 
         if 'unrealized_pnl' in ref:
             err = abs(m['unrealized_pnl'] - ref['unrealized_pnl'])
-            match = '✓' if err < 10_000_000 else f'Δ{err:,.0f}'
+            match = 'OK' if err < 10_000_000 else f'D{err:,.0f}'
             print(f"  {'Unrealized PnL':<25} {m['unrealized_pnl']:>18,.0f} {ref['unrealized_pnl']:>18,.0f} {match:>8}")
 
         if 'net_equity' in ref:
             err = abs(m['net_equity'] - ref['net_equity'])
-            match = '✓' if err < 50_000_000 else f'Δ{err:,.0f}'
+            match = 'OK' if err < 50_000_000 else f'D{err:,.0f}'
             print(f"  {'Net Equity':<25} {m['net_equity']:>18,.0f} {ref['net_equity']:>18,.0f} {match:>8}")
 
         if 'initial_capital' in ref:
             err = abs(m['initial_capital'] - ref['initial_capital'])
-            match = '✓' if err < 10_000 else f'Δ{err:,.0f}'
+            match = 'OK' if err < 10_000 else f'D{err:,.0f}'
             print(f"  {'Initial Capital':<25} {m['initial_capital']:>18,.0f} {ref['initial_capital']:>18,.0f} {match:>8}")
 
 
@@ -236,10 +243,15 @@ if __name__ == '__main__':
         print(f"Loading {args.timeframe} data...")
         df = load_data(args.timeframe)
         print(f"Loaded {len(df)} bars ({df.index[0]} to {df.index[-1]})")
-
         strategy = STRATEGIES[args.strategy]()
         engine = XNOBacktestEngine()
 
         print(f"Running {args.strategy}...")
         result = engine.run(strategy, df)
+        metrics = compute_metrics(result)
         print_report(result)
+        
+        try:
+            validate_metrics(metrics)
+        except ValueError as e:
+            logger.warning(f"Metrics validation failed: {e}")
