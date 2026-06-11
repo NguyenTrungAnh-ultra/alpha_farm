@@ -33,3 +33,7 @@
 8. **Tương quan danh mục sơ sài [ĐÃ KHẮC PHỤC]**
    - *Vấn đề:* Chỉ sử dụng tương quan Pearson trên chuỗi lợi nhuận (daily returns) có thể không phát hiện được các chiến lược trùng lặp về mặt logic vào lệnh (logic clones) nhưng có sự sai lệch nhỏ về mặt thời điểm. Điều này dẫn đến nguy cơ bị hệ thống XNOQuant phạt điểm trùng lặp.
    - *Giải pháp:* Nâng cấp cơ chế kiểm tra tương quan trong `PortfolioManager` thành kiểm tra kép (Dual-Correlation). Hệ thống hiện tại tính toán cả tương quan Pearson của chuỗi lợi nhuận (daily returns) và tương quan Pearson của mảng vị thế/tín hiệu (position/signal arrays) giữa chiến lược mới và các chiến lược đã có. Thử nghiệm thực tế cho thấy cơ chế này giúp nhận diện chính xác các chiến lược có logic tương đồng cao, từ đó nâng cao tính đa dạng của danh mục đầu tư.
+
+9. **Lệch tỷ lệ dữ liệu Khối lượng (Volume Scaling Discrepancy) [CHƯA KHẮC PHỤC ĐƯỢC]**
+   - *Vấn đề:* Dữ liệu Volume từ API DNSE có mức độ tổng hợp rất cao (hiếm khi <10 contracts/bar). Ngược lại, nền tảng XNOQuant ghi nhận rất nhiều nến có mức volume cực nhỏ hoặc rỗng. Sự khác biệt quá lớn về hệ quy chiếu Volume này khiến các chiến lược phụ thuộc vào khối lượng (VWAP, MFI, CMF) tối ưu cực tốt ở Local nhưng vỡ trận hoàn toàn khi nạp lên XNOQuant.
+   - *Giải pháp tạm thời:* Hạn chế sử dụng các chỉ báo dựa vào Khối lượng để thiết kế chiến lược và train mô hình ở môi trường Local. Chuyển hướng sang ưu tiên các chỉ báo Price-Action (MA, RSI, MACD) vì dữ liệu Giá (Close/Open/High/Low) khớp 100% với Web.

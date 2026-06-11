@@ -26,6 +26,7 @@
  - **Cơ chế khớp lệnh:** Khớp tại mức giá `Close` của nến phát tín hiệu. Vốn ban đầu hiển thị trên Web được trừ luôn phí mở lệnh đầu tiên.
  - **Lệch pha thời gian (Date Shift):** Các timestamp ngày trên web bị lệch +1 ngày dương lịch (ví dụ: Thứ Sáu thay vì Thứ Năm), nhưng tổng số ngày giao dịch (`Trading Days`) hoàn toàn bằng nhau.
  - **Dữ liệu thiếu (Data Gaps):** API DNSE bị thiếu một số ngày giao dịch lịch sử (ví dụ: 16/07/2020 - 20/07/2020), trong khi dữ liệu gốc của XNOQuant có đủ. Điều này dẫn tới lệch nhẹ số lệnh (>99.4% khớp) đối với các chiến lược sử dụng chỉ báo (CCI, ATR, SMA...) do giá trị chỉ báo bị lệch vài nến.
+ - **Lệch tỷ lệ Volume (Volume Scaling Discrepancy):** Dữ liệu Volume ở local (DNSE) có mức tổng hợp rất lớn (trung bình >7000 contracts/nến 10m), hiếm khi rơi xuống dưới 10. Trong khi đó, XNOQuant có rất nhiều nến volume rỗng/nhỏ. Do đó, các chiến lược chạy dựa vào chỉ báo khối lượng (VWAP, CMF) sẽ có kết quả chênh lệch rất lớn giữa Local và Web. Khuyến cáo hạn chế dùng Volume để train local.
  - **Sharpe Ratio:** Tính trên chuỗi tỷ suất lợi nhuận vốn cố định (Constant Capital Returns: $\Delta\text{PnL} / 1\text{e}9$) với `ddof=0` (độ lệch chuẩn tổng thể).
  - **Volatility:** Tính trên chuỗi tỷ suất lợi nhuận lũy kế (Rolling Equity Returns: `.pct_change()`) với `ddof=1` (độ lệch chuẩn mẫu).
  - **Sortino Ratio:** Tính trên chuỗi Rolling Equity Returns với downside deviation chuẩn hóa trên tổng số kỳ $N$ (thay vì chỉ số ngày âm).

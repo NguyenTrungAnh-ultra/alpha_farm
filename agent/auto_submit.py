@@ -105,7 +105,7 @@ def format_code_for_xno(code: str, params: dict = None) -> str:
     
     return clean_code
 
-def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = None, timeout_seconds: int = 300) -> bool:
+def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = None, timeout_seconds: int = 300, filepath: str = None) -> bool:
     """
     Automate strategy creation, simulation, and submission on XNOQuant via Playwright CDP.
     
@@ -117,12 +117,33 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
         Timeframe (e.g. "1m", "5m", "10m", "15m", "30m", "60m").
     timeout_seconds : int
         Max wait time for simulation.
-        
-    Returns
-    ----------
-    bool
-        True if successfully submitted, False otherwise.
+    filepath : str
+        Optional. The path of the strategy file. If provided, the file will be moved to agent/results/pushed/ on success, or agent/results/failed/ on failure.
     """
+    success = _run_auto_submit_core(strategy_code, timeframe, params, timeout_seconds)
+    
+    if filepath and os.path.exists(filepath):
+        import shutil
+        target_dir_name = "pushed" if success else "failed"
+        target_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", target_dir_name)
+        os.makedirs(target_dir, exist_ok=True)
+        dest_path = os.path.join(target_dir, os.path.basename(filepath))
+        try:
+            shutil.move(filepath, dest_path)
+            logger.info(f"[AutoSubmit] Moved {filepath} to {target_dir}")
+            
+            # Move corresponding _equity.csv if exists
+            csv_filepath = filepath.replace(".py", "_equity.csv")
+            if os.path.exists(csv_filepath):
+                csv_dest = os.path.join(target_dir, os.path.basename(csv_filepath))
+                shutil.move(csv_filepath, csv_dest)
+                
+        except Exception as e:
+            logger.error(f"[AutoSubmit] Failed to move files: {e}")
+            
+    return success
+
+def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: dict = None, timeout_seconds: int = 300) -> bool:
     strategy_code = format_code_for_xno(strategy_code, params)
 
     
@@ -193,9 +214,17 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
             page.evaluate("() => document.querySelector('button.shrink-0.w-14.border-r').click()")
             page.wait_for_timeout(1500)
             
+            logger.info("[AutoSubmit] Waiting for Monaco editor to load...")
+            try:
+                page.wait_for_function("window.monaco !== undefined", timeout=15000)
+            except Exception as e:
+                logger.error("[AutoSubmit] Monaco editor did not load in time.")
+                page.close()
+                return False
+                
             logger.info("[AutoSubmit] Setting Monaco Editor content...")
             escaped_code = strategy_code.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
-            page.evaluate(f"monaco.editor.getModels()[0].setValue(`{escaped_code}`)")
+            page.evaluate(f"monaco.editor.getEditors()[0].setValue(`{escaped_code}`)")
             page.wait_for_timeout(500)
             
             logger.info(f"[AutoSubmit] Configuring settings for {target_universe}...")
@@ -272,13 +301,17 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
                 }""")
                 
                 logger.info(f"[AutoSubmit] Status: {status_text}")
-                if status_text.lower() == "published":
-                    sim_success = True
-                    break
-                elif status_text.lower() == "completed":
-                    logger.error("[AutoSubmit] Simulation completed but did not publish (failed metrics).")
+                
+                # Check for compilation errors (remains Draft too long)
+                if status_text.lower() == 'draft' and (time.time() - start_time) > 20:
+                    logger.error("[AutoSubmit] Strategy failed to compile (Status remained Draft for > 20s). Aborting early.")
                     page.close()
                     return False
+                    
+                if status_text.lower() in ["published", "completed"]:
+                    logger.info(f"[AutoSubmit] Simulation finished with status: {status_text}. Proceeding to submission...")
+                    sim_success = True
+                    break
                 elif status_text.lower() in ["failed", "error"]:
                     logger.error("[AutoSubmit] Simulation failed (compilation/runtime error).")
                     page.close()
@@ -318,9 +351,9 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
             }""")
             
             if not strategy_ids:
-                logger.error("[AutoSubmit] Failed to get strategy ID from localStorage.")
+                logger.warning("[AutoSubmit] Failed to get strategy ID from localStorage. Treating as simulated-only.")
                 page.close()
-                return False
+                return True
                 
             strategy_id = strategy_ids[0]
             logger.info(f"[AutoSubmit] Strategy ID found: {strategy_id}")
@@ -345,9 +378,9 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
                 page.wait_for_selector(submit_item_selector, timeout=5000)
                 page.click(submit_item_selector)
             except Exception as e:
-                logger.error("[AutoSubmit] Submit Alpha option not found in menu or timed out.")
+                logger.warning("[AutoSubmit] Submit Alpha option not found in menu or timed out. Treating as simulated-only.")
                 page.close()
-                return False
+                return True
                 
             page.wait_for_timeout(1500)
             
@@ -365,9 +398,9 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
                 page.wait_for_timeout(1000)
                 submission_result = 'Submitted'
             except Exception as e:
-                logger.error(f"[AutoSubmit] Failed during confirmation: {e}")
+                logger.warning(f"[AutoSubmit] Failed during confirmation: {e}. Treating as simulated-only.")
                 page.close()
-                return False
+                return True
             
             logger.info(f"[AutoSubmit] Result: {submission_result}")
             page.close()

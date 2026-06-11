@@ -399,7 +399,8 @@ def run_pipeline(
                 print(f"  🎉 {reason}")
                 if auto_submit:
                     print(f"  🚀 [AutoSubmit] Attempting to submit strategy {name} ({tf}) to XNOQuant...")
-                    submit_success = run_auto_submit(code, timeframe=tf, params=best_params)
+                    strat_filepath = os.path.join(os.path.dirname(__file__), "results", f"{name}_{tf}.py")
+                    submit_success = run_auto_submit(code, timeframe=tf, params=best_params, filepath=strat_filepath)
                     if submit_success:
                         print(f"  ✅ [AutoSubmit] Strategy {name} submitted successfully to XNOQuant!")
                     else:
