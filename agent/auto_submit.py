@@ -3,6 +3,8 @@ import time
 import logging
 import os
 from playwright.sync_api import sync_playwright
+import pandas as pd
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +122,7 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
     filepath : str
         Optional. The path of the strategy file. If provided, the file will be moved to agent/results/pushed/ on success, or agent/results/failed/ on failure.
     """
-    success = _run_auto_submit_core(strategy_code, timeframe, params, timeout_seconds)
+    success = _run_auto_submit_core(strategy_code, timeframe, params, timeout_seconds, filepath)
     
     if filepath and os.path.exists(filepath):
         import shutil
@@ -143,7 +145,7 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
             
     return success
 
-def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: dict = None, timeout_seconds: int = 300) -> bool:
+def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: dict = None, timeout_seconds: int = 300, filepath: str = None) -> bool:
     strategy_code = format_code_for_xno(strategy_code, params)
 
     
@@ -311,9 +313,67 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                 if status_text.lower() in ["published", "completed"]:
                     logger.info(f"[AutoSubmit] Simulation finished with status: {status_text}. Proceeding to submission...")
                     sim_success = True
+                    
+                    logger.info("[AutoSubmit] Extracting performance metrics...")
+                    try:
+                        page.evaluate("""() => {
+                            let tabs = Array.from(document.querySelectorAll('button, a, div, span'));
+                            let perfTab = tabs.find(b => b.textContent === 'Performance' || b.innerText === 'Performance');
+                            if (perfTab) perfTab.click();
+                        }""")
+                        page.wait_for_timeout(1000)
+                        
+                        metrics = page.evaluate("""() => {
+                            let data = {};
+                            let elements = document.querySelectorAll('div.flex.justify-between, li.flex.justify-between');
+                            elements.forEach(el => {
+                                let children = el.children;
+                                if (children.length >= 2) {
+                                    let key = children[0].innerText || children[0].textContent;
+                                    let val = children[1].innerText || children[1].textContent;
+                                    if (key && val) {
+                                        key = key.trim();
+                                        val = val.trim();
+                                        if (key.length > 0 && key.length < 40 && val.length < 40) {
+                                            data[key] = val;
+                                        }
+                                    }
+                                }
+                            });
+                            return data;
+                        }""")
+                        
+                        # Handled below
+                        
+                        if metrics and len(metrics) > 0:
+                            logger.info(f"[AutoSubmit] Extracted {len(metrics)} metrics: {metrics}")
+                            csv_path = os.path.join(os.path.dirname(__file__), "results", "leaderboard.csv")
+                            strat_name = os.path.basename(filepath) if filepath else "Unknown"
+                            
+                            row_data = {"Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Strategy": strat_name}
+                            row_data.update(metrics)
+                            df_new = pd.DataFrame([row_data])
+                            
+                            if os.path.isfile(csv_path) and os.path.getsize(csv_path) > 0:
+                                df_existing = pd.read_csv(csv_path)
+                                df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+                                df_combined.to_csv(csv_path, index=False)
+                            else:
+                                df_new.to_csv(csv_path, index=False)
+                        else:
+                            logger.warning("[AutoSubmit] Could not extract metrics from UI.")
+                    except Exception as e:
+                        logger.error(f"[AutoSubmit] Failed to extract metrics: {e}")
+                        
                     break
                 elif status_text.lower() in ["failed", "error"]:
-                    logger.error("[AutoSubmit] Simulation failed (compilation/runtime error).")
+                    error_details = page.evaluate("""() => {
+                        let errors = [];
+                        // Attempt to capture red toasts or error messages
+                        document.querySelectorAll('.text-red-500, .Toastify__toast--error, .text-destructive').forEach(e => errors.push(e.innerText || e.textContent));
+                        return errors.join(' | ');
+                    }""")
+                    logger.error(f"[AutoSubmit] Simulation failed (compilation/runtime error). Details: {error_details}")
                     page.close()
                     return False
                 
@@ -368,7 +428,9 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
             # Click three-dots menu in details panel
             logger.info("[AutoSubmit] Clicking details action menu...")
             page.wait_for_selector('button[aria-haspopup="menu"].size-8')
-            page.click('button[aria-haspopup="menu"].size-8')
+            page.keyboard.press('Escape')  # Dismiss any lingering toasts/modals
+            page.wait_for_timeout(500)
+            page.click('button[aria-haspopup="menu"].size-8', force=True)
             page.wait_for_timeout(1000)
             
             # Click Submit Alpha
@@ -376,7 +438,7 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
             submit_item_selector = 'div[role="menuitem"]:has-text("Submit Alpha")'
             try:
                 page.wait_for_selector(submit_item_selector, timeout=5000)
-                page.click(submit_item_selector)
+                page.click(submit_item_selector, force=True)
             except Exception as e:
                 logger.warning("[AutoSubmit] Submit Alpha option not found in menu or timed out. Treating as simulated-only.")
                 page.close()
@@ -389,12 +451,12 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
             try:
                 comp_selector = 'button:has-text("Data Science Talent Competition")'
                 page.wait_for_selector(comp_selector, timeout=5000)
-                page.click(comp_selector)
+                page.click(comp_selector, force=True)
                 page.wait_for_timeout(500)
                 
                 confirm_selector = 'button:has-text("Confirm submission")'
                 page.wait_for_selector(confirm_selector, timeout=5000)
-                page.click(confirm_selector)
+                page.click(confirm_selector, force=True)
                 page.wait_for_timeout(1000)
                 submission_result = 'Submitted'
             except Exception as e:

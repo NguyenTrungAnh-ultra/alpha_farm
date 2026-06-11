@@ -38,4 +38,10 @@ class CustomStrategy(SimpleAlgorithm):
         raw_pos = self.op.where(abs_diff > 10, 1.0, 0.0)
         self.set_positions(raw_pos == 0.0, position=0.0)
         self.set_positions(raw_pos == 1.0, position=1.0)
+
+## 4. Cấm Điểm Kỳ Dị Toán Học (Anti-Singularity Rule)
+- Đặc thù của thị trường Phái sinh VN là có rất nhiều nến mang giá trị `Volume = 0` hoặc biên độ `High - Low = 0`.
+- **CẤM** thực hiện các phép chia trực tiếp cho Volume hoặc dải biến động giá (như `close / volume` hoặc `close / (high - low)`) vì nguy cơ sinh ra lỗi `NaN` hoặc `Inf` (chia cho 0) làm sập Sandbox.
+- Bắt buộc phải sử dụng hàm bảo vệ của hệ thống: `self.op.isfinite()` và `self.op.zero_ifna()` để bẻ lái an toàn, HOẶC cộng hằng số cực nhỏ `1e-8` vào mẫu số.
+- **Ví dụ đúng:** `safe_signal = self.op.where(self.op.isfinite(close / volume), close / volume, 0.0)`
 ```
