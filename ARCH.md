@@ -32,7 +32,7 @@ Dự án sinh chiến lược tự động.
 
 - `series.py` → `RestrictedSeries`: Bọc `pd.Series` của Pandas để chặn các thuộc tính/phương thức cấm trong sandbox (`.mean()`, `.std()`, `.iloc`, physical indexing) và whitelist các phương thức hợp lệ trên sàn (`.where()`, `.fillna()`, `.ffill()`, `.pct_change()`, `.shift()`, `.diff()`, `.astype()`).
 - `engine.py` → `FeatureEngine` & `OperatorEngine`: Định nghĩa toàn bộ 30 toán tử và chỉ báo tùy chỉnh tương thích 100% với hệ thống XNOQuant. Tính năng `rolling_rank` được tăng tốc 360 lần bằng thuật toán Vectorized NumPy `sliding_window_view`.
-- `engine.py` → `DataProxy`: Giả lập mảng `pv_volume` cố định về toàn bộ `0.0` để mô phỏng chính xác lỗi dữ liệu khối lượng bị rỗng trên web.
+- `engine.py` → `DataProxy`: Giả lập mảng `pv_volume` lấy dữ liệu thực tế từ cột `Volume` của CSV (kèm `fillna(0.0)` cho các nến trống), giúp các chiến lược sử dụng Volume hoạt động chính xác trên Local.
 
 ### Core Engine (`backtest/`)
 
@@ -43,10 +43,9 @@ Dự án sinh chiến lược tự động.
 - `metrics.py` → `compute_metrics()`: Tính toán toàn bộ chỉ số hiệu năng (Sharpe dùng constant capital ddof=0, Volatility dùng rolling returns ddof=1, Sortino dùng standard downside dev, VaR ddof=1, CAGR dùng Trading Days/252, Recovery Factor và Ulcer Index dùng daily drawdown) đảm bảo đồng bộ hoàn toàn với thuật toán trên Web của XNOQuant.
 - `reporting.py`: In bảng. Vẽ biểu đồ equity.
 
-### Tương tác CLI (`run_backtest.py` & `runner.py`)
+### Tương tác CLI (`run_backtest.py`)
 
-- `run_backtest.py` → `main()`: Parse arg. Gọi `optimize()` hoặc `run_single()` cho `sma_crossover`.
-- `runner.py` → `run_verification()`: Test chéo kết quả Engine Local vs Engine Web XNOQuant.
+- `run_backtest.py` → `main()`: Entry point duy nhất. Parse args để chạy backtest đơn lẻ (`--strategy`) hoặc chạy Verify đối chiếu chéo (`--verify`). Đã được dọn dẹp và hợp nhất từ `runner.py` cũ.
 
 ## 3. Liên kết Hệ Thống
 

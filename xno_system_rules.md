@@ -43,6 +43,7 @@
 - Overfit: Optimizer không chia out-of-sample → Backtest đẹp, trade thực tế nát.
 - Execution Bias: Khớp lệnh giá Close hiện tại thay vì Open nến kế tiếp → Lệch PnL thực tế.
 - Khóa AST: Trả mảng boolean (`long_setup`) → Không lưu giá vào lệnh → Không làm được Trailing Stop động.
+- Lệch Volume: Khối lượng (Volume) giữa Local DNSE và Web XNOQuant khác biệt hoàn toàn về hệ quy chiếu (XNOQuant có rất nhiều nến volume bằng 0 hoặc cực nhỏ). Cấm lạm dụng chỉ báo Volume khi train local để tránh sai điểm vào lệnh.
 
 ## Quy Tắc Viết Mã Nguồn Trên Web
 
