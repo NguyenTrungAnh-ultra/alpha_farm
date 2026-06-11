@@ -506,8 +506,8 @@ class DataProxy:
         self.pv_low = RestrictedSeries(df['Low'])
         self.pv_close = RestrictedSeries(df['Close'])
         
-        # Explicitly empty volume array to mimic XNOQuant environment (Fix Error 9)
-        self.pv_volume = RestrictedSeries(pd.Series(0.0, index=df.index))
+        # Fetch real volume data, filling NaNs with 0.0 for safety
+        self.pv_volume = RestrictedSeries(df['Volume'].fillna(0.0))
 
     @property
     def index(self):

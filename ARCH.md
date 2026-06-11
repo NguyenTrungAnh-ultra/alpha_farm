@@ -25,7 +25,7 @@ Dự án sinh chiến lược tự động.
 
 - `gemini_client.py` → `GeminiChat.send()`: Gọi API ẩn Gemini. Quản lý cookie, xoay vòng.
 - `validator.py` → `validate_strategy()`: Chạy code LLM sinh ra. Bắt lỗi AST. Trả lại lỗi để LLM tự fix (`build_fix_prompt`).
-- `portfolio.py` → `PortfolioManager.evaluate_and_add()`: Xét duyệt. Check Sharpe > 1.3, CAGR > 15%, MDD > -35%. Tính tương quan (`compute_max_correlation`). Đạt → Lưu đĩa.
+- `portfolio.py` → `PortfolioManager.evaluate_and_add()`: Xét duyệt. Check Sharpe > 1.3, CAGR > 15%, MDD > -35%. Tính tương quan kép (`compute_max_correlation` trên chuỗi lợi nhuận và `compute_max_position_correlation` trên mảng vị thế/tín hiệu). Đạt → Lưu đĩa.
 - `auto_submit.py` → `run_auto_submit()`: Nạp code chiến lược đã được format sạch (CustomStrategy), chạy giả lập trên web và tự động nộp vào cuộc thi VQC 2026. Có cơ chế dự phòng tự động khởi chạy trình duyệt và đăng nhập bằng thông tin trong `ARCH.md` nếu CDP port 9222 bị từ chối.
 
 ### Sandbox Mocking (`xno_sdk/`)

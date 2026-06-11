@@ -161,7 +161,7 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
                         pass
                 
                 # Launch a new Chromium browser
-                browser = p.chromium.launch(headless=True)
+                browser = p.chromium.launch(headless=False)
                 context = browser.new_context()
                 page = context.new_page()
                 
