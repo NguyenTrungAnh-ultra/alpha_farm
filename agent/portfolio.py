@@ -54,12 +54,13 @@ class PortfolioManager:
         
         self.strategies: list[dict] = []
         self._equity_curves: list[pd.Series] = []
+        self._position_series: list[pd.Series] = []
         
         # Load existing if resuming
         self._load_existing()
     
     def _load_existing(self):
-        """Load previously saved strategies and their equity curves."""
+        """Load previously saved strategies, equity curves, and position series."""
         summary_path = self.results_dir / "portfolio_summary.json"
         if summary_path.exists():
             try:
@@ -67,7 +68,7 @@ class PortfolioManager:
                     saved = json.load(f)
                 self.strategies = saved.get('strategies', [])
                 
-                # Load equity curves for correlation checks
+                # Load equity and position curves for correlation checks
                 for s in self.strategies:
                     eq_path = self.results_dir / f"{s['name']}_{s['timeframe']}_equity.csv"
                     if eq_path.exists():
@@ -75,9 +76,18 @@ class PortfolioManager:
                         self._equity_curves.append(eq)
                     else:
                         print(f"  ⚠️ Missing equity curve: {eq_path.name}")
+                        self._equity_curves.append(None)
+                        
+                    pos_path = self.results_dir / f"{s['name']}_{s['timeframe']}_positions.csv"
+                    if pos_path.exists():
+                        pos = pd.read_csv(pos_path, index_col=0, parse_dates=True).squeeze()
+                        self._position_series.append(pos)
+                    else:
+                        self._position_series.append(None)
                 
                 print(f"[Portfolio] Loaded {len(self.strategies)} strategies, "
-                      f"{len(self._equity_curves)} equity curves")
+                      f"{len([e for e in self._equity_curves if e is not None])} equity curves, "
+                      f"{len([p for p in self._position_series if p is not None])} position curves")
             except Exception as e:
                 print(f"[Portfolio] Load error: {e}")
     
@@ -124,7 +134,8 @@ class PortfolioManager:
         float
             Maximum absolute correlation (0 if no existing strategies).
         """
-        if not self._equity_curves:
+        valid_curves = [e for e in self._equity_curves if e is not None]
+        if not valid_curves:
             return 0.0
         
         # Compute daily returns
@@ -133,7 +144,7 @@ class PortfolioManager:
             return 0.0
         
         max_corr = 0.0
-        for existing_equity in self._equity_curves:
+        for existing_equity in valid_curves:
             existing_returns = existing_equity.pct_change().dropna()
             
             # Align indices
@@ -142,6 +153,32 @@ class PortfolioManager:
                 continue
             
             corr = abs(new_returns.loc[common_idx].corr(existing_returns.loc[common_idx]))
+            if not np.isnan(corr):
+                max_corr = max(max_corr, corr)
+        
+        return max_corr
+
+    def compute_max_position_correlation(self, new_positions: pd.Series) -> float:
+        """
+        Compute maximum correlation between new position series and all existing.
+        
+        Returns
+        -------
+        float
+            Maximum absolute correlation (0 if no existing strategies).
+        """
+        valid_positions = [p for p in self._position_series if p is not None]
+        if not valid_positions or new_positions is None:
+            return 0.0
+        
+        max_corr = 0.0
+        for existing_positions in valid_positions:
+            # Align indices
+            common_idx = new_positions.index.intersection(existing_positions.index)
+            if len(common_idx) < 10:
+                continue
+            
+            corr = abs(new_positions.loc[common_idx].corr(existing_positions.loc[common_idx]))
             if not np.isnan(corr):
                 max_corr = max(max_corr, corr)
         
@@ -157,6 +194,7 @@ class PortfolioManager:
         params: dict,
         metrics: dict,
         equity_curve: pd.Series,
+        positions: pd.Series = None,
     ) -> tuple[bool, str]:
         """
         Evaluate strategy and add to portfolio if it passes.
@@ -172,9 +210,15 @@ class PortfolioManager:
             return False, reason
         
         # ── Check correlation ──
-        max_corr = self.compute_max_correlation(equity_curve)
-        if max_corr > self.max_correlation:
-            reason = f"REJECTED (correlation): max_corr={max_corr:.2f} > {self.max_correlation}"
+        max_corr_returns = self.compute_max_correlation(equity_curve)
+        max_corr_positions = self.compute_max_position_correlation(positions)
+        
+        if max_corr_returns > self.max_correlation:
+            reason = f"REJECTED (return correlation): max_corr_returns={max_corr_returns:.2f} > {self.max_correlation}"
+            return False, reason
+            
+        if max_corr_positions > self.max_correlation:
+            reason = f"REJECTED (position correlation): max_corr_positions={max_corr_positions:.2f} > {self.max_correlation}"
             return False, reason
         
         # ── Accept! ──
@@ -193,12 +237,14 @@ class PortfolioManager:
                 'total_trades': metrics.get('total_trades', 0),
                 'win_rate': round(metrics.get('win_rate', 0), 2),
             },
-            'max_correlation': round(max_corr, 3),
+            'max_correlation_returns': round(max_corr_returns, 3),
+            'max_correlation_positions': round(max_corr_positions, 3),
             'accepted_at': datetime.now().isoformat(),
         }
         
         self.strategies.append(strategy_entry)
         self._equity_curves.append(equity_curve)
+        self._position_series.append(positions)
         
         # Save code
         code_path = self.results_dir / f"{name}_{timeframe}.py"
@@ -209,14 +255,20 @@ class PortfolioManager:
         eq_path = self.results_dir / f"{name}_{timeframe}_equity.csv"
         equity_curve.to_csv(eq_path)
         
+        # Save positions series for future correlation checks
+        if positions is not None:
+            pos_path = self.results_dir / f"{name}_{timeframe}_positions.csv"
+            positions.to_csv(pos_path)
+        
         # Save portfolio summary
         self._save_summary()
         
+        max_c = max(max_corr_returns, max_corr_positions)
         reason = (f"ACCEPTED #{len(self.strategies)} | "
                   f"Sharpe={metrics.get('sharpe_ratio', 0):.2f} "
                   f"CAGR={metrics.get('cagr', 0)*100:.1f}% "
                   f"MDD={metrics.get('max_drawdown_pct', 0):.1f}% "
-                  f"Corr={max_corr:.2f}")
+                  f"Corr={max_c:.2f} (Ret={max_corr_returns:.2f}, Pos={max_corr_positions:.2f})")
         return True, reason
     
     def _save_summary(self):
@@ -256,9 +308,12 @@ class PortfolioManager:
         
         for i, s in enumerate(self.strategies, 1):
             m = s['metrics']
+            max_c = s.get('max_correlation')
+            if max_c is None:
+                max_c = max(s.get('max_correlation_returns', 0.0), s.get('max_correlation_positions', 0.0))
             print(f"{i:3d} {s['name']:<25} {s['timeframe']:>4} {s['family']:<18} "
                   f"{m['sharpe_ratio']:7.2f} {m['cagr']*100:6.1f}% "
                   f"{m['max_drawdown_pct']:6.1f}% {m['profit_factor']:6.2f} "
-                  f"{s['max_correlation']:6.2f}")
+                  f"{max_c:6.2f}")
         
         print(f"{'='*80}\n")

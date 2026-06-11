@@ -391,6 +391,7 @@ def run_pipeline(
                 params=best_params,
                 metrics=metrics,
                 equity_curve=equity_curve,
+                positions=result.positions,
             )
             
             if accepted:
