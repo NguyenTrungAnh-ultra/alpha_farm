@@ -1,44 +1,37 @@
-# AGENT_EXP
- 
- ## TÓM TẮT CHAT
- - Xây tool `auto_submit.py` nộp chiến lược XNOQuant tự động qua Playwright.
- - Chạy pipeline: Sinh code -> Format -> Validate -> Nộp web.
- - Gặp lỗi simulation: Timeout, web chậm, lỗi code pandas/numpy trên server.
- - Debug web: Viết script connect Chrome CDP, chụp màn hình, check DOM.
- - Sửa chiến lược: Sửa cách tính `entry_price`, bỏ `iloc`.
- - Thành công nộp tự động. Kiểm tra kết quả, ghi nhận lỗi vào `weaknesses.md`.
- - Thực hiện reverse engineering thành công toàn bộ công thức tính toán chỉ số hiệu năng trên sàn XNOQuant, giải mã các lệch pha dữ liệu.
- 
- ## KINH NGHIỆM THỰC CHIẾN (CHI TIẾT)
- 
- ### 1. CODE CHIẾN LƯỢC CHO XNOQUANT
- - CHỐNG CHỈ ĐỊNH `iloc`: Hàm filter/session hay dùng `iloc` sẽ gây lỗi khi lên server do data shape khác. Dùng mask/vectorize an toàn hơn.
- - CÁCH LẤY ENTRY PRICE CHUẨN: Để tính Take Profit/Stop Loss, CẦN lưu giá vào lệnh. Cách không lỗi: `close.where(điều_kiện_vào_lệnh).ffill()`. Ổn định nhất.
- - ĐỊNH DẠNG CODE: Phải tách `get_feature()`, `get_position()`. Đảm bảo code sạch, không dùng thư viện ngoài nếu server không hỗ trợ.
- 
- ### 2. CÀO/TỰ ĐỘNG WEB (PLAYWRIGHT)
- - WEB SIÊU CHẬM: Đặt timeout cao (>60s). Simulation mất nhiều thời gian.
- - CHỜ ĐÚNG LÚC: `wait_for_selector` trạng thái `visible`. Không click mù.
- - HANDLE LỖI: Try-catch từng chiến lược. Cào thông báo lỗi trên UI, log ra file. Bỏ qua chiến lược lỗi để chạy tiếp. Không sập cả batch.
- - QUY TRÌNH NỘP: Dán code -> Ấn simulate -> Đợi -> Check lỗi -> (Nếu ok) Ấn publish.
- 
- ### 3. CƠ CHẾ KHỚP LỆNH VÀ CÔNG THỨC CHỈ SỐ (REVERSE ENGINEERING)
- - **Cơ chế khớp lệnh:** Khớp tại mức giá `Close` của nến phát tín hiệu. Vốn ban đầu hiển thị trên Web được trừ luôn phí mở lệnh đầu tiên.
- - **Lệch pha thời gian (Date Shift):** Các timestamp ngày trên web bị lệch +1 ngày dương lịch (ví dụ: Thứ Sáu thay vì Thứ Năm), nhưng tổng số ngày giao dịch (`Trading Days`) hoàn toàn bằng nhau.
- - **Dữ liệu thiếu (Data Gaps):** API DNSE bị thiếu một số ngày giao dịch lịch sử (ví dụ: 16/07/2020 - 20/07/2020), trong khi dữ liệu gốc của XNOQuant có đủ. Điều này dẫn tới lệch nhẹ số lệnh (>99.4% khớp) đối với các chiến lược sử dụng chỉ báo (CCI, ATR, SMA...) do giá trị chỉ báo bị lệch vài nến.
- - **Lệch tỷ lệ Volume (Volume Scaling Discrepancy):** Dữ liệu Volume ở local (DNSE) có mức tổng hợp rất lớn (trung bình >7000 contracts/nến 10m), hiếm khi rơi xuống dưới 10. Trong khi đó, XNOQuant có rất nhiều nến volume rỗng/nhỏ. Do đó, các chiến lược chạy dựa vào chỉ báo khối lượng (VWAP, CMF) sẽ có kết quả chênh lệch rất lớn giữa Local và Web. Khuyến cáo hạn chế dùng Volume để train local.
- - **Sharpe Ratio:** Tính trên chuỗi tỷ suất lợi nhuận vốn cố định (Constant Capital Returns: $\Delta\text{PnL} / 1\text{e}9$) với `ddof=0` (độ lệch chuẩn tổng thể).
- - **Volatility:** Tính trên chuỗi tỷ suất lợi nhuận lũy kế (Rolling Equity Returns: `.pct_change()`) với `ddof=1` (độ lệch chuẩn mẫu).
- - **Sortino Ratio:** Tính trên chuỗi Rolling Equity Returns với downside deviation chuẩn hóa trên tổng số kỳ $N$ (thay vì chỉ số ngày âm).
- - **VaR (95%):** Parametric VaR tính trên Rolling Equity Returns dùng `ddof=1` standard deviation.
- - **CAGR:** Số năm được quy đổi bằng số ngày giao dịch thực tế chia cho 252 ($\text{Trading Days} / 252$), không dùng ngày dương lịch.
- 
- ### 4. DEBUGGING & PYTHON
- - NHÌN XUYÊN BROWSER: Dùng script gọi CDP (`inspect_browser_tabs.py`) chụp ảnh màn hình + list tab để biết tool đang kẹt ở giao diện nào, rất hữu ích khi chạy ẩn/nền.
- - TERMINAL WINDOWS: Lỗi in UTF-8 (Tiếng Việt) làm sập script. Giải pháp: `sys.stdout.reconfigure(encoding='utf-8')` đầu file.
- - KIỂM TRA TRƯỚC: Viết script `verify_formatted_code.py` test đầu ra text trước khi ném cho Playwright. Phát hiện lỗi syntax từ sớm.
- 
- ### 5. BÀI HỌC QUẢN LÝ TASK
- - Tập trung fix đúng lỗi user yêu cầu, không lan man.
- - Ghi chú điểm yếu thuật toán vào file riêng ngay khi thấy fail.
+# Nhật Ký Thực Chiến & Bài Học Kinh Nghiệm (AGENT_EXP)
 
+Tài liệu này ghi nhận lại các vấn đề phát sinh trong quá trình xây dựng tự động hóa cho XNOQuant, các rủi ro hệ thống, cũng như các bài học rút ra để định hướng cho AI và lập trình viên.
+
+## 1. Rủi Ro Hạ Tầng & Hệ Thống (AI, Web, Data)
+
+- **Biến động Session (Cookies/CDP):** Cơ chế xác thực Web thường xuyên bị quá hạn hoặc từ chối kết nối CDP. Giải pháp hiện tại là mở một giao diện trình duyệt ẩn danh độc lập bằng Playwright cho mỗi chiến lược nhằm đảm bảo độ cách ly. 
+- **Giới hạn LLM Quota:** Các vòng lặp tự sửa lỗi (AST Fixer) quá nhiều có thể gây cạn kiệt số lượng token hoặc giới hạn API (Lỗi 429).
+- **Trình duyệt chậm (Timeout):** Sandbox trên XNOQuant thường có thời gian phản hồi chậm. Việc cài đặt `timeout` cao (> 60s) và chờ Selector `visible` thay vì click ngẫu nhiên là cần thiết. Bổ sung `force=True` kết hợp gửi phím `Escape` giúp tránh tình trạng Playwright bị lỗi `subtree intercepts` khi gặp các thông báo (toast) nổi.
+
+## 2. Rủi Ro Lượng Hóa & Lệch Pha Dữ Liệu (Data Discrepancy)
+
+Quá trình chạy thực tế so với Local Backtest thường nảy sinh sai số do sự khác biệt về hệ quy chiếu dữ liệu và cơ chế mô phỏng:
+
+- **Khớp lệnh (Execution Bias):** Sự khác biệt giữa giá khớp lệnh tại Local và Web đã được quan sát. Dựa trên quá trình reverse engineering, hệ thống XNOQuant thường ưu tiên khớp tại giá `Close` của nến phát tín hiệu (thay vì giá `Open` của nến sau).
+- **Lệch pha Lịch thời gian (Date Shift):** Các timestamp ngày hiển thị trên giao diện Web thường bị xê dịch +1 ngày (VD: ghi nhận lệnh vào Thứ Sáu thay vì Thứ Năm). Tuy nhiên, tổng số ngày giao dịch (Trading Days) để tính CAGR không bị ảnh hưởng.
+- **Khoảng hở Dữ liệu (Data Gaps):** Dữ liệu Local từ API DNSE thi thoảng thiếu các thanh (bars) ở quá khứ sâu, trong khi Web có đủ. Việc này khiến các chỉ báo có độ trễ lớn (như SMA dài hạn) bị lệch nhẹ tín hiệu so với hệ thống thực tế.
+- **Lệch Tỷ Lệ Khối Lượng (Volume Scaling):** Môi trường Phái sinh trên web XNOQuant có rất nhiều nến mang giá trị `Volume = 0` hoặc cực nhỏ, khác biệt lớn với dữ liệu Local vốn đã được tổng hợp (thường >10 contracts/bar). Do đó, hạn chế tối đa việc sử dụng `Volume` làm biến chính trong chiến lược, thay vào đó ưu tiên các chỉ báo Price-Action (MA, MACD).
+
+## 3. Bài Học Cấu Trúc Mã Nguồn (Coding Experience)
+
+Các quy tắc ngầm của hệ thống XNOQuant đòi hỏi lập trình viên và AI phải sử dụng các "mẹo" để tránh sập AST:
+
+- **Điểm Kỳ Dị Toán Học (Mathematical Singularities):** Vì sự xuất hiện của các nến có `Volume = 0` (hoặc `High - Low = 0`), mọi phép toán lấy Volume hoặc Range làm mẫu số đều có rủi ro trả về `NaN` hoặc `Inf`. Hậu quả là Sandbox đánh rớt chiến lược ngay lập tức. 
+  - *Giải pháp tối ưu:* Thay vì cộng số thủ công `1e-8`, hệ thống XNOQuant khuyến khích dùng hàm API `self.op.isfinite(signal)` kết hợp `self.op.zero_ifna()` hoặc `self.op.where()` để "bọc" các điểm kỳ dị và đưa chúng về 0.0 một cách chủ động.
+- **State Tracking (Vấn đề lưu giá):** Vì XNOQuant bắt buộc đầu ra là mảng vector (Stateless AST), việc ghi nhận "Giá mở cửa" (Entry Price) rất khó khăn. 
+  - *Giải pháp:* Dùng kỹ thuật Pandas nội tuyến `close.where(entry_setup).ffill()` để lưu vết giá vào lệnh, phục vụ tính toán Cắt lỗ động (Trailing Stop/SL).
+- **Cấm các tính năng mở rộng:** Tuyệt đối không dùng `.iloc`. Bất kỳ phép gọi nào cố tình bẻ cong luồng vector đều bị từ chối. Xây dựng môi trường ảo (Mock Sandbox) trên Local với lớp `RestrictedSeries` đóng vai trò là "chốt chặn" phát hiện lỗi ngay tại máy trước khi nạp lên web.
+
+## 4. Quản Trị Danh Mục Đầu Tư (Portfolio & Correlation)
+
+- **Thiếu mẫu ngoài chuẩn (Out-of-Sample):** Do tính chất Bayesian Optimizer trên toàn bộ tệp dữ liệu, nguy cơ quá khớp (overfitting) rất cao. Các chiến lược vượt qua vòng này vẫn cần thử nghiệm kỹ lưỡng ở giai đoạn tiếp theo.
+- **Nguy Cơ Bị Phạt Trùng Lặp (Correlation Penalty):** Việc chấm điểm tương quan bằng chuỗi lợi nhuận thuần túy đôi khi bỏ sót các "bản sao logic" (logic clones). Sự xuất hiện của kiểm tra tương quan kép (Dual-Correlation) - đối chiếu chéo đồng thời chuỗi PnL và mảng Vị Thế (Positions) - cung cấp lớp lọc đa chiều, giảm thiểu đáng kể nguy cơ bị loại khỏi Leaderboard do vi phạm tính độc nhất.
+
+## 5. Kinh Nghiệm Debug & Phát Triển
+- Tập trung phân tách rõ hai luồng logic: `get_feature()` và `get_position()` để mã dễ đọc.
+- Bắt và phân tích trực tiếp HTML DOM của trang Web (thông qua `.text-red-500` hoặc `.Toastify`) giúp lấy chính xác nguyên nhân từ chối chiến lược từ Sandbox để khắc phục.
