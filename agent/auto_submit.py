@@ -105,9 +105,105 @@ def format_code_for_xno(code: str, params: dict = None) -> str:
         clean_code
     )
     
+    # 6. Replace __dict__ fallback parameter checks with direct default values to avoid dunder errors
+    # E.g. self.smooth_period = int(self.smooth_period if 'smooth_period' in self.__dict__ else 15) -> self.smooth_period = 15
+    pattern_fallback = r"self\.(\w+)\s*=\s*(int|float)\(\s*self\.\1\s*if\s*['\"]\1['\"]\s*in\s*self\.__dict__\s*else\s*([^)]+)\)"
+    clean_code = re.sub(pattern_fallback, r"self.\1 = \3", clean_code)
+    
+    # 7. Replace self.feat.max/min with self.feat.rolling_max/min to bypass web sandbox suffix checks
+    clean_code = re.sub(r"self\.feat\.max\(([^,]+),\s*(?:timeperiod|window)=([^)]+)\)", r"self.feat.rolling_max(\1, window=\2)", clean_code)
+    clean_code = re.sub(r"self\.feat\.min\(([^,]+),\s*(?:timeperiod|window)=([^)]+)\)", r"self.feat.rolling_min(\1, window=\2)", clean_code)
+    # Generic fallback if not matching the pattern above
+    clean_code = re.sub(r"\bself\.feat\.max\b", "self.feat.rolling_max", clean_code)
+    clean_code = re.sub(r"\bself\.feat\.min\b", "self.feat.rolling_min", clean_code)
+    
+    # 8. Replace self.feat.cdlengulfing with self.feat.engulfing_pattern
+    clean_code = re.sub(r"\bself\.feat\.cdlengulfing\b", "self.feat.engulfing_pattern", clean_code)
+    
     return clean_code
 
-def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = None, timeout_seconds: int = 300, filepath: str = None) -> bool:
+def get_ui_errors(page) -> str:
+    """
+    Attempt to extract any visible error, alert, dialog or toast message from the page.
+    """
+    try:
+        errors = page.evaluate("""() => {
+            let messages = [];
+            
+            // 1. Toast notifications
+            let toastElements = document.querySelectorAll('.Toastify__toast, [class*="toast" i], [role="alert"], [role="status"]');
+            toastElements.forEach(el => {
+                let text = el.innerText || el.textContent;
+                if (text) {
+                    let clean = text.trim();
+                    if (clean && !messages.includes(clean)) {
+                        messages.push(clean);
+                    }
+                }
+            });
+
+            // 2. Modals/Dialogs containing error/warning/validation/lỗi
+            let dialogElements = document.querySelectorAll('[role="dialog"], [class*="modal" i], [class*="dialog" i]');
+            dialogElements.forEach(el => {
+                let text = el.innerText || el.textContent;
+                if (text) {
+                    let clean = text.trim();
+                    let lower = clean.toLowerCase();
+                    if (clean && !messages.includes(clean)) {
+                        if (lower.includes('error') || lower.includes('lỗi') || lower.includes('fail') || 
+                            lower.includes('invalid') || lower.includes('cấm') || lower.includes('vi phạm')) {
+                            messages.push(clean);
+                        }
+                    }
+                }
+            });
+
+            // 3. Error text elements in DOM
+            let errorElements = document.querySelectorAll('.text-red-500, .text-red-600, .text-destructive, [class*="error" i], [class*="danger" i]');
+            errorElements.forEach(el => {
+                let text = el.innerText || el.textContent;
+                if (text) {
+                    let clean = text.trim();
+                    if (clean && clean.length < 500 && !messages.includes(clean)) {
+                        if (!['simulate', 'cancel', 'close', 'x', 'hủy', 'đóng'].includes(clean.toLowerCase())) {
+                            messages.push(clean);
+                        }
+                    }
+                }
+            });
+
+            // 4. Terminal / Log panel content (black background, mono font, or terminal classes)
+            let logElements = document.querySelectorAll('.terminal, [class*="terminal" i], [class*="console" i], [class*="log" i], .bg-black, .font-mono');
+            logElements.forEach(el => {
+                let text = el.innerText || el.textContent;
+                if (text && text.trim().length > 10) {
+                    let clean = text.trim();
+                    if (clean.length < 2000 && !messages.includes(clean)) {
+                        let lower = clean.toLowerCase();
+                        if (lower.includes('error') || lower.includes('lỗi') || lower.includes('fail') || 
+                            lower.includes('invalid') || lower.includes('traceback') || lower.includes('line ')) {
+                            messages.push("Log Panel: " + clean);
+                        }
+                    }
+                }
+            });
+
+            // Filter out success messages if error messages are present
+            let hasErrors = messages.some(m => {
+                let l = m.toLowerCase();
+                return l.includes('error') || l.includes('lỗi') || l.includes('fail') || l.includes('invalid') || l.includes('vi phạm') || l.includes('line ') || l.includes('traceback');
+            });
+            if (hasErrors) {
+                messages = messages.filter(m => !m.toLowerCase().includes('success') && !m.toLowerCase().includes('thành công') && !m.toLowerCase().includes('started successfully'));
+            }
+
+            return messages.filter(x => x.length > 0).join(' | ');
+        }""")
+        return errors if errors else "No specific UI errors found"
+    except Exception as e:
+        return f"Failed to retrieve UI errors: {e}"
+
+def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = None, timeout_seconds: int = 300, filepath: str = None) -> tuple:
     """
     Automate strategy creation, simulation, and submission on XNOQuant via Playwright CDP.
     
@@ -121,9 +217,30 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
         Max wait time for simulation.
     filepath : str
         Optional. The path of the strategy file. If provided, the file will be moved to agent/results/pushed/ on success, or agent/results/failed/ on failure.
+        
+    Returns
+    -------
+    tuple (bool, str)
+        success: True if submitted successfully (or simulated successfully), False otherwise.
+        err_msg: Detailed error description/pop-up text if success is False, or None/warning details if True.
     """
-    success = _run_auto_submit_core(strategy_code, timeframe, params, timeout_seconds, filepath)
+    max_attempts = 2
+    success = False
+    err_msg = None
     
+    for attempt in range(max_attempts):
+        success, err_msg = _run_auto_submit_core(strategy_code, timeframe, params, timeout_seconds, filepath)
+        if success:
+            break
+            
+        # Check if rate limit exceeded
+        if err_msg and "rate limit exceeded" in err_msg.lower():
+            if attempt < max_attempts - 1:
+                logger.warning(f"[AutoSubmit] Rate limit encountered: {err_msg}. Sleeping 60 seconds and retrying (attempt {attempt + 2}/{max_attempts})...")
+                time.sleep(60)
+                continue
+        break
+        
     if filepath and os.path.exists(filepath):
         import shutil
         target_dir_name = "pushed" if success else "failed"
@@ -140,14 +257,19 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
                 csv_dest = os.path.join(target_dir, os.path.basename(csv_filepath))
                 shutil.move(csv_filepath, csv_dest)
                 
+            # Move corresponding _positions.csv if exists
+            pos_filepath = filepath.replace(".py", "_positions.csv")
+            if os.path.exists(pos_filepath):
+                pos_dest = os.path.join(target_dir, os.path.basename(pos_filepath))
+                shutil.move(pos_filepath, pos_dest)
+                
         except Exception as e:
             logger.error(f"[AutoSubmit] Failed to move files: {e}")
             
-    return success
+    return success, err_msg
 
-def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: dict = None, timeout_seconds: int = 300, filepath: str = None) -> bool:
+def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: dict = None, timeout_seconds: int = 300, filepath: str = None) -> tuple:
     strategy_code = format_code_for_xno(strategy_code, params)
-
     
     timeframe_map = {
         "1m": "VN30F1M-01MIN",
@@ -162,7 +284,7 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
     target_universe = timeframe_map.get(timeframe.lower())
     if not target_universe:
         logger.error(f"[AutoSubmit] Invalid timeframe: {timeframe}")
-        return False
+        return False, f"Invalid timeframe: {timeframe}"
         
     try:
         with sync_playwright() as p:
@@ -172,6 +294,7 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                 browser = p.chromium.connect_over_cdp("http://localhost:9222")
                 context = browser.contexts[0]
                 page = context.new_page()
+                page.on("console", lambda msg: logger.info(f"[Browser Console] {msg.type}: {msg.text}"))
                 logger.info("[AutoSubmit] Navigating to build page...")
                 page.goto("https://alpha.xnoquant.io/build")
                 page.wait_for_selector("button.shrink-0.w-14.border-r", timeout=5000)
@@ -187,12 +310,13 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                 browser = p.chromium.launch(headless=False)
                 context = browser.new_context()
                 page = context.new_page()
+                page.on("console", lambda msg: logger.info(f"[Browser Console] {msg.type}: {msg.text}"))
                 
                 # Load credentials from ARCH.md
                 account, password = load_credentials_from_arch()
                 if not account or not password:
                     logger.error("[AutoSubmit] Could not find account credentials in ARCH.md")
-                    return False
+                    return False, "Could not find account credentials in ARCH.md"
                 
                 logger.info("[AutoSubmit] Navigating to build page...")
                 page.goto("https://alpha.xnoquant.io/build")
@@ -213,7 +337,7 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                 page.wait_for_selector("button.shrink-0.w-14.border-r", timeout=15000)
             
             logger.info("[AutoSubmit] Adding new strategy tab...")
-            page.evaluate("() => document.querySelector('button.shrink-0.w-14.border-r').click()")
+            page.click("button.shrink-0.w-14.border-r")
             page.wait_for_timeout(1500)
             
             logger.info("[AutoSubmit] Waiting for Monaco editor to load...")
@@ -222,11 +346,24 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
             except Exception as e:
                 logger.error("[AutoSubmit] Monaco editor did not load in time.")
                 page.close()
-                return False
+                return False, "Monaco editor did not load in time"
                 
-            logger.info("[AutoSubmit] Setting Monaco Editor content...")
+            logger.info("[AutoSubmit] Setting Monaco Editor content on the active tab...")
             escaped_code = strategy_code.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
-            page.evaluate(f"monaco.editor.getEditors()[0].setValue(`{escaped_code}`)")
+            page.evaluate(f"""() => {{
+                let editors = monaco.editor.getEditors();
+                let activeEditor = editors.find(e => {{
+                    let domNode = e.getDomNode();
+                    return domNode && domNode.getBoundingClientRect().width > 0;
+                }});
+                if (activeEditor) {{
+                    activeEditor.setValue(`{escaped_code}`);
+                }} else if (editors.length > 0) {{
+                    editors[editors.length - 1].setValue(`{escaped_code}`);
+                }} else {{
+                    throw new Error("No Monaco editor instances found");
+                }}
+            }}""")
             page.wait_for_timeout(500)
             
             logger.info(f"[AutoSubmit] Configuring settings for {target_universe}...")
@@ -282,7 +419,26 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
             page.wait_for_timeout(1000)
             
             logger.info("[AutoSubmit] Running simulation...")
-            page.evaluate("() => document.getElementById('onboarding-simulate-btn').click()")
+            click_result = page.evaluate("""() => {
+                let buttons = Array.from(document.querySelectorAll('button'));
+                let simulateBtn = buttons.find(b => {
+                    let text = b.textContent || b.innerText;
+                    let isSimulate = text && text.trim() === 'Simulate';
+                    let isVisible = b.getBoundingClientRect().width > 0;
+                    return isSimulate && isVisible;
+                });
+                if (simulateBtn) {
+                    simulateBtn.click();
+                    return "Clicked visible Simulate button";
+                }
+                let fallbackBtn = buttons.find(b => (b.textContent || b.innerText || '').trim() === 'Simulate');
+                if (fallbackBtn) {
+                    fallbackBtn.click();
+                    return "Clicked fallback Simulate button";
+                }
+                return "Simulate button not found in DOM";
+            }""")
+            logger.info(f"[AutoSubmit] Simulate click trigger: {click_result}")
             
             # Poll status
             logger.info("[AutoSubmit] Polling simulation status...")
@@ -290,25 +446,60 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
             sim_success = False
             
             while time.time() - start_time < timeout_seconds:
-                status_text = page.evaluate("""() => {
+                # Save screenshot to debug what's on the screen
+                try:
+                    page.screenshot(path="C:/Users/TPAA/.gemini/antigravity/brain/1d3d35f3-81b2-4796-94ce-b8fd9971db7d/playwright_sim_poll.png")
+                except Exception as ss_err:
+                    logger.error(f"[AutoSubmit] Failed to take polling screenshot: {ss_err}")
+
+                # Evaluate status and log all badges found in the toolbar for debugging
+                eval_result = page.evaluate("""() => {
                     let titleEl = document.querySelector('h1.text-xl.font-semibold');
-                    if (!titleEl) return 'Loading';
-                    let toolbar = titleEl.parentElement.parentElement;
-                    let badges = Array.from(toolbar.querySelectorAll('span, div'));
-                    let statusBadge = badges.find(b => {
-                        let text = b.textContent.trim().toLowerCase();
-                        return ['draft', 'simulating', 'completed', 'published', 'failed', 'error'].includes(text);
-                    });
-                    return statusBadge ? statusBadge.textContent.trim() : 'Unknown';
+                    let toolbar = titleEl ? titleEl.parentElement.parentElement : null;
+                    let badges = [];
+                    if (toolbar) {
+                        badges = Array.from(toolbar.querySelectorAll('span, div')).map(b => b.textContent.trim());
+                    }
+                    
+                    let statusBadge = null;
+                    if (toolbar) {
+                        statusBadge = Array.from(toolbar.querySelectorAll('span, div')).find(b => {
+                            let text = b.textContent.trim().toLowerCase();
+                            return ['draft', 'simulating', 'running', 'completed', 'published', 'failed', 'error'].includes(text);
+                        });
+                    }
+                    
+                    if (!statusBadge) {
+                        let potentialBadges = Array.from(document.querySelectorAll('span, div, p, button')).filter(el => {
+                            let text = el.textContent.trim().toLowerCase();
+                            return ['draft', 'simulating', 'running', 'completed', 'published', 'failed', 'error'].includes(text);
+                        });
+                        statusBadge = potentialBadges.find(el => el.getBoundingClientRect().width > 0);
+                    }
+                    
+                    return {
+                        status: statusBadge ? statusBadge.textContent.trim() : 'Unknown',
+                        badges: badges
+                    };
                 }""")
                 
-                logger.info(f"[AutoSubmit] Status: {status_text}")
+                status_text = eval_result['status']
+                found_badges = eval_result['badges']
+                ui_errs = get_ui_errors(page)
+                logger.info(f"[AutoSubmit] Status: {status_text} | Toolbar badges found: {found_badges} | UI Errors: {ui_errs}")
+                
+                # Check for compilation/verification/rate-limit errors in UI to abort early
+                if ui_errs and ("verification failed" in ui_errs.lower() or "is not allowed" in ui_errs.lower() or "not allowed in strategy code" in ui_errs.lower() or "has no method" in ui_errs.lower() or "is not defined" in ui_errs.lower() or "rate limit exceeded" in ui_errs.lower()):
+                    logger.error(f"[AutoSubmit] Aborting simulation early due to error: {ui_errs}")
+                    page.close()
+                    return False, f"Simulation aborted early due to error: {ui_errs}"
                 
                 # Check for compilation errors (remains Draft too long)
                 if status_text.lower() == 'draft' and (time.time() - start_time) > 20:
-                    logger.error("[AutoSubmit] Strategy failed to compile (Status remained Draft for > 20s). Aborting early.")
+                    ui_err = get_ui_errors(page)
+                    logger.error(f"[AutoSubmit] Strategy failed to compile (Status remained Draft for > 20s). UI Errors: {ui_err}")
                     page.close()
-                    return False
+                    return False, f"Strategy failed to compile (remained Draft > 20s). UI Errors: {ui_err}"
                     
                 if status_text.lower() in ["published", "completed"]:
                     logger.info(f"[AutoSubmit] Simulation finished with status: {status_text}. Proceeding to submission...")
@@ -343,8 +534,6 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                             return data;
                         }""")
                         
-                        # Handled below
-                        
                         if metrics and len(metrics) > 0:
                             logger.info(f"[AutoSubmit] Extracted {len(metrics)} metrics: {metrics}")
                             csv_path = os.path.join(os.path.dirname(__file__), "results", "leaderboard.csv")
@@ -367,22 +556,24 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                         
                     break
                 elif status_text.lower() in ["failed", "error"]:
-                    error_details = page.evaluate("""() => {
-                        let errors = [];
-                        // Attempt to capture red toasts or error messages
-                        document.querySelectorAll('.text-red-500, .Toastify__toast--error, .text-destructive').forEach(e => errors.push(e.innerText || e.textContent));
-                        return errors.join(' | ');
-                    }""")
-                    logger.error(f"[AutoSubmit] Simulation failed (compilation/runtime error). Details: {error_details}")
+                    ui_err = get_ui_errors(page)
+                    logger.error(f"[AutoSubmit] Simulation failed (compilation/runtime error). Details: {ui_err}")
                     page.close()
-                    return False
+                    return False, f"Simulation failed/errored. UI Errors: {ui_err}"
                 
                 time.sleep(5)
                 
             if not sim_success:
-                logger.error("[AutoSubmit] Simulation timed out or failed to publish.")
+                ui_err = get_ui_errors(page)
+                logger.error(f"[AutoSubmit] Simulation timed out or failed to publish. UI Errors: {ui_err}")
+                try:
+                    screenshot_path = "C:/Users/TPAA/.gemini/antigravity/brain/1d3d35f3-81b2-4796-94ce-b8fd9971db7d/playwright_sim_timeout.png"
+                    page.screenshot(path=screenshot_path)
+                    logger.info(f"[AutoSubmit] Saved timeout screenshot to {screenshot_path}")
+                except Exception as ss_err:
+                    logger.error(f"[AutoSubmit] Failed to take screenshot: {ss_err}")
                 page.close()
-                return False
+                return False, f"Simulation timed out or failed to publish. UI Errors: {ui_err}"
                 
             # Get strategy ID from localStorage (find the newest editor state)
             logger.info("[AutoSubmit] Fetching Strategy ID from localStorage...")
@@ -413,11 +604,10 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
             if not strategy_ids:
                 logger.warning("[AutoSubmit] Failed to get strategy ID from localStorage. Treating as simulated-only.")
                 page.close()
-                return True
+                return True, "Simulated successfully but failed to get strategy ID from localStorage"
                 
             strategy_id = strategy_ids[0]
             logger.info(f"[AutoSubmit] Strategy ID found: {strategy_id}")
-
             
             # Navigate to Details View
             details_url = f"https://alpha.xnoquant.io/list?strategyId={strategy_id}&stage=train"
@@ -442,7 +632,7 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
             except Exception as e:
                 logger.warning("[AutoSubmit] Submit Alpha option not found in menu or timed out. Treating as simulated-only.")
                 page.close()
-                return True
+                return True, f"Simulated successfully but Submit Alpha option not found: {e}"
                 
             page.wait_for_timeout(1500)
             
@@ -462,12 +652,15 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
             except Exception as e:
                 logger.warning(f"[AutoSubmit] Failed during confirmation: {e}. Treating as simulated-only.")
                 page.close()
-                return True
+                return True, f"Simulated successfully but failed during confirmation: {e}"
             
             logger.info(f"[AutoSubmit] Result: {submission_result}")
             page.close()
-            return submission_result == 'Submitted'
+            if submission_result == 'Submitted':
+                return True, None
+            else:
+                return False, f"Submission result was not 'Submitted': {submission_result}"
             
     except Exception as e:
         logger.error(f"[AutoSubmit] Error: {e}")
-        return False
+        return False, f"Exception occurred: {e}"

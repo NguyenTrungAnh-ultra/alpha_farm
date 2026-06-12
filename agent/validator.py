@@ -63,13 +63,63 @@ def validate_strategy(
         error_message describes what went wrong.
     """
     
-    # ── Step 1: Syntax check ──
+    # ── Step 1: Syntax check & Static AST validation ──
+    import ast
     try:
-        compile(code, '<strategy>', 'exec')
+        tree = ast.parse(code)
         if verbose:
             print("  ✅ Syntax OK")
     except SyntaxError as e:
         return None, f"SyntaxError: {e}"
+
+    # Custom AST check for XNO platform constraints
+    class XNOSandboxASTValidator(ast.NodeVisitor):
+        def __init__(self):
+            self.errors = []
+            self.in_class = False
+
+        def visit_ClassDef(self, node):
+            old_in_class = self.in_class
+            self.in_class = True
+            self.generic_visit(node)
+            self.in_class = old_in_class
+
+        def visit_FunctionDef(self, node):
+            if self.in_class:
+                allowed_methods = {'__algorithm__', 'run_algorithm', '_initialize', 'set_positions', '_validate_sandbox_constraints'}
+                if node.name not in allowed_methods:
+                    self.errors.append(f"Line {node.lineno}: Forbidden function definition '{node.name}' inside CustomStrategy.")
+            else:
+                self.errors.append(f"Line {node.lineno}: Forbidden function definition '{node.name}' outside CustomStrategy.")
+            self.generic_visit(node)
+
+        def visit_Name(self, node):
+            if node.id == 'open':
+                self.errors.append(f"Line {node.lineno}: use of forbidden name 'open' is not allowed in XNO strategy sandbox.")
+            self.generic_visit(node)
+
+        def visit_Attribute(self, node):
+            if node.attr == 'open':
+                self.errors.append(f"Line {node.lineno}: use of attribute name 'open' is not allowed in XNO strategy sandbox.")
+            self.generic_visit(node)
+
+        def visit_Call(self, node):
+            if isinstance(node.func, ast.Name) and node.func.id == 'getattr':
+                self.errors.append(f"Line {node.lineno}: call to 'getattr' is not allowed in XNO strategy sandbox.")
+            self.generic_visit(node)
+            
+        def visit_Import(self, node):
+            self.errors.append(f"Line {node.lineno}: import statement is not allowed in XNO strategy sandbox.")
+            self.generic_visit(node)
+            
+        def visit_ImportFrom(self, node):
+            self.errors.append(f"Line {node.lineno}: import statement is not allowed in XNO strategy sandbox.")
+            self.generic_visit(node)
+
+    ast_validator = XNOSandboxASTValidator()
+    ast_validator.visit(tree)
+    if ast_validator.errors:
+        return None, f"ASTValidationError:\n" + "\n".join(ast_validator.errors)
     
     # ── Step 2: Execute in sandbox ──
     sandbox = {}
