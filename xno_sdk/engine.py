@@ -546,8 +546,124 @@ class SimpleAlgorithm:
     def __algorithm__(self):
         raise NotImplementedError("Subclass must implement __algorithm__()")
 
+    def _validate_sandbox_constraints(self):
+        import inspect
+        import ast
+        import dis
+        import sys
+        
+        cls = self.__class__
+        errors = []
+        
+        # 1. No __init__ check (in subclass)
+        if '__init__' in cls.__dict__:
+            errors.append("Forbidden '__init__' constructor: Do not define __init__ inside CustomStrategy. Define params in __algorithm__ instead.")
+
+        # 2. No helper functions check via dict lookup
+        allowed_methods = {'__algorithm__', 'run_algorithm', '_initialize', 'set_positions', '_validate_sandbox_constraints'}
+        for name, attr in cls.__dict__.items():
+            if callable(attr) and not name.startswith('_'):
+                if name not in allowed_methods:
+                    errors.append(f"Forbidden helper function '{name}': Only '__algorithm__' is allowed inside CustomStrategy class.")
+
+        # 3. AST checks on the source code
+        source_code = None
+        
+        # Try to get the entire module source
+        try:
+            if cls.__module__ in sys.modules:
+                module = sys.modules[cls.__module__]
+                if not module.__name__.startswith('xno_sdk') and not module.__name__.startswith('backtest') and not module.__name__ == '__main__':
+                    source_code = inspect.getsource(module)
+        except Exception:
+            pass
+            
+        # Fall back to class source if module source is not available
+        if source_code is None:
+            try:
+                source_code = inspect.getsource(cls)
+            except Exception:
+                pass
+
+        if source_code is not None:
+            try:
+                tree = ast.parse(source_code)
+                
+                class XNOSandboxASTValidator(ast.NodeVisitor):
+                    def __init__(self):
+                        self.in_class = False
+
+                    def visit_ClassDef(self, node):
+                        old_in_class = self.in_class
+                        self.in_class = True
+                        self.generic_visit(node)
+                        self.in_class = old_in_class
+
+                    def visit_FunctionDef(self, node):
+                        if self.in_class:
+                            if node.name not in allowed_methods:
+                                errors.append(f"Line {node.lineno}: Forbidden function definition '{node.name}' inside CustomStrategy.")
+                        else:
+                            errors.append(f"Line {node.lineno}: Forbidden function definition '{node.name}' outside CustomStrategy.")
+                        self.generic_visit(node)
+
+                    def visit_Name(self, node):
+                        if node.id == 'open':
+                            errors.append(f"Line {node.lineno}: use of forbidden name 'open' is not allowed in XNO strategy sandbox.")
+                        self.generic_visit(node)
+
+                    def visit_Attribute(self, node):
+                        if node.attr == 'open':
+                            errors.append(f"Line {node.lineno}: use of attribute name 'open' is not allowed in XNO strategy sandbox.")
+                        self.generic_visit(node)
+
+                    def visit_Call(self, node):
+                        if isinstance(node.func, ast.Name) and node.func.id == 'getattr':
+                            errors.append(f"Line {node.lineno}: call to 'getattr' is not allowed in XNO strategy sandbox.")
+                        self.generic_visit(node)
+                        
+                    def visit_Import(self, node):
+                        errors.append(f"Line {node.lineno}: import statement is not allowed in XNO strategy sandbox.")
+                        self.generic_visit(node)
+                        
+                    def visit_ImportFrom(self, node):
+                        errors.append(f"Line {node.lineno}: import statement is not allowed in XNO strategy sandbox.")
+                        self.generic_visit(node)
+
+                ast_validator = XNOSandboxASTValidator()
+                ast_validator.visit(tree)
+            except Exception:
+                pass
+
+        # 4. Fallback bytecode check for safety (especially if source is not available)
+        for name, attr in cls.__dict__.items():
+            if callable(attr) and hasattr(attr, '__code__'):
+                code_obj = attr.__code__
+                
+                # Check co_names (global names, attributes, function calls)
+                if 'getattr' in code_obj.co_names:
+                    errors.append(f"Forbidden call/reference to 'getattr' detected in method '{name}'.")
+                if 'open' in code_obj.co_names:
+                    errors.append(f"Forbidden name 'open' detected in method '{name}'.")
+                    
+                # Check co_varnames (local variables)
+                if 'open' in code_obj.co_varnames:
+                    errors.append(f"Forbidden local variable assignment to 'open' detected in method '{name}'.")
+                    
+                # Check for import instructions in bytecode
+                try:
+                    for instr in dis.get_instructions(attr):
+                        if 'IMPORT' in instr.opname:
+                            errors.append(f"Forbidden import instruction '{instr.opname} {instr.argval}' detected in method '{name}'.")
+                except Exception:
+                    pass
+
+        if errors:
+            raise AttributeError("XNO Sandbox Error:\n" + "\n".join(errors))
+
     def run_algorithm(self, df: pd.DataFrame) -> pd.Series:
         logger.info("Running custom algorithm in XNO SDK Mock Environment")
+        self._validate_sandbox_constraints()
         self._initialize(df)
         self.__algorithm__()
         logger.info("Custom algorithm finished successfully")
