@@ -567,23 +567,24 @@ class SimpleAlgorithm:
                     errors.append(f"Forbidden helper function '{name}': Only '__algorithm__' is allowed inside CustomStrategy class.")
 
         # 3. AST checks on the source code
-        source_code = None
+        source_code = getattr(cls, '_emulator_source_code', None)
         
-        # Try to get the entire module source
-        try:
-            if cls.__module__ in sys.modules:
-                module = sys.modules[cls.__module__]
-                if not module.__name__.startswith('xno_sdk') and not module.__name__.startswith('backtest') and not module.__name__ == '__main__':
-                    source_code = inspect.getsource(module)
-        except Exception:
-            pass
-            
-        # Fall back to class source if module source is not available
         if source_code is None:
+            # Try to get the entire module source
             try:
-                source_code = inspect.getsource(cls)
+                if cls.__module__ in sys.modules:
+                    module = sys.modules[cls.__module__]
+                    if not module.__name__.startswith('xno_sdk') and not module.__name__.startswith('backtest') and not module.__name__ == '__main__':
+                        source_code = inspect.getsource(module)
             except Exception:
                 pass
+                
+            # Fall back to class source if module source is not available
+            if source_code is None:
+                try:
+                    source_code = inspect.getsource(cls)
+                except Exception:
+                    pass
 
         if source_code is not None:
             try:
