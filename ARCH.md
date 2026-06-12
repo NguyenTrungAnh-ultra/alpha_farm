@@ -1,6 +1,7 @@
 # XNOQuant Auto-Gen Architecture
 
-Dự án sinh chiến lược tự động cho nền tảng XNOQuant. Tài liệu này mô tả kiến trúc kỹ thuật và các quy tắc hoạt động cơ bản của hệ thống.
+account: toinguyen15102004@gmail.com
+password: anhtrung15102004
 
 ## 1. Cấu trúc Thư mục
 

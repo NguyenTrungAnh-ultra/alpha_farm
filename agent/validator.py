@@ -111,8 +111,8 @@ def validate_strategy(
     
     # ── Step 5: Run run_algorithm() on sample data ──
     try:
-        # Use a subset for speed
-        test_data = sample_data.head(500).copy()
+        # Use full data to ensure all runtime errors (e.g. singularities, NaN) are caught and fixed
+        test_data = sample_data.copy()
         positions = strategy.run_algorithm(test_data)
         
         if not isinstance(positions, pd.Series):
