@@ -10,7 +10,6 @@ password: anhtrung15102004
 - `xno_sdk/`: Thư viện giả lập môi trường Sandbox và các toán tử/chỉ báo của XNOQuant để hỗ trợ kiểm thử cục bộ.
 - `strategies/`: Thư mục lưu trữ các chiến lược sinh ra.
 - `XNOQuant/`: Bản lưu các chiến lược cũ.
-- `run_backtest.py`: CLI chạy test đơn lẻ hoặc xác minh đối chiếu chéo.
 
 ## 2. Hệ Thống Luật Chơi & Giới Hạn Của Sàn (XNOQuant Rules)
 
@@ -31,37 +30,37 @@ Dưới đây là các giới hạn và quy định chung để chiến lược 
 
 ## 3. Kiến Trúc Luồng Chạy & Các Phân Hệ
 
-### Pipeline Sinh Tự Động (`agent/`)
+### Pipeline Sinh Tự Động (`agent/` & Gốc)
 
-- `pipeline.py`: Trình điều khiển chính sử dụng Gemini LLM. Lặp qua các vòng: Gọi LLM sinh ý tưởng $\rightarrow$ Lưu JSON. (Phiên bản cũ còn kết nối trực tiếp đến XNOBacktestEngine).
-- `run_deepseek_pipeline.py`: Trình điều khiển song song sử dụng DeepSeek API. Thiết kế theo chuẩn Cache Hit Optimization.
-- `build_deepseek_prompt.py`: Chứa logic bóc tách Prompt Tĩnh (System) và Động (User) nhằm hỗ trợ cơ chế lưu bộ nhớ đệm của DeepSeek.
-- `gemini_client.py`: Gọi API ẩn danh Gemini.
-- `extract_json_response.py`: Tiện ích dùng chung để bóc tách dữ liệu JSON từ phản hồi của LLM (Regex Parser).
-- `validator.py`: Chạy thử đoạn code LLM sinh ra trong Sandbox nội bộ. Bắt các lỗi cú pháp AST và đưa lỗi lại cho LLM để tự sửa.
-- `portfolio.py`: Đánh giá các chỉ số tối thiểu (Sharpe, CAGR). Thực hiện cơ chế kiểm tra tương quan kép (Dual-Correlation).
-- `auto_submit.py`: Sử dụng Playwright và giao thức CDP để tự động dán mã chiến lược, mô phỏng trên nền tảng Web và xác nhận nộp bài.
+- `main.py` (Thư mục gốc): Điểm neo khởi chạy hệ thống, chịu trách nhiệm thiết lập cấu hình cơ bản và ủy quyền (delegate) luồng sinh ý tưởng cho `agent/pipeline.py`.
+- `agent/pipeline.py`: Trình điều khiển chính sử dụng Gemini LLM. Lặp qua các vòng: Gọi LLM sinh ý tưởng $\rightarrow$ Lưu JSON. Thiết kế tập trung vào việc tạo ra ý tưởng thô và tránh trùng lặp.
+- `agent/run_deepseek_pipeline.py`: Trình điều khiển song song sử dụng DeepSeek API. Thiết kế theo chuẩn Cache Hit Optimization.
+- `agent/build_deepseek_prompt.py`: Chứa logic bóc tách Prompt Tĩnh (System) và Động (User) nhằm hỗ trợ cơ chế lưu bộ nhớ đệm của DeepSeek.
+- `agent/convert_ideas.py`: Đóng vai trò bộ chuyển đổi trung gian từ định dạng JSON sang file Python hợp lệ (`SimpleAlgorithm`). Tích hợp logic xử lý ngoại lệ (anti-singularity) chống chia cho 0 và cơ chế Idempotent (Bỏ qua file đã chuyển đổi) để ngăn việc lặp lại.
+- `agent/gemini_client.py`: Gọi API ẩn danh Gemini.
+- `agent/extract_json_response.py`: Tiện ích dùng chung để bóc tách dữ liệu JSON từ phản hồi của LLM (Regex Parser).
+- `agent/portfolio.py`: Đánh giá các chỉ số tối thiểu (Sharpe, CAGR). Thực hiện cơ chế kiểm tra tương quan kép (Dual-Correlation).
+- `agent/auto_submit.py` & `submit_all.py`: `agent/auto_submit.py` chứa logic mô phỏng thao tác Playwright/CDP tương tác với nền tảng Web. `submit_all.py` (tại thư mục gốc) là kịch bản đóng vai trò điểm quét các chiến lược mới và gọi tuần tự các API từ `auto_submit.py`.
+- Tệp hỗ trợ (`agent/`): Các tệp như `prompts.py`, `validator.py`, `debug_response.py` cung cấp cấu trúc mẫu, đánh giá tính hợp lệ và hỗ trợ gỡ lỗi phản hồi cho pipeline chính.
 
 ### Sandbox Mocking (`xno_sdk/`)
 
+- `emulator.py` $\rightarrow$ `XNOPlatformEmulator`: Khung kiểm thử (Testing Framework) được tinh chỉnh để mô phỏng chính xác cấu trúc biên dịch mã (AST parsing) của nền tảng XNOQuant Web. Xử lý triệt để việc loại bỏ từ khóa `import` nhằm đánh giá mã nguồn mà không gặp lỗi AST giả định.
 - `series.py` $\rightarrow$ `RestrictedSeries`: Lớp bọc bảo vệ (wrapper) cho Pandas Series. Nó giới hạn quyền truy cập, loại bỏ các hàm bị cấm trong XNOQuant (như `.iloc`, `.mean()`) và chỉ cho phép các phương thức được whitelist (như `.where()`, `.fillna()`, `.ffill()`, `.pct_change()`, `.shift()`, `.diff()`).
-- `engine.py`: Chứa `FeatureEngine` và `OperatorEngine` mô phỏng hành vi của sàn. Các hàm như `rolling_rank` được tinh chỉnh tối ưu thời gian chạy cục bộ thông qua NumPy `sliding_window_view`.
-- Cột `Volume` được chủ động lấp đầy bằng `fillna(0.0)` cho các vùng dữ liệu rỗng để phản ánh sát hơn dữ liệu của sàn.
+- `engine.py`: Chứa `FeatureEngine` và `OperatorEngine` mô phỏng hành vi của sàn. Các hàm như `rolling_rank` được tinh chỉnh nhằm tăng cường tốc độ xử lý thông qua NumPy `sliding_window_view`.
 
 ### Core Engine (`backtest/`)
 
 - `engine.py` $\rightarrow$ `XNOBacktestEngine.run()`: Nhận mảng vị thế từ chiến lược và mô phỏng giao dịch bar-by-bar, xử lý đóng/mở hợp đồng, trừ phí giao dịch theo tham số được cung cấp. Lệnh đầu tiên có trừ phí mở lệnh vào vốn ban đầu.
 - `data_pipeline.py`: Xử lý, làm sạch và gắn nhãn phiên giao dịch cho dữ liệu gốc.
-- `optimizer.py`: Tích hợp Optuna với phương pháp Bayesian Search để tìm tham số tối ưu cục bộ.
-- `metrics.py`: Cung cấp bộ tính toán chỉ số hiệu năng (Sharpe, Sortino, VaR, CAGR, Max Drawdown). Hệ thống tính toán này được thiết kế dựa trên các công thức chuẩn hóa của Web XNOQuant nhằm giảm thiểu sai số đo lường.
+- `optimizer_v2.py` / `optimize_all_v2.py`: Hệ thống Tối ưu tham số thế hệ 2 sử dụng Optuna. Thay vì chèn tham số lúc chạy (phương pháp bị cấm trên Web), hệ thống sử dụng Regex để thay thế trực tiếp mã nguồn (Source Code Mutation). Hỗ trợ cơ chế Idempotent bằng cách gắn nhãn `# OPTIMIZATION_V2_COMPLETED`.
+- `metrics.py`: Cung cấp bộ tính toán chỉ số hiệu năng (Sharpe, Sortino, VaR, CAGR, Max Drawdown). Được hiệu chỉnh nhằm cung cấp kết quả nhất quán với bộ tính toán của Web.
 
-## 4. Liên Kết Hệ Thống (Workflow)
+## 4. Liên Kết Hệ Thống (Workflow Khép Kín & Idempotent)
 
-1. **Khởi tạo**: Tải cấu hình, tải dữ liệu đa khung thời gian.
-2. **Khởi tạo Ý tưởng**: LLM phân tích và đề xuất ý tưởng chiến lược.
-3. **Sinh Code**: LLM viết mã tuân thủ luật XNOQuant.
-4. **Kiểm tra**: Chạy `validator.py` để loại bỏ lỗi AST cục bộ.
-5. **Tối ưu hóa**: Quét tham số thông qua `optimizer.py`.
-6. **Mô phỏng (Backtest)**: Chạy chiến lược thông qua `XNOBacktestEngine`.
-7. **Đánh giá & Lưu trữ**: Lọc qua `PortfolioManager` và lưu kết quả (Python script và CSV).
-8. **Tự động Nộp bài**: Gọi `auto_submit.py` để mô phỏng chiến lược trên Web XNOQuant. Trích xuất Metrics vào Leaderboard CSV và chính thức nộp vào cuộc thi.
+Quy trình tự động hóa được thiết kế theo cấu trúc 4 khối rời rạc, có khả năng chạy lại mà không tạo ra bản sao:
+
+1. **Sinh Ý Tưởng (Generation)**: Khởi chạy từ điểm neo `main.py`, hệ thống ủy quyền cho mô-đun `agent/pipeline.py` quét cấu trúc kho lưu trữ nhằm loại bỏ các mẫu cũ, sau đó sử dụng LLM để xuất mã chiến lược dạng JSON vào thư mục `agent/results/ideas/`.
+2. **Chuyển Đổi & Kiểm Thử Cục Bộ (Convert & Emulate)**: `agent/convert_ideas.py` diễn dịch chuỗi JSON thành Python AST (`.py`). Hệ thống `XNOPlatformEmulator` sẽ phân tích và loại bỏ các thành phần không tương thích. Các cấu trúc vượt qua được lưu vào `agent/results/`.
+3. **Tối Ưu Hóa (Optimization)**: `optimize_all_v2.py` phân tích tham số linh hoạt, sử dụng Bayesian Search để dò tìm ngưỡng chỉ báo tối ưu. Ghi đè mã nguồn qua Regex và gắn nhãn trạng thái hoàn tất.
+4. **Triển Khai Tự Động (Auto-Submit)**: `submit_all.py` sử dụng Playwright điều khiển giao diện trình duyệt để gửi mã nguồn lên `alpha.xnoquant.io`. Trích xuất dữ liệu trả về, báo cáo CSV và di chuyển tệp thành công vào `agent/results/pushed/` để loại khỏi chu kỳ sau.

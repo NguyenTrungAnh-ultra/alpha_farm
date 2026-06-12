@@ -650,9 +650,19 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                 page.wait_for_timeout(1000)
                 submission_result = 'Submitted'
             except Exception as e:
-                logger.warning(f"[AutoSubmit] Failed during confirmation: {e}. Treating as simulated-only.")
+                # Cố gắng trích xuất text từ popup/modal để xem nguyên nhân nút bị mờ
+                error_details = ""
+                try:
+                    # Tìm text trong các thành phần UI có thể chứa thông báo lỗi
+                    error_details = page.locator('[role="dialog"]').inner_text(timeout=1000)
+                    error_details = " ".join(error_details.split()) # Xóa khoảng trắng thừa
+                except Exception:
+                    pass
+                    
+                msg = f"Simulated successfully but failed during confirmation. Modal text: '{error_details}'. Exception: {e}"
+                logger.warning(f"[AutoSubmit] {msg}")
                 page.close()
-                return True, f"Simulated successfully but failed during confirmation: {e}"
+                return True, msg
             
             logger.info(f"[AutoSubmit] Result: {submission_result}")
             page.close()
