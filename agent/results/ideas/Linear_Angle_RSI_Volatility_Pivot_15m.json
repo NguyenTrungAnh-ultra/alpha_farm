@@ -1,0 +1,71 @@
+{
+    "name": "Linear_Angle_RSI_Volatility_Pivot",
+    "timeframe": "15m",
+    "family": "multi-indicator",
+    "description": "A high-quality 15-minute swing intraday strategy optimized for the VN30F1M index. It captures robust directional trend acceleration via the Linear Regression Angle of the close price. Pullback entries within established macro trends are validated using Relative Strength Index (RSI) momentum crossings. To defend against toxic sideways regimes and avoid division traps on thin or zero-volume bars, entries require a structural volatility expansion confirmation via a Normalized ATR (NATR) threshold baseline. Out-of-loop vectorized exits track price deviations relative to rolling midpoints.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "LR_Angle",
+                "definition": "self.feat.linearreg_angle(close, timeperiod=angle_period)"
+            },
+            {
+                "name": "RSI",
+                "definition": "self.feat.rsi(close, timeperiod=rsi_period)"
+            },
+            {
+                "name": "NATR",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Midpoint_Exit",
+                "definition": "self.feat.midpoint(close, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(LR_Angle > angle_min) & (RSI > 50.0) & (NATR > natr_threshold)",
+        "entry_short": "(LR_Angle < -angle_min) & (RSI < 50.0) & (NATR > natr_threshold)",
+        "exit_logic": "Exit Long: (close < Midpoint_Exit - 0.5 * ATR) or (LR_Angle < 0.0). Exit Short: (close > Midpoint_Exit + 0.5 * ATR) or (LR_Angle > 0.0)."
+    },
+    "param_space": {
+        "angle_period": {
+            "type": "int",
+            "low": 20,
+            "high": 45,
+            "step": 1
+        },
+        "angle_min": {
+            "type": "float",
+            "low": 10.0,
+            "high": 35.0,
+            "step": 2.5
+        },
+        "rsi_period": {
+            "type": "int",
+            "low": 10,
+            "high": 22,
+            "step": 1
+        },
+        "natr_threshold": {
+            "type": "float",
+            "low": 0.06,
+            "high": 0.16,
+            "step": 0.01
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 12,
+            "high": 26,
+            "step": 2
+        }
+    }
+}

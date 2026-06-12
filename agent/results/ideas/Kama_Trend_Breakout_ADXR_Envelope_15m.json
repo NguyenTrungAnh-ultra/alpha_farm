@@ -1,0 +1,69 @@
+{
+    "name": "Kama_Trend_Breakout_ADXR_Envelope",
+    "timeframe": "15m",
+    "family": "breakout",
+    "description": "A high-quality 15-minute swing intraday breakout strategy designed to capture structural impulse expansions on the VN30F1M contract. It tracks the macro baseline equilibrium via the Kaufman Adaptive Moving Average (KAMA) to naturally eliminate noise from choppy periods. Entry levels are defined using historical price extreme channels (Max/Min). To safeguard against false breakouts during quiet ranging regimes and to entirely circumvent division traps on zero-volume bars, entries require structural trend force confirmation using an ADXR threshold. Vectorized exits use a trailing midprice anchor paired with a classic ATR step.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "KAMA",
+                "definition": "self.feat.kama(close, timeperiod=kama_period)"
+            },
+            {
+                "name": "Channel_High",
+                "definition": "self.feat.max(high, timeperiod=channel_period)"
+            },
+            {
+                "name": "Channel_Low",
+                "definition": "self.feat.min(low, timeperiod=channel_period)"
+            },
+            {
+                "name": "ADXR",
+                "definition": "self.feat.adxr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Midprice_Exit",
+                "definition": "self.feat.midprice(high, low, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(close > Channel_High) & (close > KAMA) & (ADXR > adxr_threshold)",
+        "entry_short": "(close < Channel_Low) & (close < KAMA) & (ADXR > adxr_threshold)",
+        "exit_logic": "Exit Long: (close < Midprice_Exit - 0.5 * ATR) or (close < KAMA). Exit Short: (close > Midprice_Exit + 0.5 * ATR) or (close > KAMA)."
+    },
+    "param_space": {
+        "kama_period": {
+            "type": "int",
+            "low": 20,
+            "high": 45,
+            "step": 1
+        },
+        "channel_period": {
+            "type": "int",
+            "low": 14,
+            "high": 28,
+            "step": 1
+        },
+        "adxr_threshold": {
+            "type": "float",
+            "low": 15.0,
+            "high": 26.0,
+            "step": 0.5
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 10,
+            "high": 22,
+            "step": 2
+        }
+    }
+}

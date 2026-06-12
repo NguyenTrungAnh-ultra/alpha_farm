@@ -1,0 +1,77 @@
+{
+    "name": "Kama_Trend_CMO_Pullback",
+    "timeframe": "10m",
+    "family": "multi-indicator",
+    "description": "A 10-minute balanced intraday strategy capturing shallow trend pullbacks in the VN30F1M contract. It tracks institutional structural trends via the Kaufman Adaptive Moving Average (KAMA) to mitigate choppy ranging environments. Short-term pullback exhaustion within the main trend regime is evaluated using the Chande Momentum Oscillator (CMO). Signals are validated by an ADX filtering mechanism to guarantee that the primary trend possesses sufficient structural strength. Vectorized exits utilize trailing Donchian boundaries and Midprice anchors to fit static vector backtesting frameworks.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "KAMA",
+                "definition": "self.feat.kama(close, timeperiod=kama_period)"
+            },
+            {
+                "name": "CMO",
+                "definition": "self.feat.cmo(close, timeperiod=cmo_period)"
+            },
+            {
+                "name": "ADX",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Midprice",
+                "definition": "self.feat.midprice(high, low, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(close > KAMA) & (CMO < cmo_long_pullback) & (ADX > adx_threshold)",
+        "entry_short": "(close < KAMA) & (CMO > cmo_short_pullback) & (ADX > adx_threshold)",
+        "exit_logic": "Exit Long: (close < Midprice - 0.5 * ATR). Exit Short: (close > Midprice + 0.5 * ATR)."
+    },
+    "param_space": {
+        "kama_period": {
+            "type": "int",
+            "low": 20,
+            "high": 40,
+            "step": 2
+        },
+        "cmo_period": {
+            "type": "int",
+            "low": 9,
+            "high": 15,
+            "step": 1
+        },
+        "cmo_long_pullback": {
+            "type": "float",
+            "low": -15.0,
+            "high": 10.0,
+            "step": 5.0
+        },
+        "cmo_short_pullback": {
+            "type": "float",
+            "low": -10.0,
+            "high": 15.0,
+            "step": 5.0
+        },
+        "adx_threshold": {
+            "type": "float",
+            "low": 18.0,
+            "high": 28.0,
+            "step": 1.0
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 10,
+            "high": 24,
+            "step": 2
+        }
+    }
+}

@@ -1,0 +1,75 @@
+{
+    "name": "Linear_Angle_Plus_DI_Swing_Confirmation",
+    "timeframe": "15m",
+    "family": "trend-following",
+    "description": "A high-quality 15-minute swing intraday strategy focusing on structural trend initialization phases in the VN30F1M contract. It tracks underlying market trajectory and trend acceleration using the Linear Regression Angle of the close price. Signals are validated and filter-confirmed using the directional movement indicators (plus_di and minus_di) to ensure pure directional force consensus. To prevent the algorithm from entering during choppy sideways regimes or thin zero-volume bars, entries require a minimum normalized ATR filter threshold. Completely loop-free vectorized exits are managed via a rolling median midpoint anchor combined with an ATR offset.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "LR_Angle",
+                "definition": "self.feat.linearreg_angle(close, timeperiod=angle_period)"
+            },
+            {
+                "name": "Plus_DI",
+                "definition": "self.feat.plus_di(high, low, close, timeperiod=di_period)"
+            },
+            {
+                "name": "Minus_DI",
+                "definition": "self.feat.minus_di(high, low, close, timeperiod=di_period)"
+            },
+            {
+                "name": "NATR",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Midpoint",
+                "definition": "self.feat.midpoint(close, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(LR_Angle > angle_threshold) & (Plus_DI > Minus_DI) & (NATR > natr_min)",
+        "entry_short": "(LR_Angle < -angle_threshold) & (Minus_DI > Plus_DI) & (NATR > natr_min)",
+        "exit_logic": "Exit Long: (close < Midpoint - 0.5 * ATR) or (LR_Angle < 0.0). Exit Short: (close > Midpoint + 0.25 * ATR) or (LR_Angle > 0.0)."
+    },
+    "param_space": {
+        "angle_period": {
+            "type": "int",
+            "low": 14,
+            "high": 30,
+            "step": 2
+        },
+        "angle_threshold": {
+            "type": "float",
+            "low": 10.0,
+            "high": 35.0,
+            "step": 2.5
+        },
+        "di_period": {
+            "type": "int",
+            "low": 12,
+            "high": 24,
+            "step": 1
+        },
+        "natr_min": {
+            "type": "float",
+            "low": 0.05,
+            "high": 0.18,
+            "step": 0.01
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 12,
+            "high": 26,
+            "step": 2
+        }
+    }
+}

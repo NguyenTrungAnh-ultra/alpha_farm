@@ -9,7 +9,9 @@ Hệ thống được thiết kế theo mô hình khép kín: Tự động sinh 
 ```mermaid
 graph TD
     subagent[AI Agents / Users] -->|Tạo Strategy Code| strats[Thư mục: strategies/]
+    subagent -->|Sinh ý tưởng DeepSeek/Gemini| agent_ideas[Thư mục: agent/results/ideas]
     strats --> pipe(pipeline.py)
+    agent_ideas -.-> strats
 
     subgraph Local_Environment ["Môi trường Local (Sandbox)"]
         direction TB

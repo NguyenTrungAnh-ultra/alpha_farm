@@ -1,0 +1,81 @@
+{
+    "name": "Absolute_Directional_MFI_Reversal",
+    "timeframe": "10m",
+    "family": "multi-indicator",
+    "description": "A balanced 10-minute strategy targeting structural pullback entries within major multi-day trends. It maps long-term trend regimes via a slow triangular moving average (TRIMA) to reduce data noise. Pullback exhaustion zones are tracked using the Money Flow Index (MFI). By combining volume and price momentum, the MFI circumvents standard division errors during flat periods. Entries are executed only when the directional indicator differential (plus_di and minus_di) confirms a resumption of trend force. Exits are dynamically calculated via a trailing volatility band anchored to a mid-term midpoint.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "Macro_Trend",
+                "definition": "self.feat.trima(close, timeperiod=trend_period)"
+            },
+            {
+                "name": "MFI",
+                "definition": "self.feat.mfi(high, low, close, volume, timeperiod=mfi_period)"
+            },
+            {
+                "name": "Plus_DI",
+                "definition": "self.feat.plus_di(high, low, close, timeperiod=di_period)"
+            },
+            {
+                "name": "Minus_DI",
+                "definition": "self.feat.minus_di(high, low, close, timeperiod=di_period)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Exit_Anchor",
+                "definition": "self.feat.midpoint(close, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(close > Macro_Trend) & (MFI < mfi_oversold) & (Plus_DI > Minus_DI)",
+        "entry_short": "(close < Macro_Trend) & (MFI > mfi_overbought) & (Minus_DI > Plus_DI)",
+        "exit_logic": "Exit Long: (close < Exit_Anchor - 0.5 * ATR). Exit Short: (close > Exit_Anchor + 0.5 * ATR)."
+    },
+    "param_space": {
+        "trend_period": {
+            "type": "int",
+            "low": 30,
+            "high": 50,
+            "step": 2
+        },
+        "mfi_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 1
+        },
+        "mfi_oversold": {
+            "type": "float",
+            "low": 20.0,
+            "high": 40.0,
+            "step": 2.0
+        },
+        "mfi_overbought": {
+            "type": "float",
+            "low": 60.0,
+            "high": 80.0,
+            "step": 2.0
+        },
+        "di_period": {
+            "type": "int",
+            "low": 10,
+            "high": 18,
+            "step": 1
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 1
+        }
+    }
+}

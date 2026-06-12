@@ -1,0 +1,75 @@
+{
+    "name": "Oscillator_Divergence_Trend_Filter",
+    "timeframe": "10m",
+    "family": "oscillator-divergence",
+    "description": "A 10-minute balanced intraday strategy that captures momentum divergence setups while operating strictly within institutional trend directions. It evaluates macro-trend health via the structural relationship of a double exponential moving average (DEMA). Signal confirmation is triggered by an interaction between the absolute directional index (ADX) measuring structural breakout validity, and the Stochastic Oscillator tracking short-term price exhaustion. Vectorized trailing exits are derived via standard deviations from a middle reference anchor.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "DEMA_trend",
+                "definition": "self.feat.dema(close, timeperiod=trend_period)"
+            },
+            {
+                "name": "ADX",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Stoch_K",
+                "definition": "self.feat.stoch(high, low, close, fastk_period=stoch_period, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0)[0]"
+            },
+            {
+                "name": "Stoch_D",
+                "definition": "self.feat.stoch(high, low, close, fastk_period=stoch_period, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0)[1]"
+            },
+            {
+                "name": "BB_Mid",
+                "definition": "self.feat.bbands(close, timeperiod=20, nbdevup=2.0, nbdevdn=2.0)[1]"
+            },
+            {
+                "name": "StdDev",
+                "definition": "self.feat.stddev(close, timeperiod=20)"
+            }
+        ],
+        "entry_long": "(close > DEMA_trend) & (ADX > adx_min) & (Stoch_K > Stoch_D) & (Stoch_D < oversold_bound)",
+        "entry_short": "(close < DEMA_trend) & (ADX > adx_min) & (Stoch_K < Stoch_D) & (Stoch_D > overbought_bound)",
+        "exit_logic": "Exit Long: (close < BB_Mid - 0.5 * StdDev). Exit Short: (close > BB_Mid + 0.5 * StdDev)."
+    },
+    "param_space": {
+        "trend_period": {
+            "type": "int",
+            "low": 25,
+            "high": 45,
+            "step": 1
+        },
+        "adx_min": {
+            "type": "float",
+            "low": 15.0,
+            "high": 25.0,
+            "step": 0.5
+        },
+        "stoch_period": {
+            "type": "int",
+            "low": 9,
+            "high": 18,
+            "step": 1
+        },
+        "oversold_bound": {
+            "type": "float",
+            "low": 20.0,
+            "high": 40.0,
+            "step": 1.0
+        },
+        "overbought_bound": {
+            "type": "float",
+            "low": 60.0,
+            "high": 80.0,
+            "step": 1.0
+        }
+    }
+}

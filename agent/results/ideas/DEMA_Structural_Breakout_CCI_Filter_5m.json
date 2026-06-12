@@ -1,0 +1,75 @@
+{
+    "name": "DEMA_Structural_Breakout_CCI_Filter",
+    "timeframe": "5m",
+    "family": "breakout",
+    "description": "A 5-minute standard intraday strategy tracking structural breakouts from medium-term consolidation channels. It establishes institutional trend directionality using a Double Exponential Moving Average (DEMA) to eliminate short-term lagging traps. Breakout signals are triggered when the close breaks past rolling extreme price channels. To filter fakeouts during narrow sideways market regimes, entry requires confirmation from a medium-period Commodity Channel Index (CCI) velocity surge and an absolute directional index (ADX) strength threshold. Vectorized exits are evaluated using the DEMA structural anchor baseline.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "DEMA",
+                "definition": "self.feat.dema(close, timeperiod=dema_period)"
+            },
+            {
+                "name": "CCI",
+                "definition": "self.feat.cci(high, low, close, timeperiod=cci_period)"
+            },
+            {
+                "name": "ADX",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Channel_High",
+                "definition": "self.feat.max(high, timeperiod=channel_period)"
+            },
+            {
+                "name": "Channel_Low",
+                "definition": "self.feat.min(low, timeperiod=channel_period)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close > Channel_High) & (CCI > cci_bound) & (ADX > adx_min) & (close > DEMA)",
+        "entry_short": "(close < Channel_Low) & (CCI < -cci_bound) & (ADX > adx_min) & (close < DEMA)",
+        "exit_logic": "Exit Long: (close < DEMA - 0.5 * ATR) or (CCI < 0.0). Exit Short: (close > DEMA + 0.5 * ATR) or (CCI > 0.0)."
+    },
+    "param_space": {
+        "dema_period": {
+            "type": "int",
+            "low": 20,
+            "high": 40,
+            "step": 2
+        },
+        "cci_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 1
+        },
+        "cci_bound": {
+            "type": "float",
+            "low": 80.0,
+            "high": 130.0,
+            "step": 5.0
+        },
+        "adx_min": {
+            "type": "float",
+            "low": 15.0,
+            "high": 25.0,
+            "step": 0.5
+        },
+        "channel_period": {
+            "type": "int",
+            "low": 10,
+            "high": 24,
+            "step": 1
+        }
+    }
+}

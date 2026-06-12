@@ -1,0 +1,77 @@
+{
+    "name": "Parabolic_SAR_MFI_Structural_Breakout",
+    "timeframe": "5m",
+    "family": "breakout",
+    "description": "A 5-minute standard intraday strategy designed to capture robust breakout moves following structural consolidations in the VN30F1M contract. It tracks localized trend directional flips using the Parabolic SAR. To isolate high-probability expansions from deceptive noise and frequent zero-volume phases, entries are validated by volume-weighted momentum filtering via the Money Flow Index (MFI). This prevents division-by-zero crashes while ensuring strong institutional volume participation. Vectorized loop-free exits are processed using an adaptive trailing midpoint channel combined with an ATR offset.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "SAR",
+                "definition": "self.feat.sar(high, low, acceleration=sar_acc, maximum=sar_max)"
+            },
+            {
+                "name": "MFI",
+                "definition": "self.feat.mfi(high, low, close, volume, timeperiod=mfi_period)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Rolling_Max",
+                "definition": "self.feat.max(high, timeperiod=exit_period)"
+            },
+            {
+                "name": "Rolling_Min",
+                "definition": "self.feat.min(low, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(close > SAR) & (MFI > 50.0 + mfi_offset)",
+        "entry_short": "(close < SAR) & (MFI < 50.0 - mfi_offset)",
+        "exit_logic": "Exit Long: (close < SAR) or (close < Rolling_Max - (exit_mult * ATR)). Exit Short: (close > SAR) or (close > Rolling_Min + (exit_mult * ATR))."
+    },
+    "param_space": {
+        "sar_acc": {
+            "type": "float",
+            "low": 0.01,
+            "high": 0.03,
+            "step": 0.01
+        },
+        "sar_max": {
+            "type": "float",
+            "low": 0.12,
+            "high": 0.24,
+            "step": 0.02
+        },
+        "mfi_period": {
+            "type": "int",
+            "low": 10,
+            "high": 24,
+            "step": 1
+        },
+        "mfi_offset": {
+            "type": "float",
+            "low": 2.0,
+            "high": 15.0,
+            "step": 1.0
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 8,
+            "high": 18,
+            "step": 1
+        },
+        "exit_mult": {
+            "type": "float",
+            "low": 1.5,
+            "high": 3.5,
+            "step": 0.1
+        }
+    }
+}

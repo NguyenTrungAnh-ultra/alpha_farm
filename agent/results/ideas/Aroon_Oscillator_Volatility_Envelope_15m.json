@@ -1,0 +1,91 @@
+{
+    "name": "Aroon_Oscillator_Volatility_Envelope",
+    "timeframe": "15m",
+    "family": "channel",
+    "description": "A high-quality 15-minute swing intraday strategy focusing on structural trend initialization phases in the VN30F1M market. It leverages the Aroon Oscillator to pinpoint exact cyclical trend turnarounds, determining entries when the oscillator breaks from range boundaries into a strong structural regime. To defend against false breakouts during low-liquidity phases, entry is filtered by an adaptive Bollinger Bands bandwidth channel expansion. Fully vectorized, loop-free trailing exits are computed via a rolling extreme channel offset with a normalized ATR buffer.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "Aroon_Osc",
+                "definition": "self.feat.aroonosc(high, low, timeperiod=aroon_period)"
+            },
+            {
+                "name": "BB_Upper",
+                "definition": "self.feat.bbands(close, timeperiod=bb_period, nbdevup=bb_mult, nbdevdn=bb_mult)[0]"
+            },
+            {
+                "name": "BB_Lower",
+                "definition": "self.feat.bbands(close, timeperiod=bb_period, nbdevup=bb_mult, nbdevdn=bb_mult)[2]"
+            },
+            {
+                "name": "BB_Width",
+                "definition": "(BB_Upper - BB_Lower) / (self.feat.midpoint(close, timeperiod=bb_period) + 1e-8)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Rolling_Max",
+                "definition": "self.feat.max(high, timeperiod=exit_period)"
+            },
+            {
+                "name": "Rolling_Min",
+                "definition": "self.feat.min(low, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(Aroon_Osc > aroon_threshold) & (BB_Width > width_min) & (close > BB_Upper)",
+        "entry_short": "(Aroon_Osc < -aroon_threshold) & (BB_Width > width_min) & (close < BB_Lower)",
+        "exit_logic": "Exit Long: (close < Rolling_Max - (exit_mult * ATR)) or (Aroon_Osc < 0.0). Exit Short: (close > Rolling_Min + (exit_mult * ATR)) or (Aroon_Osc > 0.0)."
+    },
+    "param_space": {
+        "aroon_period": {
+            "type": "int",
+            "low": 20,
+            "high": 35,
+            "step": 1
+        },
+        "aroon_threshold": {
+            "type": "float",
+            "low": 30.0,
+            "high": 70.0,
+            "step": 5.0
+        },
+        "bb_period": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        },
+        "bb_mult": {
+            "type": "float",
+            "low": 1.8,
+            "high": 2.4,
+            "step": 0.1
+        },
+        "width_min": {
+            "type": "float",
+            "low": 0.005,
+            "high": 0.015,
+            "step": 0.001
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 1
+        },
+        "exit_mult": {
+            "type": "float",
+            "low": 2.0,
+            "high": 4.5,
+            "step": 0.1
+        }
+    }
+}

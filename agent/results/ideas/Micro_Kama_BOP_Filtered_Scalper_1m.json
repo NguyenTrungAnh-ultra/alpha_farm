@@ -1,0 +1,80 @@
+{
+    "name": "Micro_Kama_BOP_Filtered_Scalper",
+    "timeframe": "1m",
+    "family": "multi-indicator",
+    "description": "An ultra-fast scalping strategy optimized for the highly noisy 1-minute timeframe of the VN30F1M contract. It tracks micro-momentum shifts using the slope of a hyper-short Kaufman Adaptive Moving Average (KAMA) to filter out deceptive noise. True underlying accumulation/distribution is confirmed using Balance of Power (BOP) to handle zero-volume or flat bars smoothly without division errors. A standardized volatility floor ensures the market is active before executing trades. Vectorized exits are processed via tight trailing micro-channel extremes.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume",
+            "open"
+        ],
+        "indicators": [
+            {
+                "name": "Fast_KAMA",
+                "definition": "self.feat.kama(close, timeperiod=kama_period)"
+            },
+            {
+                "name": "KAMA_Slope",
+                "definition": "self.feat.linearreg_slope(Fast_KAMA, timeperiod=3)"
+            },
+            {
+                "name": "BOP",
+                "definition": "self.feat.bop(open, high, low, close)"
+            },
+            {
+                "name": "BOP_Smooth",
+                "definition": "self.feat.wma(BOP, timeperiod=5)"
+            },
+            {
+                "name": "Volatility_Filter",
+                "definition": "self.feat.stddev(close, timeperiod=10)"
+            },
+            {
+                "name": "Micro_High",
+                "definition": "self.feat.max(high, timeperiod=exit_period)"
+            },
+            {
+                "name": "Micro_Low",
+                "definition": "self.feat.min(low, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(KAMA_Slope > slope_threshold) & (BOP_Smooth > bop_threshold) & (Volatility_Filter > noise_floor)",
+        "entry_short": "(KAMA_Slope < -slope_threshold) & (BOP_Smooth < -bop_threshold) & (Volatility_Filter > noise_floor)",
+        "exit_logic": "Exit Long: (close < Micro_Low) or (KAMA_Slope < 0.0). Exit Short: (close > Micro_High) or (KAMA_Slope > 0.0)."
+    },
+    "param_space": {
+        "kama_period": {
+            "type": "int",
+            "low": 5,
+            "high": 12,
+            "step": 1
+        },
+        "slope_threshold": {
+            "type": "float",
+            "low": 0.02,
+            "high": 0.18,
+            "step": 0.02
+        },
+        "bop_threshold": {
+            "type": "float",
+            "low": 0.05,
+            "high": 0.25,
+            "step": 0.05
+        },
+        "noise_floor": {
+            "type": "float",
+            "low": 0.3,
+            "high": 1.0,
+            "step": 0.1
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 3,
+            "high": 6,
+            "step": 1
+        }
+    }
+}

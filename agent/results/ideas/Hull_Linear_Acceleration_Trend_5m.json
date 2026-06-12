@@ -1,0 +1,71 @@
+{
+    "name": "Hull_Linear_Acceleration_Trend",
+    "timeframe": "5m",
+    "family": "trend-following",
+    "description": "A 5-minute trend-following strategy designed to capture structural momentum shifts while actively filtering out sideways market regimes. It replaces correlated lagging metrics with a forward-looking trend approach using the slope of a short-term linear regression paired with the structural trend direction of a Weighted Moving Average (WMA). A volatility barrier based on standard deviation limits entries during low-liquidity or flat periods (Volume = 0 environments). Exits are mathematically mapped using dynamic midprice bands to satisfy vector calculation constraints without looping.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "WMA_Trend",
+                "definition": "self.feat.wma(close, timeperiod=wma_period)"
+            },
+            {
+                "name": "L_Slope",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=slope_period)"
+            },
+            {
+                "name": "StdDev",
+                "definition": "self.feat.stddev(close, timeperiod=wma_period)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Midprice_Exit",
+                "definition": "self.feat.midprice(high, low, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(close > WMA_Trend) & (L_Slope > slope_trigger) & (StdDev > noise_threshold)",
+        "entry_short": "(close < WMA_Trend) & (L_Slope < -slope_trigger) & (StdDev > noise_threshold)",
+        "exit_logic": "Exit Long: (close < Midprice_Exit - 0.25 * ATR) or (L_Slope < 0.0). Exit Short: (close > Midprice_Exit + 0.25 * ATR) or (L_Slope > 0.0)."
+    },
+    "param_space": {
+        "wma_period": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        },
+        "slope_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 1
+        },
+        "slope_trigger": {
+            "type": "float",
+            "low": 0.05,
+            "high": 0.25,
+            "step": 0.05
+        },
+        "noise_threshold": {
+            "type": "float",
+            "low": 0.5,
+            "high": 2.0,
+            "step": 0.1
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 8,
+            "high": 16,
+            "step": 2
+        }
+    }
+}

@@ -13,71 +13,71 @@ Design principles:
 
 # ─── Available talib indicators (curated for futures) ────────────────
 TALIB_INDICATORS = """
-## Available talib Indicators (gọi qua self.feat.xxx())
+## Available talib Indicators (called via self.feat.xxx())
 
 **Trend**: sma, ema, dema, tema, wma, kama, t3, trima, midpoint, midprice, sar, linearreg, linearreg_slope
 **Momentum**: rsi, stoch, stochf, stochrsi, macd, mom, roc, rocp, willr, cci, cmo, mfi, ultosc, trix, adx, adxr, aroon, aroonosc, dx, minus_di, plus_di, apo, ppo, bop
 **Volatility**: atr, natr, trange, bbands (upper/middle/lower)
 **Volume**: ad, adosc, obv
-**Pattern**: CDL functions (cdl_engulfing, cdl_hammer, cdl_doji, v.v.)
+**Pattern**: CDL functions (cdl_engulfing, cdl_hammer, cdl_doji, etc.)
 **Math**: max, min, stddev, var, linearreg_angle
 """
 
 # ─── Timeframe-specific guidance ────────────────────────────────────
 TIMEFRAME_HINTS = {
     "1m": """
-**Khung 1 phút** — Scalping cực nhanh:
-- Indicator periods: rất ngắn (3-15 bars)
-- Trades: nhiều (10-30+/ngày), target nhỏ (0.5-2 points)
-- Phù hợp: Momentum bursts, order flow, micro mean-reversion
-- Stop loss: rất chặt (1-3 points)
-- Chú ý: noise cao, cần filter mạnh (volume, volatility)
+**1-Minute Timeframe** — Ultra-fast Scalping:
+- Indicator periods: very short (3-15 bars)
+- Trades: frequent (10-30+/day), small targets (0.5-2 points)
+- Suitable for: Momentum bursts, order flow, micro mean-reversion
+- Stop loss: very tight (1-3 points)
+- Note: High noise, requires strong filters (volume, volatility)
 """,
     "3m": """
-**Khung 3 phút** — Scalping/Intraday nhanh:
-- Indicator periods: ngắn-trung (5-20 bars)
-- Trades: trung bình (5-15/ngày)
-- Phù hợp: Momentum, short-term trend, breakout phiên
+**3-Minute Timeframe** — Fast Scalping/Intraday:
+- Indicator periods: short-to-medium (5-20 bars)
+- Trades: medium (5-15/day)
+- Suitable for: Momentum, short-term trends, session breakouts
 - Stop loss: 2-5 points
 """,
     "5m": """
-**Khung 5 phút** — Intraday chuẩn:
-- Indicator periods: trung bình (10-30 bars)
-- Trades: 3-8/ngày
-- Phù hợp: Trend-following, mean-reversion, breakout consolidation
+**5-Minute Timeframe** — Standard Intraday:
+- Indicator periods: medium (10-30 bars)
+- Trades: 3-8/day
+- Suitable for: Trend-following, mean-reversion, consolidation breakouts
 - Stop loss: 3-8 points
-- Đây là khung phổ biến nhất, nhiều chiến lược kinh điển hoạt động tốt
+- This is the most popular timeframe, many classic strategies work well here
 """,
     "10m": """
-**Khung 10 phút** — Intraday balanced:
-- Indicator periods: trung bình-dài (10-40 bars)
-- Trades: 2-5/ngày
-- Phù hợp: Trend confirmation, multi-indicator systems
+**10-Minute Timeframe** — Balanced Intraday:
+- Indicator periods: medium-to-long (10-40 bars)
+- Trades: 2-5/day
+- Suitable for: Trend confirmation, multi-indicator systems
 - Stop loss: 5-10 points
 """,
     "15m": """
-**Khung 15 phút** — Swing intraday:
-- Indicator periods: dài hơn (14-50 bars)
-- Trades: 1-3/ngày
-- Phù hợp: Trend-following chất lượng cao, divergence, pattern recognition
+**15-Minute Timeframe** — Swing Intraday:
+- Indicator periods: longer (14-50 bars)
+- Trades: 1-3/day
+- Suitable for: High-quality trend-following, divergence, pattern recognition
 - Stop loss: 8-15 points
-- Tín hiệu ít nhưng chất lượng cao hơn
+- Fewer signals but much higher quality
 """,
     "30m": """
-**Khung 30 phút** — Position intraday:
-- Indicator periods: dài (20-60 bars)
-- Trades: 0-2/ngày (có thể có ngày không trade)
-- Phù hợp: Major trend, range breakout, session-based strategies
+**30-Minute Timeframe** — Position Intraday:
+- Indicator periods: long (20-60 bars)
+- Trades: 0-2/day (some days may have no trades)
+- Suitable for: Major trends, range breakouts, session-based strategies
 - Stop loss: 10-20 points
-- Cẩn trọng: ít bars/ngày nên indicator cần đủ lookback
+- Caution: Fewer bars per day, so indicators need sufficient lookback
 """,
     "1H": """
-**Khung 1 giờ** — Position/Swing lớn:
-- Indicator periods: dài (10-30 bars ≈ 2-6 ngày)
-- Trades: 0-1/ngày (rất ít, có tuần không trade)
-- Phù hợp: Major trend following, regime detection
+**1-Hour Timeframe** — Position/Large Swing:
+- Indicator periods: long (10-30 bars ≈ 2-6 days)
+- Trades: 0-1/day (very rare, some weeks may have no trades)
+- Suitable for: Major trend following, regime detection
 - Stop loss: 15-30 points
-- Cần indicator periods phù hợp (1 ngày chỉ có ~5 bars)
+- Requires appropriate indicator periods (only ~5 bars per day)
 """,
 }
 
@@ -95,103 +95,6 @@ STRATEGY_FAMILIES = [
     "session-based",        # Opening range breakout, session momentum
 ]
 
-# ─── SimpleAlgorithm interface reference ────────────────────────────
-STRATEGY_INTERFACE = """
-## SimpleAlgorithm Interface (XNOQuant compatible)
-
-```python
-import talib
-import numpy as np
-import pandas as pd
-from backtest.strategy import SimpleAlgorithm
-
-class StrategyNameHere(SimpleAlgorithm):
-    def __init__(self, rsi_period=14, ema_period=20):
-        super().__init__()
-        self.rsi_period = rsi_period
-        self.ema_period = ema_period
-        self.params = dict(rsi_period=rsi_period, ema_period=ema_period)
-
-    def __algorithm__(self):
-        # 1. Lấy dữ liệu giá
-        close = self.data.pv_close
-        high = self.data.pv_high
-        low = self.data.pv_low
-
-        # 2. Tính indicators (vectorized, qua self.feat)
-        rsi = self.feat.rsi(close, timeperiod=self.rsi_period)
-        ema = self.feat.ema(close, timeperiod=self.ema_period)
-
-        # 3. Tạo điều kiện entry/exit
-        long_setup = (close > ema) & (rsi < 30)
-        short_setup = (close < ema) & (rsi > 70)
-        exit_long = rsi > 50
-        exit_short = rsi < 50
-        exit_setup = exit_long | exit_short
-
-        # 4. Set positions (EXIT trước, ENTRY sau để override)
-        self.set_positions(exit_setup, position=0)
-        self.set_positions(long_setup, position=1)
-        self.set_positions(short_setup, position=-1)
-```
-
-## Important Rules:
-1. MUST `import talib`, `import numpy as np`, `import pandas as pd`
-2. MUST inherit from `SimpleAlgorithm` (KHÔNG phải BaseStrategy)
-3. MUST implement `__algorithm__()` method
-4. Indicators gọi qua `self.feat.xxx()` — ví dụ: `self.feat.rsi(close, timeperiod=14)`
-5. Dữ liệu giá qua `self.data.pv_close`, `self.data.pv_high`, `self.data.pv_low`, `self.data.pv_open`
-6. Entry/Exit dùng `self.set_positions(mask, position=...)` — 1=long, -1=short, 0=flat
-7. EXIT conditions PHẢI set TRƯỚC entry conditions (entry sẽ override exit khi cùng lúc)
-8. `self.params` dict MUST contain ALL constructor parameters
-9. TUYỆT ĐỐI KHÔNG dùng tên class 'MyStrategy' hay 'StrategyNameHere'
-10. TUYỆT ĐỐI KHÔNG dùng param1/param2 — phải dùng tên parameter có ý nghĩa
-"""
-
-# ─── Complete example strategy ──────────────────────────────────────
-EXAMPLE_STRATEGY = """
-## Complete Working Example — EMA Crossover + ADX Filter
-
-```python
-import talib
-import numpy as np
-import pandas as pd
-from backtest.strategy import SimpleAlgorithm
-
-class EmaCrossADX(SimpleAlgorithm):
-    def __init__(self, ema_fast=10, ema_slow=30, adx_period=14, adx_threshold=25.0):
-        super().__init__()
-        self.ema_fast = ema_fast
-        self.ema_slow = ema_slow
-        self.adx_period = adx_period
-        self.adx_threshold = adx_threshold
-        self.params = dict(ema_fast=ema_fast, ema_slow=ema_slow,
-                           adx_period=adx_period, adx_threshold=adx_threshold)
-
-    def __algorithm__(self):
-        close = self.data.pv_close
-        high = self.data.pv_high
-        low = self.data.pv_low
-
-        # Tính indicators
-        ef = self.feat.ema(close, timeperiod=self.ema_fast)
-        es = self.feat.ema(close, timeperiod=self.ema_slow)
-        adx = self.feat.adx(high, low, close, timeperiod=self.adx_period)
-
-        # Điều kiện
-        trend_strong = adx > self.adx_threshold
-        long_setup = trend_strong & (ef > es)
-        short_setup = trend_strong & (ef < es)
-        exit_setup = adx <= self.adx_threshold
-
-        # Set positions (exit trước, entry sau)
-        self.set_positions(exit_setup, position=0)
-        self.set_positions(long_setup, position=1)
-        self.set_positions(short_setup, position=-1)
-```
-"""
-
-
 # ═══════════════════════════════════════════════════════════════════════
 # Prompt Builders
 # ═══════════════════════════════════════════════════════════════════════
@@ -201,6 +104,7 @@ def build_idea_prompt(
     existing_strategies: list[dict],
     round_num: int,
     total_rounds: int,
+    experience: str = "",
     tried_names: list[str] = None,
 ) -> str:
     """
@@ -214,22 +118,22 @@ def build_idea_prompt(
             for s in existing_strategies
         ])
         existing_section = f"""
-## ĐÃ CÓ {len(existing_strategies)} CHIẾN LƯỢC ACCEPTED — KHÔNG ĐƯỢC TRÙNG:
+## THERE ARE ALREADY {len(existing_strategies)} ACCEPTED STRATEGIES — DO NOT DUPLICATE:
 {existing_list}
 
-→ Hãy tạo chiến lược KHÁC BIỆT hoàn toàn: khác indicators, khác logic, khác family.
+→ You must create a COMPLETELY DIFFERENT strategy: use different indicators, different logic, or a different family.
 """
     else:
-        existing_section = "\n## Đây là chiến lược ĐẦU TIÊN — hãy chọn approach mạnh và đa dạng.\n"
+        existing_section = "\n## This is the FIRST strategy — choose a strong and diverse approach.\n"
     
     # Add ALL tried strategy names
     if tried_names:
         tried_list = ", ".join(sorted(tried_names))
         tried_section = f"""
-## TÊN CHIẾN LƯỢC ĐÃ THỬ (KHÔNG ĐƯỢC DÙNG LẠI):
+## PREVIOUSLY TRIED STRATEGY NAMES (DO NOT REUSE):
 {tried_list}
 
-→ TUYỆT ĐỐI không dùng lại bất kỳ tên nào ở trên. Phải dùng tên MỚI HOÀN TOÀN và indicators/logic KHÁC.
+→ ABSOLUTELY DO NOT reuse any names listed above. You must use a COMPLETELY NEW name and DIFFERENT indicators/logic.
 """
     else:
         tried_section = ""
@@ -238,26 +142,28 @@ def build_idea_prompt(
     used_families = [s.get('family', '') for s in existing_strategies]
     unused_families = [f for f in STRATEGY_FAMILIES if f not in used_families]
     if unused_families:
-        suggested = f"Gợi ý family chưa dùng: **{', '.join(unused_families[:3])}**"
+        suggested = f"Suggested unused families: **{', '.join(unused_families[:3])}**"
     else:
-        suggested = "Tất cả families đã dùng. Hãy tạo BIẾN THỂ sáng tạo khác biệt."
+        suggested = "All families have been used. Please create a highly creative and distinctive VARIATION."
 
     tf_hint = TIMEFRAME_HINTS.get(timeframe, "")
 
-    return f"""Bạn là một **Quant Researcher** chuyên nghiệp đang thiết kế chiến lược giao dịch cho **hợp đồng tương lai VN30F1M** (phái sinh chỉ số VN30 trên sàn Việt Nam).
+    exp_section = f"\n## COMBAT EXPERIENCE (MANDATORY READING)\n{experience}\n" if experience else ""
 
-## Nhiệm vụ
-Thiết kế 1 chiến lược giao dịch intraday cho khung **{timeframe}**.
-Đây là vòng {round_num}/{total_rounds}.
+    return f"""You are an expert **Quant Researcher** designing trading strategies for the **VN30F1M futures contract** (VN30 index derivatives on the Vietnamese market).
+
+## Task
+Design 1 intraday trading strategy for the **{timeframe}** timeframe.
+This is round {round_num}/{total_rounds}.
 
 {tf_hint}
-
-## Yêu cầu chất lượng
-- Chiến lược phải có **logic entry/exit RÕ RÀNG**, không mơ hồ
-- Phải dùng **ít nhất 2 indicators** (1 chính + 1 filter/confirmation)
-- Phải có **exit logic riêng** (không chỉ đảo tín hiệu)
-- Parameters phải có **khoảng tìm kiếm hợp lý** cho optimization
-- Phải **KHÁC BIỆT** hoàn toàn với các chiến lược đã có
+{exp_section}
+## Quality Requirements
+- The strategy must have **CLEAR entry/exit logic**, not vague, expressed using mathematical formulas.
+- Must use **at least 2 indicators** (1 primary + 1 filter/confirmation).
+- Must have its **own exit logic** (do not just reverse signals).
+- Parameters must have **reasonable search spaces** for optimization.
+- Must be **COMPLETELY DIFFERENT** from existing strategies.
 
 {existing_section}
 
@@ -267,18 +173,24 @@ Thiết kế 1 chiến lược giao dịch intraday cho khung **{timeframe}**.
 
 {TALIB_INDICATORS}
 
-## Output Format — PHẢI trả về JSON CHÍNH XÁC như sau:
+## Output Format — MUST return EXACT JSON structure below:
 
 ```json
 {{
-    "name": "TênChiếnLược",
+    "name": "StrategyName",
     "timeframe": "{timeframe}",
     "family": "trend-following|momentum|mean-reversion|breakout|volatility|multi-indicator|pattern-based|channel|oscillator-divergence|session-based",
-    "description": "Mô tả ngắn gọn logic chiến lược",
-    "indicators": ["RSI", "EMA", "ATR"],
-    "entry_long": "Điều kiện cụ thể để vào lệnh LONG",
-    "entry_short": "Điều kiện cụ thể để vào lệnh SHORT",
-    "exit_logic": "Điều kiện thoát lệnh (áp dụng cho cả long và short)",
+    "description": "Brief description of the strategy logic",
+    "formula": {{
+        "inputs": ["close", "high", "low", "volume"],
+        "indicators": [
+            {{"name": "EMA_fast", "definition": "EMA(close, timeperiod=10)"}},
+            {{"name": "ATR", "definition": "ATR(high, low, close, timeperiod=14)"}}
+        ],
+        "entry_long": "Specific mathematical formula to enter LONG (e.g.: close > EMA_fast + 0.5 * ATR)",
+        "entry_short": "Specific mathematical formula to enter SHORT",
+        "exit_logic": "Exit conditions (applied commonly or separately)"
+    }},
     "param_space": {{
         "param_name": {{"type": "int|float", "low": 5, "high": 30, "step": 1}},
         "another_param": {{"type": "float", "low": 0.5, "high": 3.0, "step": 0.1}}
@@ -286,55 +198,5 @@ Thiết kế 1 chiến lược giao dịch intraday cho khung **{timeframe}**.
 }}
 ```
 
-QUAN TRỌNG: Chỉ trả về JSON, không thêm text ngoài block."""
+IMPORTANT: Return ONLY valid JSON. Do not add any text outside the JSON block."""
 
-
-def build_code_prompt(strategy_idea: dict) -> str:
-    """Build prompt for generating strategy Python code."""
-    idea_json = str(strategy_idea)
-    tf = strategy_idea.get("timeframe", "5m")
-    
-    return f"""Bạn là một **Quant Developer** chuyên viết code Python cho hệ thống backtesting.
-
-## Nhiệm vụ
-Viết code Python cho chiến lược sau, tuân thủ CHÍNH XÁC interface SimpleAlgorithm.
-
-## Chiến lược cần implement:
-```json
-{idea_json}
-```
-
-{STRATEGY_INTERFACE}
-
-{EXAMPLE_STRATEGY}
-
-## QUY TẮC BẮT BUỘC (VI PHẠM = THẤT BẠI):
-1. Class PHẢI tên CHÍNH XÁC: `{strategy_idea.get('name', 'Strategy')}` — KHÔNG ĐƯỢC dùng MyStrategy, StrategyNameHere, hay bất kỳ tên khác
-2. PHẢI kế thừa `SimpleAlgorithm` (KHÔNG phải BaseStrategy)
-3. Constructor PHẢI có `self.params = dict(...)` chứa TẤT CẢ parameters VỚI TÊN CÓ Ý NGHĨA
-4. Implement `__algorithm__()` — dùng `self.data.pv_close`, `self.feat.xxx()`, `self.set_positions()`
-5. EXIT conditions set TRƯỚC, ENTRY conditions set SAU
-6. KHÔNG dùng print(), KHÔNG dùng global state
-7. Dữ liệu đầu vào có columns: Open, High, Low, Close, Volume (index = Datetime)
-
-## Output: CHỈ trả về code Python trong block ```python ... ```. Không giải thích."""
-
-
-def build_fix_prompt(code: str, error: str, strategy_name: str) -> str:
-    """Build prompt to fix broken strategy code."""
-    return f"""Code chiến lược `{strategy_name}` bị lỗi khi chạy:
-
-## Error:
-```
-{error[:1000]}
-```
-
-## Code hiện tại:
-```python
-{code}
-```
-
-{STRATEGY_INTERFACE}
-
-Hãy sửa code để chạy đúng. CHỈ trả về code Python đã sửa trong block ```python ... ```.
-Không giải thích, không thêm text."""

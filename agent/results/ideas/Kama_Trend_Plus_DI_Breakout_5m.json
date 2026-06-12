@@ -1,0 +1,73 @@
+{
+    "name": "Kama_Trend_Plus_DI_Breakout",
+    "timeframe": "5m",
+    "family": "trend-following",
+    "description": "A 5-minute standard intraday trend-following strategy designed to capture high-velocity extensions out of price ranges. It establishes an adaptive baseline using the Kaufman Adaptive Moving Average (KAMA) to naturally smooth out horizontal chop. Trend strength and directional alignment are validated via the directional movement indicators (plus_di and minus_di) along with an absolute ADX threshold floor to completely protect the strategy against thin trading periods or flat bars (Volume = 0 scenarios). Completely loop-free vectorized exits monitor trailing price channels relative to the current close.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "KAMA",
+                "definition": "self.feat.kama(close, timeperiod=kama_period)"
+            },
+            {
+                "name": "ADX",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Plus_DI",
+                "definition": "self.feat.plus_di(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Minus_DI",
+                "definition": "self.feat.minus_di(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Rolling_Max",
+                "definition": "self.feat.max(high, timeperiod=exit_period)"
+            },
+            {
+                "name": "Rolling_Min",
+                "definition": "self.feat.min(low, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(close > KAMA) & (ADX > adx_min) & (Plus_DI > Minus_DI)",
+        "entry_short": "(close < KAMA) & (ADX > adx_min) & (Minus_DI > Plus_DI)",
+        "exit_logic": "Exit Long: (close < KAMA) or (close < Rolling_Max - (exit_mult * ATR)). Exit Short: (close > KAMA) or (close > Rolling_Min + (exit_mult * ATR))."
+    },
+    "param_space": {
+        "kama_period": {
+            "type": "int",
+            "low": 15,
+            "high": 35,
+            "step": 1
+        },
+        "adx_min": {
+            "type": "float",
+            "low": 16.0,
+            "high": 26.0,
+            "step": 0.5
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 8,
+            "high": 18,
+            "step": 1
+        },
+        "exit_mult": {
+            "type": "float",
+            "low": 1.5,
+            "high": 3.5,
+            "step": 0.1
+        }
+    }
+}

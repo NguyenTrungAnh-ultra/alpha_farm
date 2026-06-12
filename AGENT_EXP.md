@@ -35,3 +35,9 @@ Các quy tắc ngầm của hệ thống XNOQuant đòi hỏi lập trình viên
 ## 5. Kinh Nghiệm Debug & Phát Triển
 - Tập trung phân tách rõ hai luồng logic: `get_feature()` và `get_position()` để mã dễ đọc.
 - Bắt và phân tích trực tiếp HTML DOM của trang Web (thông qua `.text-red-500` hoặc `.Toastify`) giúp lấy chính xác nguyên nhân từ chối chiến lược từ Sandbox để khắc phục.
+
+## 6. Tối Ưu Hóa Bộ Đệm (Cache Hit Optimization)
+
+Khi sử dụng các mô hình LLM lớn (như DeepSeek) để sinh dữ liệu hàng loạt:
+- **Tách biệt Ngữ cảnh (Context Segregation):** Cần chia tách System Prompt (chứa thông tin tĩnh như luật chơi, danh sách chỉ báo) và User Prompt (chứa thông tin động như yêu cầu vòng lặp). Phần System Prompt phải được giữ nguyên hoàn toàn (byte-for-byte) qua các lần gọi.
+- **Hiệu quả:** Phương pháp này dự kiến giảm thiểu lượng Input Tokens phải xử lý lại, hỗ trợ tính năng Cache Hit của nhà cung cấp. Điều này có khả năng giúp giảm chi phí và cải thiện tốc độ phản hồi ở các vòng lặp sau, với giả định hệ thống API hoạt động ổn định.
