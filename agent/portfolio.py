@@ -214,12 +214,14 @@ class PortfolioManager:
         max_corr_positions = self.compute_max_position_correlation(positions)
         
         if max_corr_returns > self.max_correlation:
-            reason = f"REJECTED (return correlation): max_corr_returns={max_corr_returns:.2f} > {self.max_correlation}"
-            return False, reason
+            reason = f"WARNING (return correlation): max_corr_returns={max_corr_returns:.2f} > {self.max_correlation}"
+            # return False, reason  # Bỏ tiêu chí corr
+            print(f"  ⚠️ {reason}")
             
         if max_corr_positions > self.max_correlation:
-            reason = f"REJECTED (position correlation): max_corr_positions={max_corr_positions:.2f} > {self.max_correlation}"
-            return False, reason
+            reason = f"WARNING (position correlation): max_corr_positions={max_corr_positions:.2f} > {self.max_correlation}"
+            # return False, reason  # Bỏ tiêu chí corr
+            print(f"  ⚠️ {reason}")
         
         # ── Accept! ──
         strategy_entry = {

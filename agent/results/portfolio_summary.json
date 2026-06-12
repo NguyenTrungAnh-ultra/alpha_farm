@@ -1,0 +1,53 @@
+{
+  "total_accepted": 2,
+  "last_updated": "2026-06-11T19:47:30.824285",
+  "strategies": [
+    {
+      "name": "DonchianObv_RangeBreakout_30m",
+      "timeframe": "30m",
+      "family": "breakout",
+      "description": "Chiến lược phá vỡ nền giá giằng co kết hợp xác nhận khối lượng. Sử dụng hàm MAX/MIN để thiết lập kênh giá cản trên/dưới (Donchian Channel). Lệnh đột phá được kích hoạt khi giá phá vỡ kênh và có sự đồng thuận từ dòng tiền lớn thông qua On Balance Volume (OBV).",
+      "params": {
+        "channel_period": 20,
+        "obv_sma_period": 10,
+        "exit_sma_period": 15
+      },
+      "metrics": {
+        "sharpe_ratio": 1.355,
+        "cagr": 0.3215,
+        "max_drawdown_pct": -27.16,
+        "profit_factor": 1.455,
+        "calmar_ratio": 1.183,
+        "total_trades": 1934,
+        "win_rate": 46.85
+      },
+      "max_correlation_returns": 0.0,
+      "max_correlation_positions": 0.0,
+      "accepted_at": "2026-06-11T19:37:34.051545"
+    },
+    {
+      "name": "AroonOscMidprice_TrendSwing_30m",
+      "timeframe": "30m",
+      "family": "trend-following",
+      "description": "Kết hợp sức mạnh xu hướng từ Aroon Oscillator với vùng cân bằng giá (Midprice) để xác định điểm swing chính trong xu hướng dài hạn, loại bỏ nhiễu của các sóng điều chỉnh nhỏ.",
+      "params": {
+        "period_aroon": 40,
+        "period_midprice": 60,
+        "threshold_aroon": 50,
+        "atr_exit_multiplier": 2.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.442,
+        "cagr": 0.509,
+        "max_drawdown_pct": -14.65,
+        "profit_factor": 1.793,
+        "calmar_ratio": 3.474,
+        "total_trades": 618,
+        "win_rate": 45.63
+      },
+      "max_correlation_returns": 0.0,
+      "max_correlation_positions": 0.276,
+      "accepted_at": "2026-06-11T19:47:30.784819"
+    }
+  ]
+}

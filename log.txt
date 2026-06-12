@@ -1,0 +1,250 @@
+================================================================================
+                      KHỞI ĐỘNG HỆ THỐNG XNOQUANT AUTO-FARM
+================================================================================
+
+✅ Đã nạp Cookie thành công! Khởi động động cơ AI...
+
+╔══════════════════════════════════════════════════════════════╗
+║           AUTO STRATEGY GENERATION PIPELINE                ║
+║  Target: 100 strategies | Model: pro                      ║
+║  Timeframes: 5m, 10m, 15m, 30m, 1m                     ║
+║  Optimization: 100 trials/strategy (Bayesian)           ║
+║  Objective: total_return_pct     (maximize)             ║
+╚══════════════════════════════════════════════════════════════╝
+
+[GeminiChat] Session initialized (nonce=AOOh0PHEPugkQs3KyLYX...)
+[GeminiChat] ✅ Ready | model=pro (gemini-3-pro) | auto-rotate=600s | keepalive=5m
+[Pipeline] GeminiChat ready: GeminiChat(model=pro [gemini-3-pro], requests=0)
+  ⚠️ Missing equity curve: DonchianObv_RangeBreakout_30m_30m_equity.csv
+  ⚠️ Missing equity curve: AroonOscMidprice_TrendSwing_30m_30m_equity.csv
+[Portfolio] Loaded 2 strategies, 0 equity curves, 2 position curves
+[Pipeline] Portfolio: 2 existing strategies
+[Pipeline] Engine: capital=1,000,000,000 | margin=28.5% | fee=6,000/HĐ/chiều
+[Pipeline] Loading data...
+    5m:   57,147 bars (2020-01-02 → 2024-12-31)
+   10m:   30,250 bars (2020-01-02 → 2024-12-31)
+   15m:   21,285 bars (2020-01-02 → 2024-12-31)
+   30m:   11,204 bars (2020-01-02 → 2024-12-31)
+    1m:  272,137 bars (2020-01-02 → 2024-12-31)
+[Pipeline] Loaded 145 previously tried strategies
+
+────────────────────────────────────────────────────────────
+  Round 1/100 | TF=5m | Accepted: 0 | Rate: 0% | Elapsed: 0m
+────────────────────────────────────────────────────────────
+  [1/5] Generating idea (5m)...
+[GeminiChat] 💬 Chat: cid=...bb6d2274, rid=...2c6f1cf6
+[GeminiChat] ✅ 1802 chars (attempt 1)
+[GeminiChat] ✅ JSON extracted (dict)
+  ✅ Idea: WillrAdx_RangeReversion_5m (mean-reversion)
+     Chiến lược giao dịch đảo chiều về giá trị trung bình (mean-reversion) chuyên biệ
+  [2/5] Generating code...
+[GeminiChat] 💬 Chat: cid=...bb6d2274, rid=...bf460973
+[GeminiChat] ✅ 2831 chars (attempt 1)
+  ✅ Code generated (2817 chars)
+  [3/5] Validating...
+  ✅ Syntax OK
+  ✅ Exec OK
+  ✅ Found class: WillrAdx_RangeReversion_5m
+  ✅ Instantiated with params: {'adx_period': 14, 'adx_threshold': 25.0, 'willr_period': 14, 'willr_lower': -80.0, 'willr_upper': -20.0, 'ema_period': 40, 'atr_period': 14, 'atr_sl_mult': 2.0}
+  ✅ run_algorithm() OK (unique positions: [np.float64(-1.0), np.float64(0.0), np.float64(1.0)])
+  ✅ Validated: WillrAdx_RangeReversion_5m
+  [4/5] Optimizing (100 trials)...
+f:\Projects\alpha_farm\backtest\optimizer.py:358: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  return TPESampler(
+
+============================================================
+  OPTIMIZER — WillrAdx_RangeReversion_5m
+============================================================
+  Method:     BAYESIAN (TPE)
+  Objective:  total_return_pct
+  Trials:     100
+  Parallel:   1 job
+  Params:     ['adx_period', 'adx_threshold', 'willr_period', 'willr_lower', 'willr_upper', 'ema_period', 'atr_period', 'atr_sl_mult']
+============================================================
+
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [00:00<00:00, 102.97it/s]
+  ❌ Optimization failed: No trials are completed yet.
+
+────────────────────────────────────────────────────────────
+  Round 2/100 | TF=10m | Accepted: 0 | Rate: 0% | Elapsed: 1m
+────────────────────────────────────────────────────────────
+  [1/5] Generating idea (10m)...
+[GeminiChat] 💬 Chat: cid=...bb6d2274, rid=...694ed720
+[GeminiChat] ✅ 1503 chars (attempt 1)
+[GeminiChat] ✅ JSON extracted (dict)
+  ✅ Idea: PpoBbands_VolatilityThrust_10m (volatility)
+     Chiến lược giao dịch bùng nổ biến động (volatility breakout) kết hợp dải Bolling
+  [2/5] Generating code...
+[GeminiChat] 💬 Chat: cid=...bb6d2274, rid=...027dcada
+[GeminiChat] ✅ 2378 chars (attempt 1)
+  ✅ Code generated (2364 chars)
+  [3/5] Validating...
+  ✅ Syntax OK
+  ✅ Exec OK
+  ✅ Found class: PpoBbands_VolatilityThrust_10m
+  ✅ Instantiated with params: {'bb_period': 20, 'bb_dev': 2.0, 'ppo_fast': 12, 'ppo_slow': 26, 'ppo_signal': 9, 'atr_period': 14, 'atr_sl_mult': 2.0}
+  ✅ run_algorithm() OK (unique positions: [np.float64(-1.0), np.float64(0.0), np.float64(1.0)])
+  ✅ Validated: PpoBbands_VolatilityThrust_10m
+  [4/5] Optimizing (100 trials)...
+f:\Projects\alpha_farm\backtest\optimizer.py:358: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  return TPESampler(
+
+============================================================
+  OPTIMIZER — PpoBbands_VolatilityThrust_10m
+============================================================
+  Method:     BAYESIAN (TPE)
+  Objective:  total_return_pct
+  Trials:     100
+  Parallel:   1 job
+  Params:     ['bb_period', 'bb_dev', 'ppo_fast', 'ppo_slow', 'ppo_signal', 'atr_period', 'atr_sl_mult']
+============================================================
+
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [00:00<00:00, 141.96it/s] 
+  ❌ Optimization failed: No trials are completed yet.
+
+────────────────────────────────────────────────────────────
+  Round 3/100 | TF=15m | Accepted: 0 | Rate: 0% | Elapsed: 2m
+────────────────────────────────────────────────────────────
+  [1/5] Generating idea (15m)...
+[GeminiChat] 💬 Chat: cid=...bb6d2274, rid=...728a87dd
+[GeminiChat] ✅ 1713 chars (attempt 1)
+[GeminiChat] ✅ JSON extracted (dict)
+  ✅ Idea: MfiKama_MomentumPullback_15m (momentum)
+     Chiến lược giao dịch theo xu hướng dạng pullback trên khung 15 phút. Sử dụng đườ
+  [2/5] Generating code...
+[GeminiChat] 💬 Chat: cid=...bb6d2274, rid=...3f336d1e
+[GeminiChat] ✅ 2495 chars (attempt 1)
+  ✅ Code generated (2481 chars)
+  [3/5] Validating...
+  ✅ Syntax OK
+  ✅ Exec OK
+  ✅ Found class: MfiKama_MomentumPullback_15m
+  ✅ Instantiated with params: {'kama_period': 30, 'mfi_period': 14, 'mfi_oversold': 35.0, 'mfi_overbought': 65.0, 'mfi_tp_long': 80.0, 'mfi_tp_short': 20.0, 'atr_period': 14, 'atr_sl_mult': 3.0}
+  ✅ run_algorithm() OK (unique positions: [np.float64(-1.0), np.float64(0.0), np.float64(1.0)])
+  ✅ Validated: MfiKama_MomentumPullback_15m
+  [4/5] Optimizing (100 trials)...
+f:\Projects\alpha_farm\backtest\optimizer.py:358: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  return TPESampler(
+
+============================================================
+  OPTIMIZER — MfiKama_MomentumPullback_15m
+============================================================
+  Method:     BAYESIAN (TPE)
+  Objective:  total_return_pct
+  Trials:     100
+  Parallel:   1 job
+  Params:     ['kama_period', 'mfi_period', 'mfi_oversold', 'mfi_overbought', 'mfi_tp_long', 'mfi_tp_short', 'atr_period', 'atr_sl_mult']
+============================================================
+
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [00:00<00:00, 133.79it/s] 
+  ❌ Optimization failed: No trials are completed yet.
+
+────────────────────────────────────────────────────────────
+  Round 4/100 | TF=30m | Accepted: 0 | Rate: 0% | Elapsed: 3m
+────────────────────────────────────────────────────────────
+  [1/5] Generating idea (30m)...
+[GeminiChat] 💬 Chat: cid=...bb6d2274, rid=...636c7519
+[GeminiChat] ✅ 1594 chars (attempt 1)
+[GeminiChat] ✅ JSON extracted (dict)
+  ✅ Idea: CmoTrima_MeanReversion_30m (mean-reversion)
+     Chiến lược đảo chiều trung bình trên khung 30 phút. Sử dụng đường trung bình siê
+  [2/5] Generating code...
+[GeminiChat] 💬 Chat: cid=...bb6d2274, rid=...40b34d10
+[GeminiChat] ✅ 2428 chars (attempt 1)
+  ✅ Code generated (2414 chars)
+  [3/5] Validating...
+  ✅ Syntax OK
+  ✅ Exec OK
+  ✅ Found class: CmoTrima_MeanReversion_30m
+  ✅ Instantiated with params: {'trima_period': 40, 'cmo_period': 14, 'cmo_oversold': -50.0, 'cmo_overbought': 50.0, 'atr_period': 14, 'atr_sl_mult': 3.0}
+  ✅ run_algorithm() OK (unique positions: [np.float64(-1.0), np.float64(0.0), np.float64(1.0)])
+  ✅ Validated: CmoTrima_MeanReversion_30m
+  [4/5] Optimizing (100 trials)...
+f:\Projects\alpha_farm\backtest\optimizer.py:358: ExperimentalWarning: Argument ``multivariate`` is an experimental feature. The interface can change in the future.
+  return TPESampler(
+
+============================================================
+  OPTIMIZER — CmoTrima_MeanReversion_30m
+============================================================
+  Method:     BAYESIAN (TPE)
+  Objective:  total_return_pct
+  Trials:     100
+  Parallel:   1 job
+  Params:     ['trima_period', 'cmo_period', 'cmo_oversold', 'cmo_overbought', 'atr_period', 'atr_sl_mult']
+============================================================
+
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 100/100 [00:00<00:00, 212.82it/s] 
+  ❌ Optimization failed: No trials are completed yet.
+
+────────────────────────────────────────────────────────────
+  Round 5/100 | TF=1m | Accepted: 0 | Rate: 0% | Elapsed: 4m
+────────────────────────────────────────────────────────────
+  [1/5] Generating idea (1m)...
+Traceback (most recent call last):
+  File "f:\Projects\alpha_farm\main.py", line 77, in <module>
+    main()
+    ~~~~^^
+  File "f:\Projects\alpha_farm\main.py", line 66, in main
+    run_pipeline(
+    ~~~~~~~~~~~~^
+        cookies=cookies,
+        ^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+        auto_submit=False             # Tắt Auto Submit tạm thời để chạy ngầm không bị kẹt GUI
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "f:\Projects\alpha_farm\agent\pipeline.py", line 261, in run_pipeline
+    idea = chat.send_json(idea_prompt, retries=3)
+  File "f:\Projects\alpha_farm\agent\gemini_client.py", line 896, in send_json
+    text = self.send(prompt)
+  File "f:\Projects\alpha_farm\agent\gemini_client.py", line 829, in send
+    raw = self._send_request(prompt)
+  File "f:\Projects\alpha_farm\agent\gemini_client.py", line 620, in _send_request
+    resp = self._session.post(
+        GENERATE_URL,
+    ...<3 lines>...
+        timeout=self.timeout,
+    )
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\requests\sessions.py", line 637, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\urllib3\connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\http\client.py", line 1450, in getresponse
+    response.begin()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\http\client.py", line 336, in begin
+    version, status, reason = self._read_status()
+                              ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\http\client.py", line 297, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\socket.py", line 725, in readinto
+    return self._sock.recv_into(b)
+           ~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\ssl.py", line 1304, in recv_into
+    return self.read(nbytes, buffer)
+           ~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\Lib\ssl.py", line 1138, in read
+    return self._sslobj.read(len, buffer)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+KeyboardInterrupt
