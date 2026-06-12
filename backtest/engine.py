@@ -112,7 +112,7 @@ class XNOBacktestEngine:
         positions = strategy.run_algorithm(df)
         
         # Unwrap RestrictedSeries if returned by strategy to allow engine/metrics to process it normally
-        if hasattr(positions, '_data'):
+        if type(positions).__name__ == 'RestrictedSeries':
             positions = positions._data
 
         close = df['Close'].values

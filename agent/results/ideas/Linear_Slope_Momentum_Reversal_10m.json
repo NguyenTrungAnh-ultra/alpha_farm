@@ -1,0 +1,77 @@
+{
+    "name": "Linear_Slope_Momentum_Reversal",
+    "timeframe": "10m",
+    "family": "momentum",
+    "description": "A balanced 10-minute intraday strategy combining structural trend orientation with structural oscillator momentum. It uses the slope of a Linear Regression line to guarantee a strong directional bias, while utilizing the Chande Momentum Oscillator (CMO) to enter during clean momentum surges in the direction of that trend. Exits are handled via dynamic Donchian Channel boundary tracking to secure profits and protect against market reversals without using looping logic.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "Slope",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=slope_period)"
+            },
+            {
+                "name": "CMO",
+                "definition": "self.feat.cmo(close, timeperiod=cmo_period)"
+            },
+            {
+                "name": "Donchian_High",
+                "definition": "self.feat.max(high, timeperiod=dc_period)"
+            },
+            {
+                "name": "Donchian_Low",
+                "definition": "self.feat.min(low, timeperiod=dc_period)"
+            },
+            {
+                "name": "Donchian_Mid",
+                "definition": "(Donchian_High + Donchian_Low) / 2.0"
+            }
+        ],
+        "entry_long": "(Slope > slope_threshold) & (CMO > cmo_long_trigger)",
+        "entry_short": "(Slope < -slope_threshold) & (CMO < cmo_short_trigger)",
+        "exit_logic": "Exit Long: (close < Donchian_Mid). Exit Short: (close > Donchian_Mid)."
+    },
+    "param_space": {
+        "slope_period": {
+            "type": "int",
+            "low": 20,
+            "high": 40,
+            "step": 2
+        },
+        "slope_threshold": {
+            "type": "float",
+            "low": 0.05,
+            "high": 0.35,
+            "step": 0.05
+        },
+        "cmo_period": {
+            "type": "int",
+            "low": 9,
+            "high": 18,
+            "step": 1
+        },
+        "cmo_long_trigger": {
+            "type": "float",
+            "low": 0.0,
+            "high": 25.0,
+            "step": 5.0
+        },
+        "cmo_short_trigger": {
+            "type": "float",
+            "low": -25.0,
+            "high": 0.0,
+            "step": 5.0
+        },
+        "dc_period": {
+            "type": "int",
+            "low": 10,
+            "high": 25,
+            "step": 1
+        }
+    }
+}

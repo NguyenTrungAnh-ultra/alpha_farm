@@ -1,0 +1,71 @@
+{
+    "name": "Kama_Linear_Angle_Regime_Position",
+    "timeframe": "30m",
+    "family": "trend-following",
+    "description": "A robust 30-minute position intraday strategy built to capture macro institutional trend legs while entirely filtering out choppy sideways segments. It utilizes the Kaufman Adaptive Moving Average (KAMA) as a dynamic baseline. To ensure the market is in a high-velocity phase and to protect against low-activity periods (such as flat bars or zero-volume spikes), entry is strictly conditioned on a prolonged Linear Regression Angle breakout. Exits are completely vectorized and loop-free, combining a trailing ATR envelope with structural KAMA crossing logic.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "KAMA",
+                "definition": "self.feat.kama(close, timeperiod=kama_period)"
+            },
+            {
+                "name": "LR_Angle",
+                "definition": "self.feat.linearreg_angle(close, timeperiod=angle_period)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Rolling_Max",
+                "definition": "self.feat.max(high, timeperiod=exit_period)"
+            },
+            {
+                "name": "Rolling_Min",
+                "definition": "self.feat.min(low, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(close > KAMA) & (LR_Angle > angle_threshold)",
+        "entry_short": "(close < KAMA) & (LR_Angle < -angle_threshold)",
+        "exit_logic": "Exit Long: (close < KAMA) or (close < Rolling_Max - (exit_mult * ATR)). Exit Short: (close > KAMA) or (close > Rolling_Min + (exit_mult * ATR))."
+    },
+    "param_space": {
+        "kama_period": {
+            "type": "int",
+            "low": 30,
+            "high": 55,
+            "step": 1
+        },
+        "angle_period": {
+            "type": "int",
+            "low": 20,
+            "high": 40,
+            "step": 2
+        },
+        "angle_threshold": {
+            "type": "float",
+            "low": 15.0,
+            "high": 35.0,
+            "step": 2.5
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        },
+        "exit_mult": {
+            "type": "float",
+            "low": 2.5,
+            "high": 4.5,
+            "step": 0.1
+        }
+    }
+}

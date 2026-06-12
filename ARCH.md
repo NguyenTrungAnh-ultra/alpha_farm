@@ -31,16 +31,16 @@ Dưới đây là các giới hạn và quy định chung để chiến lược 
 
 ## 3. Kiến Trúc Luồng Chạy & Các Phân Hệ
 
-### Pipeline Sinh Tự Động (`agent/pipeline.py`)
+### Pipeline Sinh Tự Động (`agent/`)
 
-- `run_pipeline()`: Trình điều khiển chính. Lặp qua các vòng: Gọi LLM sinh ý tưởng $\rightarrow$ Sinh Code $\rightarrow$ `validate_strategy` $\rightarrow$ `XNOBacktestEngine.run` $\rightarrow$ `portfolio.evaluate_and_add`.
-
-### Agent & AI (`agent/`)
-
+- `pipeline.py`: Trình điều khiển chính sử dụng Gemini LLM. Lặp qua các vòng: Gọi LLM sinh ý tưởng $\rightarrow$ Lưu JSON. (Phiên bản cũ còn kết nối trực tiếp đến XNOBacktestEngine).
+- `run_deepseek_pipeline.py`: Trình điều khiển song song sử dụng DeepSeek API. Thiết kế theo chuẩn Cache Hit Optimization.
+- `build_deepseek_prompt.py`: Chứa logic bóc tách Prompt Tĩnh (System) và Động (User) nhằm hỗ trợ cơ chế lưu bộ nhớ đệm của DeepSeek.
 - `gemini_client.py`: Gọi API ẩn danh Gemini.
-- `validator.py`: Chạy thử đoạn code LLM sinh ra trong Sandbox nội bộ. Bắt các lỗi cú pháp AST và đưa lỗi lại cho LLM để tự sửa thông qua `build_fix_prompt`.
-- `portfolio.py`: Đánh giá các chỉ số tối thiểu (Sharpe, CAGR). Thực hiện cơ chế kiểm tra tương quan kép (Dual-Correlation) trên cả chuỗi lợi nhuận và chuỗi tín hiệu để giảm thiểu chiến lược trùng lặp. Đạt đủ điều kiện thì lưu vào đĩa.
-- `auto_submit.py`: Sử dụng Playwright và giao thức CDP để tự động dán mã chiến lược, mô phỏng trên nền tảng Web và xác nhận nộp bài. Script cũng có cơ chế bóc tách thông số (Metrics) trực tiếp từ giao diện DOM để lưu vào `leaderboard.csv`.
+- `extract_json_response.py`: Tiện ích dùng chung để bóc tách dữ liệu JSON từ phản hồi của LLM (Regex Parser).
+- `validator.py`: Chạy thử đoạn code LLM sinh ra trong Sandbox nội bộ. Bắt các lỗi cú pháp AST và đưa lỗi lại cho LLM để tự sửa.
+- `portfolio.py`: Đánh giá các chỉ số tối thiểu (Sharpe, CAGR). Thực hiện cơ chế kiểm tra tương quan kép (Dual-Correlation).
+- `auto_submit.py`: Sử dụng Playwright và giao thức CDP để tự động dán mã chiến lược, mô phỏng trên nền tảng Web và xác nhận nộp bài.
 
 ### Sandbox Mocking (`xno_sdk/`)
 

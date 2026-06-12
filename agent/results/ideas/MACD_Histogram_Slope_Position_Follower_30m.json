@@ -1,0 +1,77 @@
+{
+    "name": "MACD_Histogram_Slope_Position_Follower",
+    "timeframe": "30m",
+    "family": "volatility",
+    "description": "A 30-minute position-intraday strategy that exploits major volatility shifts in the VN30F1M contract. It tracks the physical derivative momentum via the rate of change of the MACD Histogram slope rather than simple crosses, capturing institutional velocity early. To prevent false breakouts during the market's common prolonged narrow sideways phases, entries are restricted by a strict Normalized ATR (NATR) threshold acting as a structural volatility filter. Vectorized exits use a multi-bar rolling median price boundary to protect the position over broader multi-hour swings.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "MACD_Hist",
+                "definition": "self.feat.macd(close, fastperiod=fast_macd, slowperiod=slow_macd, signalperiod=9)[2]"
+            },
+            {
+                "name": "Hist_Slope",
+                "definition": "self.feat.linearreg_slope(MACD_Hist, timeperiod=slope_period)"
+            },
+            {
+                "name": "NATR",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Midpoint",
+                "definition": "self.feat.midpoint(close, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(Hist_Slope > slope_threshold) & (NATR > volatility_min)",
+        "entry_short": "(Hist_Slope < -slope_threshold) & (NATR > volatility_min)",
+        "exit_logic": "Exit Long: (close < Midpoint - 0.25 * ATR) or (Hist_Slope < 0.0). Exit Short: (close > Midpoint + 0.25 * ATR) or (Hist_Slope > 0.0)."
+    },
+    "param_space": {
+        "fast_macd": {
+            "type": "int",
+            "low": 12,
+            "high": 24,
+            "step": 2
+        },
+        "slow_macd": {
+            "type": "int",
+            "low": 26,
+            "high": 52,
+            "step": 2
+        },
+        "slope_period": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "slope_threshold": {
+            "type": "float",
+            "low": 0.02,
+            "high": 0.15,
+            "step": 0.01
+        },
+        "volatility_min": {
+            "type": "float",
+            "low": 0.08,
+            "high": 0.22,
+            "step": 0.01
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 20,
+            "high": 40,
+            "step": 2
+        }
+    }
+}
