@@ -6,3 +6,5 @@ data/
 *.png
 scoring_analysis_full.json
 scoring_analysis_raw.csv
+api.txt
+log.txt
