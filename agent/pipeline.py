@@ -44,6 +44,17 @@ def load_cookies(filepath: str = None) -> str:
                 return line
     raise ValueError(f"No cookies found in {filepath}")
 
+def load_deepseek_token(filepath: str = None) -> str:
+    """Read auth token from token.txt"""
+    if filepath is None:
+        filepath = os.path.join(PROJECT_ROOT, "token.txt")
+    with open(filepath, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                return line
+    raise ValueError(f"No token found in {filepath}")
+
 def load_experience_log(filepath: str = None) -> str:
     if filepath is None:
         filepath = os.path.join(PROJECT_ROOT, "agent", "experience_log.md")
@@ -67,7 +78,7 @@ def load_existing_ideas(ideas_dir: str) -> list[dict]:
     return ideas
 
 # ─── Timeframe Configuration ────────────────────────────────────────
-TIMEFRAME_ORDER = ["5m", "10m", "15m", "30m", "1m"]
+TIMEFRAME_ORDER = ["10m", "15m", "30m", "60m"]
 
 
 # ─── Main Pipeline ──────────────────────────────────────────────────
@@ -89,15 +100,25 @@ def run_pipeline(
     
     os.makedirs(results_dir, exist_ok=True)
     
-    chat = GeminiChat(
-        cookies=cookies,
-        model=model,
-        request_delay=request_delay,
-        max_retries=5,
-        timeout=180, # Increased timeout for thinking model
-        verbose=True,
-    )
-    print(f"[Pipeline] GeminiChat ready: {chat}")
+    if model == "deepseek-thinking":
+        try:
+            from agent.deepseek_client import DeepseekChatClient
+            token = load_deepseek_token()
+            chat = DeepseekChatClient(auth_token=token, thinking_enabled=True, verbose=True)
+            print(f"[Pipeline] DeepseekChatClient ready")
+        except Exception as e:
+            print(f"[Pipeline] Failed to init Deepseek: {e}")
+            sys.exit(1)
+    else:
+        chat = GeminiChat(
+            cookies=cookies,
+            model=model,
+            request_delay=request_delay,
+            max_retries=5,
+            timeout=180, # Increased timeout for thinking model
+            verbose=True,
+        )
+        print(f"[Pipeline] GeminiChat ready: {chat}")
     
     experience = load_experience_log()
     print(f"[Pipeline] Loaded Experience Log: {len(experience)} chars")

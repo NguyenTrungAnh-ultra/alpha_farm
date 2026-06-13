@@ -25,29 +25,6 @@ TALIB_INDICATORS = """
 
 # ─── Timeframe-specific guidance ────────────────────────────────────
 TIMEFRAME_HINTS = {
-    "1m": """
-**1-Minute Timeframe** — Ultra-fast Scalping:
-- Indicator periods: very short (3-15 bars)
-- Trades: frequent (10-30+/day), small targets (0.5-2 points)
-- Suitable for: Momentum bursts, order flow, micro mean-reversion
-- Stop loss: very tight (1-3 points)
-- Note: High noise, requires strong filters (volume, volatility)
-""",
-    "3m": """
-**3-Minute Timeframe** — Fast Scalping/Intraday:
-- Indicator periods: short-to-medium (5-20 bars)
-- Trades: medium (5-15/day)
-- Suitable for: Momentum, short-term trends, session breakouts
-- Stop loss: 2-5 points
-""",
-    "5m": """
-**5-Minute Timeframe** — Standard Intraday:
-- Indicator periods: medium (10-30 bars)
-- Trades: 3-8/day
-- Suitable for: Trend-following, mean-reversion, consolidation breakouts
-- Stop loss: 3-8 points
-- This is the most popular timeframe, many classic strategies work well here
-""",
     "10m": """
 **10-Minute Timeframe** — Balanced Intraday:
 - Indicator periods: medium-to-long (10-40 bars)
@@ -71,7 +48,7 @@ TIMEFRAME_HINTS = {
 - Stop loss: 10-20 points
 - Caution: Fewer bars per day, so indicators need sufficient lookback
 """,
-    "1H": """
+    "60m": """
 **1-Hour Timeframe** — Position/Large Swing:
 - Indicator periods: long (10-30 bars ≈ 2-6 days)
 - Trades: 0-1/day (very rare, some weeks may have no trades)
@@ -114,7 +91,7 @@ def build_idea_prompt(
     # Format existing strategies list
     if existing_strategies:
         existing_list = "\n".join([
-            f"  - [{s['timeframe']}] {s['name']} ({s['family']}): {s.get('description', '')[:80]}"
+            f"  - [{s['timeframe']}] {s['name']} ({s['family']})"
             for s in existing_strategies
         ])
         existing_section = f"""
@@ -159,11 +136,13 @@ This is round {round_num}/{total_rounds}.
 {tf_hint}
 {exp_section}
 ## Quality Requirements
-- The strategy must have **CLEAR entry/exit logic**, not vague, expressed using mathematical formulas.
+- The strategy must have **CLEAR entry/exit logic**, expressed strictly as mathematical formulas. NO natural language.
 - Must use **at least 2 indicators** (1 primary + 1 filter/confirmation).
 - Must have its **own exit logic** (do not just reverse signals).
 - Parameters must have **reasonable search spaces** for optimization.
 - Must be **COMPLETELY DIFFERENT** from existing strategies.
+- **CRITICAL**: Use Pandas bitwise operators `&`, `|`, `~` for logic instead of `and`, `or`, `not`. You MUST wrap every condition in parentheses, e.g., `(close > MA) & (RSI < 30)`.
+- **CRITICAL**: ONLY use the indicators listed below via `self.feat.xxx()`. Do not invent functions like `shift()`, `cumulative_sum()`, or `.rolling()`.
 
 {existing_section}
 
@@ -184,12 +163,12 @@ This is round {round_num}/{total_rounds}.
     "formula": {{
         "inputs": ["close", "high", "low", "volume"],
         "indicators": [
-            {{"name": "EMA_fast", "definition": "EMA(close, timeperiod=10)"}},
-            {{"name": "ATR", "definition": "ATR(high, low, close, timeperiod=14)"}}
+            {{"name": "EMA_fast", "definition": "self.feat.ema(close, timeperiod=10)"}},
+            {{"name": "ATR", "definition": "self.feat.atr(high, low, close, timeperiod=14)"}}
         ],
-        "entry_long": "Specific mathematical formula to enter LONG (e.g.: close > EMA_fast + 0.5 * ATR)",
+        "entry_long": "Specific mathematical formula to enter LONG (e.g.: (close > EMA_fast) & (ATR > 0.5))",
         "entry_short": "Specific mathematical formula to enter SHORT",
-        "exit_logic": "Exit conditions (applied commonly or separately)"
+        "exit_logic": "Exit Long: [strict python formula]. Exit Short: [strict python formula]."
     }},
     "param_space": {{
         "param_name": {{"type": "int|float", "low": 5, "high": 30, "step": 1}},
