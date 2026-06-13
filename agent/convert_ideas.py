@@ -19,7 +19,7 @@ def clean_expression(expr: str) -> str:
     if not expr:
         return ""
     # Correct TA-Lib CDL function naming (e.g. cdl_engulfing -> cdlengulfing)
-    expr = re.sub(r'\bcdl_(\w+)\b', lambda m: f"cdl{m.group(1)}", expr)
+    expr = re.sub(r'\bcdl_(\w+)\b', lambda m: f"cdl{m.group(1)}", expr, flags=re.IGNORECASE)
     # Replace forbidden open variable name with open_price
     expr = re.sub(r'\bopen\b', 'open_price', expr)
     # Replace case-insensitive ' or ' and ' and ' with '|' and '&'
@@ -31,18 +31,21 @@ def clean_expression(expr: str) -> str:
 
 def parse_exit_logic(exit_logic_str: str) -> tuple[str, str]:
     """Parse exit_logic string into exit_long and exit_short expressions."""
-    # Pattern: Exit Long: <expr>. Exit Short: <expr>.
-    long_match = re.search(r'Exit Long:\s*(.*?)(?=\.?\s*Exit Short:|$)', exit_logic_str, re.IGNORECASE)
-    short_match = re.search(r'Exit Short:\s*(.*?)(?=\.?\s*Exit Long:|$)', exit_logic_str, re.IGNORECASE)
-    
+    parts = re.split(r'[;\.]', exit_logic_str)
     exit_long = ""
     exit_short = ""
-    
-    if long_match:
-        exit_long = clean_expression(long_match.group(1))
-    if short_match:
-        exit_short = clean_expression(short_match.group(1))
-        
+    for part in parts:
+        part = part.strip()
+        if not part: continue
+        if 'long' in part.lower():
+            expr = re.sub(r'.*long.*?(:|when)\s*', '', part, flags=re.IGNORECASE).strip()
+            expr = re.sub(r'^(?:exit\s+when|exit)\s*', '', expr, flags=re.IGNORECASE).strip()
+            exit_long = clean_expression(expr)
+        elif 'short' in part.lower():
+            expr = re.sub(r'.*short.*?(:|when)\s*', '', part, flags=re.IGNORECASE).strip()
+            expr = re.sub(r'^(?:exit\s+when|exit)\s*', '', expr, flags=re.IGNORECASE).strip()
+            exit_short = clean_expression(expr)
+            
     return exit_long, exit_short
 
 def generate_python_code(idea: dict) -> str:
@@ -66,12 +69,12 @@ def generate_python_code(idea: dict) -> str:
         # Determine default value as midpoint
         if p_type == 'int':
             default_val = int((low + high) // 2)
-            lines.append(f"        self.{param_name} = int(self.{param_name} if '{param_name}' in self.__dict__ else {default_val})")
+            lines.append(f"        self.{param_name} = {default_val}")
         else:
             default_val = float((low + high) / 2.0)
             # Round float default to a clean representation
             default_val = round(default_val, 4)
-            lines.append(f"        self.{param_name} = float(self.{param_name} if '{param_name}' in self.__dict__ else {default_val})")
+            lines.append(f"        self.{param_name} = {default_val}")
             
     lines.append("")
     lines.append("        # 2. Local variables for parameters")
@@ -94,9 +97,15 @@ def generate_python_code(idea: dict) -> str:
         ind_def = ind.get('definition')
         
         # Correct TA-Lib CDL function naming (e.g. cdl_engulfing -> cdlengulfing)
-        ind_def = re.sub(r'\bcdl_(\w+)\b', lambda m: f"cdl{m.group(1)}", ind_def)
+        ind_def = re.sub(r'\bcdl_(\w+)\b', lambda m: f"cdl{m.group(1)}", ind_def, flags=re.IGNORECASE)
         # Replace forbidden open variable name with open_price
         ind_def = re.sub(r'\bopen\b', 'open_price', ind_def)
+        
+        # Auto-inject self.feat. for known functions if missing
+        func_pattern = r'(?<!self\.feat\.)\b(sma|ema|dema|tema|wma|kama|t3|trima|midpoint|midprice|sar|linearreg|linearreg_slope|rsi|stoch|stochf|stochrsi|macd|mom|roc|rocp|willr|cci|cmo|mfi|ultosc|trix|adx|adxr|aroon|aroonosc|dx|minus_di|plus_di|apo|ppo|bop|atr|natr|trange|bbands|ad|adosc|obv|max|min|stddev|var|linearreg_angle|cdl[a-z0-9_]+)\s*\('
+        ind_def = re.sub(func_pattern, r'self.feat.\1(', ind_def, flags=re.IGNORECASE)
+        # Lowercase the function name after self.feat.
+        ind_def = re.sub(r'self\.feat\.([A-Za-z0-9_]+)', lambda m: f"self.feat.{m.group(1).lower()}", ind_def)
         
         # Apply anti-singularity adjustments if dividing by volume or high-low range
         # Check if the definition contains division by volume or price range

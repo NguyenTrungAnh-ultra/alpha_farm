@@ -1,0 +1,731 @@
+adx
+Returns: SeriesT
+self.feat.adx(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, timeperiod=14)
+ADX function
+sma
+Returns: SeriesT
+self.feat.sma(close: SeriesT = None, timeperiod=30)
+Simple Moving Average (SMA). Calculates the average closing price over a specified time period.
+macd
+Returns: tuple[SeriesT, SeriesT, SeriesT]
+self.feat.macd(close: SeriesT = None, fastperiod=12, slowperiod=26, signalperiod=9)
+Moving Average Convergence Divergence (MACD). A trend-following momentum indicator. Returns (macd, signal, histogram).
+roc
+Returns: SeriesT
+self.feat.roc(close: SeriesT = None, timeperiod=10)
+Rate of Change (ROC). Measures the percentage change in price over a specified time period.
+rsi
+Returns: SeriesT
+self.feat.rsi(close: SeriesT = None, timeperiod=14)
+Relative Strength Index (RSI). Measures price momentum on a scale of 0-100. RSI > 70 indicates overbought, RSI < 30 indicates oversold.
+obv
+Returns: SeriesT
+self.feat.obv(close: SeriesT = None, volume: SeriesT = None)
+On Balance Volume (OBV). A cumulative volume indicator that adds volume on up days and subtracts on down days.
+vwap
+Returns: SeriesT
+self.feat.vwap(high: SeriesT, low: SeriesT, close: SeriesT, volume: SeriesT)
+Volume Weighted Average Price (VWAP). The average price weighted by volume, commonly used as a trading benchmark.
+rolling_vwap
+Returns: SeriesT
+self.feat.rolling_vwap(high: SeriesT, low: SeriesT, close: SeriesT, volume: SeriesT, window=20)
+Rolling Volume Weighted Average Price. VWAP calculated over a rolling window period.
+bbands
+Returns: tuple[SeriesT, SeriesT, SeriesT]
+self.feat.bbands(close: SeriesT = None, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
+Bollinger Bands. A volatility indicator with upper, middle, and lower bands based on standard deviations. Returns (upperband, middleband, lowerband).
+dema
+Returns: SeriesT
+self.feat.dema(series: SeriesT = None, timeperiod=30)
+Double Exponential Moving Average (DEMA). Reduces lag compared to traditional EMA by applying EMA twice.
+ema
+Returns: SeriesT
+self.feat.ema(series: SeriesT = None, timeperiod=30)
+Exponential Moving Average (EMA). A weighted moving average that gives more weight to recent prices.
+ht_trendline
+Returns: SeriesT
+self.feat.ht_trendline(series: SeriesT = None)
+Hilbert Transform - Instantaneous Trendline. A cycle indicator that smooths price data to identify trend direction.
+kama
+Returns: SeriesT
+self.feat.kama(series: SeriesT = None, timeperiod=30)
+Kaufman Adaptive Moving Average (KAMA). An adaptive moving average that adjusts speed based on market volatility.
+ma
+Returns: SeriesT
+self.feat.ma(series: SeriesT = None, timeperiod=30, matype=0)
+Moving Average. A generic moving average with configurable type (0=SMA, 1=EMA, 2=WMA, etc.).
+mama
+Returns: tuple[SeriesT, SeriesT]
+self.feat.mama(series: SeriesT = None, fastlimit=0, slowlimit=0)
+MESA Adaptive Moving Average (MAMA). An adaptive moving average that adjusts to market cycles. Returns (mama, fama).
+mavp
+Returns: SeriesT
+self.feat.mavp(series: SeriesT = None, periods: SeriesT = None, minperiod=2, maxperiod=30, matype=0)
+Moving Average with Variable Period (MAVP). A moving average where the period can vary for each data point.
+midpoint
+Returns: SeriesT
+self.feat.midpoint(series: SeriesT = None, timeperiod=14)
+MidPoint over period. Returns the average of highest and lowest values over a period.
+midprice
+Returns: SeriesT
+self.feat.midprice(high: SeriesT = None, low: SeriesT = None, timeperiod=14)
+Midpoint Price over period. Returns the average of highest high and lowest low over a period.
+sar
+Returns: SeriesT
+self.feat.sar(high: SeriesT = None, low: SeriesT = None, acceleration=0, maximum=0)
+Parabolic SAR (Stop and Reverse). A trend-following indicator that provides entry/exit points.
+sarext
+Returns: SeriesT
+self.feat.sarext(high: SeriesT = None, low: SeriesT = None, startvalue=0, offsetonreverse=0, ...)
+Parabolic SAR Extended. Extended version of SAR with more configurable acceleration factors for long and short positions.
+t3
+Returns: SeriesT
+self.feat.t3(series: SeriesT = None, timeperiod=5, vfactor=0)
+Triple Exponential Moving Average (T3). A smoothed moving average with reduced lag using volume factor.
+tema
+Returns: SeriesT
+self.feat.tema(series: SeriesT = None, timeperiod=30)
+Triple Exponential Moving Average (TEMA). Reduces lag further than DEMA by applying EMA three times.
+trima
+Returns: SeriesT
+self.feat.trima(series: SeriesT = None, timeperiod=30)
+Triangular Moving Average (TRIMA). A double-smoothed simple moving average with more weight on the middle of the period.
+wma
+Returns: SeriesT
+self.feat.wma(series: SeriesT = None, timeperiod=30)
+Weighted Moving Average (WMA). A moving average that assigns linearly increasing weights to more recent data.
+adxr
+Returns: SeriesT
+self.feat.adxr(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, timeperiod=14)
+Average Directional Movement Index Rating (ADXR). A smoothed version of ADX measuring trend strength.
+apo
+Returns: SeriesT
+self.feat.apo(series: SeriesT = None, fastperiod=12, slowperiod=26, matype=0)
+Absolute Price Oscillator (APO). Measures the difference between two moving averages of price.
+aroon
+Returns: Tuple[SeriesT, SeriesT]
+self.feat.aroon(high: SeriesT = None, low: SeriesT = None, timeperiod=14)
+Aroon Indicator. Identifies trend changes and strength. Returns ["aroondown", "aroonup"]. Values range 0-100.
+aroonosc
+Returns: SeriesT
+self.feat.aroonosc(high: SeriesT = None, low: SeriesT = None, timeperiod=14)
+Aroon Oscillator. The difference between Aroon Up and Aroon Down. Range -100 to +100.
+bop
+Returns: SeriesT
+self.feat.bop(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Balance of Power (BOP). Measures the strength of buyers vs sellers. Range -1 to +1.
+cci
+Returns: SeriesT
+self.feat.cci(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, timeperiod=14)
+Commodity Channel Index (CCI). Measures price deviation from statistical mean. Values above +100 indicate overbought, below -100 indicate oversold.
+cmo
+Returns: SeriesT
+self.feat.cmo(series: SeriesT = None, timeperiod=14)
+Chande Momentum Oscillator (CMO). A momentum indicator similar to RSI. Range -100 to +100.
+dx
+Returns: SeriesT
+self.feat.dx(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, timeperiod=14)
+Directional Movement Index (DX). Measures trend strength without considering direction. Range 0-100.
+macdext
+Returns: Tuple[SeriesT, SeriesT, SeriesT]
+self.feat.macdext(series: SeriesT = None, fastperiod=12, fastmatype=0, slowperiod=26, slowmatype=0, signalperiod=9, signalmatype=0)
+MACD with controllable MA type. Extended MACD allowing different moving average types for ["macd", "macdsignal", "macdhist"].
+macdfix
+Returns: Tuple[SeriesT, SeriesT, SeriesT]
+self.feat.macdfix(series: SeriesT = None, signalperiod=9)
+Return ["macd", "macdsignal", "macdhist"]
+mfi
+Returns: SeriesT
+self.feat.mfi(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, volume: SeriesT = None, timeperiod=14)
+Money Flow Index (MFI). A volume-weighted RSI that measures buying and selling pressure. Range 0-100.
+minus_di
+Returns: SeriesT
+self.feat.minus_di(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, timeperiod=14)
+Minus Directional Indicator (-DI). Measures downward price movement strength. Used with ADX.
+minus_dm
+Returns: SeriesT
+self.feat.minus_dm(high: SeriesT = None, low: SeriesT = None, timeperiod=14)
+Minus Directional Movement (-DM). Raw downward movement before smoothing.
+momentum
+Returns: SeriesT
+self.feat.momentum(series: SeriesT = None, timeperiod=10)
+Momentum. Measures the rate of price change over a period. Positive values indicate upward momentum.
+plus_di
+Returns: SeriesT
+self.feat.plus_di(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, timeperiod=14)
+Plus Directional Indicator (+DI). Measures upward price movement strength. Used with ADX.
+plus_dm
+Returns: SeriesT
+self.feat.plus_dm(high: SeriesT = None, low: SeriesT = None, timeperiod=14)
+Plus Directional Movement (+DM). Raw upward movement before smoothing.
+ppo
+Returns: SeriesT
+self.feat.ppo(series: SeriesT = None, fastperiod=12, slowperiod=26, matype=0)
+Percentage Price Oscillator (PPO). Similar to MACD but expressed as a percentage.
+rocp
+Returns: SeriesT
+self.feat.rocp(series: SeriesT = None, timeperiod=10)
+Rate of Change Percentage (ROCP). Price change as a decimal percentage.
+rocr
+Returns: SeriesT
+self.feat.rocr(series: SeriesT = None, timeperiod=10)
+Rate of Change Ratio (ROCR). Current price divided by price N periods ago.
+rocr100
+Returns: SeriesT
+self.feat.rocr100(series: SeriesT = None, timeperiod=10)
+Rate of Change Ratio 100 scale (ROCR100). ROCR multiplied by 100 for easier reading.
+stoch
+Returns: Tuple[SeriesT, SeriesT]
+self.feat.stoch(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, fastk_period=5, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0)
+Stochastic Oscillator. A momentum indicator comparing closing price to price range. Returns (slowk, slowd). Values above 80 indicate overbought, below 20 indicate oversold.
+stochf
+Returns: Tuple[SeriesT, SeriesT]
+self.feat.stochf(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, fastk_period=5, fastd_period=3, fastd_matype=0)
+Stochastic Fast. Fast version of Stochastic Oscillator. Returns (fastk, fastd).
+stochrsi
+Returns: Tuple[SeriesT, SeriesT]
+self.feat.stochrsi(series: SeriesT = None, timeperiod=14, fastk_period=5, fastd_period=3, fastd_matype=0)
+Stochastic RSI. Applies Stochastic formula to RSI values. Returns (fastk, fastd). Very sensitive oscillator.
+trix
+Returns: SeriesT
+self.feat.trix(close: SeriesT = None, timeperiod=30)
+TRIX. 1-day Rate of Change of Triple Smoothed EMA. A momentum oscillator filtering out noise.
+ultosc
+Returns: SeriesT
+self.feat.ultosc(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, timeperiod1=7, timeperiod2=14, timeperiod3=28)
+Ultimate Oscillator. A momentum oscillator using three timeframes to reduce volatility and false signals.
+willr
+Returns: SeriesT
+self.feat.willr(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, timeperiod=14)
+Williams %R. A momentum indicator measuring overbought/oversold levels. Range -100 to 0. Below -80 is oversold, above -20 is overbought.
+ad
+Returns: SeriesT
+self.feat.ad(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, volume: SeriesT = None)
+Accumulation/Distribution Line (AD). A volume-based indicator measuring money flow into or out of a security.
+adosc
+Returns: SeriesT
+self.feat.adosc(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, volume: SeriesT = None, fastperiod=3, slowperiod=10)
+Chaikin A/D Oscillator (ADOSC). Measures momentum of the Accumulation/Distribution line using MACD formula.
+atr
+Returns: SeriesT
+self.feat.atr(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, timeperiod=14)
+Average True Range (ATR). A volatility indicator that measures the average range between high and low prices.
+natr
+Returns: SeriesT
+self.feat.natr(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None, timeperiod=14)
+Normalized Average True Range (NATR). ATR expressed as a percentage of closing price for comparability across securities.
+trange
+Returns: SeriesT
+self.feat.trange(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+True Range (TRANGE). The greatest of: current high - current low, abs(current high - previous close), abs(current low - previous close).
+dcperiod
+Returns: SeriesT
+self.feat.dcperiod(close: SeriesT = None)
+Hilbert Transform - Dominant Cycle Period. Identifies the dominant cycle period in the data.
+sine
+Returns: Tuple[SeriesT, SeriesT]
+self.feat.sine(close: SeriesT)
+Hilbert Transform - SineWave. Returns (sine, leadsine) for identifying cycle turning points.
+trendmode
+Returns: SeriesT
+self.feat.trendmode(close: SeriesT = None)
+Hilbert Transform - Trend vs Cycle Mode. Returns 1 for trend mode, 0 for cycle mode.
+avgprice
+Returns: SeriesT
+self.feat.avgprice(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Average Price. Returns (open + high + low + close) / 4.
+medprice
+Returns: SeriesT
+self.feat.medprice(high: SeriesT = None, low: SeriesT = None)
+Median Price. Returns (high + low) / 2.
+typprice
+Returns: SeriesT
+self.feat.typprice(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Typical Price. Returns (high + low + close) / 3.
+wclprice
+Returns: SeriesT
+self.feat.wclprice(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Weighted Close Price. Returns (high + low + close*2) / 4. Gives more weight to closing price.
+beta
+Returns: SeriesT
+self.feat.beta(s1: SeriesT, s2: SeriesT, timeperiod=5)
+Beta (β). Measures the volatility or systematic risk of a security compared to another series. Beta > 1 indicates higher volatility.
+correl
+Returns: SeriesT
+self.feat.correl(s1: SeriesT, s2: SeriesT, timeperiod=30)
+Pearson's Correlation Coefficient (r). Measures the linear relationship between two series. Range -1 to +1.
+linearreg
+Returns: SeriesT
+self.feat.linearreg(s1: SeriesT, timeperiod=14)
+Linear Regression. Calculates the linear regression line endpoint values over a period.
+linearreg_angle
+Returns: SeriesT
+self.feat.linearreg_angle(s1: SeriesT, timeperiod=14)
+Linear Regression Angle. Returns the angle (in degrees) of the linear regression line.
+linearreg_intercept
+Returns: SeriesT
+self.feat.linearreg_intercept(s1: SeriesT, timeperiod=14)
+Linear Regression Intercept. Returns the y-intercept of the linear regression line.
+linearreg_slope
+Returns: SeriesT
+self.feat.linearreg_slope(s1: SeriesT, timeperiod=14)
+Linear Regression Slope. Returns the slope of the linear regression line.
+stddev
+Returns: SeriesT
+self.feat.stddev(s1: SeriesT, timeperiod=5, nbdev=1)
+Standard Deviation. Measures the dispersion of values from their mean over a period.
+tsf
+Returns: SeriesT
+self.feat.tsf(s1: SeriesT, timeperiod=14)
+Time Series Forecast. Projects the linear regression line one period into the future.
+var
+Returns: SeriesT
+self.feat.var(s1: SeriesT, timeperiod=5, nbdev=1)
+Variance. Measures the squared deviation of values from their mean over a period.
+acos
+Returns: SeriesT
+self.feat.acos(s1: SeriesT)
+Arc Cosine. Calculates the inverse cosine (in radians) of each value.
+asin
+Returns: SeriesT
+self.feat.asin(s1: SeriesT)
+Arc Sine. Calculates the inverse sine (in radians) of each value.
+atan
+Returns: SeriesT
+self.feat.atan(s1: SeriesT)
+Arc Tangent. Calculates the inverse tangent (in radians) of each value.
+ceil
+Returns: SeriesT
+self.feat.ceil(s1: SeriesT)
+Ceiling. Rounds each value up to the nearest integer.
+cos
+Returns: SeriesT
+self.feat.cos(s1: SeriesT)
+Cosine. Calculates the cosine of each value (input in radians).
+cosh
+Returns: SeriesT
+self.feat.cosh(s1: SeriesT)
+Hyperbolic Cosine. Calculates the hyperbolic cosine of each value.
+exp
+Returns: SeriesT
+self.feat.exp(s1: SeriesT)
+Exponential. Calculates e raised to the power of each value (e^x).
+floor
+Returns: SeriesT
+self.feat.floor(s1: SeriesT)
+Floor. Rounds each value down to the nearest integer.
+ln
+Returns: SeriesT
+self.feat.ln(s1: SeriesT)
+Natural Logarithm. Calculates the natural logarithm (base e) of each value.
+log10
+Returns: SeriesT
+self.feat.log10(s1: SeriesT)
+Logarithm Base 10. Calculates the base-10 logarithm of each value.
+sin
+Returns: SeriesT
+self.feat.sin(s1: SeriesT)
+Sine. Calculates the sine of each value (input in radians).
+sinh
+Returns: SeriesT
+self.feat.sinh(s1: SeriesT)
+Hyperbolic Sine. Calculates the hyperbolic sine of each value.
+sqrt
+Returns: SeriesT
+self.feat.sqrt(s1: SeriesT)
+Square Root. Calculates the square root of each value.
+tan
+Returns: SeriesT
+self.feat.tan(s1: SeriesT)
+Tangent. Calculates the tangent of each value (input in radians).
+tanh
+Returns: SeriesT
+self.feat.tanh(s1: SeriesT)
+Hyperbolic Tangent. Calculates the hyperbolic tangent of each value.
+add
+Returns: SeriesT
+self.feat.add(s1: SeriesT, s2: SeriesT)
+Vector Addition. Adds two series element-wise (s1 + s2).
+div
+Returns: SeriesT
+self.feat.div(s1: SeriesT, s2: SeriesT)
+Vector Division. Divides two series element-wise (s1 / s2).
+max
+Returns: SeriesT
+self.feat.max(s1: SeriesT, timeperiod=30)
+Highest Value over Period. Returns the maximum value over a rolling window.
+maxindex
+Returns: SeriesT
+self.feat.maxindex(s1: SeriesT, timeperiod=30)
+Index of Highest Value. Returns the index of the maximum value within a rolling window.
+min
+Returns: SeriesT
+self.feat.min(s1: SeriesT, timeperiod=30)
+Lowest Value over Period. Returns the minimum value over a rolling window.
+minindex
+Returns: SeriesT
+self.feat.minindex(s1: SeriesT, timeperiod=30)
+Index of Lowest Value. Returns the index of the minimum value within a rolling window.
+minmax
+Returns: Tuple[SeriesT, SeriesT]
+self.feat.minmax(s1: SeriesT, timeperiod=30)
+Lowest and Highest Values. Returns both minimum and maximum values over a rolling window as (min, max).
+minmaxindex
+Returns: Tuple[SeriesT, SeriesT]
+self.feat.minmaxindex(s1: SeriesT, timeperiod=30)
+Indices of Lowest and Highest Values. Returns both minimum and maximum indices within a rolling window.
+mult
+Returns: SeriesT
+self.feat.mult(s1: SeriesT, s2: SeriesT)
+Vector Multiplication. Multiplies two series element-wise (s1 * s2).
+sub
+Returns: SeriesT
+self.feat.sub(s1: SeriesT, s2: SeriesT)
+Vector Subtraction. Subtracts two series element-wise (s1 - s2).
+sum
+Returns: SeriesT
+self.feat.sum(s1: SeriesT, timeperiod=30)
+Summation. Calculates the sum of values over a rolling window.
+rolling_mean
+Returns: SeriesT
+self.feat.rolling_mean(s1: SeriesT, window=20)
+Rolling Mean. Calculates the mean over a rolling window.
+rolling_max
+Returns: SeriesT
+self.feat.rolling_max(s1: SeriesT, window=20)
+Rolling Maximum. Calculates the maximum value over a rolling window.
+rolling_min
+Returns: SeriesT
+self.feat.rolling_min(s1: SeriesT, window=20)
+Rolling Minimum. Calculates the minimum value over a rolling window.
+rolling_std
+Returns: SeriesT
+self.feat.rolling_std(s1: SeriesT, window=20)
+Rolling Standard Deviation. Calculates the standard deviation over a rolling window.
+rolling_sum
+Returns: SeriesT
+self.feat.rolling_sum(s1: SeriesT, window=20)
+Rolling Sum. Calculates the sum of values over a rolling window.
+rolling_prod
+Returns: SeriesT
+self.feat.rolling_prod(s1: SeriesT, window=20)
+Rolling Product. Calculates the product of values over a rolling window.
+rolling_rank
+Returns: SeriesT
+self.feat.rolling_rank(s1: SeriesT, window=20)
+Rolling Rank. Returns the percentile rank of the current value within a rolling window.
+rolling_correlation
+Returns: SeriesT
+self.feat.rolling_correlation(s1: SeriesT, s2: SeriesT, window=20)
+Rolling Correlation. Calculates the correlation coefficient between two series over a rolling window.
+rolling_covariance
+Returns: SeriesT
+self.feat.rolling_covariance(s1: SeriesT, s2: SeriesT, window=20)
+Rolling Covariance. Calculates the covariance between two series over a rolling window.
+rolling_median
+Returns: SeriesT
+self.feat.rolling_median(s1: SeriesT, window=20)
+Rolling Median. Calculates the median value over a rolling window.
+rolling_quantile
+Returns: SeriesT
+self.feat.rolling_quantile(s1: SeriesT, window=20, q=0.5)
+Rolling Quantile. Calculates the q quantile over a trailing window.
+rolling_percentile_rank
+Returns: SeriesT
+self.feat.rolling_percentile_rank(s1: SeriesT, window=20, method='average')
+Rolling Percentile Rank. Returns the current value's percentile rank inside the trailing window, normalized from 0 to 1.
+rolling_zscore
+Returns: SeriesT
+self.feat.rolling_zscore(s1: SeriesT, window=20)
+Rolling Z-Score. Returns the current value's z-score inside the trailing window.
+rolling_mad
+Returns: SeriesT
+self.feat.rolling_mad(s1: SeriesT, window=20)
+Rolling Median Absolute Deviation. Calculates robust dispersion over a trailing window.
+rolling_argmax
+Returns: SeriesT
+self.feat.rolling_argmax(s1: SeriesT, window=20)
+Rolling Argmax. Returns bars since the most recent maximum within the trailing window. 0 means the current row is the maximum.
+rolling_argmin
+Returns: SeriesT
+self.feat.rolling_argmin(s1: SeriesT, window=20)
+Rolling Argmin. Returns bars since the most recent minimum within the trailing window. 0 means the current row is the minimum.
+two_crows
+Returns: SeriesT
+self.feat.two_crows(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Two Crows. A bearish reversal pattern with two black candles following an uptrend.
+three_black_crows
+Returns: SeriesT
+self.feat.three_black_crows(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Three Black Crows. A bearish reversal pattern with three consecutive long black candles.
+three_inside_up_down
+Returns: SeriesT
+self.feat.three_inside_up_down(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Three Inside Up/Down. A reversal pattern with three candles showing containment and breakout.
+three_line_strike
+Returns: SeriesT
+self.feat.three_line_strike(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Three Line Strike. A continuation pattern with three consecutive candles followed by a reversal candle.
+three_outside_up_down
+Returns: SeriesT
+self.feat.three_outside_up_down(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Three Outside Up/Down. A reversal pattern with engulfing followed by confirmation.
+three_stars_in_south
+Returns: SeriesT
+self.feat.three_stars_in_south(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Three Stars in the South. A bullish reversal pattern with three consecutive candles with diminishing bodies.
+three_white_soldiers
+Returns: SeriesT
+self.feat.three_white_soldiers(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Three White Soldiers. A bullish reversal pattern with three consecutive long white candles.
+abandoned_baby
+Returns: SeriesT
+self.feat.abandoned_baby(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Abandoned Baby. A reversal pattern with a gap followed by a doji, then another gap in the opposite direction.
+advance_block
+Returns: SeriesT
+self.feat.advance_block(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Advance Block. A bearish reversal pattern with three white candles showing weakening momentum.
+belt_hold
+Returns: SeriesT
+self.feat.belt_hold(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Belt Hold. A single candle reversal pattern with a long body opening on the extreme.
+breakaway
+Returns: SeriesT
+self.feat.breakaway(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Breakaway. A five-candle reversal pattern indicating trend exhaustion.
+closing_marubozu
+Returns: SeriesT
+self.feat.closing_marubozu(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Closing Marubozu. A candle with no shadow at the close, indicating strong directional movement.
+concealing_baby_swallow
+Returns: SeriesT
+self.feat.concealing_baby_swallow(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Concealing Baby Swallow. A bullish reversal pattern with four black candles showing trend exhaustion.
+counterattack
+Returns: SeriesT
+self.feat.counterattack(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Counterattack. A two-candle pattern where the second candle closes at the same level as the first.
+dark_cloud_cover
+Returns: SeriesT
+self.feat.dark_cloud_cover(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Dark Cloud Cover. A bearish reversal pattern where a black candle opens above and closes into the prior white candle.
+doji
+Returns: SeriesT
+self.feat.doji(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Doji. A candle where open and close are nearly equal, indicating indecision.
+doji_star
+Returns: SeriesT
+self.feat.doji_star(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Doji Star. A reversal pattern with a doji that gaps away from the previous candle.
+dragonfly_doji
+Returns: SeriesT
+self.feat.dragonfly_doji(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Dragonfly Doji. A doji with a long lower shadow and no upper shadow, potentially bullish.
+engulfing_pattern
+Returns: SeriesT
+self.feat.engulfing_pattern(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Engulfing Pattern. A reversal pattern where the second candle's body completely engulfs the first.
+evening_doji_star
+Returns: SeriesT
+self.feat.evening_doji_star(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Evening Doji Star. A bearish reversal pattern with a doji at the top of an uptrend.
+evening_star
+Returns: SeriesT
+self.feat.evening_star(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Evening Star. A bearish reversal pattern with three candles at the top of an uptrend.
+gap_sidesidewhite
+Returns: SeriesT
+self.feat.gap_sidesidewhite(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Gap Side by Side White. A continuation pattern with two white candles side by side after a gap.
+gravestone_doji
+Returns: SeriesT
+self.feat.gravestone_doji(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Gravestone Doji. A doji with a long upper shadow and no lower shadow, potentially bearish.
+hammer
+Returns: SeriesT
+self.feat.hammer(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Hammer. A bullish reversal pattern with a long lower shadow and small body at the top.
+hanging_man
+Returns: SeriesT
+self.feat.hanging_man(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Hanging Man. A bearish reversal pattern similar to hammer but appears at the top of an uptrend.
+harami_pattern
+Returns: SeriesT
+self.feat.harami_pattern(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Harami Pattern. A reversal pattern where a small candle is contained within the previous larger candle's body.
+harami_cross_pattern
+Returns: SeriesT
+self.feat.harami_cross_pattern(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Harami Cross. A harami pattern where the second candle is a doji, indicating stronger reversal signal.
+high_wave_candle
+Returns: SeriesT
+self.feat.high_wave_candle(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+High Wave Candle. A candle with long upper and lower shadows and a small body, indicating uncertainty.
+hikkake_pattern
+Returns: SeriesT
+self.feat.hikkake_pattern(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Hikkake Pattern. A breakout pattern that traps traders before reversing.
+modified_hikkake_pattern
+Returns: SeriesT
+self.feat.modified_hikkake_pattern(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Modified Hikkake Pattern. An enhanced version of the hikkake pattern with additional confirmation.
+homing_pigeon
+Returns: SeriesT
+self.feat.homing_pigeon(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Homing Pigeon. A bullish reversal pattern with a small black candle contained within the previous larger black candle.
+identical_three_crows
+Returns: SeriesT
+self.feat.identical_three_crows(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Identical Three Crows. A bearish pattern with three consecutive black candles opening at the same price.
+in_neck_pattern
+Returns: SeriesT
+self.feat.in_neck_pattern(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+In Neck Pattern. A bearish continuation pattern where the second candle closes near the first's close.
+inverted_hammer
+Returns: SeriesT
+self.feat.inverted_hammer(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Inverted Hammer. A bullish reversal pattern with a long upper shadow and small body at the bottom.
+kicking
+Returns: SeriesT
+self.feat.kicking(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Kicking. A strong reversal pattern with two marubozu candles in opposite directions.
+kicking_by_length
+Returns: SeriesT
+self.feat.kicking_by_length(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Kicking by Length. A kicking pattern with consideration for candle length.
+ladder_bottom
+Returns: SeriesT
+self.feat.ladder_bottom(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Ladder Bottom. A bullish reversal pattern with five candles showing trend exhaustion.
+long_legged_doji
+Returns: SeriesT
+self.feat.long_legged_doji(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Long Legged Doji. A doji with very long upper and lower shadows, indicating high volatility and indecision.
+long_line_candle
+Returns: SeriesT
+self.feat.long_line_candle(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Long Line Candle. A candle with an unusually long body indicating strong directional movement.
+marubozu
+Returns: SeriesT
+self.feat.marubozu(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Marubozu. A candle with no shadows, indicating very strong directional movement.
+matching_low
+Returns: SeriesT
+self.feat.matching_low(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Matching Low. A bullish reversal pattern with two black candles closing at the same low.
+mat_hold
+Returns: SeriesT
+self.feat.mat_hold(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Mat Hold. A bullish continuation pattern similar to rising three methods.
+morning_doji_star
+Returns: SeriesT
+self.feat.morning_doji_star(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Morning Doji Star. A bullish reversal pattern with a doji at the bottom of a downtrend.
+morning_star
+Returns: SeriesT
+self.feat.morning_star(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Morning Star. A bullish reversal pattern with three candles at the bottom of a downtrend.
+on_neck_pattern
+Returns: SeriesT
+self.feat.on_neck_pattern(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+On Neck Pattern. A bearish continuation pattern where the second candle closes at the first's low.
+piercing_pattern
+Returns: SeriesT
+self.feat.piercing_pattern(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Piercing Pattern. A bullish reversal pattern where a white candle opens below and closes into the prior black candle.
+rickshaw_man
+Returns: SeriesT
+self.feat.rickshaw_man(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Rickshaw Man. A doji-like pattern with long shadows indicating market indecision.
+rising_falling_three_methods
+Returns: SeriesT
+self.feat.rising_falling_three_methods(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Rising/Falling Three Methods. A continuation pattern with a pause in the trend followed by resumption.
+separating_lines
+Returns: SeriesT
+self.feat.separating_lines(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Separating Lines. A continuation pattern with two candles opening at the same level.
+shooting_star
+Returns: SeriesT
+self.feat.shooting_star(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Shooting Star. A bearish reversal pattern with a long upper shadow appearing at the top of an uptrend.
+short_line_candle
+Returns: SeriesT
+self.feat.short_line_candle(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Short Line Candle. A candle with a short body indicating minimal price movement.
+spinning_top
+Returns: SeriesT
+self.feat.spinning_top(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Spinning Top. A candle with a small body and long shadows indicating indecision.
+stalled_pattern
+Returns: SeriesT
+self.feat.stalled_pattern(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Stalled Pattern. A bearish reversal pattern showing weakening upward momentum.
+stick_sandwich
+Returns: SeriesT
+self.feat.stick_sandwich(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Stick Sandwich. A bullish reversal pattern with two black candles sandwiching a white candle.
+takuri
+Returns: SeriesT
+self.feat.takuri(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Takuri Line. A bullish reversal pattern similar to a dragonfly doji with a very long lower shadow.
+thrusting_pattern
+Returns: SeriesT
+self.feat.thrusting_pattern(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Thrusting Pattern. A bearish continuation pattern where the second candle closes below the midpoint of the first.
+tristar_pattern
+Returns: SeriesT
+self.feat.tristar_pattern(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Tristar Pattern. A rare reversal pattern consisting of three consecutive doji candles.
+unique_3_river
+Returns: SeriesT
+self.feat.unique_3_river(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Unique 3 River. A bullish reversal pattern with three candles showing trend exhaustion.
+upside_gap_two_crows
+Returns: SeriesT
+self.feat.upside_gap_two_crows(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Upside Gap Two Crows. A bearish reversal pattern with two black candles after a gap up.
+xside_gap_3methods
+Returns: SeriesT
+self.feat.xside_gap_3methods(open_: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+Upside/Downside Gap Three Methods. A continuation pattern with a gap followed by three candles filling the gap.
+hlc3
+Returns: SeriesT
+self.feat.hlc3(high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+HLC3 (Typical Price). Returns (high + low + close) / 3.
+ohlc4
+Returns: SeriesT
+self.feat.ohlc4(open: SeriesT = None, high: SeriesT = None, low: SeriesT = None, close: SeriesT = None)
+OHLC4 (Average Price). Returns (open + high + low + close) / 4.
+donchian_upper
+Returns: SeriesT
+self.feat.donchian_upper(high: SeriesT = None, timeperiod=30)
+Donchian Channel Upper Band. The highest high over a period.
+donchian_lower
+Returns: SeriesT
+self.feat.donchian_lower(low: SeriesT = None, timeperiod=30)
+Donchian Channel Lower Band. The lowest low over a period.
+zscore
+Returns: SeriesT
+self.feat.zscore(s1: SeriesT = None, timeperiod: int = 30)
+Z-Score. Standardizes values by subtracting the mean and dividing by standard deviation. Indicates how many standard deviations a value is from the mean.
+price_z
+Returns: SeriesT
+self.feat.price_z(close: SeriesT = None, timeperiod: int = 30)
+Price Z-Score. Calculates the z-score of closing prices over a period. Shows how extreme current prices are relative to recent history.
+volume_z
+Returns: SeriesT
+self.feat.volume_z(volume: SeriesT = None, timeperiod: int = 30)
+Volume Z-Score. Calculates the z-score of trading volume over a period. Identifies unusual volume activity.
+cmf
+Returns: SeriesT
+self.feat.cmf(high: SeriesT, low: SeriesT, close: SeriesT, volume: SeriesT, timeperiod=20)
+Chaikin Money Flow (CMF). Measures buying/selling pressure over a period. Range -1 to +1.
+returns
+Returns: SeriesT
+self.feat.returns(series: SeriesT = None, periods=1)
+Calculate simple returns from the input series.
+log_returns
+Returns: SeriesT
+self.feat.log_returns(series: SeriesT = None, periods=1)

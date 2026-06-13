@@ -33,10 +33,10 @@ Dưới đây là các giới hạn và quy định chung để chiến lược 
 ### Pipeline Sinh Tự Động (`agent/` & Gốc)
 
 - `main.py` (Thư mục gốc): Điểm neo khởi chạy hệ thống, chịu trách nhiệm thiết lập cấu hình cơ bản và ủy quyền (delegate) luồng sinh ý tưởng cho `agent/pipeline.py`.
-- `agent/pipeline.py`: Trình điều khiển chính sử dụng Gemini LLM. Lặp qua các vòng: Gọi LLM sinh ý tưởng $\rightarrow$ Lưu JSON. Thiết kế tập trung vào việc tạo ra ý tưởng thô và tránh trùng lặp.
-
+- `agent/pipeline.py`: Trình điều khiển chính, hỗ trợ cả `Gemini` và `DeepSeek-Thinking`. Lặp qua các vòng: Gọi LLM sinh ý tưởng $\rightarrow$ Lưu JSON. Thiết kế tập trung vào việc tạo ra ý tưởng thô và tránh trùng lặp.
 - `agent/convert_ideas.py`: Đóng vai trò bộ chuyển đổi trung gian từ định dạng JSON sang file Python hợp lệ (`SimpleAlgorithm`). Tích hợp logic xử lý ngoại lệ (anti-singularity) chống chia cho 0 và cơ chế Idempotent (Bỏ qua file đã chuyển đổi) để ngăn việc lặp lại.
-- `agent/gemini_client.py`: Gọi API ẩn danh Gemini.
+- `agent/deepseek_client.py`: Client giao tiếp với API DeepSeek thông qua gói `deepseek4free`, tự động xử lý Cloudflare và xử lý stateful parsing để lấy dữ liệu suy luận (Thinking) chất lượng cao.
+- `agent/gemini_client.py`: Giao diện gọi API ẩn danh Gemini.
 - `agent/extract_json_response.py`: Tiện ích dùng chung để bóc tách dữ liệu JSON từ phản hồi của LLM (Regex Parser).
 - `agent/portfolio.py`: Đánh giá các chỉ số tối thiểu (Sharpe, CAGR). Thực hiện cơ chế kiểm tra tương quan kép (Dual-Correlation).
 - `agent/auto_submit.py` & `submit_all.py`: `agent/auto_submit.py` chứa logic mô phỏng thao tác Playwright/CDP tương tác với nền tảng Web. `submit_all.py` (tại thư mục gốc) là kịch bản đóng vai trò điểm quét các chiến lược mới và gọi tuần tự các API từ `auto_submit.py`.

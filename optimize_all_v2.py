@@ -129,13 +129,13 @@ def main():
         # Lấy base metrics trước khi tối ưu
         try:
             base_metrics = emulator.get_metrics(filepath, timeframe)
-            sharpe_before = base_metrics.get("sharpe_ratio", 0.0)
+            obj_before = base_metrics.get("total_return_pct", 0.0)
         except Exception as e:
             print(f"  [!] Base metrics error: {e}")
-            sharpe_before = 0.0
+            obj_before = 0.0
             
         print(f"  > Param space: {param_space}")
-        print(f"  > Initial Sharpe: {sharpe_before:.4f}")
+        print(f"  > Initial Objective: {obj_before:.4f}")
         
         # Chạy Optuna V2 (30 trials)
         try:
@@ -144,10 +144,10 @@ def main():
                 timeframe=timeframe,
                 param_space=param_space,
                 n_trials=30,
-                objective='sharpe_ratio'
+                objective='total_return_pct'
             )
             study = opt.run()
-            sharpe_after = study.best_value
+            obj_after = study.best_value
             best_params = study.best_params
             
             # Đo lại metrics sau khi đã ghi đè code
@@ -157,8 +157,8 @@ def main():
                 "strategy": basename,
                 "timeframe": timeframe,
                 "status": "optimized",
-                "sharpe_before": sharpe_before,
-                "sharpe_after": sharpe_after,
+                "obj_before": obj_before,
+                "obj_after": obj_after,
                 "trades": final_metrics.get("total_trades", 0),
                 "cagr": final_metrics.get("cagr", 0.0),
                 "best_params": str(best_params)
@@ -186,10 +186,10 @@ def main():
         df_success = df_res[df_res['status'] != 'error'].copy()
         
         if not df_success.empty:
-            df_success['improvement'] = df_success['sharpe_after'] - df_success['sharpe_before']
-            df_success = df_success.sort_values(by='sharpe_after', ascending=False)
+            df_success['improvement'] = df_success['obj_after'] - df_success['obj_before']
+            df_success = df_success.sort_values(by='obj_after', ascending=False)
             
-            print(df_success[['strategy', 'timeframe', 'sharpe_before', 'sharpe_after', 'improvement', 'trades', 'cagr']].to_string(index=False))
+            print(df_success[['strategy', 'timeframe', 'obj_before', 'obj_after', 'improvement', 'trades', 'cagr']].to_string(index=False))
             
             df_success.to_csv("agent/results/optuna_v2_report.csv", index=False)
             print("\nSaved detailed report to: agent/results/optuna_v2_report.csv")

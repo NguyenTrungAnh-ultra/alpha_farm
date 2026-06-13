@@ -37,21 +37,20 @@ class XNOOptimizerV2:
         """Thay thế các tham số mặc định trong code."""
         new_code = code
         for name, val in params.items():
-            # Tìm pattern self.param_name = <number> hoặc getattr(self, 'param_name', <number>)
-            # Xử lý format do LLM sinh ra: self.window = int(self.window if 'window' in self.__dict__ else 20)
-            llm_pattern = rf"self\.{name}\s*=\s*(?:int|float)\(self\.{name}\s+if\s+'{name}'\s+in\s+self\.__dict__\s+else\s+[\d\.]+\)"
+            num_pattern = r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?"
+            llm_pattern = rf"self\.{name}\s*=\s*(?:int|float)\(self\.{name}\s+if\s+'{name}'\s+in\s+self\.__dict__\s+else\s+{num_pattern}\)"
             if re.search(llm_pattern, new_code):
                 new_code = re.sub(llm_pattern, f"self.{name} = {repr(val)}", new_code)
                 continue
                 
             # Xử lý getattr
-            getattr_pattern = rf"getattr\(\s*self\s*,\s*['\"]{name}['\"]\s*,\s*[\d\.]+\)"
+            getattr_pattern = rf"getattr\(\s*self\s*,\s*['\"]{name}['\"]\s*,\s*{num_pattern}\)"
             if re.search(getattr_pattern, new_code):
                 new_code = re.sub(getattr_pattern, repr(val), new_code)
                 continue
                 
             # Xử lý gán cứng: self.window = 20
-            hardcode_pattern = rf"self\.{name}\s*=\s*[\d\.]+"
+            hardcode_pattern = rf"self\.{name}\s*=\s*{num_pattern}"
             if re.search(hardcode_pattern, new_code):
                 new_code = re.sub(hardcode_pattern, f"self.{name} = {repr(val)}", new_code)
                 continue

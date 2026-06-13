@@ -64,7 +64,7 @@ def main():
     
     # Cấu hình pipeline
     n_strategies = 100
-    model = "pro"
+    model = "deepseek-thinking"
     auto_submit = False
 
     # 2. Khởi chạy Pipeline (Sinh ý tưởng)

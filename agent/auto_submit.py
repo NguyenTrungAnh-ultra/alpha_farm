@@ -307,7 +307,7 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                         pass
                 
                 # Launch a new Chromium browser
-                browser = p.chromium.launch(headless=False)
+                browser = p.chromium.launch(headless=True)
                 context = browser.new_context()
                 page = context.new_page()
                 page.on("console", lambda msg: logger.info(f"[Browser Console] {msg.type}: {msg.text}"))
