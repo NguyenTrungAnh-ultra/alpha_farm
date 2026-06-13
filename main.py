@@ -62,16 +62,35 @@ def main():
     cookies = check_and_get_cookies()
     print("\n✅ Đã nạp Cookie thành công! Khởi động động cơ AI...")
     
-    # 2. Khởi chạy Pipeline
+    # Cấu hình pipeline
+    n_strategies = 100
+    model = "pro"
+    auto_submit = False
+
+    # 2. Khởi chạy Pipeline (Sinh ý tưởng)
+    print("\n[Bước 1/4] Đang sinh ý tưởng (Ideas Generation)...")
     run_pipeline(
         cookies=cookies,
-        n_strategies=100,             # Số lượng vòng lặp AI
-        model="pro",                  # Sử dụng mô hình Gemini Pro
-        n_trials=100,                 # Số vòng chạy Bayesian Optimization
-        objective="total_return_pct", # Tối đa hóa lợi nhuận (bỏ qua Sharpe)
-        direction="maximize",         # Mục tiêu tăng trưởng
-        auto_submit=False             # Tắt Auto Submit tạm thời để chạy ngầm không bị kẹt GUI
+        n_strategies=n_strategies,
+        model=model
     )
+
+    import subprocess
+    
+    # 3. Chuyển đổi ý tưởng thành Code Python
+    print("\n[Bước 2/4] Chuyển đổi JSON sang Python Code...")
+    subprocess.run([sys.executable, "agent/convert_ideas.py"])
+
+    # 4. Tối ưu hóa (Bayesian Optimization)
+    print("\n[Bước 3/4] Tối ưu hóa tham số (Optimization)...")
+    subprocess.run([sys.executable, "optimize_all_v2.py"])
+
+    # 5. Nộp chiến lược (Auto Submit)
+    print("\n[Bước 4/4] Nộp chiến lược (Auto Submit)...")
+    if auto_submit:
+        subprocess.run([sys.executable, "submit_all.py"])
+    else:
+        print("Đã tắt auto_submit. Bỏ qua bước nộp lên web.")
 
 if __name__ == "__main__":
     main()

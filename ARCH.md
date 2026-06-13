@@ -34,8 +34,7 @@ Dưới đây là các giới hạn và quy định chung để chiến lược 
 
 - `main.py` (Thư mục gốc): Điểm neo khởi chạy hệ thống, chịu trách nhiệm thiết lập cấu hình cơ bản và ủy quyền (delegate) luồng sinh ý tưởng cho `agent/pipeline.py`.
 - `agent/pipeline.py`: Trình điều khiển chính sử dụng Gemini LLM. Lặp qua các vòng: Gọi LLM sinh ý tưởng $\rightarrow$ Lưu JSON. Thiết kế tập trung vào việc tạo ra ý tưởng thô và tránh trùng lặp.
-- `agent/run_deepseek_pipeline.py`: Trình điều khiển song song sử dụng DeepSeek API. Thiết kế theo chuẩn Cache Hit Optimization.
-- `agent/build_deepseek_prompt.py`: Chứa logic bóc tách Prompt Tĩnh (System) và Động (User) nhằm hỗ trợ cơ chế lưu bộ nhớ đệm của DeepSeek.
+
 - `agent/convert_ideas.py`: Đóng vai trò bộ chuyển đổi trung gian từ định dạng JSON sang file Python hợp lệ (`SimpleAlgorithm`). Tích hợp logic xử lý ngoại lệ (anti-singularity) chống chia cho 0 và cơ chế Idempotent (Bỏ qua file đã chuyển đổi) để ngăn việc lặp lại.
 - `agent/gemini_client.py`: Gọi API ẩn danh Gemini.
 - `agent/extract_json_response.py`: Tiện ích dùng chung để bóc tách dữ liệu JSON từ phản hồi của LLM (Regex Parser).
