@@ -109,6 +109,14 @@ def run_pipeline(
         except Exception as e:
             print(f"[Pipeline] Failed to init Deepseek: {e}")
             sys.exit(1)
+    elif model == "ollama-local":
+        try:
+            from agent.ollama_client import OllamaChatClient
+            chat = OllamaChatClient(model="qwen3.5:4b", verbose=True)
+            print(f"[Pipeline] OllamaChatClient ready")
+        except Exception as e:
+            print(f"[Pipeline] Failed to init Ollama: {e}")
+            sys.exit(1)
     else:
         chat = GeminiChat(
             cookies=cookies,
@@ -144,13 +152,18 @@ def run_pipeline(
         
         try:
             print(f"  [1/1] Generating idea ({tf})...")
+            # Lọc bớt ý tưởng để tránh tràn ngữ cảnh và quá tải phần nháp của mô hình local
+            # Chỉ gửi những ý tưởng cùng timeframe và giới hạn tối đa 20 ý tưởng gần nhất
+            filtered_existing = [idea for idea in existing_ideas if idea.get("timeframe") == tf][-20:]
+            filtered_tried = list(tried_names)[-20:]
+            
             idea_prompt = build_idea_prompt(
                 timeframe=tf,
-                existing_strategies=existing_ideas,
+                existing_strategies=filtered_existing,
                 round_num=round_num,
                 total_rounds=n_strategies,
                 experience=experience,
-                tried_names=list(tried_names),
+                tried_names=filtered_tried,
             )
             
             # Send JSON request (requires GeminiChat.send_json to be available, which it is)

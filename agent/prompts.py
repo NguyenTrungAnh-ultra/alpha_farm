@@ -11,16 +11,27 @@ Design principles:
     - Diversity-enforcing: explicit list of existing strategies
 """
 
-# ─── Available talib indicators (curated for futures) ────────────────
+# ─── Available talib & SDK indicators (curated for futures) ────────────────
 TALIB_INDICATORS = """
-## Available talib Indicators (called via self.feat.xxx())
+## Available Indicators (called via self.feat.xxx())
 
 **Trend**: sma, ema, dema, tema, wma, kama, t3, trima, midpoint, midprice, sar, linearreg, linearreg_slope
 **Momentum**: rsi, stoch, stochf, stochrsi, macd, mom, roc, rocp, willr, cci, cmo, mfi, ultosc, trix, adx, adxr, aroon, aroonosc, dx, minus_di, plus_di, apo, ppo, bop
 **Volatility**: atr, natr, trange, bbands (upper/middle/lower)
-**Volume**: ad, adosc, obv
-**Pattern**: CDL functions (cdl_engulfing, cdl_hammer, cdl_doji, etc.)
-**Math**: max, min, stddev, var, linearreg_angle
+**Volume**: ad, adosc, obv, cmf, rolling_vwap
+**Pattern (Use EXACT names below, DO NOT use cdl_ prefix)**: piercing_pattern, engulfing_pattern, harami_pattern, harami_cross_pattern, hikkake_pattern, modified_hikkake_pattern, in_neck_pattern, on_neck_pattern
+**Math**: max, min, stddev, linearreg_angle
+**Advanced/Statistical**: rolling_zscore, rolling_mad, rolling_correlation, rolling_rank, log_returns
+"""
+
+# ─── Available operator functions ────────────────────────────────────────
+OPERATOR_FUNCTIONS = """
+## Available Operator Functions (called via self.op.xxx())
+
+**Time Series**: shift, diff, pct_change
+**Crossings**: crossed, crossed_above, crossed_below, crossed_above_value, crossed_below_value
+**Rolling Math**: rolling_mean, rolling_max, rolling_min, rolling_std, rolling_sum
+**Utility**: clip, fillna, ffill, abs, where, sign, isna, notna, isfinite, zero_ifna
 """
 
 # ─── Timeframe-specific guidance ────────────────────────────────────
@@ -88,94 +99,77 @@ def build_idea_prompt(
     Build prompt for generating a strategy idea (JSON).
     """
     
-    # Format existing strategies list
+    # Context sections
+    existing_section = ""
     if existing_strategies:
-        existing_list = "\n".join([
-            f"  - [{s['timeframe']}] {s['name']} ({s['family']})"
-            for s in existing_strategies
-        ])
-        existing_section = f"""
-## THERE ARE ALREADY {len(existing_strategies)} ACCEPTED STRATEGIES — DO NOT DUPLICATE:
-{existing_list}
-
-→ You must create a COMPLETELY DIFFERENT strategy: use different indicators, different logic, or a different family.
-"""
+        existing_list = "\n".join([f"  - [{s['timeframe']}] {s['name']} ({s['family']})" for s in existing_strategies])
+        existing_section = f"## 1. ALREADY ACCEPTED STRATEGIES (DO NOT DUPLICATE)\n{existing_list}\n"
     else:
-        existing_section = "\n## This is the FIRST strategy — choose a strong and diverse approach.\n"
-    
-    # Add ALL tried strategy names
+        existing_section = "## 1. ALREADY ACCEPTED STRATEGIES\n(None yet. This is the first strategy.)\n"
+        
+    tried_section = ""
     if tried_names:
         tried_list = ", ".join(sorted(tried_names))
-        tried_section = f"""
-## PREVIOUSLY TRIED STRATEGY NAMES (DO NOT REUSE):
-{tried_list}
+        tried_section = f"## 2. PREVIOUSLY TRIED & FAILED NAMES (DO NOT REUSE)\n{tried_list}\n"
 
-→ ABSOLUTELY DO NOT reuse any names listed above. You must use a COMPLETELY NEW name and DIFFERENT indicators/logic.
-"""
-    else:
-        tried_section = ""
-
-    # Pick suggested family
     used_families = [s.get('family', '') for s in existing_strategies]
     unused_families = [f for f in STRATEGY_FAMILIES if f not in used_families]
-    if unused_families:
-        suggested = f"Suggested unused families: **{', '.join(unused_families[:3])}**"
-    else:
-        suggested = "All families have been used. Please create a highly creative and distinctive VARIATION."
+    suggested = f"Suggested unused families: **{', '.join(unused_families[:3])}**" if unused_families else "All families used. Create a unique variation."
 
     tf_hint = TIMEFRAME_HINTS.get(timeframe, "")
+    exp_section = f"## 3. COMBAT EXPERIENCE (MANDATORY)\n{experience}\n" if experience else ""
 
-    exp_section = f"\n## COMBAT EXPERIENCE (MANDATORY READING)\n{experience}\n" if experience else ""
-
-    return f"""You are an expert **Quant Researcher** designing trading strategies for the **VN30F1M futures contract** (VN30 index derivatives on the Vietnamese market).
+    return f"""You are an expert **Quant Researcher** designing trading strategies for the **VN30 Index Futures contract** (Vietnamese market derivatives).
 
 ## Task
 Design 1 intraday trading strategy for the **{timeframe}** timeframe.
 This is round {round_num}/{total_rounds}.
 
 {tf_hint}
-{exp_section}
-## Quality Requirements
-- The strategy must have **CLEAR entry/exit logic**, expressed strictly as mathematical formulas. NO natural language.
-- Must use **at least 2 indicators** (1 primary + 1 filter/confirmation).
-- Must have its **own exit logic** (do not just reverse signals).
-- Parameters must have **reasonable search spaces** for optimization.
-- Must be **COMPLETELY DIFFERENT** from existing strategies.
-- **CRITICAL**: Use Pandas bitwise operators `&`, `|`, `~` for logic instead of `and`, `or`, `not`. You MUST wrap every condition in parentheses, e.g., `(close > MA) & (RSI < 30)`.
-- **CRITICAL**: ONLY use the indicators listed below via `self.feat.xxx()`. Do not invent functions like `shift()`, `cumulative_sum()`, or `.rolling()`.
 
 {existing_section}
-
 {tried_section}
-
-{suggested}
+{exp_section}
+## 4. REFERENCE LIBRARY
 
 {TALIB_INDICATORS}
 
-## Output Format — MUST return EXACT JSON structure below:
+{OPERATOR_FUNCTIONS}
+
+## 5. CRITICAL RULES (MUST FOLLOW STRICTLY)
+1. **Uniqueness**: Your strategy MUST be COMPLETELY DIFFERENT from the accepted ones above. Use different logic, different indicators, or a different family.
+2. **Family**: {suggested}
+3. **Logic Strictness**: You must have CLEAR entry and exit logic, expressed strictly as Python mathematical formulas. NO natural language.
+4. **Complexity**: Must use **at least 2 indicators** (1 primary + 1 filter/confirmation).
+5. **Distinct Exits**: Must have its **own exit logic** (do not just reverse the entry signals).
+6. **Valid Functions ONLY**: You are ONLY allowed to use the indicators and operators listed in the "REFERENCE LIBRARY" above via `self.feat.xxx()` or `self.op.xxx()`. Do NOT invent any functions. Do NOT use Pandas methods like `.rolling()` or `.shift()`.
+7. **Pandas Bitwise Logic**: You MUST use Pandas bitwise operators `&`, `|`, `~` for logical conditions instead of `and`, `or`, `not`. You MUST wrap every condition in parentheses. Example: `(close > MA) & (RSI < 30)`.
+
+## 6. OUTPUT FORMAT
+
+You MUST return EXACTLY the following JSON structure. Do not add any text outside the JSON block.
 
 ```json
 {{
     "name": "StrategyName",
     "timeframe": "{timeframe}",
     "family": "trend-following|momentum|mean-reversion|breakout|volatility|multi-indicator|pattern-based|channel|oscillator-divergence|session-based",
-    "description": "Brief description of the strategy logic",
+    "description": "Brief description of the strategy logic.",
     "formula": {{
-        "inputs": ["close", "high", "low", "volume"],
+        "inputs": ["close", "high", "low", "open_price", "volume"],
         "indicators": [
             {{"name": "EMA_fast", "definition": "self.feat.ema(close, timeperiod=10)"}},
             {{"name": "ATR", "definition": "self.feat.atr(high, low, close, timeperiod=14)"}}
         ],
-        "entry_long": "Specific mathematical formula to enter LONG (e.g.: (close > EMA_fast) & (ATR > 0.5))",
-        "entry_short": "Specific mathematical formula to enter SHORT",
-        "exit_logic": "Exit Long: [strict python formula]. Exit Short: [strict python formula]."
+        "entry_long": "(close > EMA_fast) & (ATR > 0.5)",
+        "entry_short": "(close < EMA_fast) & (ATR > 0.5)",
+        "exit_long": "(close < EMA_fast)",
+        "exit_short": "(close > EMA_fast)"
     }},
     "param_space": {{
         "param_name": {{"type": "int|float", "low": 5, "high": 30, "step": 1}},
         "another_param": {{"type": "float", "low": 0.5, "high": 3.0, "step": 0.1}}
     }}
 }}
-```
-
-IMPORTANT: Return ONLY valid JSON. Do not add any text outside the JSON block."""
+```"""
 

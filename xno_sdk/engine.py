@@ -2,9 +2,70 @@ import pandas as pd
 import numpy as np
 import talib
 import logging
+import os
+import re
 from .series import RestrictedSeries
 
 logger = logging.getLogger("xno_sdk.engine")
+
+def _load_feature_whitelist():
+    whitelist = set()
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(current_dir)
+    possible_paths = [
+        os.path.join(project_root, "feature.txt"),
+        "f:/Projects/alpha_farm/feature.txt"
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                matches = re.findall(r"self\.feat\.([a-zA-Z0-9_]+)\s*\(", content)
+                for m in matches:
+                    whitelist.add(m.lower())
+            except Exception:
+                pass
+            break
+            
+    if not whitelist:
+        whitelist = {
+            "adx", "sma", "macd", "roc", "rsi", "obv", "vwap", "rolling_vwap", "bbands",
+            "dema", "ema", "wma", "kama", "tema", "t3", "trima", "stddev", "var", "mom",
+            "cmo", "cci", "mfi", "willr", "ultosc", "trix", "adxr", "aroon", "aroonosc",
+            "dx", "minus_di", "plus_di", "apo", "ppo", "bop", "atr", "natr", "trange",
+            "ad", "adosc", "linearreg", "linearreg_slope", "linearreg_angle", "midpoint",
+            "midprice", "sar", "stoch", "stochf", "stochrsi", "max", "min", "rolling_mean",
+            "rolling_sum", "rolling_std", "rolling_max", "rolling_min", "rolling_median",
+            "rolling_quantile", "rolling_mad", "rolling_argmax", "rolling_argmin", "rolling_rank",
+            "rolling_percentile_rank", "rolling_covariance", "rolling_correlation", "rolling_zscore",
+            "price_z", "volume_z", "zscore", "returns", "log_returns", "donchian_upper",
+            "donchian_lower", "hlc3", "ohlc4", "cmf", "minmax", "piercing_pattern", "engulfing_pattern",
+            "harami_pattern", "harami_cross_pattern", "hikkake_pattern", "modified_hikkake_pattern",
+            "in_neck_pattern", "on_neck_pattern"
+        }
+    return whitelist
+
+
+TALIB_NAME_MAPPING = {
+    "piercing_pattern": "CDLPIERCING",
+    "engulfing_pattern": "CDLENGULFING",
+    "harami_pattern": "CDLHARAMI",
+    "harami_cross_pattern": "CDLHARAMICROSS",
+    "hikkake_pattern": "CDLHIKKAKE",
+    "modified_hikkake_pattern": "CDLHIKKAKE",
+    "in_neck_pattern": "CDLINNECK",
+    "on_neck_pattern": "CDLONNECK",
+    "three_white_soldiers": "CDL3WHITESOLDIERS",
+    "three_black_crows": "CDL3BLACKCROWS",
+    "two_crows": "CDL2CROWS",
+    "three_inside_up_down": "CDL3INSIDE",
+    "three_outside_up_down": "CDL3OUTSIDE",
+    "three_line_strike": "CDL3LINESTRIKE",
+    "three_stars_in_south": "CDL3STARSINSOUTH",
+    "identical_three_crows": "CDLIDENTICAL3CROWS",
+    "upside_gap_two_crows": "CDLUPSGAPTWOCROWS",
+}
 
 class FeatureEngine:
     """
@@ -218,11 +279,27 @@ class FeatureEngine:
         return self.rolling_min(series, window=timeperiod), self.rolling_max(series, window=timeperiod)
 
     def __getattr__(self, name):
+        if name.startswith('_'):
+            raise AttributeError(f"'FeatureEngine' object has no attribute '{name}'")
+            
+        # Clean the name to lower for comparison
+        lower_name = name.lower()
+        if "_whitelist" not in self.__dict__:
+            self._whitelist = _load_feature_whitelist()
+            
+        if lower_name not in self._whitelist:
+            logger.error(f"XNO Sandbox Error: self.feat has no method '{name}' (not in feature.txt whitelist)")
+            raise AttributeError(f"strategy verification failed: 'self.feat' has no method '{name}'.")
+
+        # Resolve to standard TA-Lib name if it is a mapped pattern
+        talib_name = TALIB_NAME_MAPPING.get(lower_name, name)
+
         # Dynamically load standard TA-Lib functions
-        func = getattr(talib, name, None) or getattr(talib, name.upper(), None)
+        func = getattr(talib, talib_name, None) or getattr(talib, talib_name.upper(), None)
         if func is None:
-            logger.error(f"talib has no function '{name}' or '{name.upper()}'")
-            raise AttributeError(f"talib has no function '{name}' or '{name.upper()}'")
+            logger.error(f"talib has no function '{talib_name}' or '{talib_name.upper()}'")
+            raise AttributeError(f"talib has no function '{talib_name}' or '{talib_name.upper()}'")
+
 
         def wrapper(*args, **kwargs):
             logger.debug(f"FeatureEngine.{name} called")
@@ -531,7 +608,7 @@ class SimpleAlgorithm:
             setattr(self, k, v)
 
     def _initialize(self, df: pd.DataFrame):
-        logger.info("Setting up strategy environment (DataProxy, FeatureEngine, OperatorEngine)")
+        logger.debug("Setting up strategy environment (DataProxy, FeatureEngine, OperatorEngine)")
         self.data = DataProxy(df)
         self.feat = FeatureEngine()
         self.op = OperatorEngine()
@@ -663,9 +740,9 @@ class SimpleAlgorithm:
             raise AttributeError("XNO Sandbox Error:\n" + "\n".join(errors))
 
     def run_algorithm(self, df: pd.DataFrame) -> pd.Series:
-        logger.info("Running custom algorithm in XNO SDK Mock Environment")
+        logger.debug("Running custom algorithm in XNO SDK Mock Environment")
         self._validate_sandbox_constraints()
         self._initialize(df)
         self.__algorithm__()
-        logger.info("Custom algorithm finished successfully")
+        logger.debug("Custom algorithm finished successfully")
         return self._positions.copy()

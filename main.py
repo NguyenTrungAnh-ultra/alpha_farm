@@ -63,7 +63,7 @@ def main():
     print("\n✅ Đã nạp Cookie thành công! Khởi động động cơ AI...")
     
     # Cấu hình pipeline
-    n_strategies = 100
+    n_strategies = 20
     model = "deepseek-thinking"
     auto_submit = False
 

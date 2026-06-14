@@ -1,0 +1,8 @@
+# Chọn mô hình gốc là bản 4b bạn đang dùng
+FROM qwen3.5:4b
+
+# Ép nhận 16k ngữ cảnh để không bị nuốt chữ khi bạn gửi prompt dài kèm nháp suy nghĩ của local model
+PARAMETER num_ctx 16384
+
+# Độ sáng tạo giảm xuống 0.3 để AI tập trung viết code chuẩn cú pháp và đúng định dạng JSON
+PARAMETER temperature 0.3

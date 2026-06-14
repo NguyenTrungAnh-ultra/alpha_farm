@@ -20,39 +20,50 @@ def generate_param_space(filepath: str) -> Dict[str, Any]:
     matches = re.findall(pattern, code)
     
     for name, ptype, default_val_str in matches:
+        name_lower = name.lower()
         if ptype == 'int':
             default_val = int(default_val_str)
-            # Phạm vi: [default/2, default*2]
-            low = max(2, default_val // 2)
-            high = default_val * 2
             
-            # Làm tròn range nếu số lớn
-            if default_val > 10:
-                low = (low // 5) * 5
-                high = ((high + 4) // 5) * 5
-            
-            step = 1 if default_val <= 10 else 2
-            param_space[name] = (low, high, step)
+            # Sử dụng tập hợp cố định cho các tham số chu kỳ
+            if any(k in name_lower for k in ['window', 'timeperiod', 'period', 'length']):
+                param_space[name] = [5, 10, 20, 30, 50, 60, 100, 200]
+            else:
+                # Phạm vi: [default/2, default*2]
+                low = max(2, default_val // 2)
+                high = default_val * 2
+                
+                # Làm tròn range nếu số lớn
+                if default_val > 10:
+                    low = (low // 5) * 5
+                    high = ((high + 4) // 5) * 5
+                
+                step = 1 if default_val <= 10 else 2
+                param_space[name] = (low, high, step)
             
         elif ptype == 'float':
             default_val = float(default_val_str)
-            # Phạm vi: [default*0.5, default*1.5]
-            if default_val == 0.0:
-                low, high, step = 0.0, 1.0, 0.1
-            else:
-                low = default_val * 0.5
-                high = default_val * 1.5
-                step = default_val * 0.1
-                
-                # Round cho đẹp
-                low = round(low, 2)
-                high = round(high, 2)
-                step = round(step, 2)
-                if step == 0.0:
-                    step = 0.01
-                    
-            param_space[name] = (low, high, step)
             
+            # Tập hợp cho các tham số multiplier, std_dev, factor...
+            if any(k in name_lower for k in ['multiplier', 'std_dev', 'stddev', 'deviation', 'factor', 'sigma']):
+                param_space[name] = [1.0, 1.5, 2.0, 2.5, 3.0]
+            else:
+                # Phạm vi: [default*0.5, default*1.5]
+                if default_val == 0.0:
+                    low, high, step = 0.0, 1.0, 0.1
+                else:
+                    low = default_val * 0.5
+                    high = default_val * 1.5
+                    step = default_val * 0.1
+                    
+                    # Round cho đẹp
+                    low = round(low, 2)
+                    high = round(high, 2)
+                    step = round(step, 2)
+                    if step == 0.0:
+                        step = 0.01
+                        
+                param_space[name] = (low, high, step)
+                
     return param_space
 
 def main():
@@ -153,19 +164,32 @@ def main():
             # Đo lại metrics sau khi đã ghi đè code
             final_metrics = emulator.get_metrics(filepath, timeframe)
             
-            results.append({
-                "strategy": basename,
-                "timeframe": timeframe,
-                "status": "optimized",
-                "obj_before": obj_before,
-                "obj_after": obj_after,
-                "trades": final_metrics.get("total_trades", 0),
-                "cagr": final_metrics.get("cagr", 0.0),
-                "best_params": str(best_params)
-            })
+            final_sharpe = final_metrics.get("sharpe_ratio", 0.0)
+            final_cagr = final_metrics.get("cagr", 0.0)
             
-            with open(filepath, 'a', encoding='utf-8') as f:
-                f.write("\n\n# OPTIMIZATION_V2_COMPLETED\n")
+            if final_sharpe > 1.3 and final_cagr > 0.15:
+                results.append({
+                    "strategy": basename,
+                    "timeframe": timeframe,
+                    "status": "optimized",
+                    "obj_before": obj_before,
+                    "obj_after": obj_after,
+                    "trades": final_metrics.get("total_trades", 0),
+                    "cagr": final_cagr,
+                    "best_params": str(best_params)
+                })
+                
+                with open(filepath, 'a', encoding='utf-8') as f:
+                    f.write("\n\n# OPTIMIZATION_V2_COMPLETED\n")
+            else:
+                print(f"  [!] Optimized strategy failed V2 filter (Sharpe={final_sharpe:.4f}, CAGR={final_cagr*100:.1f}%). Deleting file.")
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                results.append({
+                    "strategy": basename,
+                    "timeframe": timeframe,
+                    "status": "failed_v2_filter"
+                })
             
         except Exception as e:
             print(f"  [!] Optimization error: {e}")

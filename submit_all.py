@@ -23,15 +23,21 @@ def main():
     # Filter out init files or others if necessary
     py_files = [f for f in py_files if not os.path.basename(f).startswith("__")]
     
+    print("\n" + "★" * 80, flush=True)
+    print(f"🔄 [NEW LOOP] Scanning agent/results/ at {time.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
     if not py_files:
-        print("No unpushed strategies found in agent/results/", flush=True)
+        print("   No unpushed strategies found.", flush=True)
+        print("★" * 80 + "\n", flush=True)
         return
         
-    print(f"Found {len(py_files)} unpushed strategies. Starting submission...", flush=True)
+    print(f"   Found {len(py_files)} unpushed strategies. Starting submission...", flush=True)
+    print("★" * 80 + "\n", flush=True)
     
     for filepath in py_files:
         filename = os.path.basename(filepath)
-        print(f"\n[{filename}] Submitting...", flush=True)
+        print("┌" + "─" * 78 + "┐", flush=True)
+        print(f"│ 📤 SUBMITTING STRATEGY: {filename:<53} │", flush=True)
+        print("└" + "─" * 78 + "┘", flush=True)
         
         # Extract timeframe from filename (e.g., ..._10m.py -> 10m)
         tf_part = filename.split('_')[-1].replace('.py', '')
@@ -48,13 +54,13 @@ def main():
         
         if success:
             if err_msg:
-                print(f"[{filename}] SUCCESS! (Info/Warning: {err_msg}) File moved to pushed/.", flush=True)
+                print(f"✅ SUCCESS: {filename} (Info/Warning: {err_msg})", flush=True)
             else:
-                print(f"[{filename}] SUCCESS! File moved to pushed/.", flush=True)
+                print(f"✅ SUCCESS: {filename}", flush=True)
         else:
-            print(f"[{filename}] FAILED or ERRORED: {err_msg}", flush=True)
+            print(f"❌ FAILED: {filename} - {err_msg}", flush=True)
             
-        print("Sleeping 15 seconds cooldown...", flush=True)
+        print("💤 Sleeping 15 seconds cooldown...\n", flush=True)
         time.sleep(15)
             
 if __name__ == "__main__":
