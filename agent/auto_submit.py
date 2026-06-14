@@ -244,7 +244,18 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
     if filepath and os.path.exists(filepath):
         import shutil
         target_dir_name = "pushed" if success else "failed"
-        target_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", target_dir_name)
+        
+        # Check origin to sub-categorize
+        sub_dir = "llm_strategies"
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+                if "[MCTS_DISCOVERY_ENGINE]" in content:
+                    sub_dir = "mcts_strategies"
+        except Exception:
+            pass
+            
+        target_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results", target_dir_name, sub_dir)
         os.makedirs(target_dir, exist_ok=True)
         dest_path = os.path.join(target_dir, os.path.basename(filepath))
         try:
@@ -267,6 +278,14 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
             logger.error(f"[AutoSubmit] Failed to move files: {e}")
             
     return success, err_msg
+
+def log_console_message(msg):
+    text = msg.text
+    # Filter out common accessibility warnings/errors from Radix UI / React
+    # that do not affect the execution of our script.
+    if any(k in text for k in ["DialogContent", "DialogTitle", "VisuallyHidden", "aria-describedby"]):
+        return
+    logger.info(f"[Browser Console] {msg.type}: {text}")
 
 def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: dict = None, timeout_seconds: int = 300, filepath: str = None) -> tuple:
     strategy_code = format_code_for_xno(strategy_code, params)
@@ -294,7 +313,7 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                 browser = p.chromium.connect_over_cdp("http://localhost:9222")
                 context = browser.contexts[0]
                 page = context.new_page()
-                page.on("console", lambda msg: logger.info(f"[Browser Console] {msg.type}: {msg.text}"))
+                page.on("console", log_console_message)
                 logger.info("[AutoSubmit] Navigating to build page...")
                 page.goto("https://alpha.xnoquant.io/build")
                 page.wait_for_selector("button.shrink-0.w-14.border-r", timeout=5000)
@@ -310,7 +329,7 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                 browser = p.chromium.launch(headless=True)
                 context = browser.new_context()
                 page = context.new_page()
-                page.on("console", lambda msg: logger.info(f"[Browser Console] {msg.type}: {msg.text}"))
+                page.on("console", log_console_message)
                 
                 # Load credentials from ARCH.md
                 account, password = load_credentials_from_arch()
@@ -627,7 +646,7 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
             logger.info("[AutoSubmit] Clicking Submit Alpha...")
             submit_item_selector = 'div[role="menuitem"]:has-text("Submit Alpha")'
             try:
-                page.wait_for_selector(submit_item_selector, timeout=5000)
+                page.wait_for_selector(submit_item_selector, timeout=10000)
                 page.click(submit_item_selector, force=True)
             except Exception as e:
                 logger.warning("[AutoSubmit] Submit Alpha option not found in menu or timed out. Treating as simulated-only.")
@@ -640,12 +659,12 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
             logger.info("[AutoSubmit] Confirming VQC 2026 event submission...")
             try:
                 comp_selector = 'button:has-text("Data Science Talent Competition")'
-                page.wait_for_selector(comp_selector, timeout=5000)
+                page.wait_for_selector(comp_selector, timeout=10000)
                 page.click(comp_selector, force=True)
                 page.wait_for_timeout(500)
                 
                 confirm_selector = 'button:has-text("Confirm submission")'
-                page.wait_for_selector(confirm_selector, timeout=5000)
+                page.wait_for_selector(confirm_selector, timeout=10000)
                 page.click(confirm_selector, force=True)
                 page.wait_for_timeout(1000)
                 submission_result = 'Submitted'

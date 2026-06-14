@@ -75,7 +75,7 @@ class PortfolioManager:
                         eq = pd.read_csv(eq_path, index_col=0, parse_dates=True).squeeze()
                         self._equity_curves.append(eq)
                     else:
-                        print(f"  ⚠️ Missing equity curve: {eq_path.name}")
+                        # print(f"  ⚠️ Missing equity curve: {eq_path.name}")
                         self._equity_curves.append(None)
                         
                     pos_path = self.results_dir / f"{s['name']}_{s['timeframe']}_positions.csv"
@@ -93,37 +93,66 @@ class PortfolioManager:
     
     def meets_criteria(self, metrics: dict) -> tuple[bool, list[str]]:
         """
-        Check if metrics meet competition criteria.
-        
-        Returns
-        -------
-        (passed, reasons)
-            passed: True if all criteria met
-            reasons: list of failure reasons
+        Check if metrics meet extreme competition criteria (Sharpe > 1.3, CAGR > 15%).
         """
-        reasons = []
+        fail_reasons = []
         
-        # Minimum trades
-        total_trades = metrics.get('total_trades', 0)
-        if total_trades < MIN_TRADES:
-            reasons.append(f"Trades={total_trades} < {MIN_TRADES}")
-        
-        # Competition criteria
-        for key, spec in CRITERIA.items():
-            value = metrics.get(key, 0)
-            if value is None or np.isnan(value):
-                reasons.append(f"{spec['label']}=NaN")
-                continue
+        # Check Sharpe
+        sharpe = metrics.get('sharpe_ratio', 0)
+        if sharpe <= 1.3:
+            fail_reasons.append(f"Sharpe {sharpe:.2f} <= 1.3")
             
-            if key == 'max_drawdown_pct':
-                # MDD is negative, check ≥ threshold
-                if value < spec['min']:
-                    reasons.append(f"{spec['label']}={value:.1f}% < {spec['min']}%")
-            else:
-                if value < spec['min']:
-                    reasons.append(f"{spec['label']}={value:.2f} < {spec['min']}")
+        # Check CAGR
+        cagr = metrics.get('cagr', 0)
+        if cagr <= 0.15:
+            fail_reasons.append(f"CAGR {cagr*100:.1f}% <= 15%")
+            
+        return len(fail_reasons) == 0, fail_reasons
+
+    def cleanup_portfolio(self) -> int:
+        """
+        Quét qua toàn bộ danh mục hiện tại và xóa bỏ các chiến lược 
+        không đạt tiêu chuẩn (Sharpe > 1.3 và CAGR > 0.15).
+        Xóa file .py, _equity.csv, _positions.csv và cập nhật lại JSON.
+        """
+        removed_count = 0
+        valid_strategies = []
+        valid_equity = []
+        valid_positions = []
         
-        return len(reasons) == 0, reasons
+        for idx, s in enumerate(self.strategies):
+            m = s.get('metrics', {})
+            sharpe = m.get('sharpe_ratio', 0)
+            cagr = m.get('cagr', 0)
+            
+            if sharpe > 1.3 and cagr > 0.15:
+                valid_strategies.append(s)
+                valid_equity.append(self._equity_curves[idx])
+                valid_positions.append(self._position_series[idx])
+            else:
+                # Xóa file liên quan
+                name = s['name']
+                tf = s['timeframe']
+                
+                for ext in ['.py', '_equity.csv', '_positions.csv']:
+                    fpath = self.results_dir / f"{name}_{tf}{ext}"
+                    if fpath.exists():
+                        try:
+                            fpath.unlink()
+                        except Exception as e:
+                            print(f"Error deleting {fpath}: {e}")
+                
+                removed_count += 1
+                print(f"Removed failed strategy from portfolio: {name}_{tf} (Sharpe={sharpe}, CAGR={cagr})")
+                
+        if removed_count > 0:
+            self.strategies = valid_strategies
+            self._equity_curves = valid_equity
+            self._position_series = valid_positions
+            self._save_summary()
+            print(f"Portfolio cleanup complete. Removed {removed_count} strategies.")
+            
+        return removed_count
     
     def compute_max_correlation(self, new_equity: pd.Series) -> float:
         """
