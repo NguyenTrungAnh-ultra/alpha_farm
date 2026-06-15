@@ -10,7 +10,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from agent.pipeline import run_pipeline, load_cookies
-from agent.convert_ideas import main as convert_ideas_main
+from agent.optimize_ideas import run_optimization
 from agent.auto_submit import run_auto_submit
 from agent.mcts_pipeline import run_mcts_pipeline
 
@@ -193,11 +193,11 @@ def run_master_pipeline():
         print("!" * 80 + "\n")
         sys.exit(1)
         
-    logger.info("\n--- PHASE 2: Convert LLM Ideas to Code & Sandbox Verify ---")
+    logger.info("\n--- PHASE 2: Convert LLM Ideas to Code & Optuna Auto-Tune ---")
     try:
-        convert_ideas_main()
+        run_optimization()
     except Exception as e:
-        logger.error(f"❌ Convert Ideas failed: {e}")
+        logger.error(f"❌ Parameter Optimization failed: {e}")
         print("\n" + "!" * 80)
         print("🚨 CRITICAL ERROR IN PHASE 2: FAILED TO CONVERT AI IDEAS TO CODE 🚨")
         print(f"Error details: {e}")

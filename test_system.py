@@ -8,8 +8,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from agent.pipeline import run_pipeline, load_cookies
-from agent.convert_ideas import main as convert_main
-from optimize_all_v2 import main as optimize_main
+from agent.optimize_ideas import run_optimization
 
 def test_system():
     print("="*80)
@@ -33,15 +32,9 @@ def test_system():
     except Exception as e:
         print(f"Lỗi bước sinh ý tưởng: {e}")
 
-    print("\n--- BƯỚC 2: CHUYỂN ĐỔI SANG CODE PYTHON & KIỂM THỬ SANDBOX ---")
+    print("\n--- BƯỚC 2: LẮP RÁP TEMPLATE & TỐI ƯU HÓA OPTUNA ---")
     try:
-        convert_main()
-    except Exception as e:
-        print(f"Lỗi bước chuyển đổi: {e}")
-
-    print("\n--- BƯỚC 3: TỐI ƯU HÓA BAYESIAN ---")
-    try:
-        optimize_main()
+        run_optimization()
     except Exception as e:
         print(f"Lỗi bước tối ưu hóa: {e}")
 

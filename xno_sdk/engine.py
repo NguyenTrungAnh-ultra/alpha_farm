@@ -74,6 +74,52 @@ class FeatureEngine:
     Automatically unwraps RestrictedSeries, computes using pandas/numpy/talib, 
     and wraps the result back to RestrictedSeries.
     """
+    def __init__(self):
+        # Tự động bọc tất cả các hàm để chuẩn hóa tham số (window/timeperiod)
+        import inspect
+        for name in dir(self):
+            if not name.startswith('_') and name not in ['_unwrap', '_wrap']:
+                attr = getattr(self, name)
+                # Dùng __func__ nếu là bound method để lấy hàm gốc
+                func_obj = getattr(attr, '__func__', attr)
+                if inspect.isfunction(func_obj):
+                    # Bọc hàm gốc rồi bind lại thành method
+                    wrapped = self._wrap_normalize_params(func_obj)
+                    import types
+                    setattr(self, name, types.MethodType(wrapped, self))
+
+    def _wrap_normalize_params(self, func):
+        import inspect
+        try:
+            sig = inspect.signature(func)
+        except ValueError:
+            return func
+            
+        def wrapper(*args, **kwargs):
+            # 1. Chuẩn hóa tên tham số window / timeperiod
+            if 'window' in sig.parameters and 'window' not in kwargs:
+                for alt in ['timeperiod', 'period']:
+                    if alt in kwargs:
+                        kwargs['window'] = kwargs.pop(alt)
+                        break
+            if 'timeperiod' in sig.parameters and 'timeperiod' not in kwargs:
+                for alt in ['window', 'period']:
+                    if alt in kwargs:
+                        kwargs['timeperiod'] = kwargs.pop(alt)
+                        break
+                        
+            # 2. Loại bỏ các tham số lạ (không có trong signature) để tránh lỗi crash do AI tự bịa tham số
+            has_var_keyword = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+            if not has_var_keyword:
+                filtered_kwargs = {}
+                for k, v in kwargs.items():
+                    if k in sig.parameters:
+                        filtered_kwargs[k] = v
+                kwargs = filtered_kwargs
+                
+            return func(*args, **kwargs)
+        return wrapper
+
     def _unwrap(self, val):
         if isinstance(val, RestrictedSeries):
             return val._data
@@ -317,7 +363,43 @@ class FeatureEngine:
                 else:
                     converted.append(arg)
 
-            result = func(*converted, **kwargs)
+            # Chuẩn hóa tên tham số của TA-Lib (bỏ gạch dưới, đổi period -> timeperiod, map stoch/macd)
+            normalized_kwargs = {}
+            for k, v in kwargs.items():
+                k_norm = k.replace('_', '').lower()
+                if k_norm == 'period':
+                    k_norm = 'timeperiod'
+                
+                # Ánh xạ riêng cho stoch và macd
+                if talib_name.lower() in ['stoch', 'stochf'] and k_norm == 'timeperiod':
+                    k_norm = 'fastk_period'
+                if talib_name.lower() in ['macd', 'macdext', 'ppo', 'apo'] and k_norm == 'timeperiod':
+                    k_norm = 'fastperiod'
+                
+                normalized_kwargs[k_norm] = v
+
+            try:
+                result = func(*converted, **normalized_kwargs)
+            except TypeError as e:
+                # Lỗi tham số (unexpected keyword argument hoặc sai số lượng positional argument)
+                # Thử tự động thích ứng đối số
+                logger.warning(f"TA-Lib call failed: {e}. Retrying argument adaptation...")
+                try:
+                    # 1. Thử rút gọn chỉ lấy 1 đối số cuối cùng (thường là close)
+                    try:
+                        result = func(converted[-1], **normalized_kwargs)
+                    except:
+                        # 2. Thử lấy 2 đối số cuối cùng (thường là close, volume cho OBV)
+                        if len(converted) >= 2:
+                            try:
+                                result = func(converted[-2], converted[-1], **normalized_kwargs)
+                            except:
+                                pass
+                        # 3. Thử chạy positional thuần túy không có kwargs
+                        result = func(*converted)
+                except Exception as e2:
+                    logger.error(f"Adaptation failed. Original error: {e}")
+                    raise e
 
             if isinstance(result, np.ndarray):
                 s = pd.Series(result, index=index) if index is not None else pd.Series(result)

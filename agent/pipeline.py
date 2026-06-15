@@ -164,6 +164,7 @@ def run_pipeline(
                 total_rounds=n_strategies,
                 experience=experience,
                 tried_names=filtered_tried,
+                use_lite=(model == "ollama-local"),
             )
             
             # Send JSON request (requires GeminiChat.send_json to be available, which it is)
@@ -192,8 +193,8 @@ def run_pipeline(
             consecutive_errors = 0
             
             name = idea.get('name', f'Idea_{round_num}')
-            family = idea.get('family', 'unknown')
-            description = idea.get('description', '')
+            family = idea.get('template_name', idea.get('family', 'unknown'))
+            description = idea.get('rationale', idea.get('description', ''))
             tried_names.add(name)
             
             print(f"  ✅ Idea: {name} ({family})")
