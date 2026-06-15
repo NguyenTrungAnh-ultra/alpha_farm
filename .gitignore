@@ -9,3 +9,20 @@ scoring_analysis_raw.csv
 api.txt
 log.txt
 agent/results/
+
+# IDE and Editor settings
+.vscode/
+.idea/
+*.swp
+
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache & testing
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
