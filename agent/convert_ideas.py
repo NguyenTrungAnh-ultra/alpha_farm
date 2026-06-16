@@ -5,6 +5,7 @@ import re
 import traceback
 import pandas as pd
 import ast
+from sandbox_prefixer import apply_prefixes
 
 from pathlib import Path
 
@@ -73,13 +74,20 @@ class XNOASTFixer(ast.NodeTransformer):
         
     def visit_Attribute(self, node):
         self.generic_visit(node)
-        # Convert `foo.upperband` -> `foo[0]`
-        if node.attr in ['upperband', 'fastk', 'macd']:
-            return ast.Subscript(value=node.value, slice=ast.Constant(value=0), ctx=ast.Load())
-        if node.attr in ['middleband', 'fastd', 'macdsignal']:
-            return ast.Subscript(value=node.value, slice=ast.Constant(value=1), ctx=ast.Load())
-        if node.attr in ['lowerband', 'macdhist']:
-            return ast.Subscript(value=node.value, slice=ast.Constant(value=2), ctx=ast.Load())
+        # Check if base value is self.feat to avoid replacing self.feat.macd, etc.
+        is_self_feat = False
+        if isinstance(node.value, ast.Attribute) and node.value.attr == 'feat':
+            if isinstance(node.value.value, ast.Name) and node.value.value.id == 'self':
+                is_self_feat = True
+                
+        if not is_self_feat:
+            # Convert `foo.upperband` -> `foo[0]`
+            if node.attr in ['upperband', 'fastk', 'macd']:
+                return ast.Subscript(value=node.value, slice=ast.Constant(value=0), ctx=ast.Load())
+            if node.attr in ['middleband', 'fastd', 'macdsignal']:
+                return ast.Subscript(value=node.value, slice=ast.Constant(value=1), ctx=ast.Load())
+            if node.attr in ['lowerband', 'macdhist']:
+                return ast.Subscript(value=node.value, slice=ast.Constant(value=2), ctx=ast.Load())
         return node
 
     def visit_Compare(self, node):
@@ -251,9 +259,14 @@ def clean_expression(expr: str) -> str:
 
 def generate_python_code(idea: dict) -> str:
     name = idea.get('name', 'CustomStrategy')
-    formula = idea.get('formula', {})
-    param_space = idea.get('param_space', {})
-    
+    formula = idea.get('formula')
+    param_space = idea.get('param_space')
+        
+    if not formula:
+        formula = {}
+    if not param_space:
+        param_space = {}
+        
     lines = []
     lines.append("from xno_sdk.engine import SimpleAlgorithm")
     lines.append("")
@@ -267,24 +280,31 @@ def generate_python_code(idea: dict) -> str:
         low = param_info.get('low')
         high = param_info.get('high')
         
-        # Determine default value as midpoint
+        # Check if parameter has custom default value in legacy ideas
+        default_val = idea.get('parameters', {}).get(param_name)
+        if default_val is None:
+            if p_type == 'int':
+                default_val = int((low + high) // 2)
+            else:
+                default_val = float((low + high) / 2.0)
+                
+        # Generate parameter lines
         if p_type == 'int':
-            default_val = int((low + high) // 2)
-            lines.append(f"        self.{param_name} = int(self.{param_name} if '{param_name}' in self.__dict__ else {default_val})")
+            lines.append(f"        self.{param_name} = int(self.{param_name} if '{param_name}' in self.__dict__ else {int(default_val)})")
         else:
-            default_val = float((low + high) / 2.0)
-            # Round float default to a clean representation
-            default_val = round(default_val, 4)
+            default_val = round(float(default_val), 4)
             lines.append(f"        self.{param_name} = float(self.{param_name} if '{param_name}' in self.__dict__ else {default_val})")
             
     lines.append("")
     lines.append("        # 2. Local variables for parameters")
     for param_name in param_space.keys():
         lines.append(f"        {param_name} = self.{param_name}")
+
         
     lines.append("")
     lines.append("        # 3. Inputs")
     lines.append("        open_price = self.data.pv_open")
+    lines.append("        open_ = self.data.pv_open")
     lines.append("        high = self.data.pv_high")
     lines.append("        low = self.data.pv_low")
     lines.append("        close = self.data.pv_close")
@@ -293,8 +313,15 @@ def generate_python_code(idea: dict) -> str:
     
     lines.append("        # 4. Indicators")
     indicators = formula.get('indicators', [])
+    indicator_map = {}
     for ind in indicators:
-        ind_name = ind.get('name')
+        orig_name = ind.get('name')
+        if orig_name:
+            indicator_map[orig_name] = orig_name.lower()
+            
+    for ind in indicators:
+        orig_name = ind.get('name')
+        ind_name = indicator_map[orig_name]
         ind_def = ind.get('definition')
         
         # Apply pattern mapping
@@ -311,15 +338,14 @@ def generate_python_code(idea: dict) -> str:
         ind_def = ind_def.replace('.upperband', '[0]').replace('.middleband', '[1]').replace('.lowerband', '[2]')
         ind_def = ind_def.replace('.fastk', '[0]').replace('.fastd', '[1]')
         
+        # Replace other indicator references inside this indicator's definition (case-insensitively)
+        for o_name, l_name in sorted(indicator_map.items(), key=lambda x: len(x[0]), reverse=True):
+            if o_name != orig_name:
+                ind_def = re.sub(rf'\b{re.escape(o_name)}\b', l_name, ind_def, flags=re.IGNORECASE)
+        
         # Apply anti-singularity adjustments if dividing by volume or high-low range
-        # Check if the definition contains division by volume or price range
-        # Note: self.data.pv_volume has volume = 0, so division by volume is very dangerous
         if '/' in ind_def:
-            # Check for close/volume or similar
             if 'volume' in ind_def and not '1e-8' in ind_def and not 'isfinite' in ind_def:
-                # Add tiny constant to volume or wrap
-                # E.g., change / volume to / (volume + 1e-8)
-                # But let's be careful and use re.sub or a replacement
                 ind_def = re.sub(r'/\s*volume\b', '/ (volume + 1e-8)', ind_def)
             if ('high - low' in ind_def or 'high-low' in ind_def) and not '1e-8' in ind_def and not 'isfinite' in ind_def:
                 ind_def = ind_def.replace('high - low', '(high - low + 1e-8)')
@@ -327,21 +353,29 @@ def generate_python_code(idea: dict) -> str:
                 
         lines.append(f"        {ind_name} = {ind_def}")
         
+    def clean_expr_with_indicators(expr: str) -> str:
+        if not expr:
+            return "close != close"
+        # Substitute indicator names case-insensitively
+        for o_name, l_name in sorted(indicator_map.items(), key=lambda x: len(x[0]), reverse=True):
+            expr = re.sub(rf'\b{re.escape(o_name)}\b', l_name, expr, flags=re.IGNORECASE)
+        cleaned = clean_expression(expr)
+        if not cleaned:
+            return "close != close"
+        return cleaned
+
     lines.append("")
     lines.append("        # 5. Entry logic")
-    entry_long = clean_expression(formula.get('entry_long', ''))
-    entry_short = clean_expression(formula.get('entry_short', ''))
+    entry_long = clean_expr_with_indicators(formula.get('entry_long', ''))
+    entry_short = clean_expr_with_indicators(formula.get('entry_short', ''))
     
     lines.append(f"        long_setup = {entry_long}")
     lines.append(f"        short_setup = {entry_short}")
     lines.append("")
     
     lines.append("        # 6. Exit logic")
-    exit_long = clean_expression(formula.get('exit_long', ''))
-    exit_short = clean_expression(formula.get('exit_short', ''))
-    
-    if not exit_long: exit_long = "False"
-    if not exit_short: exit_short = "False"
+    exit_long = clean_expr_with_indicators(formula.get('exit_long', ''))
+    exit_short = clean_expr_with_indicators(formula.get('exit_short', ''))
     
     lines.append(f"        exit_long = {exit_long}")
     lines.append(f"        exit_short = {exit_short}")
@@ -391,9 +425,14 @@ def main():
         py_filename = filename.replace('.json', '.py')
         py_filepath = os.path.join(output_dir, py_filename)
         pushed_filepath = os.path.join(output_dir, "pushed", py_filename)
-        failed_filepath = os.path.join(output_dir, "failed_conversions", py_filename)
+        llm_strategies_filepath =  os.path.join(output_dir, "pushed","llm_strategies", py_filename)
+        mcts_strategies_filepath = os.path.join(output_dir, "pushed","mcts_strategies", py_filename)
+        failed_conv_filepath = os.path.join(output_dir, "failed_conversions", py_filename)
+        failed_filepath = os.path.join(output_dir, "failed", py_filename)
+        failed_llm_strategies_filepath = os.path.join(output_dir, "failed","llm_strategies", py_filename)
+        failed_mcts_strategies_filepath = os.path.join(output_dir, "failed","mcts_strategies", py_filename)
         
-        if os.path.exists(py_filepath) or os.path.exists(pushed_filepath) or os.path.exists(failed_filepath):
+        if os.path.exists(py_filepath) or os.path.exists(pushed_filepath) or os.path.exists(failed_conv_filepath) or os.path.exists(llm_strategies_filepath) or os.path.exists(mcts_strategies_filepath) or os.path.exists(failed_llm_strategies_filepath) or os.path.exists(failed_mcts_strategies_filepath) or os.path.exists(failed_filepath):
             print(f"Skipping {filename} - already converted.")
             continue
         
@@ -402,9 +441,22 @@ def main():
             with open(filepath, 'r', encoding='utf-8') as f:
                 idea = json.load(f)
                 
+            # 1. AI sinh mã thô
             code = generate_python_code(idea)
             
-            # Get timeframe for validation
+            # 2. [KÍCH HOẠT BỨC TƯỜNG PHÒNG NGỰ] - Đưa qua sandbox_prefixer
+            code, idea, was_modified, fix_log = apply_prefixes(code, idea)
+            
+            if was_modified:
+                print("  🛡️ [Prefixed] Đã can thiệp sửa mã bằng sandbox_prefixer:")
+                for log_item in fix_log:
+                    print(log_item)
+                
+                # Đồng bộ ngược (Reverse Synchronization): Ghi đè lại file JSON để các lần học sau của AI không lặp lại lỗi
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    json.dump(idea, f, indent=4)
+                    
+            # 3. Tiếp tục luồng Validation bình thường
             tf = idea.get('timeframe', '10m')
             if tf not in data_cache:
                 print(f"  Loading {tf} data for validation...")
@@ -438,7 +490,7 @@ def main():
             except Exception as e:
                 error = str(e)
                 print(f"  ❌ Validation error: {error}")
-                # Đưa file bị lỗi vào failed_conversions và xóa khỏi kết quả
+                # Đưa file bị lỗi vào failed_conversions và xóa khỏi results
                 fail_filepath = os.path.join(output_dir, "failed_conversions", py_filename)
                 os.makedirs(os.path.dirname(fail_filepath), exist_ok=True)
                 if os.path.exists(py_filepath):

@@ -136,6 +136,18 @@ def run_pipeline(
     
     tried_names = set([idea.get("name") for idea in existing_ideas if idea.get("name")])
     
+    # Initialize local model client for self-correction if main model is not local
+    local_chat = None
+    if model != "ollama-local":
+        try:
+            from agent.ollama_client import OllamaChatClient
+            local_chat = OllamaChatClient(model="qwen3.5:4b", verbose=False)
+            print("[Pipeline] Local Ollama client initialized for self-correction.")
+        except Exception as e:
+            print(f"[Pipeline] Warning: Failed to init local Ollama for self-correction: {e}")
+    else:
+        local_chat = chat
+        
     start_time = time.time()
     accepted = 0
     errors = 0
@@ -164,20 +176,11 @@ def run_pipeline(
                 total_rounds=n_strategies,
                 experience=experience,
                 tried_names=filtered_tried,
-                use_lite=(model == "ollama-local"),
             )
             
-            # Send JSON request (requires GeminiChat.send_json to be available, which it is)
-            # Actually wait, GeminiChat originally didn't have a specific `send_json` method, wait let me check gemini_client.py
-            # Line 38 of pipeline.py in the past: `from agent.gemini_client import GeminiChat, extract_json`
-            # And it called `idea = chat.send_json(idea_prompt, retries=3)`.
-            # If `send_json` exists, we use it. If not, we just use `extract_json(chat.send(prompt))`.
-            # I will use extract_json just in case `send_json` was a wrapper.
-            raw_response = chat._send_request(idea_prompt) if hasattr(chat, '_send_request') else "" # wait, it's `chat.send(prompt)`
-            # Let's use standard send and extract
+            # Send JSON request
             raw_text = chat.send(idea_prompt) if hasattr(chat, 'send') else ""
             
-            # Actually let's safely import extract_json
             from agent.gemini_client import extract_json
             idea = extract_json(raw_text)
             
@@ -190,26 +193,108 @@ def run_pipeline(
                 errors += 1
                 continue
             
-            consecutive_errors = 0
+            # Now, enter the self-correction loop
+            max_correction_attempts = 1
+            correction_attempt = 0
+            validation_passed = False
             
-            name = idea.get('name', f'Idea_{round_num}')
-            family = idea.get('template_name', idea.get('family', 'unknown'))
-            description = idea.get('rationale', idea.get('description', ''))
-            tried_names.add(name)
+            from agent.convert_ideas import generate_python_code
+            from xno_sdk.emulator import XNOPlatformEmulator
+            from agent.prompts import build_correction_prompt
+            from sandbox_prefixer import apply_prefixes
+            emulator = XNOPlatformEmulator(verbose=False)
             
-            print(f"  ✅ Idea: {name} ({family})")
-            print(f"     {description[:100]}...")
-            
-            # Save to JSON
-            out_path = os.path.join(results_dir, f"{name}_{tf}.json")
-            with open(out_path, 'w', encoding='utf-8') as f:
-                json.dump(idea, f, indent=4, ensure_ascii=False)
+            while correction_attempt < max_correction_attempts:
+                correction_attempt += 1
+                name = idea.get('name', f'Idea_{round_num}_{tf}')
+                # Clean name to be valid python identifier
+                import re
+                name = re.sub(r'[^a-zA-Z0-9_]', '', name)
+                idea['name'] = name
+                idea['timeframe'] = tf
                 
-            print(f"  💾 Saved to {out_path}")
-            
-            existing_ideas.append(idea)
-            accepted += 1
-            
+                py_code = generate_python_code(idea)
+                # =====================================================================
+                # [THÊM MỚI] KÍCH HOẠT BỨC TƯỜNG PHÒNG NGỰ - SANDBOX PREFIXER
+                # =====================================================================
+                py_code, idea, was_modified, fix_log = apply_prefixes(py_code, idea)
+                
+                if was_modified:
+                    print(f"  [Attempt {correction_attempt}/{max_correction_attempts}] 🛡️ [Prefixed] Đã can thiệp sửa mã bằng sandbox_prefixer:")
+                    for log_item in fix_log:
+                        print(f"  {log_item}")
+                # =====================================================================
+
+                # Define paths
+                ideas_folder = os.path.join(PROJECT_ROOT, "agent", "results", "ideas")
+                os.makedirs(ideas_folder, exist_ok=True)
+                
+                json_path = os.path.join(ideas_folder, f"{name}_{tf}.json")
+                py_path = os.path.join(PROJECT_ROOT, "agent", "results", f"{name}_{tf}.py")
+                
+                # Write to temp file for sandbox validation
+                with open(py_path, 'w', encoding='utf-8') as f:
+                    f.write(py_code)
+                    
+                print(f"  [Attempt {correction_attempt}/{max_correction_attempts}] Validating {name} in sandbox...")
+                
+                try:
+                    metrics = emulator.get_metrics(py_path, tf)
+                    sharpe = metrics.get('sharpe_ratio', 0.0)
+                    cagr = metrics.get('cagr', 0.0)
+                    
+                    if sharpe >= 1.3:
+                        print(f"  ✅ Validation passed! Sharpe: {sharpe:.4f} | CAGR: {cagr*100:.2f}%")
+                        # Write JSON
+                        with open(json_path, 'w', encoding='utf-8') as f:
+                            json.dump(idea, f, indent=4, ensure_ascii=False)
+                        print(f"  💾 Saved JSON to {json_path}")
+                        print(f"  💾 Saved Python to {py_path}")
+                        validation_passed = True
+                        tried_names.add(name)
+                        break
+                    else:
+                        print(f"  ❌ Discarded: Low Sharpe Ratio ({sharpe:.4f} < 1.3)")
+                        # Delete python file and break correction loop (no retry for performance)
+                        if os.path.exists(py_path):
+                            os.remove(py_path)
+                        break
+                except Exception as e:
+                    error_msg = traceback.format_exc()
+                    print(f"  ❌ Sandbox Error: {type(e).__name__}: {e}")
+                    
+                    # Clean up the python file
+                    if os.path.exists(py_path):
+                        try:
+                            os.remove(py_path)
+                        except:
+                            pass
+                            
+                    if correction_attempt < max_correction_attempts:
+                        correction_chat = local_chat if local_chat is not None else chat
+                        print(f"  🔄 Retrying self-correction using local model ({getattr(correction_chat, 'model', 'default')})...")
+                        # Build correction prompt
+                        correction_prompt = build_correction_prompt(json.dumps(idea, indent=4), error_msg)
+                        
+                        # Send correction prompt to LLM
+                        raw_text = correction_chat.send(correction_prompt) if hasattr(correction_chat, 'send') else ""
+                        corrected_idea = extract_json(raw_text)
+                        
+                        if corrected_idea:
+                            idea = corrected_idea
+                        else:
+                            print("  ❌ Failed to parse corrected JSON from LLM.")
+                            break
+                    else:
+                        print("  ❌ Out of correction attempts. Discarding idea.")
+                        
+            if validation_passed:
+                consecutive_errors = 0
+                existing_ideas.append(idea)
+                accepted += 1
+            else:
+                errors += 1
+                
         except Exception as e:
             errors += 1
             print(f"  💥 Unexpected error: {type(e).__name__}: {e}")
@@ -227,6 +312,8 @@ def run_pipeline(
 ║  Errors:           {errors:6d}                               ║
 ╚══════════════════════════════════════════════════════════════╝
     """)
+    if local_chat and local_chat is not chat and hasattr(local_chat, 'stop_keepalive'):
+        local_chat.stop_keepalive()
     if hasattr(chat, 'stop_keepalive'):
         chat.stop_keepalive()
     return existing_ideas

@@ -9,6 +9,7 @@ scoring_analysis_raw.csv
 api.txt
 log.txt
 agent/results/
+token.txt
 
 # IDE and Editor settings
 .vscode/

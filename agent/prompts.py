@@ -1,21 +1,50 @@
 """
-Prompt Templates for Template-Based Strategy Generation (XNO Engine)
-=====================================================================
-Prompts that produce XNOQuant-compatible strategies using pre-defined Templates.
+Prompt Templates for Strategy Generation (XNO Engine)
+======================================================
+Prompts that produce XNOQuant-compatible strategies using SimpleAlgorithm.
+
+Design principles:
+    - Self-contained: each prompt includes ALL context needed
+    - Structured output: always request JSON/code in specific format
+    - Domain-aware: VN30F1M futures specifics baked in
+    - Timeframe-adaptive: different guidance per timeframe
+    - Diversity-enforcing: explicit list of existing strategies
 """
 
-from agent.templates import TEMPLATE_REGISTRY
+# ─── Available talib & SDK indicators (curated for futures) ────────────────
+TALIB_INDICATORS = """
+## Available Indicators (called via self.feat.xxx())
+
+**Trend**: sma, ema, dema, tema, wma, kama, t3, trima, midpoint, midprice, sar, linearreg, linearreg_slope
+**Momentum**: rsi, stoch, stochf, stochrsi, macd, mom, roc, rocp, willr, cci, cmo, mfi, ultosc, trix, adx, adxr, aroon, aroonosc, dx, minus_di, plus_di, apo, ppo, bop
+**Volatility**: atr, natr, trange, bbands (upper/middle/lower)
+**Volume**: ad, adosc, obv, cmf, rolling_vwap
+**Pattern (Use EXACT names below, DO NOT use cdl_ prefix)**: piercing_pattern, engulfing_pattern, harami_pattern, harami_cross_pattern, hikkake_pattern, modified_hikkake_pattern, in_neck_pattern, on_neck_pattern
+**Math/Rolling**: max, min, stddev, linearreg_angle, rolling_mean, rolling_max, rolling_min, rolling_std, rolling_sum
+**Advanced/Statistical**: rolling_zscore, rolling_mad, rolling_correlation, rolling_rank, log_returns
+"""
+
+# ─── Available operator functions ────────────────────────────────────────
+OPERATOR_FUNCTIONS = """
+## Available Operator Functions (called via self.op.xxx())
+
+**Time Series**: shift, diff, pct_change
+**Crossings**: crossed, crossed_above, crossed_below, crossed_above_value, crossed_below_value
+**Utility**: clip, fillna, ffill, abs, where, sign, isna, notna, isfinite, zero_ifna
+"""
 
 # ─── Timeframe-specific guidance ────────────────────────────────────
 TIMEFRAME_HINTS = {
     "10m": """
 **10-Minute Timeframe** — Balanced Intraday:
+- Indicator periods: medium-to-long (10-40 bars)
 - Trades: 2-5/day
 - Suitable for: Trend confirmation, multi-indicator systems
 - Stop loss: 5-10 points
 """,
     "15m": """
 **15-Minute Timeframe** — Swing Intraday:
+- Indicator periods: longer (14-50 bars)
 - Trades: 1-3/day
 - Suitable for: High-quality trend-following, divergence, pattern recognition
 - Stop loss: 8-15 points
@@ -23,6 +52,7 @@ TIMEFRAME_HINTS = {
 """,
     "30m": """
 **30-Minute Timeframe** — Position Intraday:
+- Indicator periods: long (20-60 bars)
 - Trades: 0-2/day (some days may have no trades)
 - Suitable for: Major trends, range breakouts, session-based strategies
 - Stop loss: 10-20 points
@@ -30,6 +60,7 @@ TIMEFRAME_HINTS = {
 """,
     "60m": """
 **1-Hour Timeframe** — Position/Large Swing:
+- Indicator periods: long (10-30 bars ≈ 2-6 days)
 - Trades: 0-1/day (very rare, some weeks may have no trades)
 - Suitable for: Major trend following, regime detection
 - Stop loss: 15-30 points
@@ -37,15 +68,23 @@ TIMEFRAME_HINTS = {
 """,
 }
 
-def get_templates_help_text() -> str:
-    lines = []
-    lines.append("## Available Strategy Templates")
-    for name, info in TEMPLATE_REGISTRY.items():
-        lines.append(f"- **{name}**: {info['description']}")
-        lines.append("  Allowed parameters and bounds (You MUST pick values strictly within these ranges):")
-        for p_name, p_info in info['params'].items():
-            lines.append(f"    - `{p_name}` ({p_info['type']}): Min={p_info['low']}, Max={p_info['high']} (default={p_info['default']})")
-    return "\n".join(lines)
+# ─── Strategy families for diversity ────────────────────────────────
+STRATEGY_FAMILIES = [
+    "trend-following",      # EMA crossover, ADX filter, SAR, DEMA
+    "momentum",             # RSI, MACD, Stochastic, TRIX, ROC
+    "mean-reversion",       # Bollinger Bands, RSI extremes, CCI
+    "breakout",             # Donchian, Keltner, range breakout, volatility breakout
+    "volatility",           # ATR-based, Bollinger squeeze, volatility regime
+    "multi-indicator",      # Combining 2-3 uncorrelated indicators
+    "pattern-based",        # Candlestick patterns + confirmation
+    "channel",              # Linear regression channel, price channel
+    "oscillator-divergence",# RSI/MACD divergence, hidden divergence
+    "session-based",        # Opening range breakout, session momentum
+]
+
+# ═══════════════════════════════════════════════════════════════════════
+# Prompt Builders
+# ═══════════════════════════════════════════════════════════════════════
 
 def build_idea_prompt(
     timeframe: str,
@@ -54,63 +93,35 @@ def build_idea_prompt(
     total_rounds: int,
     experience: str = "",
     tried_names: list[str] = None,
-    use_lite: bool = False,
 ) -> str:
     """
-    Build prompt for generating a strategy idea (JSON) using template-based approach.
+    Build prompt for generating a strategy idea (JSON).
     """
-    templates_help = get_templates_help_text()
-    tf_hint = TIMEFRAME_HINTS.get(timeframe, "")
-
+    
+    # Context sections
     existing_section = ""
     if existing_strategies:
-        existing_list = "\n".join([f"  - [{s.get('timeframe')}] {s.get('name')} ({s.get('template_name', 'unknown')})" for s in existing_strategies])
-        existing_section = f"## 1. ALREADY ACCEPTED STRATEGIES (DO NOT DUPLICATE NAMES)\n{existing_list}\n"
+        existing_list = "\n".join([f"  - [{s.get('timeframe', '10m')}] {s.get('name', 'Strategy')} ({s.get('family', s.get('template_name', 'unknown'))})" for s in existing_strategies])
+        existing_section = f"## 1. ALREADY ACCEPTED STRATEGIES (DO NOT DUPLICATE)\n{existing_list}\n"
     else:
         existing_section = "## 1. ALREADY ACCEPTED STRATEGIES\n(None yet. This is the first strategy.)\n"
-
+        
     tried_section = ""
     if tried_names:
         tried_list = ", ".join(sorted(tried_names))
         tried_section = f"## 2. PREVIOUSLY TRIED & FAILED NAMES (DO NOT REUSE)\n{tried_list}\n"
 
-    if use_lite:
-        # Lite Prompt for Local Model (Ollama)
-        return f"""You are a Quant Researcher. Design 1 intraday trading strategy for VN30 Index Futures on **{timeframe}** timeframe.
-This is round {round_num}/{total_rounds}.
+    used_families = [s.get('family', '') for s in existing_strategies]
+    unused_families = [f for f in STRATEGY_FAMILIES if f not in used_families]
+    suggested = f"Suggested unused families: **{', '.join(unused_families[:3])}**" if unused_families else "All families used. Create a unique variation."
 
-{tf_hint}
-
-{existing_section}
-{tried_section}
-{templates_help}
-
-## CRITICAL RULES
-1. You MUST select exactly ONE template from the list above.
-2. You MUST specify parameter values strictly within their allowed Min and Max bounds.
-3. The name MUST be unique and not in the list of tried/accepted names.
-4. Output ONLY valid JSON in the format below. No markdown text outside the JSON block.
-
-## OUTPUT FORMAT
-```json
-{{
-    "name": "UniqueStrategyName",
-    "timeframe": "{timeframe}",
-    "template_name": "SelectedTemplateName",
-    "rationale": "Brief rationale for selecting this template and these parameters",
-    "parameters": {{
-        "param_name": value
-    }}
-}}
-```"""
-
-    # Full Prompt for Big Model (Gemini/Deepseek)
+    tf_hint = TIMEFRAME_HINTS.get(timeframe, "")
     exp_section = f"## 3. COMBAT EXPERIENCE (MANDATORY)\n{experience}\n" if experience else ""
 
-    return f"""You are an expert **Quant Researcher** designing trading strategies for the **VN30 Index Futures contract** (Vietnamese market derivatives).
+    return f"""You are an expert **Quant Researcher** designing trading strategies for the **VN30 Index Futures contract**.
 
 ## Task
-Design 1 intraday trading strategy for the **{timeframe}** timeframe by choosing an optimal template and parameter set.
+Design 1 intraday trading strategy for the **{timeframe}** timeframe.
 This is round {round_num}/{total_rounds}.
 
 {tf_hint}
@@ -118,26 +129,68 @@ This is round {round_num}/{total_rounds}.
 {existing_section}
 {tried_section}
 {exp_section}
-{templates_help}
+## 4. REFERENCE LIBRARY
 
-## CRITICAL RULES (MUST FOLLOW STRICTLY)
-1. **Uniqueness**: Your strategy name and setup must be unique.
-2. **Template Selection**: You MUST choose exactly ONE template from the "Available Strategy Templates" list.
-3. **Parameter Integrity**: You MUST supply values for ALL parameters required by the selected template. The values MUST be strictly within the defined Min and Max bounds. Do NOT invent new parameters.
-4. **Logic**: Choose parameters that align with VN30 index behaviors (mean-reverting vs trend-following based on your Combat Experience).
+{TALIB_INDICATORS}
 
-## OUTPUT FORMAT
+{OPERATOR_FUNCTIONS}
+
+## 5. CRITICAL RULES (MUST FOLLOW STRICTLY)
+1. **Uniqueness**: Your strategy MUST be COMPLETELY DIFFERENT from the accepted ones above. Use different logic, different indicators, or a different family.
+2. **Family**: {suggested}
+3. **Logic Strictness**: You must have CLEAR entry and exit logic, expressed strictly as Python mathematical formulas. NO natural language.
+4. **Complexity**: Must use **at least 2 indicators** (1 primary + 1 filter/confirmation).
+5. **Distinct Exits**: Must have its **own exit logic** (do not just reverse the entry signals).
+6. **Valid Functions ONLY**: You are ONLY allowed to use the indicators and operators listed in the "REFERENCE LIBRARY" above via `self.feat.xxx()` or `self.op.xxx()`. Do NOT invent any functions. Do NOT use Pandas methods like `.rolling()` or `.shift()`.
+7. **Pandas Bitwise Logic**: You MUST use Pandas bitwise operators `&`, `|`, `~` for logical conditions instead of `and`, `or`, `not`. You MUST wrap every condition in parentheses. Example: `(close > MA) & (RSI < 30)`.
+
+## 6. OUTPUT FORMAT
+
 You MUST return EXACTLY the following JSON structure. Do not add any text outside the JSON block.
 
 ```json
 {{
-    "name": "UniqueStrategyName",
+    "name": "StrategyName",
     "timeframe": "{timeframe}",
-    "template_name": "SelectedTemplateName",
-    "rationale": "Detailed rationale based on market analysis and experience",
-    "parameters": {{
-        "param1": 15,
-        "param2": 65.0
+    "family": "trend-following|momentum|mean-reversion|breakout|volatility|multi-indicator|pattern-based|channel|oscillator-divergence|session-based",
+    "description": "Brief description of the strategy logic.",
+    "formula": {{
+        "inputs": ["close", "high", "low", "open_price", "volume"],
+        "indicators": [
+            {{"name": "EMA_fast", "definition": "self.feat.ema(close, timeperiod=10)"}},
+            {{"name": "ATR", "definition": "self.feat.atr(high, low, close, timeperiod=14)"}}
+        ],
+        "entry_long": "(close > EMA_fast) & (ATR > 0.5)",
+        "entry_short": "(close < EMA_fast) & (ATR > 0.5)",
+        "exit_long": "(close < EMA_fast)",
+        "exit_short": "(close > EMA_fast)"
+    }},
+    "param_space": {{
+        "param_name": {{"type": "int|float", "low": 5, "high": 30, "step": 1}},
+        "another_param": {{"type": "float", "low": 0.5, "high": 3.0, "step": 0.1}}
     }}
 }}
 ```"""
+
+def build_correction_prompt(original_json_str: str, error_traceback: str) -> str:
+    """
+    Build prompt for self-correction when a generated strategy fails validation.
+    """
+    return f"""Your previous generated strategy JSON failed execution validation in our sandbox.
+
+Here is the original JSON you generated:
+```json
+{original_json_str}
+```
+
+Here is the error traceback from the sandbox:
+```
+{error_traceback}
+```
+
+CRITICAL RULES FOR CORRECTION:
+1. Identify the source of the error in your formulas or parameter space.
+   - For example: syntax errors, incorrect TA-Lib function parameter names (e.g. `period` instead of `timeperiod`), missing required parameters, dividing by zero/volume without offset, or using unallowed functions.
+2. Fix the errors while preserving the core trading concept.
+3. Return ONLY a valid JSON block in the exact same format as before. Do not include any explanations or commentary.
+"""

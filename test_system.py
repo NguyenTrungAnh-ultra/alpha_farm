@@ -8,7 +8,8 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from agent.pipeline import run_pipeline, load_cookies
-from agent.optimize_ideas import run_optimization
+from agent.convert_ideas import main as convert_main
+from optimize_all_v2 import main as optimize_main
 
 def test_system():
     print("="*80)
@@ -18,23 +19,29 @@ def test_system():
     try:
         cookies = load_cookies()
     except Exception as e:
-        print(f"Lỗi tải cookies: {e}")
-        return
+        print(f"Lỗi tải cookies (bỏ qua nếu dùng local): {e}")
+        cookies = None
 
     print("\n--- BƯỚC 1: SINH Ý TƯỞNG ---")
     try:
         run_pipeline(
             cookies=cookies,
             n_strategies=1,  # Chỉ sinh 1 chiến lược để test nhanh
-            model="pro",     # Sử dụng Gemini Pro
+            model="ollama-local",     # Sử dụng Ollama local
             request_delay=2.0
         )
     except Exception as e:
         print(f"Lỗi bước sinh ý tưởng: {e}")
 
-    print("\n--- BƯỚC 2: LẮP RÁP TEMPLATE & TỐI ƯU HÓA OPTUNA ---")
+    print("\n--- BƯỚC 2: CHUYỂN ĐỔI SANG CODE PYTHON & KIỂM THỬ SANDBOX ---")
     try:
-        run_optimization()
+        convert_main()
+    except Exception as e:
+        print(f"Lỗi bước chuyển đổi: {e}")
+
+    print("\n--- BƯỚC 3: TỐI ƯU HÓA BAYESIAN ---")
+    try:
+        optimize_main()
     except Exception as e:
         print(f"Lỗi bước tối ưu hóa: {e}")
 

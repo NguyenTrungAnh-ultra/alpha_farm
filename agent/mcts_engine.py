@@ -301,15 +301,15 @@ class DynamicMCTSStrategy(SimpleAlgorithm):
             alpha_val = close * 0.0
 
         # Normalize to [-1.0, 1.0]
-        window = 120
-        r_min = self.feat.rolling_min(alpha_val, window)
-        r_max = self.feat.rolling_max(alpha_val, window)
-        scaled = (alpha_val - r_min) / (r_max - r_min + 1e-8)
-        scaled = (scaled - 0.5) * 2.0
-        scaled = scaled * direction
+        window = 20  # Cửa sổ ngắn 20 phiên để bám sát vi mô
+        r_mean = self.feat.rolling_mean(alpha_val, window)
+        r_std = self.feat.rolling_std(alpha_val, window) + 1e-8
+        
+        z_score = (alpha_val - r_mean) / r_std
+        z_score = z_score * direction
 
-        # Discretize positions using dynamic pos_scale
-        raw_pos = self.op.where(scaled > 0.5, pos_scale, self.op.where(scaled < -0.5, -pos_scale, 0.0))
+        # Cắt ngưỡng: Vào lệnh khi độ lệch chuẩn phá vỡ mức 1.0 (1 Sigma)
+        raw_pos = self.op.where(z_score > 1.0, pos_scale, self.op.where(z_score < -1.0, -pos_scale, 0.0))
         
         flat_mask = raw_pos == 0.0
         long_mask = raw_pos == pos_scale
@@ -382,8 +382,23 @@ class MCTSEngine:
                     sharpe = 0.0
                     
                 # Correlation penalty (against existing alphas in portfolio)
+                # MỚI
                 eq_curve = result.equity_curve
-                max_corr = self.portfolio_manager.compute_max_correlation(eq_curve)
+                max_corr = 0.0
+                
+                # So sánh trực tiếp với các đường cong vốn đã lọt vào Leaderboard
+                if self.leaderboard:
+                    correlations = []
+                    for item in self.leaderboard:
+                        hist_curve = item['metrics'].get('equity_curve_series')
+                        if hist_curve is not None:
+                            # Tính tương quan Spearman hoặc Pearson
+                            valid_df = pd.DataFrame({'curr': eq_curve, 'hist': hist_curve}).dropna()
+                            if len(valid_df) > 20 and valid_df['curr'].std() > 0 and valid_df['hist'].std() > 0:
+                                corr = valid_df['curr'].corr(valid_df['hist'])
+                                correlations.append(corr)
+                    if correlations:
+                        max_corr = max(correlations)
                 
                 # Minimum trades check
                 total_trades = metrics.get('total_trades', 0)
@@ -391,7 +406,7 @@ class MCTSEngine:
                     reward = 0.0
                 else:
                     # Reward function: combination of RankIC and Sharpe, with correlation penalty
-                    reward = 10.0 * abs(rank_ic) + max(0.0, sharpe) - 2.0 * max_corr
+                    reward = 10.0 * abs(rank_ic) + max(0.0, sharpe) - 5.0 * max_corr
                     
                 if reward > best_reward:
                     best_reward = reward
