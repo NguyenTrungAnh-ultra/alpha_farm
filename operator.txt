@@ -1,0 +1,120 @@
+crossed
+Returns: SeriesT
+self.op.crossed(series1: SeriesT, series2: SeriesT)
+Detect when two series cross each other (either direction). Returns True when series1 crosses series2.
+crossed_above
+Returns: SeriesT
+self.op.crossed_above(series1: SeriesT, series2: SeriesT)
+Detect when series1 crosses above series2. Returns True at the crossover point.
+crossed_below
+Returns: SeriesT
+self.op.crossed_below(series1: SeriesT, series2: SeriesT)
+Detect when series1 crosses below series2. Returns True at the crossover point.
+current
+Returns: SeriesT
+self.op.current(series: SeriesT)
+Get the current value of a series. Used for clarity when comparing current vs previous values.
+previous
+Returns: SeriesT
+self.op.previous(series: SeriesT, periods: int = 1)
+Get the previous value of a series. Shifts the series back by the specified number of periods.
+shift
+Returns: SeriesT
+self.op.shift(series: SeriesT, periods: int = 1)
+Shift series backward by positive periods only. `periods <= 0` is rejected for causal safety.
+diff
+Returns: SeriesT
+self.op.diff(series: SeriesT, periods: int = 1)
+Difference between current and lagged values. Past-looking only, so `periods > 0` is required.
+pct_change
+Returns: SeriesT
+self.op.pct_change(series: SeriesT, periods: int = 1)
+Percent change from lagged values: `(current / previous) - 1`. Requires `periods > 0`.
+rising
+Returns: SeriesT
+self.op.rising(series: SeriesT, periods: int = 1)
+Return True when the current value is greater than the value `periods` bars ago. Equivalent to `series > self.op.previous(series, periods)`. Example: `self.op.rising(close, 3)`. Causal note: this compares only current and past values; it does not require every bar in between to rise.
+falling
+Returns: SeriesT
+self.op.falling(series: SeriesT, periods: int = 1)
+Return True when the current value is less than the value `periods` bars ago. Equivalent to `series < self.op.previous(series, periods)`. Example: `self.op.falling(close, 3)`. Causal note: this compares only current and past values; it does not require every bar in between to fall.
+fillna
+Returns: SeriesT
+self.op.fillna(series: SeriesT, value: float | None = None, method: str | None = None)
+Fill NA values with a constant (`value`) or forward-fill (`method='ffill'`). Backfill is rejected.
+ffill
+Returns: SeriesT
+self.op.ffill(series: SeriesT)
+Forward-fill missing values using only past observations.
+abs
+Returns: SeriesT
+self.op.abs(series: SeriesT)
+Absolute value transform.
+clip
+Returns: SeriesT
+self.op.clip(series: SeriesT, lower: float | None = None, upper: float | None = None)
+Clip series values to lower/upper bounds.
+isna
+Returns: SeriesT
+self.op.isna(series: SeriesT)
+Element-wise NA/null check.
+notna
+Returns: SeriesT
+self.op.notna(series: SeriesT)
+Element-wise not-NA check.
+isfinite
+Returns: SeriesT
+self.op.isfinite(series: SeriesT)
+Element-wise finite-number check (rejects inf/-inf and NaN).
+zero_ifna
+Returns: SeriesT
+self.op.zero_ifna(series: SeriesT)
+Convenience helper: replace NA values with 0.
+sign
+Returns: SeriesT
+self.op.sign(series: SeriesT)
+Element-wise sign function returning -1, 0, or 1 (NaN remains NaN).
+replace
+Returns: SeriesT
+self.op.replace(series: SeriesT, to_replace: float | int | None, value: float | int | None)
+Safely replace exact values. Backfill-like method replacement is intentionally unsupported.
+between
+Returns: SeriesT
+self.op.between(series: SeriesT, lower: SeriesOrFloatT, upper: SeriesOrFloatT)
+Inclusive range check. Equivalent to `(series >= lower) & (series <= upper)`. Example: `self.op.between(rsi, 30, 70)`. Causal note: this is pointwise and does not read future rows.
+where
+Returns: SeriesT
+self.op.where(condition: SeriesT, x: SeriesOrFloatT, y: SeriesOrFloatT)
+Element-wise conditional selection. Returns `x` where condition is True, else `y`.
+value_when
+Returns: SeriesT
+self.op.value_when(condition: SeriesT, values: SeriesT, occurrence: int = 0)
+For each row, return the value at the latest prior True condition (`occurrence=0`), or earlier occurrences.
+bars_since
+Returns: SeriesT
+self.op.bars_since(condition: SeriesT)
+Count bars since the latest True condition. Returns 0 on bars where condition is True, 1 on the next bar, and NaN before the condition has ever been True. Example: `self.op.bars_since(entry_signal)`. Equivalent to a causal running count reset by the latest True row. NaN conditions are treated as False. Causal note: each row only uses conditions at or before that row.
+hold_for
+Returns: SeriesT
+self.op.hold_for(condition: SeriesT, periods: int)
+Keep a signal True for a trailing window after it fires. Equivalent to `bars_since(condition) < periods`. Example: `self.op.hold_for(entry_signal, 5)` is True on the entry bar and the next 4 bars. Causal note: this only looks backward from the current row.
+crossed_above_value
+Returns: SeriesT
+self.op.crossed_above_value(series: SeriesT, value: float)
+Detect when a series crosses above a constant threshold. Equivalent to crossing above a constant series with the same threshold value. Example: `self.op.crossed_above_value(rsi, 50)`. Causal note: uses only current and previous values.
+crossed_below_value
+Returns: SeriesT
+self.op.crossed_below_value(series: SeriesT, value: float)
+Detect when a series crosses below a constant threshold. Equivalent to crossing below a constant series with the same threshold value. Example: `self.op.crossed_below_value(rsi, 30)`. Causal note: uses only current and previous values.
+and_
+Returns: SeriesT
+self.op.and_(*conditions: SeriesT)
+Logical AND operation. Combines multiple boolean conditions with element-wise AND. All conditions must be True.
+or_
+Returns: SeriesT
+self.op.or_(*conditions: SeriesT)
+Logical OR operation. Combines multiple boolean conditions with element-wise OR. At least one condition must be True.
+not_
+Returns: SeriesT
+self.op.not_(series: SeriesT)
+Logical NOT operation. Inverts a boolean series. True becomes False and vice versa.

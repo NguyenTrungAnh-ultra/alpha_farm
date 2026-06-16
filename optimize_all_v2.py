@@ -78,9 +78,6 @@ def main():
         py_files = glob.glob(f"{d}/*.py")
         for f in py_files:
             basename = os.path.basename(f)
-            # Bỏ qua 1m và 5m vì phí quá cao
-            if "1m.py" in basename or "5m.py" in basename:
-                continue
             # Bỏ qua alpha 101 raw
             if "alpha_101" in basename.lower() or "wq_alpha" in basename.lower():
                 continue
@@ -93,7 +90,7 @@ def main():
         files_dict[os.path.basename(f)] = f
     unique_files = list(files_dict.values())
     
-    print(f"Found {len(unique_files)} valid strategies (10m, 15m, 30m, 60m).")
+    print(f"Found {len(unique_files)} valid strategies.")
     
     results = []
     emulator = XNOPlatformEmulator(verbose=False)
@@ -126,10 +123,11 @@ def main():
                     "strategy": basename,
                     "timeframe": timeframe,
                     "status": "benchmark_only",
-                    "sharpe_before": metrics.get("sharpe_ratio", 0.0),
-                    "sharpe_after": metrics.get("sharpe_ratio", 0.0),
+                    "obj_before": metrics.get("total_return_pct", 0.0),
+                    "obj_after": metrics.get("total_return_pct", 0.0),
                     "trades": metrics.get("total_trades", 0),
-                    "cagr": metrics.get("cagr", 0.0)
+                    "cagr": metrics.get("cagr", 0.0),
+                    "best_params": ""
                 })
                 with open(filepath, 'a', encoding='utf-8') as f:
                     f.write("\n\n# OPTIMIZATION_V2_COMPLETED\n")
@@ -188,7 +186,12 @@ def main():
                 results.append({
                     "strategy": basename,
                     "timeframe": timeframe,
-                    "status": "failed_v2_filter"
+                    "status": "failed_v2_filter",
+                    "obj_before": obj_before,
+                    "obj_after": obj_after,
+                    "trades": final_metrics.get("total_trades", 0),
+                    "cagr": final_cagr,
+                    "best_params": str(best_params)
                 })
             
         except Exception as e:
@@ -196,7 +199,12 @@ def main():
             results.append({
                 "strategy": basename,
                 "timeframe": timeframe,
-                "status": f"error: {e}"
+                "status": f"error: {e}",
+                "obj_before": obj_before if 'obj_before' in locals() else None,
+                "obj_after": None,
+                "trades": 0,
+                "cagr": 0.0,
+                "best_params": ""
             })
             
     # In báo cáo tổng kết
@@ -206,8 +214,7 @@ def main():
     
     df_res = pd.DataFrame(results)
     if not df_res.empty:
-        # Lọc ra các chiến lược thành công
-        df_success = df_res[df_res['status'] != 'error'].copy()
+        df_success = df_res[~df_res['status'].str.startswith('error', na=False)].copy()
         
         if not df_success.empty:
             df_success['improvement'] = df_success['obj_after'] - df_success['obj_before']

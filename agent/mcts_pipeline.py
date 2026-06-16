@@ -57,6 +57,7 @@ class CustomStrategy(SimpleAlgorithm):
     def __algorithm__(self):
         # 1. Inputs
         open_price = self.data.pv_open
+        open_ = self.data.pv_open
         high = self.data.pv_high
         low = self.data.pv_low
         close = self.data.pv_close
@@ -65,18 +66,16 @@ class CustomStrategy(SimpleAlgorithm):
         # 2. Discovered Core Formula
         alpha_val = {expr_str}
         
-        # 3. Standardization
-        window = 120
-        r_min = self.feat.rolling_min(alpha_val, window)
-        r_max = self.feat.rolling_max(alpha_val, window)
-        scaled = (alpha_val - r_min) / (r_max - r_min + 1e-8)
-        scaled = (scaled - 0.5) * 2.0
+        # 3. Standardization (Z-Score)
+        window = 20
+        r_mean = self.feat.rolling_mean(alpha_val, window)
+        r_std = self.feat.rolling_std(alpha_val, window) + 1e-8
         
-        # Direction
-        scaled = scaled * {direction}
-        
+        z_score = (alpha_val - r_mean) / r_std
+        z_score = z_score * {direction}
+
         # 4. Position signals (EXIT first, ENTRY second)
-        raw_pos = self.op.where(scaled > 0.5, {position_scale}, self.op.where(scaled < -0.5, -{position_scale}, 0.0))
+        raw_pos = self.op.where(z_score > 1.0, {position_scale}, self.op.where(z_score < -1.0, -{position_scale}, 0.0))
         
         flat_mask = raw_pos == 0.0
         long_mask = raw_pos == {position_scale}
@@ -97,16 +96,24 @@ def process_timeframe(tf: str, iterations: int = 10000):
     
     mcts = MCTSEngine(timeframe=tf, max_depth=4)
     
-    # Search dimensions
+    # ==========================================
+    # PHẪU THUẬT 1: Cắt tỉa Không gian Lãng phí
+    # Chỉ tập trung đào sâu vào RATIO (Nơi chứa Alpha)
+    # ==========================================
     mcts.run_search(Dimension.RATIO, n_iterations=iterations)
-    mcts.run_search(Dimension.CURRENCY, n_iterations=iterations)
-    mcts.run_search(Dimension.VOLUME, n_iterations=iterations)
+    # Loại bỏ hoàn toàn mcts.run_search cho CURRENCY và VOLUME
     
     candidates = mcts.get_best_candidates()
     
     total_generated = len(candidates)
     total_rejected = 0
     successful_candidates = []
+    
+    # ==========================================
+    # PHẪU THUẬT 2: Khởi tạo Bộ nhớ Ngắn hạn
+    # Lưu trữ đường cong vốn của các chiến lược đã đỗ
+    # ==========================================
+    local_accepted_curves = [] 
     
     if not candidates:
         print(f"[Worker {tf}] No candidates found.")
@@ -138,20 +145,35 @@ def process_timeframe(tf: str, iterations: int = 10000):
                 result = full_backtest_engine.run(strategy, df_full)
                 metrics = compute_metrics(result)
                 
-                # Check criteria
                 passed, reasons = portfolio_manager.meets_criteria(metrics)
                 
-                # We still evaluate correlation for logs but we don't reject
-                max_corr_returns = portfolio_manager.compute_max_correlation(result.equity_curve)
-                max_corr_positions = portfolio_manager.compute_max_position_correlation(result.positions)
-                max_corr = max(max_corr_returns, max_corr_positions)
+                # ==========================================
+                # PHẪU THUẬT 3: Máy chém Tương quan Động
+                # So sánh chiến lược hiện tại với sổ tay bộ nhớ
+                # ==========================================
+                max_corr = 0.0
+                if local_accepted_curves:
+                    correlations = []
+                    for hist_curve in local_accepted_curves:
+                        # Ghép nối 2 đường cong vốn để loại bỏ giá trị NaN
+                        valid_df = pd.DataFrame({'curr': result.equity_curve, 'hist': hist_curve}).dropna()
+                        # Đảm bảo có đủ dữ liệu và có phương sai (chống lỗi ConstantInput)
+                        if len(valid_df) > 20 and valid_df['curr'].std() > 0 and valid_df['hist'].std() > 0:
+                            corr_value = valid_df['curr'].corr(valid_df['hist'])
+                            correlations.append(corr_value)
+                    
+                    if correlations:
+                        max_corr = max(correlations)
                 
-                # Find the scale with the highest Sharpe, but ONLY if it passes the extreme V2 filter
+                # Cài đặt ngưỡng loại bỏ khắc nghiệt (Ví dụ: 0.70)
+                CORR_THRESHOLD = 0.70
                 current_sharpe = metrics.get('sharpe_ratio', -999.0)
-                if passed and current_sharpe > best_sharpe:
+                
+                # Phải thỏa mãn cả 3: Đỗ tiêu chuẩn CƠ BẢN + Độc lập + Sharpe TỐT NHẤT
+                if passed and (max_corr < CORR_THRESHOLD) and (current_sharpe > best_sharpe):
                     best_sharpe = current_sharpe
                     best_scale = scale
-                    best_metrics = metrics
+                    best_metrics = best_metrics = metrics
                     best_result = result
             except Exception as e:
                 pass
@@ -168,9 +190,12 @@ def process_timeframe(tf: str, iterations: int = 10000):
                 "equity_curve": best_result.equity_curve,
                 "positions": best_result.positions
             })
-            # No break! We want all candidates.
+            
+            # KẾT THÚC PHẪU THUẬT 3: Lưu lại bằng chứng vào sổ tay bộ nhớ
+            local_accepted_curves.append(best_result.equity_curve)
+            
         else:
-            print(f"[Worker {tf}] ❌ Formula failed performance criteria (Sharpe > 1.3, CAGR > 15%) or mathematically failed on all scales.")
+            print(f"[Worker {tf}] ❌ Formula failed performance or correlation criteria (> 0.70).")
             total_rejected += 1
             
     print(f"--- [Worker {tf}] Finished processing ---")
@@ -254,4 +279,9 @@ def run_mcts_pipeline(iterations: int = 10000):
         print(f"Failed to save stats: {e}")
 
 if __name__ == "__main__":
-    run_mcts_pipeline()
+    # MỚI: Dùng toàn bộ 12 luồng, chỉ chừa lại 1-2 luồng cho Windows thở
+    import multiprocessing
+    beast_mode_workers = max(1, multiprocessing.cpu_count() - 2)  # Sẽ bằng 10
+    
+    with concurrent.futures.ProcessPoolExecutor(max_workers=beast_mode_workers) as executor:
+        run_mcts_pipeline(iterations=30000)

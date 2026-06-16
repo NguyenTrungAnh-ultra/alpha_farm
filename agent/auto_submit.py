@@ -56,12 +56,14 @@ def format_code_for_xno(code: str, params: dict = None) -> str:
     4. Replace getattr(self, 'param', default) with the actual parameter value.
     5. Clean up any unallowed numpy (np) and pandas (pd) references.
     """
-    # 1. Strip imports
+    # 1. Strip imports and comments
     lines = code.splitlines()
     clean_lines = []
     for line in lines:
         stripped = line.strip()
         if stripped.startswith("import ") or stripped.startswith("from "):
+            continue
+        if stripped.startswith("#"):
             continue
         clean_lines.append(line)
         

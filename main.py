@@ -77,12 +77,16 @@ def main():
 
     import subprocess
     
-    # 3. Lắp ráp Template & Tối ưu hóa tham số (Optuna)
-    print("\n[Bước 2/3] Lắp ráp Template & Tối ưu hóa tham số (Optuna)...")
-    subprocess.run([sys.executable, "agent/optimize_ideas.py"])
+    # 3. Chuyển đổi ý tưởng thành Code Python
+    print("\n[Bước 2/4] Chuyển đổi JSON sang Python Code...")
+    subprocess.run([sys.executable, "agent/convert_ideas.py"])
 
-    # 4. Nộp chiến lược (Auto Submit)
-    print("\n[Bước 3/3] Nộp chiến lược (Auto Submit)...")
+    # 4. Tối ưu hóa (Bayesian Optimization)
+    print("\n[Bước 3/4] Tối ưu hóa tham số (Optimization)...")
+    subprocess.run([sys.executable, "optimize_all_v2.py"])
+
+    # 5. Nộp chiến lược (Auto Submit)
+    print("\n[Bước 4/4] Nộp chiến lược (Auto Submit)...")
     if auto_submit:
         subprocess.run([sys.executable, "submit_all.py"])
     else:
