@@ -1,0 +1,53 @@
+{
+    "name": "Slope_Ema_Atr_Trend_Trail",
+    "timeframe": "60m",
+    "family": "trend-following",
+    "description": "Trend following strategy using Linear Regression Slope for direction, EMA for price trend confirmation, and ATR-based trailing stop to manage risk without hard SLs.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "Slope_Trend",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=20)"
+            },
+            {
+                "name": "Price_MA",
+                "definition": "self.feat.ema(close, timeperiod=50)"
+            },
+            {
+                "name": "Volatility_ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(Slope_Trend > 0) & (close >= Price_MA)",
+        "entry_short": "(Slope_Trend < 0) & (close <= Price_MA)",
+        "exit_long": "(close < Price_MA - self.params.atr_mult * Volatility_ATR)",
+        "exit_short": "(close > Price_MA + self.params.atr_mult * Volatility_ATR)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 20,
+            "high": 150,
+            "step": 5
+        },
+        "slope_period": {
+            "type": "int",
+            "low": 10,
+            "high": 60,
+            "step": 5
+        },
+        "atr_mult": {
+            "type": "float",
+            "low": 1.0,
+            "high": 3.0,
+            "step": 0.2
+        }
+    }
+}

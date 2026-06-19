@@ -1,0 +1,47 @@
+{
+    "name": "[10m] Engulf_Pattern_Cmf_Adx_Vol_Follow",
+    "timeframe": "10m",
+    "family": "pattern-based",
+    "description": "A pattern-driven strategy that uses engulfing candle patterns combined with Cumulative Money Flow (CMF) to confirm institutional volume participation. It filters out noise during low-volume periods and avoids range traps by requiring positive/negative CMF flow alongside the price action signal.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "TEMA_fast",
+                "definition": "self.feat.ema(close, timeperiod=20)"
+            },
+            {
+                "name": "CMF_flow",
+                "definition": "self.feat.cmf(open_price)"
+            },
+            {
+                "name": "Engulfing_Signal",
+                "definition": "self.feat.engulfing_pattern(high, low)"
+            }
+        ],
+        "entry_long": "(cmf > 0.1) & (close > TEMA_fast)",
+        "entry_short": "(cmf < -0.1) & (close < TEMA_fast)",
+        "exit_long": "(close < EMA(25))",
+        "exit_short": "(close > EMA(25))"
+    },
+    "param_space": {
+        "ema_period_1": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 1
+        },
+        "ema_period_2": {
+            "type": "int",
+            "low": 5,
+            "high": 40,
+            "step": 1
+        }
+    }
+}

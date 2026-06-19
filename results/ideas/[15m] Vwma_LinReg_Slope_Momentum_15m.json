@@ -1,0 +1,43 @@
+{
+    "name": "[15m] Vwma_LinReg_Slope_Momentum",
+    "timeframe": "15m",
+    "family": "trend-following",
+    "description": "Trend following strategy using Rolling VWAP as the dynamic mean and Linear Regression Slope for momentum direction. Filters out choppy markets by requiring positive/negative slope alignment with price position relative to volume-weighted average.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "VWAP_Trend",
+                "definition": "self.feat.rolling_vwap(open_price, high, low, close)"
+            },
+            {
+                "name": "Price_Angle",
+                "definition": "self.feat.linearreg_slope(close)"
+            }
+        ],
+        "entry_long": "(close > VWAP_Trend) & (Price_Angle > 0)",
+        "entry_short": "(close < VWAP_Trend) & (Price_Angle < 0)",
+        "exit_long": "(Price_Angle <= -1.5)",
+        "exit_short": "(Price_Angle >= 1.5)"
+    },
+    "param_space": {
+        "vwap_period": {
+            "type": "int",
+            "low": 20,
+            "high": 40,
+            "step": 1
+        },
+        "slope_threshold": {
+            "type": "float",
+            "low": -3.0,
+            "high": 5.0,
+            "step": 0.5
+        }
+    }
+}

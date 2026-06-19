@@ -1,0 +1,45 @@
+{
+    "name": "MACD_EMA_NATR_Breakout",
+    "timeframe": "60m",
+    "family": "trend-following|breakout",
+    "description": "A trend-following breakout strategy using MACD momentum, EMA direction filter, and NATR volatility expansion to avoid choppy markets. Uses vectorized logic without division by zero.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "EMA_fast",
+                "definition": "self.feat.ema(close, timeperiod=10)"
+            },
+            {
+                "name": "MACD_Line",
+                "definition": "self.feat.macd(close)"
+            },
+            {
+                "name": "NATR",
+                "definition": "self.feat.natr(high, low, close, timeperiod=20)"
+            }
+        ],
+        "entry_long": "(close > EMA_fast) & (MACD_Line > 0)",
+        "entry_short": "(close < EMA_fast) & (MACD_Line < 0)",
+        "exit_long": "(close <= EMA_fast)",
+        "exit_short": "(close >= EMA_fast)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 5,
+            "high": 20,
+            "step": 1
+        },
+        "macd_signal_threshold": {
+            "type": "float",
+            "low": -0.5,
+            "high": 0.5,
+            "step": 0.1
+        }
+    }
+}

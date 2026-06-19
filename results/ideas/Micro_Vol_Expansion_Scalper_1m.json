@@ -1,0 +1,79 @@
+{
+    "name": "Micro_Vol_Expansion_Scalper",
+    "timeframe": "1m",
+    "family": "volatility",
+    "description": "An ultra-fast 1-minute scalping strategy capitalizing on sudden volatility expansions within the noisy VN30F1M micro-structure. It measures relative micro-volatility using the ratio of True Range to a short-term Average True Range (ATR), which eliminates any division-by-zero errors during Volume = 0 bars. Directional bias is filtered using a fast Linear Regression Angle, while micro-momentum exhaustion is captured via the Rate of Change Percentage (ROCP). Exits are strictly managed vectorially via tight trailing extreme boundaries to capture rapid, high-frequency targets.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "TR",
+                "definition": "self.feat.trange(high, low, close)"
+            },
+            {
+                "name": "Micro_ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=atr_period)"
+            },
+            {
+                "name": "Vol_Ratio",
+                "definition": "TR / (Micro_ATR + 1e-8)"
+            },
+            {
+                "name": "LR_Angle",
+                "definition": "self.feat.linearreg_angle(close, timeperiod=trend_period)"
+            },
+            {
+                "name": "ROCP",
+                "definition": "self.feat.rocp(close, timeperiod=3)"
+            },
+            {
+                "name": "Micro_High",
+                "definition": "self.feat.max(high, timeperiod=exit_period)"
+            },
+            {
+                "name": "Micro_Low",
+                "definition": "self.feat.min(low, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(Vol_Ratio > vol_trigger) & (LR_Angle > angle_threshold) & (ROCP > 0.0005)",
+        "entry_short": "(Vol_Ratio > vol_trigger) & (LR_Angle < -angle_threshold) & (ROCP < -0.0005)",
+        "exit_logic": "Exit Long: (close < Micro_Low) or (LR_Angle < 0.0). Exit Short: (close > Micro_High) or (LR_Angle > 0.0)."
+    },
+    "param_space": {
+        "atr_period": {
+            "type": "int",
+            "low": 10,
+            "high": 15,
+            "step": 1
+        },
+        "vol_trigger": {
+            "type": "float",
+            "low": 1.1,
+            "high": 1.8,
+            "step": 0.1
+        },
+        "trend_period": {
+            "type": "int",
+            "low": 8,
+            "high": 15,
+            "step": 1
+        },
+        "angle_threshold": {
+            "type": "float",
+            "low": 5.0,
+            "high": 25.0,
+            "step": 2.5
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 3,
+            "high": 5,
+            "step": 1
+        }
+    }
+}

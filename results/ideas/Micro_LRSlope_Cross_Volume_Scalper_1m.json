@@ -1,0 +1,89 @@
+{
+    "name": "Micro_LRSlope_Cross_Volume_Scalper",
+    "timeframe": "1m",
+    "family": "momentum",
+    "description": "Ultra-fast scalping strategy for 1-minute VN30F1M futures using crossover of fast and slow linear regression slopes to capture momentum shifts, confirmed by volume surge. Exits on slope reversal or ATR-based trailing stop.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "fast_slope",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=fast_len)"
+            },
+            {
+                "name": "slow_slope",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=slow_len)"
+            },
+            {
+                "name": "fast_slope_prev",
+                "definition": "self.feat.shift(fast_slope, 1)"
+            },
+            {
+                "name": "slow_slope_prev",
+                "definition": "self.feat.shift(slow_slope, 1)"
+            },
+            {
+                "name": "volume_sma",
+                "definition": "self.feat.sma(volume, timeperiod=20)"
+            },
+            {
+                "name": "atr",
+                "definition": "self.feat.atr(high, low, close, timeperiod=atr_len)"
+            },
+            {
+                "name": "trail_high",
+                "definition": "self.feat.highest(close, timeperiod=trail_len)"
+            },
+            {
+                "name": "trail_low",
+                "definition": "self.feat.lowest(close, timeperiod=trail_len)"
+            }
+        ],
+        "entry_long": "(fast_slope > slow_slope) & (fast_slope_prev <= slow_slope_prev) & (volume > volume_sma * vol_mult) & (fast_slope > 0)",
+        "entry_short": "(fast_slope < slow_slope) & (fast_slope_prev >= slow_slope_prev) & (volume > volume_sma * vol_mult) & (fast_slope < 0)",
+        "exit_logic": "Exit Long: (fast_slope < 0) | (close < (trail_high - atr_mult * atr)). Exit Short: (fast_slope > 0) | (close > (trail_low + atr_mult * atr))."
+    },
+    "param_space": {
+        "fast_len": {
+            "type": "int",
+            "low": 2,
+            "high": 5,
+            "step": 1
+        },
+        "slow_len": {
+            "type": "int",
+            "low": 8,
+            "high": 15,
+            "step": 1
+        },
+        "vol_mult": {
+            "type": "float",
+            "low": 1.2,
+            "high": 2.0,
+            "step": 0.1
+        },
+        "atr_len": {
+            "type": "int",
+            "low": 5,
+            "high": 10,
+            "step": 1
+        },
+        "atr_mult": {
+            "type": "float",
+            "low": 1.0,
+            "high": 2.5,
+            "step": 0.1
+        },
+        "trail_len": {
+            "type": "int",
+            "low": 3,
+            "high": 8,
+            "step": 1
+        }
+    }
+}

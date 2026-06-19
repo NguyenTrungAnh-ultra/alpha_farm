@@ -1,0 +1,73 @@
+{
+    "name": "CCI_ATR_Breakout_Trend",
+    "timeframe": "15m",
+    "family": "breakout",
+    "description": "Volatility breakout using a simple moving average plus ATR channel, confirmed by CCI momentum. Long entry when price breaks above the upper band and CCI is above a positive threshold; short entry on downside break with CCI below a negative threshold. Exits occur when price returns to the SMA or when CCI loses its extreme momentum, ensuring early exits on reversal.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "sma",
+                "definition": "self.feat.sma(close, timeperiod=20)"
+            },
+            {
+                "name": "atr",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "upper_band",
+                "definition": "sma + 2.0 * atr"
+            },
+            {
+                "name": "lower_band",
+                "definition": "sma - 2.0 * atr"
+            },
+            {
+                "name": "cci",
+                "definition": "self.feat.cci(high, low, close, timeperiod=20)"
+            }
+        ],
+        "entry_long": "(close > upper_band) & (cci > 100) & (atr > 0.5)",
+        "entry_short": "(close < lower_band) & (cci < -100) & (atr > 0.5)",
+        "exit_long": "(close < sma) | (cci < 0)",
+        "exit_short": "(close > sma) | (cci > 0)"
+    },
+    "param_space": {
+        "sma_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 1
+        },
+        "cci_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "multiplier": {
+            "type": "float",
+            "low": 1.5,
+            "high": 3.0,
+            "step": 0.5
+        },
+        "cci_threshold": {
+            "type": "int",
+            "low": 80,
+            "high": 150,
+            "step": 10
+        }
+    }
+}

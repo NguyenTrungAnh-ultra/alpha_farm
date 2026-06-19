@@ -1,0 +1,47 @@
+{
+    "name": "Slope_Roc_Natr_Multi_Swing_15m",
+    "timeframe": "15m",
+    "family": "multi-indicator",
+    "description": "A multi-factor momentum strategy using LinearReg Slope for trend direction, ROC for acceleration confirmation, and NATR volatility expansion to filter entries and exit trades. Avoids fixed stop losses by relying on volatility exhaustion.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "Slope_Trend",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=20)"
+            },
+            {
+                "name": "ROC_Mom",
+                "definition": "self.feat.roc(close, timeperiod=5)"
+            },
+            {
+                "name": "NATR_Vol",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(slope_trend > 0.2) & (shift(roc_mom, -1)) <= roc_mom)",
+        "entry_short": "(slope_trend < -0.2) & (shift(roc_mom, -1)) >= roc_mom",
+        "exit_long": "(natr_vol > natr_threshold * 1.5)",
+        "exit_short": "(natr_vol > natr_threshold * 1.5)"
+    },
+    "param_space": {
+        "slope_trend_thresh": {
+            "type": "float",
+            "low": -0.2,
+            "high": 0.3,
+            "step": 0.01
+        },
+        "roc_mom_period": {
+            "type": "int",
+            "low": 5,
+            "high": 10,
+            "step": 1
+        }
+    }
+}

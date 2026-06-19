@@ -1,0 +1,74 @@
+{
+    "name": "MedianROC_Bollinger_Thrust",
+    "timeframe": "10m",
+    "family": "momentum",
+    "description": "Uses median price (high+low)/2 rate of change (ROC) as momentum indicator. Enters long when ROC crosses above Bollinger Band upper band, short when crosses below lower band, with ADX trend strength filter. Exits when ROC reverts to middle band.",
+    "formula": {
+        "inputs": [
+            "high",
+            "low",
+            "close"
+        ],
+        "indicators": [
+            {
+                "name": "median",
+                "definition": "(high + low) / 2"
+            },
+            {
+                "name": "roc_med",
+                "definition": "self.feat.roc(median, timeperiod=roc_period)"
+            },
+            {
+                "name": "bb_upper",
+                "definition": "self.feat.bbands(roc_med, timeperiod=bb_period, nbdevup=std_dev, nbdevdn=std_dev)[0]"
+            },
+            {
+                "name": "bb_middle",
+                "definition": "self.feat.bbands(roc_med, timeperiod=bb_period, nbdevup=std_dev, nbdevdn=std_dev)[1]"
+            },
+            {
+                "name": "bb_lower",
+                "definition": "self.feat.bbands(roc_med, timeperiod=bb_period, nbdevup=std_dev, nbdevdn=std_dev)[2]"
+            },
+            {
+                "name": "adx",
+                "definition": "self.feat.adx(high, low, close, timeperiod=adx_period)"
+            }
+        ],
+        "entry_long": "(roc_med > bb_upper) & (adx > adx_threshold)",
+        "entry_short": "(roc_med < bb_lower) & (adx > adx_threshold)",
+        "exit_logic": "Exit Long: (roc_med < bb_middle). Exit Short: (roc_med > bb_middle)."
+    },
+    "param_space": {
+        "roc_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 1
+        },
+        "bb_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 1
+        },
+        "std_dev": {
+            "type": "float",
+            "low": 1.5,
+            "high": 3.0,
+            "step": 0.1
+        },
+        "adx_period": {
+            "type": "int",
+            "low": 14,
+            "high": 30,
+            "step": 1
+        },
+        "adx_threshold": {
+            "type": "int",
+            "low": 20,
+            "high": 30,
+            "step": 1
+        }
+    }
+}

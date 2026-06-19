@@ -1,0 +1,47 @@
+{
+    "name": "[30m] Pattern_BB_ADX_Follow",
+    "timeframe": "30m",
+    "family": "pattern-based",
+    "description": "Uses Bullish Engulfing pattern combined with Bollinger Band breakout and ADX regime filter to capture trend momentum while avoiding choppy sideways markets.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "BB_Upper",
+                "definition": "self.feat.bbands(close, high, low, timeperiod=20).upper"
+            },
+            {
+                "name": "ADX_Value",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "EMA_Slow",
+                "definition": "self.feat.ema(close, timeperiod=50)"
+            }
+        ],
+        "entry_long": "(engulfing_pattern(open_price, high, close)) & (close > BB_Upper) & (ADX_Value >= 18)",
+        "entry_short": "(engulfing_pattern(low, low, open_price)) & (close < BB_Lower) & (ADX_Value >= 15)",
+        "exit_long": "(close < EMA_Slow)",
+        "exit_short": "(close > EMA_Slow)"
+    },
+    "param_space": {
+        "adx_threshold": {
+            "type": "int",
+            "low": 10,
+            "high": 60,
+            "step": 2
+        },
+        "bb_period": {
+            "type": "int",
+            "low": 5,
+            "high": 40,
+            "step": 1
+        }
+    }
+}

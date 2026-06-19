@@ -1,0 +1,43 @@
+{
+    "name": "OBV_Natr_Ema_Breakout",
+    "timeframe": "30m",
+    "family": "breakout",
+    "description": "A volatility and volume breakout strategy using OBV flow confirmation with EMA trend direction, filtered by ADX regime to avoid choppy markets.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "EMA_fast",
+                "definition": "self.feat.ema(close, timeperiod=10)"
+            },
+            {
+                "name": "OBV_SMA",
+                "definition": "self.feat.sma(self.feat.obv(volume), timeperiod=20)"
+            }
+        ],
+        "entry_long": "(close > EMA_fast) & (obv_cross_above(OBV, OBV_SMA)) & (feat.adx(close, high, low, volume, timeperiod=14) > 25)",
+        "entry_short": "(close < EMA_fast) & (obv_cross_below(OBV, OBV_SMA)) & (feat.adx(close, high, low, volume, timeperiod=14) > 25)",
+        "exit_long": "(close <= ema(close))",
+        "exit_short": "(close >= ema(close))"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 3,
+            "high": 40,
+            "step": 1
+        },
+        "obv_sma_period": {
+            "type": "int",
+            "low": 5,
+            "high": 60,
+            "step": 2
+        }
+    }
+}

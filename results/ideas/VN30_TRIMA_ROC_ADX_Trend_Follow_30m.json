@@ -1,0 +1,45 @@
+{
+    "name": "VN30_TRIMA_ROC_ADX_Trend_Follow",
+    "timeframe": "30m",
+    "family": "trend-following",
+    "description": "Trend following strategy using TRIMA for direction, ROC for momentum confirmation and ADX to filter low volatility regimes. Exits on price deviation beyond trend line relative to normalized ATR.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "TRIMA_Trend",
+                "definition": "self.feat.trima(close, timeperiod=20)"
+            },
+            {
+                "name": "ROC_Mom",
+                "definition": "self.feat.roc(close, timeperiod=14)"
+            },
+            {
+                "name": "ADX_Regime",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close > TRIMA_Trend) & (ROC_Mom >= 0.5) & (ADX_Regime >= 20)",
+        "entry_short": "(close < TRIMA_Trend) & (ROC_Mom <= -0.5) & (ADX_Regime >= 20)",
+        "exit_long": "(close < TRIMA_Trend - natr(high, low, close, timeperiod=14))",
+        "exit_short": "(close > TRIMA_Trend + natr(high, low, close, timeperiod=14))"
+    },
+    "param_space": {
+        "adx_threshold": {
+            "type": "int",
+            "low": 20,
+            "high": 50,
+            "step": 5
+        },
+        "roc_period": {
+            "type": "int",
+            "low": 7,
+            "high": 30,
+            "step": 1
+        }
+    }
+}

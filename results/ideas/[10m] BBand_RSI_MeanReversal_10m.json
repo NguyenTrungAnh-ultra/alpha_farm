@@ -1,0 +1,41 @@
+{
+    "name": "[10m] BBand_RSI_MeanReversal",
+    "timeframe": "10m",
+    "family": "mean-reversion",
+    "description": "Captures mean-reverting moves on VN30 10m by trading when price touches Bollinger Bands extremes combined with RSI confirmation. Avoids noise in ranging markets.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "BBands_Lower",
+                "definition": "self.feat.bbands(high, low, close, timeperiod=20)[1]"
+            },
+            {
+                "name": "RSI_Signal",
+                "definition": "self.feat.rsi(close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close <= BBands_Lower) & (rsi_signal < 35)",
+        "entry_short": "(close >= self.op.max(BBands_upper)) & (rsi_signal > 60)",
+        "exit_long": "(close >= self.feat.bbands(high, low, close, timeperiod=20)[1]) | (rsi_signal > 75)",
+        "exit_short": "(close <= BBands_Lower) & (rsi_signal < 35)"
+    },
+    "param_space": {
+        "bb_period": {
+            "type": "int",
+            "low": 20,
+            "high": 40,
+            "step": 1
+        },
+        "rsi_entry_long": {
+            "type": "float",
+            "low": 28.0,
+            "high": 35.0,
+            "step": 1.0
+        }
+    }
+}

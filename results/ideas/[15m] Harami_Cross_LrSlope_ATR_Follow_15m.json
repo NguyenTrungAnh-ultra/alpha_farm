@@ -1,0 +1,51 @@
+{
+    "name": "[15m] Harami_Cross_LrSlope_ATR_Follow",
+    "timeframe": "15m",
+    "family": "pattern-based",
+    "description": "Uses harami_cross_pattern to confirm trend continuation within a positive linearreg_slope direction, filtered by volatility (natr) for noise reduction. Exit logic uses ATR-based reversal instead of hard price levels.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "ema_fast",
+                "definition": "self.feat.ema(close, timeperiod=10)"
+            },
+            {
+                "name": "linearreg_slope",
+                "definition": "self.feat.linearreg_slope(high, low, close, timeperiod=20)"
+            },
+            {
+                "name": "harami_cross_pattern",
+                "definition": "self.feat.harami_cross_pattern(close, high, low, open_price)"
+            },
+            {
+                "name": "natr",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(linearreg_slope > 0.5) & (harami_cross_pattern == True)",
+        "entry_short": "(linearreg_slope < -0.5) & (~harami_cross_pattern)",
+        "exit_long": "(close < (ema_fast - 1.8 * natr))",
+        "exit_short": "(close > (ema_fast + 1.8 * natr))"
+    },
+    "param_space": {
+        "timeperiod_slope": {
+            "type": "int",
+            "low": 5,
+            "high": 30,
+            "step": 1
+        },
+        "atr_multiplier": {
+            "type": "float",
+            "low": 0.8,
+            "high": 2.5,
+            "step": 0.1
+        }
+    }
+}

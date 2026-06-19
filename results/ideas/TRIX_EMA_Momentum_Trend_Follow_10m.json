@@ -1,0 +1,43 @@
+{
+    "name": "TRIX_EMA_Momentum_Trend_Follow",
+    "timeframe": "10m",
+    "family": "trend-following",
+    "description": "A momentum-driven trend following strategy using TRIX for signal generation and EMA for direction confirmation. Exits on candle close when price reverses relative to EMA or momentum shifts negative.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "EMA_fast",
+                "definition": "self.feat.ema(close, timeperiod=20)"
+            },
+            {
+                "name": "TRIX_mom",
+                "definition": "self.feat.trix(high, low, close, timeperiod=9)"
+            }
+        ],
+        "entry_long": "(close >= ema_fast) & (trix_mom > 0)",
+        "entry_short": "(close <= ema_fast) & (trix_mom < 0)",
+        "exit_long": "(close < ema_fast) | (trix_mom <= 0)",
+        "exit_short": "(close >= ema_fast) | (trix_mom > 0)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        },
+        "trix_period": {
+            "type": "int",
+            "low": 9,
+            "high": 24,
+            "step": 1
+        }
+    }
+}

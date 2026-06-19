@@ -1,0 +1,71 @@
+{
+    "name": "Micro_Donchian_Volume_Burst_Scalper",
+    "timeframe": "1m",
+    "family": "breakout",
+    "description": "Ultra-fast scalping strategy using Donchian channel breakout with volume surge confirmation and ATR volatility filter. Enters long when price breaks above previous bar's upper channel with above-average volume and sufficient volatility; exits when price falls back below channel midline. Short logic symmetric.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "donchian_upper",
+                "definition": "self.feat.max(high, timeperiod=donchian_period)"
+            },
+            {
+                "name": "donchian_lower",
+                "definition": "self.feat.min(low, timeperiod=donchian_period)"
+            },
+            {
+                "name": "midline",
+                "definition": "(donchian_upper + donchian_lower) / 2"
+            },
+            {
+                "name": "vol_ema",
+                "definition": "self.feat.ema(volume, timeperiod=vol_period)"
+            },
+            {
+                "name": "atr",
+                "definition": "self.feat.atr(high, low, close, timeperiod=atr_period)"
+            }
+        ],
+        "entry_long": "(close > donchian_upper.shift(1)) & (volume > vol_ema * vol_mult) & (atr > atr_threshold)",
+        "entry_short": "(close < donchian_lower.shift(1)) & (volume > vol_ema * vol_mult) & (atr > atr_threshold)",
+        "exit_logic": "Exit Long: (close < midline). Exit Short: (close > midline)."
+    },
+    "param_space": {
+        "donchian_period": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "vol_period": {
+            "type": "int",
+            "low": 5,
+            "high": 20,
+            "step": 1
+        },
+        "vol_mult": {
+            "type": "float",
+            "low": 1.0,
+            "high": 3.0,
+            "step": 0.1
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 5,
+            "high": 14,
+            "step": 1
+        },
+        "atr_threshold": {
+            "type": "float",
+            "low": 0.2,
+            "high": 2.0,
+            "step": 0.1
+        }
+    }
+}

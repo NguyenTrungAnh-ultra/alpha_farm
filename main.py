@@ -1,96 +1,307 @@
 import os
 import sys
+import glob
 import time
-from pathlib import Path
+import argparse
+from utilities.AppConfig import PROJECT_ROOT, QUALITY_THRESHOLDS
 
 # Fix Windows terminal UTF-8 encoding issue
 sys.stdout.reconfigure(encoding='utf-8')
 
-# Thêm thư mục gốc vào đường dẫn hệ thống
-PROJECT_ROOT = str(Path(__file__).parent)
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
-from agent.pipeline import run_pipeline, load_cookies
-
-def check_and_get_cookies():
-    cookie_path = os.path.join(PROJECT_ROOT, "cookies.txt")
+def cmd_generate(args):
+    print("\n[Bước 1/4] Đang sinh ý tưởng (Ideas Generation)...")
+    from strategy_workflows.GenerateStrategies import run_pipeline, load_cookies
     
-    while True:
-        try:
-            cookies = load_cookies(cookie_path)
-            if cookies and len(cookies) > 20:
-                return cookies
-        except Exception:
-            pass # Chuyển xuống in thông báo lỗi
+    # 1. Trợ lý Cookie
+    cookie_path = os.path.join(PROJECT_ROOT, "cookies.txt")
+    cookies = None
+    try:
+        cookies = load_cookies(cookie_path)
+    except Exception:
+        print("Lỗi: Không thể load cookies.txt.")
+        if not args.no_cookies:
+            sys.exit(1)
             
-        print("\n" + "="*80)
-        print(" LỖI: KHÔNG TÌM THẤY COOKIE ĐĂNG NHẬP HOẶC COOKIE HẾT HẠN!".center(80))
-        print("="*80)
-        print("Hệ thống Google chặn việc lấy Cookie tự động bằng Bot.")
-        print("Do đó, bạn cần cung cấp Cookie thủ công vào file cookies.txt:")
-        print("\n[HƯỚNG DẪN LẤY COOKIE]")
-        print("1. Mở trình duyệt Chrome/Edge.")
-        print("2. Truy cập vào trang: https://aistudio.google.com/app/prompts/new_chat")
-        print("3. Đăng nhập tài khoản Google.")
-        print("4. Bấm F12 (Mở Developer Tools) -> Chọn tab 'Network'.")
-        print("5. F5 lại trang, bấm vào một request bất kỳ (ví dụ 'new_chat').")
-        print("6. Kéo xuống phần 'Request Headers', copy toàn bộ nội dung của biến 'cookie:'.")
-        print("7. Tạo/mở file 'cookies.txt' trong thư mục dự án và dán đoạn mã đó vào.")
-        print("="*80)
+    run_pipeline(
+        cookies=cookies,
+        n_strategies=args.n_strategies,
+        model=args.model
+    )
+
+def cmd_convert(args):
+    print("\n[Bước 2/4] Chuyển đổi JSON sang Python Code...")
+    from strategy_workflows.ConvertLegacyIdeas import main as convert_main
+    convert_main()
+
+def cmd_optimize(args):
+    print("\n[Bước 3/4] Tối ưu hóa tham số (Optimization V2)...")
+    from strategy_workflows.OptimizeV2 import XNOOptimizerV2
+    from core_engine.PlatformEmulator import XNOPlatformEmulator
+    import pandas as pd
+    
+    results_dir = os.path.join(PROJECT_ROOT, "results")
+    if not os.path.exists(results_dir):
+        print("Thư mục results không tồn tại.")
+        return
         
-        choice = input("\nBạn đã dán cookie vào file 'cookies.txt' chưa? (y/n/thoát): ")
-        if choice.lower() == 'y':
-            try:
-                cookies = load_cookies(cookie_path)
-                if cookies:
-                    return cookies
-            except Exception:
-                print("Vẫn chưa đọc được Cookie hợp lệ. Hãy kiểm tra lại file cookies.txt!")
-        elif choice.lower() in ['thoat', 'exit', 'quit']:
-            sys.exit(0)
+    py_files = glob.glob(os.path.join(results_dir, "*.py"))
+    py_files = [f for f in py_files if not os.path.basename(f).startswith("__")]
+    
+    report_data = []
+    
+    for filepath in py_files:
+        filename = os.path.basename(filepath)
+        tf_part = filename.split('_')[-1].replace('.py', '')
+        tf = tf_part if tf_part in ['1m', '3m', '5m', '10m', '15m', '30m', '60m'] else '10m'
+        
+        # Simple param space heuristic (can be expanded)
+        param_space = {
+            'window': (5, 60, 5),
+            'fast_period': (3, 20),
+            'slow_period': (10, 50),
+            'multiplier': (0.5, 3.0)
+        }
+        
+        optimizer = XNOOptimizerV2(
+            filepath=filepath,
+            timeframe=tf,
+            param_space=param_space,
+            n_trials=args.n_trials,
+            objective='total_return_pct'
+        )
+        study = optimizer.run()
+        
+        # Check final metrics
+        emulator = XNOPlatformEmulator(verbose=False)
+        final_metrics = emulator.get_metrics(filepath, tf)
+        
+        if final_metrics:
+            final_sharpe = final_metrics.get('sharpe_ratio', 0)
+            final_cagr = final_metrics.get('cagr', 0)
+            
+            if final_sharpe >= QUALITY_THRESHOLDS['sharpe_ratio'] and final_cagr >= QUALITY_THRESHOLDS['cagr']:
+                print(f"✅ PASSED: {filename} (Sharpe: {final_sharpe:.2f}, CAGR: {final_cagr:.1%})")
+            else:
+                print(f"❌ FAILED: {filename} (Sharpe: {final_sharpe:.2f}, CAGR: {final_cagr:.1%})")
+                os.remove(filepath)
+
+def cmd_submit(args):
+    print("\n[Bước 4/4] Nộp chiến lược (Auto Submit)...")
+    from strategy_workflows.SubmitStrategies import run_auto_submit
+    
+    results_dir = os.path.join(PROJECT_ROOT, "results")
+    py_files = glob.glob(os.path.join(results_dir, "*.py"))
+    py_files = [f for f in py_files if not os.path.basename(f).startswith("__")]
+    
+    if not py_files:
+        print("Không có chiến lược nào để nộp.")
+        return
+        
+    for filepath in py_files:
+        filename = os.path.basename(filepath)
+        tf_part = filename.split('_')[-1].replace('.py', '')
+        tf = tf_part if tf_part in ['1m', '3m', '5m', '10m', '15m', '30m', '60m'] else '10m'
+        
+        with open(filepath, 'r', encoding='utf-8') as f:
+            code = f.read()
+            
+        success, err_msg = run_auto_submit(strategy_code=code, timeframe=tf, filepath=filepath)
+        if success:
+            print(f"✅ SUCCESS: {filename}")
         else:
-            print("Vui lòng cập nhật file cookies.txt để tiếp tục!")
-            time.sleep(2)
+            print(f"❌ FAILED: {filename} - {err_msg}")
+        time.sleep(15)
+
+def cmd_mcts(args):
+    print("\nKhởi chạy MCTS Pipeline...")
+    from strategy_workflows.RunMCTS import run_mcts_pipeline
+    run_mcts_pipeline()
+
+def cmd_full(args):
+    cmd_generate(args)
+    cmd_convert(args)
+    cmd_optimize(args)
+    cmd_submit(args)
+
+def display_interactive_menu(options: list[str], title: str = "Select option:") -> int:
+    import msvcrt
+    
+    # Enable ANSI escape codes on Windows 10+
+    os.system("")
+    
+    selected_index = 0
+    print(f"\n  \033[1;36m{title}\033[0m")
+    
+    def render_menu():
+        for i, option in enumerate(options):
+            if i == selected_index:
+                sys.stdout.write(f"  \033[1;32m➔  {option}\033[0m\n")
+            else:
+                sys.stdout.write(f"     {option}\n")
+        sys.stdout.flush()
+                
+    render_menu()
+    
+    try:
+        while True:
+            char = msvcrt.getch()
+            if char in (b'\xe0', b'\x00'): # Arrow key prefix
+                sub_char = msvcrt.getch()
+                if sub_char == b'H': # Up arrow
+                    selected_index = (selected_index - 1) % len(options)
+                elif sub_char == b'P': # Down arrow
+                    selected_index = (selected_index + 1) % len(options)
+            elif char in (b'\r', b'\n'): # Enter key
+                break
+            elif char == b'\x03': # Ctrl+C
+                print("\nThoát chương trình.")
+                sys.exit(0)
+            else:
+                continue
+                
+            # Clear previous printed menu lines
+            sys.stdout.write(f"\033[{len(options)}A")
+            render_menu()
+    except KeyboardInterrupt:
+        print("\nThoát chương trình.")
+        sys.exit(0)
+        
+    return selected_index
+
+def retrieve_numerical_input(label: str, default_value: int, value_type: type = int) -> int:
+    os.system("")
+    sys.stdout.write(f"\n  \033[1;33m? \033[0m{label} [\033[36mMặc định: {default_value}\033[0m]: ")
+    sys.stdout.flush()
+    try:
+        user_input = input().strip()
+        if not user_input:
+            return default_value
+        return value_type(user_input)
+    except ValueError:
+        print(f"  \033[31mLỗi: Giá trị không hợp lệ. Sử dụng mặc định: {default_value}\033[0m")
+        return default_value
+
+def select_ai_model() -> str:
+    models = ["deepseek-thinking", "ollama-local", "gemini-2.5-flash"]
+    selected_idx = display_interactive_menu(models, "Chọn AI Model:")
+    return models[selected_idx]
+
+class InteractiveArgs:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+def run_interactive_cli() -> None:
+    os.system("")
+    print("="*80)
+    print("  GIAO DIỆN TƯƠNG TÁC XNOQUANT AUTO-FARM ".center(80))
+    print("="*80)
+    
+    commands = [
+        "generate (Sinh ý tưởng từ LLM)",
+        "convert (Dịch JSON sang Python)",
+        "optimize (Tối ưu tham số Optuna)",
+        "submit (Tự động nộp bài)",
+        "mcts (Dò biểu thức toán học MCTS)",
+        "full (Chạy toàn bộ quy trình)",
+        "Exit (Thoát)"
+    ]
+    
+    selected_cmd_idx = display_interactive_menu(commands, "Chọn lệnh muốn thực thi:")
+    selected_cmd = commands[selected_cmd_idx].split()[0]
+    
+    if selected_cmd == "Exit":
+        print("\nTạm biệt!")
+        sys.exit(0)
+        
+    print(f"\n  \033[1;32m» Lệnh đã chọn: {selected_cmd}\033[0m")
+    
+    args_dict = {"command": selected_cmd, "no_cookies": False}
+    
+    if selected_cmd in ("generate", "full"):
+        args_dict["n_strategies"] = retrieve_numerical_input("Số lượng chiến lược sinh ra", 20, int)
+        args_dict["model"] = select_ai_model()
+        
+    if selected_cmd in ("optimize", "full"):
+        args_dict["n_trials"] = retrieve_numerical_input("Số lần chạy thử nghiệm tối ưu (Optuna trials)", 30, int)
+        
+    args = InteractiveArgs(**args_dict)
+    
+    print("\n" + "="*80)
+    print("  KHỞI ĐỘNG HỆ THỐNG XNOQUANT AUTO-FARM ".center(80))
+    print("="*80)
+    
+    if selected_cmd == "generate":
+        cmd_generate(args)
+    elif selected_cmd == "convert":
+        cmd_convert(args)
+    elif selected_cmd == "optimize":
+        cmd_optimize(args)
+    elif selected_cmd == "submit":
+        cmd_submit(args)
+    elif selected_cmd == "mcts":
+        cmd_mcts(args)
+    elif selected_cmd == "full":
+        cmd_full(args)
 
 def main():
+    parser = argparse.ArgumentParser(description="XNOQuant Auto-Farm CLI")
+    subparsers = parser.add_subparsers(dest="command", required=False)
+    
+    # Generate
+    parser_gen = subparsers.add_parser("generate", help="Run LLM strategy generation")
+    parser_gen.add_argument("--n_strategies", type=int, default=20, help="Number of strategies to generate")
+    parser_gen.add_argument("--model", type=str, default="deepseek-thinking", help="LLM Model")
+    parser_gen.add_argument("--no_cookies", action="store_true", help="Skip cookie check")
+    
+    # Convert
+    parser_conv = subparsers.add_parser("convert", help="Convert generated ideas to code")
+    
+    # Optimize
+    parser_opt = subparsers.add_parser("optimize", help="Run V2 Optimization")
+    parser_opt.add_argument("--n_trials", type=int, default=30, help="Number of optuna trials")
+    
+    # Submit
+    parser_sub = subparsers.add_parser("submit", help="Auto submit valid strategies")
+    
+    # MCTS
+    parser_mcts = subparsers.add_parser("mcts", help="Run MCTS Pipeline")
+    
+    # Full
+    parser_full = subparsers.add_parser("full", help="Run full pipeline (generate -> convert -> optimize -> submit)")
+    parser_full.add_argument("--n_strategies", type=int, default=20)
+    parser_full.add_argument("--model", type=str, default="deepseek-thinking")
+    parser_full.add_argument("--n_trials", type=int, default=30)
+    parser_full.add_argument("--no_cookies", action="store_true")
+    
+    args = parser.parse_args()
+    
+    if len(sys.argv) == 1:
+        if sys.stdin.isatty():
+            run_interactive_cli()
+        else:
+            parser.print_help()
+        sys.exit(0)
+        
+    if args.command is None:
+        parser.print_help()
+        sys.exit(0)
+        
     print("="*80)
     print("  KHỞI ĐỘNG HỆ THỐNG XNOQUANT AUTO-FARM ".center(80))
     print("="*80)
     
-    # 1. Trợ lý Cookie
-    cookies = check_and_get_cookies()
-    print("\n✅ Đã nạp Cookie thành công! Khởi động động cơ AI...")
-    
-    # Cấu hình pipeline
-    n_strategies = 20
-    model = "deepseek-thinking"
-    auto_submit = False
-
-    # 2. Khởi chạy Pipeline (Sinh ý tưởng)
-    print("\n[Bước 1/4] Đang sinh ý tưởng (Ideas Generation)...")
-    run_pipeline(
-        cookies=cookies,
-        n_strategies=n_strategies,
-        model=model
-    )
-
-    import subprocess
-    
-    # 3. Chuyển đổi ý tưởng thành Code Python
-    print("\n[Bước 2/4] Chuyển đổi JSON sang Python Code...")
-    subprocess.run([sys.executable, "agent/convert_ideas.py"])
-
-    # 4. Tối ưu hóa (Bayesian Optimization)
-    print("\n[Bước 3/4] Tối ưu hóa tham số (Optimization)...")
-    subprocess.run([sys.executable, "optimize_all_v2.py"])
-
-    # 5. Nộp chiến lược (Auto Submit)
-    print("\n[Bước 4/4] Nộp chiến lược (Auto Submit)...")
-    if auto_submit:
-        subprocess.run([sys.executable, "submit_all.py"])
-    else:
-        print("Đã tắt auto_submit. Bỏ qua bước nộp lên web.")
+    if args.command == "generate":
+        cmd_generate(args)
+    elif args.command == "convert":
+        cmd_convert(args)
+    elif args.command == "optimize":
+        cmd_optimize(args)
+    elif args.command == "submit":
+        cmd_submit(args)
+    elif args.command == "mcts":
+        cmd_mcts(args)
+    elif args.command == "full":
+        cmd_full(args)
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,53 @@
+{
+    "name": "[30m] RollingVWAP_Ema_NATR_Trend",
+    "timeframe": "30m",
+    "family": "trend-following",
+    "description": "Trend following strategy using Price deviation from Rolling VWAP as the primary baseline, confirmed by EMA slope direction and NATR volatility expansion filter to capture trend continuations while avoiding chop.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "RollingVWAP",
+                "definition": "self.feat.rolling_vwap(close, timeperiod=20)"
+            },
+            {
+                "name": "EMA_fast",
+                "definition": "self.feat.ema(close, timeperiod=14)"
+            },
+            {
+                "name": "NATR",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close > RollingVWAP) & (EMA_fast < shift(rolling_vwap, 1)) & NATR > param_natr_threshold",
+        "entry_short": "(close < RollingVWAP) & (EMA_fast > shift(rolling_vwap, 1)) & NATR > param_natr_threshold",
+        "exit_long": "(close <= rolling_vwap)",
+        "exit_short": "(close >= rolling_vwap)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 5,
+            "high": 30,
+            "step": 1
+        },
+        "vwap_period": {
+            "type": "int",
+            "low": 20,
+            "high": 60,
+            "step": 5
+        },
+        "natr_threshold": {
+            "type": "float",
+            "low": 0.8,
+            "high": 3.0,
+            "step": 0.1
+        }
+    }
+}

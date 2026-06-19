@@ -1,0 +1,46 @@
+{
+    "name": "[60m] Linreg_Natr_Roc_Volatility_Confirmation",
+    "timeframe": "60m",
+    "family": "momentum|breakout",
+    "description": "Strategy uses Linear Regression Slope to identify trend direction, filtered by ATR volatility expansion and ROC momentum confirmation. Entry occurs when price breaks above the regression line with positive slope and acceleration. Exit relies on mean reversion or momentum reversal.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price"
+        ],
+        "indicators": [
+            {
+                "name": "midpoint_reg",
+                "definition": "self.feat.linearreg(close, timeperiod=20)"
+            },
+            {
+                "name": "slope_angle",
+                "definition": "self.feat.linearreg_slope(high, low, close, open_price, timeperiod=20)"
+            },
+            {
+                "name": "volatility_scale",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(slope_angle > 5.0) & (close >= midpoint_reg + volatility_scale * 2.0)",
+        "entry_short": "(slope_angle < -5.0) & (close <= midpoint_reg - volatility_scale * 2.0)",
+        "exit_long": "(roc(close, timeperiod=14) < -3.0) | (close < midpoint_reg + volatility_scale * 1.0)",
+        "exit_short": "(roc(close, timeperiod=14) > 3.0) | (close > midpoint_reg - volatility_scale * 1.0)"
+    },
+    "param_space": {
+        "slope_threshold": {
+            "type": "float",
+            "low": 2.0,
+            "high": 8.0,
+            "step": 0.5
+        },
+        "volatility_mult_long": {
+            "type": "float",
+            "low": 1.0,
+            "high": 3.0,
+            "step": 0.1
+        }
+    }
+}

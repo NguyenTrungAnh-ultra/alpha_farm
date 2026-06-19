@@ -1,0 +1,54 @@
+{
+    "name": "T3_Ultimate_NATR_Confluence",
+    "timeframe": "30m",
+    "family": "trend-following",
+    "description": "30-minute trend-following strategy using T3 moving average slope for trend direction, Ultimate Oscillator for oversold/overbought entry triggers, and NATR volatility filter to avoid low-volatility sideways markets. Exits occur when overbought/oversold conditions reverse or the T3 slope flips, providing a dynamic trailing mechanism.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "T3",
+                "definition": "self.feat.t3(close, timeperiod={t3_period}, vfactor=0.7)"
+            },
+            {
+                "name": "T3_shift",
+                "definition": "T3.shift({slope_period})"
+            },
+            {
+                "name": "ULT",
+                "definition": "self.feat.ultosc(high, low, close, timeperiod1=7, timeperiod2=14, timeperiod3=28)"
+            },
+            {
+                "name": "NATR",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(T3 > T3_shift) & (ULT < 30) & (NATR > {natr_threshold})",
+        "entry_short": "(T3 < T3_shift) & (ULT > 70) & (NATR > {natr_threshold})",
+        "exit_logic": "Exit Long: (ULT > 70) | (T3 < T3_shift). Exit Short: (ULT < 30) | (T3 > T3_shift)."
+    },
+    "param_space": {
+        "t3_period": {
+            "type": "int",
+            "low": 20,
+            "high": 60,
+            "step": 5
+        },
+        "natr_threshold": {
+            "type": "float",
+            "low": 10.0,
+            "high": 30.0,
+            "step": 2.0
+        },
+        "slope_period": {
+            "type": "int",
+            "low": 3,
+            "high": 10,
+            "step": 1
+        }
+    }
+}

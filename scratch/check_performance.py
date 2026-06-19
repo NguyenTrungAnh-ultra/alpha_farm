@@ -1,16 +1,13 @@
+from utilities.AppConfig import PROJECT_ROOT
 import os
 import re
 import sys
 
 # Add project root to sys.path
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
-from xno_sdk.emulator import XNOPlatformEmulator
+from core_engine.PlatformEmulator import XNOPlatformEmulator
 
 def main():
-    pushed_dir = os.path.join(PROJECT_ROOT, "agent", "results", "pushed")
+    pushed_dir = os.path.join(PROJECT_ROOT, "results", "pushed")
     py_files = [f for f in os.listdir(pushed_dir) if f.endswith(".py") and f != "__init__.py"]
     
     if not py_files:

@@ -1,0 +1,85 @@
+{
+    "name": "Stoch_Momentum_WMA_Trend_Enforcer",
+    "timeframe": "10m",
+    "family": "multi-indicator",
+    "description": "A balanced 10-minute timeframe strategy built on the interaction between a medium-term Weighted Moving Average (WMA) trend filter and short-term Stochastic Momentum index behavior. To isolate high-probability trend continuation points and safeguard capital from low-liquidity spikes or flat periods (Volume = 0 scenarios), entries require an active structural volatility confirmation using the Average True Range (ATR) relative to its historical deviation. Completely loop-free vectorized exits track the close price relative to trailing extremes.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "WMA_Trend",
+                "definition": "self.feat.wma(close, timeperiod=wma_period)"
+            },
+            {
+                "name": "Stoch_K",
+                "definition": "self.feat.stochf(high, low, close, fastk_period=stoch_period, fastd_period=3, fastd_matype=0)[0]"
+            },
+            {
+                "name": "Stoch_D",
+                "definition": "self.feat.stochf(high, low, close, fastk_period=stoch_period, fastd_period=3, fastd_matype=0)[1]"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR_Threshold",
+                "definition": "self.feat.wma(ATR, timeperiod=20)"
+            },
+            {
+                "name": "Rolling_Max",
+                "definition": "self.feat.max(high, timeperiod=exit_period)"
+            },
+            {
+                "name": "Rolling_Min",
+                "definition": "self.feat.min(low, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(close > WMA_Trend) & (Stoch_K > Stoch_D) & (Stoch_D < oversold_bound) & (ATR > ATR_Threshold)",
+        "entry_short": "(close < WMA_Trend) & (Stoch_K < Stoch_D) & (Stoch_D > overbought_bound) & (ATR > ATR_Threshold)",
+        "exit_logic": "Exit Long: (close < Rolling_Max - (exit_mult * ATR)) or (close < WMA_Trend). Exit Short: (close > Rolling_Min + (exit_mult * ATR)) or (close > WMA_Trend)."
+    },
+    "param_space": {
+        "wma_period": {
+            "type": "int",
+            "low": 20,
+            "high": 40,
+            "step": 2
+        },
+        "stoch_period": {
+            "type": "int",
+            "low": 10,
+            "high": 18,
+            "step": 1
+        },
+        "oversold_bound": {
+            "type": "float",
+            "low": 20.0,
+            "high": 45.0,
+            "step": 1.0
+        },
+        "overbought_bound": {
+            "type": "float",
+            "low": 55.0,
+            "high": 80.0,
+            "step": 1.0
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 8,
+            "high": 16,
+            "step": 1
+        },
+        "exit_mult": {
+            "type": "float",
+            "low": 1.5,
+            "high": 3.5,
+            "step": 0.1
+        }
+    }
+}

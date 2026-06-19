@@ -1,0 +1,109 @@
+{
+    "name": "Variance_Squeeze_ADX_Breakout",
+    "timeframe": "15m",
+    "family": "breakout",
+    "description": "Identifies volatility contraction periods (variance squeeze) as a precursor to directional breakouts. Enters long when price breaks above Donchian channel high, variance is compressed relative to its recent minimum, and ADX confirms trend strength (> threshold). Enters short on similar breakdown. Exits using ATR trailing stop to capture sustained moves while protecting against reversals.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "typical_price",
+                "definition": "(high + low + close) / 3"
+            },
+            {
+                "name": "variance",
+                "definition": "self.feat.var(typical_price, timeperiod=20)"
+            },
+            {
+                "name": "variance_min",
+                "definition": "self.feat.min(variance, timeperiod=20)"
+            },
+            {
+                "name": "squeeze",
+                "definition": "variance <= variance_min * (1 + 0.2)"
+            },
+            {
+                "name": "ADX",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Donchian_high",
+                "definition": "self.feat.max(high, timeperiod=20)"
+            },
+            {
+                "name": "Donchian_low",
+                "definition": "self.feat.min(low, timeperiod=20)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "trailing_high",
+                "definition": "self.feat.max(high, timeperiod=10)"
+            },
+            {
+                "name": "trailing_low",
+                "definition": "self.feat.min(low, timeperiod=10)"
+            }
+        ],
+        "entry_long": "(close > Donchian_high) & (squeeze) & (ADX > 25)",
+        "entry_short": "(close < Donchian_low) & (squeeze) & (ADX > 25)",
+        "exit_logic": "Exit Long: close < (trailing_high - 2.0 * ATR). Exit Short: close > (trailing_low + 2.0 * ATR)."
+    },
+    "param_space": {
+        "variance_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "squeeze_buffer": {
+            "type": "float",
+            "low": 0.05,
+            "high": 0.5,
+            "step": 0.05
+        },
+        "adx_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 1
+        },
+        "adx_threshold": {
+            "type": "int",
+            "low": 20,
+            "high": 30,
+            "step": 1
+        },
+        "donchian_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 1
+        },
+        "atr_multiplier": {
+            "type": "float",
+            "low": 1.5,
+            "high": 3.0,
+            "step": 0.1
+        },
+        "trailing_period": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        }
+    }
+}

@@ -1,0 +1,78 @@
+{
+    "name": "Micro_DI_Cross_Volume_Burst_Scalper",
+    "timeframe": "1m",
+    "family": "trend-following",
+    "description": "Ultra-fast scalping for VN30F1M 1-minute futures using directional movement index (DI) crossovers confirmed by volume surge and ADX trend filter. Enters long when +DI crosses above -DI with volume > volume_sma * multiplier and ADX > threshold. Short on opposite cross. Exits on opposite DI cross or trailing ATR stop (1.0-2.5x ATR from entry). Uses short periods (5-15) for responsiveness and filters out zero-volume bars.",
+    "formula": {
+        "inputs": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "PLUS_DI",
+                "definition": "PLUS_DI(high, low, close, timeperiod=di_period)"
+            },
+            {
+                "name": "MINUS_DI",
+                "definition": "MINUS_DI(high, low, close, timeperiod=di_period)"
+            },
+            {
+                "name": "ADX",
+                "definition": "ADX(high, low, close, timeperiod=di_period)"
+            },
+            {
+                "name": "VOLUME_SMA",
+                "definition": "SMA(volume, timeperiod=volume_period)"
+            },
+            {
+                "name": "ATR",
+                "definition": "ATR(high, low, close, timeperiod=atr_period)"
+            }
+        ],
+        "entry_long": "(PLUS_DI > MINUS_DI) AND (PLUS_DI.shift(1) <= MINUS_DI.shift(1)) AND (volume > VOLUME_SMA * volume_mult) AND (ADX > adx_threshold) AND (volume > 0)",
+        "entry_short": "(MINUS_DI > PLUS_DI) AND (MINUS_DI.shift(1) <= PLUS_DI.shift(1)) AND (volume > VOLUME_SMA * volume_mult) AND (ADX > adx_threshold) AND (volume > 0)",
+        "exit_logic": "For long: exit when (MINUS_DI > PLUS_DI) OR (close < entry_price - atr_mult * ATR). For short: exit when (PLUS_DI > MINUS_DI) OR (close > entry_price + atr_mult * ATR)."
+    },
+    "param_space": {
+        "di_period": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "volume_period": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "volume_mult": {
+            "type": "float",
+            "low": 1.2,
+            "high": 2.5,
+            "step": 0.1
+        },
+        "adx_threshold": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "atr_mult": {
+            "type": "float",
+            "low": 1.0,
+            "high": 2.5,
+            "step": 0.1
+        }
+    }
+}

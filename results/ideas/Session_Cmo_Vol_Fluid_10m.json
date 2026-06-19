@@ -1,0 +1,41 @@
+{
+    "name": "Session_Cmo_Vol_Fluid",
+    "timeframe": "10m",
+    "family": "session-based",
+    "description": "Captures momentum during high volatility periods often associated with session transitions in VN30F, using CMO for direction and ATR expansion as a filter.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "CMO",
+                "definition": "self.feat.cmo(close)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(shift(crossed_above_value)) & (cmo > 5.0)",
+        "entry_short": "(shift(crossed_below_value)) & (cmo < -5.0)",
+        "exit_long": "(close < ema(close, timeperiod=21))",
+        "exit_short": "(close > ema(close, timeperiod=21))"
+    },
+    "param_space": {
+        "cmo_threshold": {
+            "type": "float",
+            "low": 3.0,
+            "high": 8.0,
+            "step": 0.5
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 14,
+            "high": 21,
+            "step": 1
+        }
+    }
+}

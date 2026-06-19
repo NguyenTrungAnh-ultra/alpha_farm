@@ -1,0 +1,45 @@
+{
+    "name": "Ult_Osc_AD_X_Momentum_Swing",
+    "timeframe": "15m",
+    "family": "momentum",
+    "description": "A momentum strategy for VN30F1M using Ultimate Oscillator strength combined with ADX trend regime filtering. It avoids volume division by relying on pre-calculated indicators and vectorized price action exits.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "Ult_Osc",
+                "definition": "self.feat.ultosc(close)"
+            },
+            {
+                "name": "ADX",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "EMA_Trend",
+                "definition": "self.feat.ema(close, timeperiod=20)"
+            }
+        ],
+        "entry_long": "(Ult_Osc > 50) & (ADX > 20)",
+        "entry_short": "(Ult_Osc < 30) & (ADX > 20)",
+        "exit_long": "(close < EMA_Trend)",
+        "exit_short": "(close > EMA_Trend)"
+    },
+    "param_space": {
+        "AD_X_threshold": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 2
+        },
+        "Ult_Osc_long_limit": {
+            "type": "float",
+            "low": 40.0,
+            "high": 60.0,
+            "step": 5.0
+        }
+    }
+}

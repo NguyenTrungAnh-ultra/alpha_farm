@@ -1,0 +1,53 @@
+{
+    "name": "Slope_Stochrsi_ATR_Trend",
+    "timeframe": "60m",
+    "family": "trend-following",
+    "description": "A trend-following strategy that uses Linear Regression Slope for direction, StochRSI for entry timing within the regime, and ATR to filter volatility expansion. It avoids ADX reliance by using slope magnitude thresholds.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "slope_20",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=20)"
+            },
+            {
+                "name": "stochrsi_val",
+                "definition": "self.feat.stochrsi(high, low, close, length14, timeperiod=3)"
+            },
+            {
+                "name": "atr_14",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(slope_20 > 5.0) & (stochrsi_val < 30)",
+        "entry_short": "(slope_20 < -5.0) & (stochrsi_val > 70)",
+        "exit_long": "(slope_20 <= -10.0) | (stochrsi_val >= 80)",
+        "exit_short": "(slope_20 >= 10.0) | (stochrsi_val <= 20)"
+    },
+    "param_space": {
+        "slope_threshold_long": {
+            "type": "int",
+            "low": -5,
+            "high": 30,
+            "step": 5
+        },
+        "slope_threshold_short": {
+            "type": "int",
+            "low": -30,
+            "high": 10,
+            "step": 5
+        },
+        "stochrsi_entry_long": {
+            "type": "float",
+            "low": 20.0,
+            "high": 40.0,
+            "step": 5.0
+        }
+    }
+}

@@ -1,0 +1,47 @@
+{
+    "name": "Wma_Roc_Cmf_Flow_Momentum",
+    "timeframe": "60m",
+    "family": "momentum",
+    "description": "A momentum strategy using WMA for trend direction and CMF for volume flow confirmation, avoiding ADX/EMA/KAMA families found in accepted strategies. Exits on SMA(20) break to ensure distinct exit logic.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "WMA_fast",
+                "definition": "self.feat.wma(close, timeperiod=10)"
+            },
+            {
+                "name": "CMF_Flow",
+                "definition": "self.feat.cmf(high, low, close)"
+            },
+            {
+                "name": "ROC_Mom",
+                "definition": "self.feat.roc(close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close > WMA_fast) & (CMF_Flow > -0.5)",
+        "entry_short": "(close < WMA_fast) & (CMF_Flow < 0.5)",
+        "exit_long": "(close < sma(close, timeperiod=20))",
+        "exit_short": "(close > sma(close, timeperiod=20))"
+    },
+    "param_space": {
+        "wma_period": {
+            "type": "int",
+            "low": 5,
+            "high": 30,
+            "step": 1
+        },
+        "cmf_threshold": {
+            "type": "float",
+            "low": -1.0,
+            "high": 1.0,
+            "step": 0.2
+        }
+    }
+}

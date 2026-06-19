@@ -1,0 +1,47 @@
+{
+    "name": "[30m] CMF_LinearReg_Slope_ADX",
+    "timeframe": "30m",
+    "family": "momentum/Volume-based (Multi-Indicator)",
+    "description": "Combines Volume Flow and Price Acceleration with ADX Regime Filter to capture trend momentum in trending regimes only. Uses Linear Regression Slope for acceleration confirmation instead of simple price direction.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "CMF",
+                "definition": "self.feat.cmf(high, low, close)"
+            },
+            {
+                "name": "LinearReg_Slope_Price",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=20)"
+            },
+            {
+                "name": "ADX_Trend_Strength",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(cmf > 0.5) & (linearreg_slope_price > linearreg_slope(ema(close), timeperiod=20)) & (adx_trend_strength > adx_threshold)",
+        "entry_short": "(cmf < -0.5) & (linearreg_slope_price < linearreg_slope(ema(close), timeperiod=20)) & (adx_trend_strength > adx_threshold)",
+        "exit_long": "(close < midprice - atr(high, low, close, timeperiod=14))",
+        "exit_short": "(close > midprice + atr(high, low, close, timeperiod=14))"
+    },
+    "param_space": {
+        "adx_threshold": {
+            "type": "float",
+            "low": 20.0,
+            "high": 50.0,
+            "step": 1
+        },
+        "cmf_ma_period": {
+            "type": "int",
+            "low": 3,
+            "high": 20,
+            "step": 1
+        }
+    }
+}

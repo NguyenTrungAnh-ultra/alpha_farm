@@ -1,0 +1,49 @@
+{
+    "name": "Slope_Roc_Natr_Follow",
+    "timeframe": "10m",
+    "family": "trend-following",
+    "description": "Trend following strategy using Linear Regression Slope for direction and Rate of Change (ROC) for momentum confirmation, filtered by Normalized ATR volatility expansion.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "slope_20",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=20)"
+            },
+            {
+                "name": "roc_14",
+                "definition": "self.feat.roc(close, timeperiod=14)"
+            },
+            {
+                "name": "ema_roc_mean",
+                "definition": "self.feat.ema(self.indicators['roc_14'], timeperiod=5)"
+            },
+            {
+                "name": "natr_volatility",
+                "definition": "self.feat.natr(high, low, close, timeperiod=20)"
+            }
+        ],
+        "entry_long": "(slope_20 > 0.3) & (roc_crossed_above(ema_roc_mean))",
+        "entry_short": "(slope_20 < -0.3) & (roc_crossed_below(ema_roc_mean))",
+        "exit_long": "(natr_volatility > natr_ma(natr_volatility, timeperiod=5))",
+        "exit_short": "(natr_volatility > natr_ma(natr_volatility, timeperiod=5))"
+    },
+    "param_space": {
+        "slope_threshold": {
+            "type": "float",
+            "low": 0.1,
+            "high": 1.0,
+            "step": 0.1
+        },
+        "ema_roc_period": {
+            "type": "int",
+            "low": 3,
+            "high": 25,
+            "step": 1
+        }
+    }
+}

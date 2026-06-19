@@ -1,0 +1,47 @@
+{
+    "name": "[30m] Volatility_Sma_Cmf_Trail",
+    "timeframe": "30m",
+    "family": "volatility",
+    "description": "A volatility-based trend-following strategy using SMA for direction, CMF for volume flow confirmation, and NATR expansion filter. Avoids ADX filters to reduce signal lag while managing chop.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "SMA_Trend",
+                "definition": "self.feat.sma(close, timeperiod=20)"
+            },
+            {
+                "name": "CMF_Vol_Flow",
+                "definition": "self.feat.cmf(volume)"
+            },
+            {
+                "name": "NATR_Expanding",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close > SMA_Trend) & (CMF_Vol_Flow > rolling_mean(CMF_Vol_Flow, 20))",
+        "entry_short": "(close < SMA_Trend) & (CMF_Vol_Flow < rolling_min(CMF_Vol_Flow, 56))",
+        "exit_long": "(close < SMA_Trend)",
+        "exit_short": "(close > SMA_Trend)"
+    },
+    "param_space": {
+        "SMA_Period": {
+            "type": "int",
+            "low": 10,
+            "high": 50,
+            "step": 2
+        },
+        "CMF_Roll_Period": {
+            "type": "int",
+            "low": 8,
+            "high": 30,
+            "step": 4
+        }
+    }
+}

@@ -1,0 +1,57 @@
+{
+    "name": "Slope_Acceleration_EMA_Follow",
+    "timeframe": "30m",
+    "family": "trend-following",
+    "description": "Trend following strategy using slope acceleration (shorter timeframe slope steeper than longer) combined with ADX strength filter for entry, and EMA cross/price position for exit.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "Slope_20",
+                "definition": "self.feat.linearreg_slope(close, 20)"
+            },
+            {
+                "name": "Slope_30",
+                "definition": "self.feat.linearreg_slope(close, 30)"
+            },
+            {
+                "name": "ADX_Trend",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "EMA_Slow",
+                "definition": "self.feat.ema(close, 50)"
+            }
+        ],
+        "entry_long": "(Slope_20 > Slope_30) & (ADX_Trend > 20)",
+        "entry_short": "(Slope_20 < Slope_30) & (ADX_Trend > 20)",
+        "exit_long": "(close < EMA_Slow) | (Slope_20 <= Slope_30)",
+        "exit_short": "(close > EMA_Slow) | (Slope_20 >= Slope_30)"
+    },
+    "param_space": {
+        "slope_period_fast": {
+            "type": "int",
+            "low": 15,
+            "high": 40,
+            "step": 5
+        },
+        "slope_period_slow": {
+            "type": "int",
+            "low": 25,
+            "high": 60,
+            "step": 5
+        },
+        "adx_threshold": {
+            "type": "float",
+            "low": 18.0,
+            "high": 30.0,
+            "step": 1.0
+        }
+    }
+}

@@ -1,0 +1,75 @@
+{
+    "name": "TEMA_DEMA_Cross_Trend_Follower",
+    "timeframe": "15m",
+    "family": "trend-following",
+    "description": "Uses fast TEMA and slow DEMA crossover as primary trend signal, with ADX filter to avoid ranging markets. Exits using ATR-based trailing stop from the highest high (long) or lowest low (short) over a lookback period, capturing swing moves while limiting drawdowns.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "TEMA_fast",
+                "definition": "self.feat.tema(close, timeperiod=fast_period)"
+            },
+            {
+                "name": "DEMA_slow",
+                "definition": "self.feat.dema(close, timeperiod=slow_period)"
+            },
+            {
+                "name": "ADX",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "highest_high",
+                "definition": "high.rolling(window=exit_period).max()"
+            },
+            {
+                "name": "lowest_low",
+                "definition": "low.rolling(window=exit_period).min()"
+            }
+        ],
+        "entry_long": "(TEMA_fast > DEMA_slow) & (TEMA_fast.shift(1) <= DEMA_slow.shift(1)) & (ADX > adx_threshold)",
+        "entry_short": "(TEMA_fast < DEMA_slow) & (TEMA_fast.shift(1) >= DEMA_slow.shift(1)) & (ADX > adx_threshold)",
+        "exit_logic": "Exit Long: close < (highest_high - ATR * atr_mult_exit). Exit Short: close > (lowest_low + ATR * atr_mult_exit)."
+    },
+    "param_space": {
+        "fast_period": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "slow_period": {
+            "type": "int",
+            "low": 20,
+            "high": 50,
+            "step": 2
+        },
+        "adx_threshold": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        },
+        "atr_mult_exit": {
+            "type": "float",
+            "low": 1.0,
+            "high": 3.0,
+            "step": 0.1
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 5,
+            "high": 20,
+            "step": 1
+        }
+    }
+}

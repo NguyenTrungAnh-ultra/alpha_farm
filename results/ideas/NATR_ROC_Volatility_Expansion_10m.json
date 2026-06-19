@@ -1,0 +1,47 @@
+{
+    "name": "NATR_ROC_Volatility_Expansion",
+    "timeframe": "10m",
+    "family": "volatility",
+    "description": "Strategy enters long when volatility expands (NATR above rolling mean) and momentum confirms up. Exits on momentum reversal or contraction.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "natr_expansion",
+                "definition": "self.feat.natr(high, low, close, timeperiod=15)"
+            },
+            {
+                "name": "roc_momentum",
+                "definition": "self.feat.roc(close, timeperiod=5)"
+            },
+            {
+                "name": "volatility_mean",
+                "definition": "op.rolling_mean(natr_expansion, timeperiod=20)"
+            }
+        ],
+        "entry_long": "(natr_expansion > volatility_mean) & (roc_momentum > 0)",
+        "entry_short": "(natr_expansion < volatility_mean) & (roc_momentum <= 0)",
+        "exit_long": "(close >= open_price) | (volatility_mean > natr_expansion)",
+        "exit_short": "(close < open_price) | (volatility_mean < natr_expansion)"
+    },
+    "param_space": {
+        "natr_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "roc_period": {
+            "type": "int",
+            "low": 2,
+            "high": 8,
+            "step": 1
+        }
+    }
+}

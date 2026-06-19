@@ -1,0 +1,53 @@
+{
+    "name": "Volume_Kama_Stochf_Strategy",
+    "timeframe": "60m",
+    "family": "trend-following",
+    "description": "A trend-following strategy using volatility-adaptive KAMA for direction, StochF for momentum confirmation within the trend, and CMF to ensure volume support. Exits when price breaks below/above trend line adjusted by ATR.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "KAMA_fast",
+                "definition": "self.feat.kama(close, timeperiod=15)"
+            },
+            {
+                "name": "StochF_Signal",
+                "definition": "self.feat.stochf(open_price, high, low, close, timeperiod=20)"
+            },
+            {
+                "name": "CMF_Volume",
+                "definition": "self.feat.cmf(close, open_price, volume, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close > KAMA_fast) & (StochF_Signal < 35.0) & (CMF_Volume > -0.2)",
+        "entry_short": "(close < KAMA_fast) & (StochF_Signal > 65.0) & (CMF_Volume < 0.1)",
+        "exit_long": "(close <= KAMA_fast - 1.8 * self.feat.atr(high, low, close, timeperiod=20))",
+        "exit_short": "(close >= KAMA_fast + 1.8 * self.feat.atr(high, low, close, timeperiod=20))"
+    },
+    "param_space": {
+        "kama_period": {
+            "type": "int",
+            "low": 5,
+            "high": 30,
+            "step": 1
+        },
+        "stoch_length": {
+            "type": "int",
+            "low": 14,
+            "high": 25,
+            "step": 1
+        },
+        "cmf_threshold_long": {
+            "type": "float",
+            "low": -0.5,
+            "high": 0.3,
+            "step": 0.05
+        }
+    }
+}

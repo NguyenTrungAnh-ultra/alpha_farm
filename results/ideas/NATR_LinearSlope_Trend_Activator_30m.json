@@ -1,0 +1,52 @@
+{
+    "name": "NATR_LinearSlope_Trend_Activator",
+    "timeframe": "30m",
+    "family": "trend-following",
+    "description": "Combines linear regression slope for trend direction with Normalized Average True Range (NATR) as volatility filter. Enters only when volatility is above threshold to avoid choppy markets. Exits when trend slope reverses or volatility collapses below exit threshold.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "LRS",
+                "definition": "linearreg_slope(close, timeperiod=period_slope)"
+            },
+            {
+                "name": "NATR",
+                "definition": "NATR(high, low, close, timeperiod=period_natr)"
+            }
+        ],
+        "entry_long": "LRS > 0 AND NATR > vol_enter_threshold",
+        "entry_short": "LRS < 0 AND NATR > vol_enter_threshold",
+        "exit_logic": "For long positions: exit when LRS <= 0 OR NATR < vol_exit_threshold. For short positions: exit when LRS >= 0 OR NATR < vol_exit_threshold."
+    },
+    "param_space": {
+        "period_slope": {
+            "type": "int",
+            "low": 20,
+            "high": 60,
+            "step": 5
+        },
+        "period_natr": {
+            "type": "int",
+            "low": 14,
+            "high": 30,
+            "step": 2
+        },
+        "vol_enter_threshold": {
+            "type": "float",
+            "low": 0.5,
+            "high": 1.5,
+            "step": 0.1
+        },
+        "vol_exit_threshold": {
+            "type": "float",
+            "low": 0.2,
+            "high": 0.8,
+            "step": 0.1
+        }
+    }
+}

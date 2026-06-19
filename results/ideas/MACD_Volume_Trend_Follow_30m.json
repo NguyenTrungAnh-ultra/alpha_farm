@@ -1,0 +1,43 @@
+{
+    "name": "MACD_Volume_Trend_Follow",
+    "timeframe": "30m",
+    "family": "trend-following",
+    "description": "Trend following strategy using MACD momentum direction and ATR volatility filter to confirm trend strength. Exits on signal reversal.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "MACD_Histogram",
+                "definition": "self.feat.macd(close)"
+            },
+            {
+                "name": "ATR_Fast",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(macd_h > 0.5)",
+        "entry_short": "(macd_h < -0.5)",
+        "exit_long": "(macd_h < 0)",
+        "exit_short": "(macd_h > 0)"
+    },
+    "param_space": {
+        "ema_fast_period": {
+            "type": "int",
+            "low": 12,
+            "high": 35,
+            "step": 1
+        },
+        "atr_mult": {
+            "type": "float",
+            "low": 0.8,
+            "high": 2.0,
+            "step": 0.1
+        }
+    }
+}

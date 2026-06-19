@@ -1,16 +1,13 @@
+from utilities.AppConfig import PROJECT_ROOT
 import os
 import sys
 
 # Add project root to sys.path first
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
 import ast
 import re
 import pandas as pd
 from collections import defaultdict
-from xno_sdk.emulator import XNOPlatformEmulator
+from core_engine.PlatformEmulator import XNOPlatformEmulator
 
 def get_strategy_parameters(file_path):
     with open(file_path, "r", encoding="utf-8") as f:
@@ -42,7 +39,7 @@ def get_strategy_parameters(file_path):
     return list(params)
 
 def main():
-    pushed_dir = os.path.join(PROJECT_ROOT, "agent", "results", "pushed")
+    pushed_dir = os.path.join(PROJECT_ROOT, "results", "pushed")
     if not os.path.exists(pushed_dir):
         print(f"Directory not found: {pushed_dir}")
         return

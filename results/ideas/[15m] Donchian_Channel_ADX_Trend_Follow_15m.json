@@ -1,0 +1,45 @@
+{
+    "name": "[15m] Donchian_Channel_ADX_Trend_Follow",
+    "timeframe": "15m",
+    "family": "trend-following",
+    "description": "Trend following strategy using a rolling price channel (Donchian style) combined with ADX regime filtering. Avoids volume division issues by relying on High/Low ranges and trend strength.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "Channel_Upper",
+                "definition": "self.op.rolling_max(high, timeperiod=20)"
+            },
+            {
+                "name": "Channel_Lower",
+                "definition": "self.op.rolling_min(low, timeperiod=20)"
+            },
+            {
+                "name": "ADX_Trend",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close > Channel_Upper) & (ADX_Trend > 25)",
+        "entry_short": "(close < Channel_Lower) & (ADX_Trend > 25)",
+        "exit_long": "(close <= Channel_Upper)",
+        "exit_short": "(close >= Channel_Lower)"
+    },
+    "param_space": {
+        "adx_threshold": {
+            "type": "int",
+            "low": 18,
+            "high": 30,
+            "step": 2
+        },
+        "channel_period": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 5
+        }
+    }
+}

@@ -1,0 +1,43 @@
+{
+    "name": "[15m] RSI_ADX_Mean_Reversion_Swing",
+    "timeframe": "15m",
+    "family": "mean-reversion",
+    "description": "Mean reversion strategy entering on oversold conditions (RSI < 30) during low volatility regimes (ADX < threshold), exiting when momentum reverses to neutral.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "rsi_oversold",
+                "definition": "self.feat.rsi(close, timeperiod=14)"
+            },
+            {
+                "name": "adx_regime",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(rsi_oversold < 30) & (adx_regime < 25)",
+        "entry_short": "(rsi_oversold > 70) & (adx_regime < 25)",
+        "exit_long": "(rsi_oversold > 45) | (close >= self.feat.ema(close, timeperiod=14))",
+        "exit_short": "(rsi_oversold < 35) | (close <= self.feat.ema(close, timeperiod=14))"
+    },
+    "param_space": {
+        "adx_threshold": {
+            "type": "int",
+            "low": 20,
+            "high": 30,
+            "step": 1
+        },
+        "rsi_period": {
+            "type": "int",
+            "low": 9,
+            "high": 25,
+            "step": 1
+        }
+    }
+}
