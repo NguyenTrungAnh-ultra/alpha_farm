@@ -1,0 +1,7 @@
+{
+    "name": "5m5mVN30F12M_MeanReversion",
+    "timeframe": "5m",
+    "family": "mean-reversion",
+    "description": "Exploits mean reversion in high volatility sideways markets by trading deviations from VWAP using RSI as a trigger.",
+    "macro_blueprint": "div(sub(vwap(?), ema(?)), stddev(?))"
+}

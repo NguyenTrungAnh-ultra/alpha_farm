@@ -92,7 +92,7 @@ def load_existing_ideas(ideas_dir: str) -> list[dict]:
     return ideas
 
 # ─── Timeframe Configuration ────────────────────────────────────────
-TIMEFRAME_ORDER = ["10m", "15m", "30m", "60m"]
+TIMEFRAME_ORDER = ["1m", "3m", "5m", "10m", "15m", "30m", "60m"]
 
 
 # ─── Main Pipeline ──────────────────────────────────────────────────
@@ -123,13 +123,14 @@ def run_pipeline(
         except Exception as e:
             print(f"[Pipeline] Failed to init Deepseek: {e}")
             sys.exit(1)
-    elif model == "ollama-local":
+    elif model in ["ollama-local", "ollama-9b"]:
+        model_name = "qwen3.5:9b" if model == "ollama-9b" else "qwen3.5:4b"
         try:
             from llm_clients.OllamaClient import OllamaChatClient
-            chat = OllamaChatClient(model="qwen3.5:4b", verbose=True)
-            print(f"[Pipeline] OllamaChatClient ready")
+            chat = OllamaChatClient(model=model_name, verbose=True)
+            print(f"[Pipeline] OllamaChatClient ready ({model_name})")
         except Exception as e:
-            print(f"[Pipeline] Failed to init Ollama: {e}")
+            print(f"[Pipeline] Failed to init Ollama ({model_name}): {e}")
             sys.exit(1)
     else:
         chat = GeminiChat(
@@ -152,7 +153,7 @@ def run_pipeline(
     
     # Initialize local model client for self-correction if main model is not local
     local_chat = None
-    if model != "ollama-local":
+    if model not in ["ollama-local", "ollama-9b"]:
         try:
             from llm_clients.OllamaClient import OllamaChatClient
             local_chat = OllamaChatClient(model="qwen3.5:4b", verbose=False)
@@ -190,14 +191,19 @@ def run_pipeline(
                 total_rounds=n_strategies,
                 experience=experience,
                 tried_names=filtered_tried,
+                fsa_forbidden_patterns=[],
             )
             
             # Phân luồng Local / Cloud
             schema_arg = {}
             if model == "ollama-local":
-                schema_arg = {"schema": StrategyBlueprint.model_json_schema()}
+                schema_arg = {"schema": "json"}
                 
-            raw_text = chat.send(idea_prompt, **schema_arg) if hasattr(chat, 'send') else ""
+            try:
+                raw_text = chat.send(idea_prompt, **schema_arg) if hasattr(chat, 'send') else ""
+            except Exception as e:
+                print(f"  ❌ Error during chat.send: {e}")
+                raw_text = ""
             
             from llm_clients.GeminiClient import extract_json
             idea_json = extract_json(raw_text)
@@ -205,8 +211,9 @@ def run_pipeline(
             if idea_json is None:
                 consecutive_errors += 1
                 print(f"  ❌ Failed to extract JSON (consecutive errors: {consecutive_errors})")
+                print(f"  [Debug] raw_text from model:\n{raw_text[:1000]}")
                 if consecutive_errors >= 3:
-                    print(f"\n  🛑 RATE LIMIT DETECTED — Stopping pipeline.")
+                    print(f"\n  🛑 RATE LIMIT DETECTED / MODEL FAILURE — Stopping pipeline.")
                     break
                 errors += 1
                 continue
@@ -221,6 +228,14 @@ def run_pipeline(
                     # Validate JSON against schema
                     valid_idea = StrategyBlueprint.model_validate(idea_json).model_dump()
                     
+                    # Validate AST Syntax and Semantic constraints
+                    from strategy_workflows.SemanticCompiler import SemanticCompiler
+                    compiler = SemanticCompiler()
+                    try:
+                        compiler.compile_blueprint(valid_idea['macro_blueprint'])
+                    except Exception as compile_e:
+                        raise ValueError(f"Macro-Blueprint Semantic Error: {str(compile_e)}")
+                        
                     name = valid_idea.get('name', f'Idea_{round_num}_{tf}')
                     import re
                     name = re.sub(r'[^a-zA-Z0-9_]', '', name)
@@ -242,8 +257,22 @@ def run_pipeline(
                     break
                     
                 except Exception as e:
+                    import pydantic
                     error_msg = str(e)
-                    print(f"  ❌ Pydantic Validation Error: {error_msg}")
+                    print(f"  ❌ Validation Error: {error_msg}")
+                    
+                    failed_parts = {}
+                    if isinstance(e, pydantic.ValidationError):
+                        for error in e.errors():
+                            field = error.get("loc")[0]
+                            if field in idea_json:
+                                failed_parts[field] = idea_json[field]
+                    elif "Macro-Blueprint Semantic Error" in error_msg:
+                        if "macro_blueprint" in idea_json:
+                            failed_parts["macro_blueprint"] = idea_json["macro_blueprint"]
+                            
+                    if not failed_parts:
+                        failed_parts = idea_json
                     
                     if correction_attempt < max_correction_attempts:
                         correction_attempt += 1
@@ -251,17 +280,15 @@ def run_pipeline(
                         print(f"  🔄 Retrying self-correction using model ({getattr(correction_chat, 'model', 'default')})...")
                         
                         from utilities.Prompts import build_correction_prompt
-                        correction_prompt = build_correction_prompt(json.dumps(idea_json, indent=4), error_msg)
+                        correction_prompt = build_correction_prompt(json.dumps(failed_parts, indent=4), error_msg)
                         
                         schema_arg_retry = {}
-                        if getattr(correction_chat, 'model', '').startswith("qwen"):
-                            schema_arg_retry = {"schema": StrategyBlueprint.model_json_schema()}
-                            
+                        
                         raw_text = correction_chat.send(correction_prompt, **schema_arg_retry) if hasattr(correction_chat, 'send') else ""
                         corrected_idea = extract_json(raw_text)
                         
                         if corrected_idea:
-                            idea_json = corrected_idea
+                            idea_json.update(corrected_idea)
                         else:
                             print("  ❌ Failed to parse corrected JSON from LLM.")
                             break
@@ -300,8 +327,14 @@ def run_pipeline(
     return existing_ideas
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate trading strategies.")
+    parser.add_argument("--model", type=str, default="thinking", help="Model to use: thinking, deepseek, ollama-local, ollama-9b")
+    parser.add_argument("--n", type=int, default=50, help="Number of strategies to generate")
+    args = parser.parse_args()
+
     try:
         cookies = load_cookies()
-        run_pipeline(cookies=cookies, n_strategies=50, model="thinking")
+        run_pipeline(cookies=cookies, n_strategies=args.n, model=args.model)
     except Exception as e:
         print(f"Failed to start pipeline: {e}")

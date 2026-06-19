@@ -1,0 +1,7 @@
+{
+    "name": "1m1mVN30F1M_VolatilityBreakout",
+    "timeframe": "1m",
+    "family": "volatility|statistical-arbitrage",
+    "description": "Exploits order flow asymmetry during high volatility by scaling entry signals with ADX confirmation to filter noise.",
+    "macro_blueprint": "div(mult(rsi(?), adx(?)), stddev(?))"
+}

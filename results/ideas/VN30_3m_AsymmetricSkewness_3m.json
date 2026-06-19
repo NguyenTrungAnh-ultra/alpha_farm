@@ -1,0 +1,7 @@
+{
+    "name": "VN30_3m_AsymmetricSkewness",
+    "timeframe": "3m",
+    "family": "momentum",
+    "description": "Exploits order flow asymmetry by combining MACD momentum with volatility normalization to capture directional breaks in high-volatility sideways markets.",
+    "macro_blueprint": "div(macd(?), stddev(?))"
+}

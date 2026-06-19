@@ -1,0 +1,7 @@
+{
+    "name": "10m10mVN30F40M_AsymmetricSkewBreakout",
+    "timeframe": "10m",
+    "family": "momentum|volatility",
+    "description": "Exploits asymmetric order flow by combining MACD momentum with volatility-adjusted skewness. The strategy identifies when price action deviates significantly from the mean (using zscore) while maintaining upward/downward trend strength, filtering for high-probability directional moves in sideways regimes.",
+    "macro_blueprint": "zscore(div(macd(?), ema(?)))"
+}

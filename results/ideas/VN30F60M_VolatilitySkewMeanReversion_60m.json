@@ -1,0 +1,7 @@
+{
+    "name": "VN30F60M_VolatilitySkewMeanReversion",
+    "timeframe": "60m",
+    "family": "volatility|mean-reversion",
+    "description": "Captures mean reversion opportunities during sideways regimes by measuring the z-score of price relative to a rolling average, adjusted for current volatility. The strategy identifies when prices deviate significantly from their expected range under normal conditions.",
+    "macro_blueprint": "zscore(div(ema(?), ema(?)))"
+}

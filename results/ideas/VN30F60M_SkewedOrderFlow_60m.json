@@ -1,0 +1,7 @@
+{
+    "name": "VN30F60M_SkewedOrderFlow",
+    "timeframe": "60m",
+    "family": "statistical-arbitrage",
+    "description": "Exploits high volatility by normalizing momentum against price variance to identify asymmetric order flow skewness.",
+    "macro_blueprint": "div(mult(rsi(?), var(?)), stddev(?))"
+}

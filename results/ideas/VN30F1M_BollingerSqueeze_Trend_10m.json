@@ -1,0 +1,7 @@
+{
+    "name": "VN30F1M_BollingerSqueeze_Trend",
+    "timeframe": "10m",
+    "family": "breakout",
+    "description": "A trend-following strategy that waits for a Bollinger Band Squeeze (low volatility) followed by a breakout confirmed by ADX and price action.",
+    "macro_blueprint": "and_(less_than(stddev(?), ?), crossed_above(?, ema(?)))"
+}

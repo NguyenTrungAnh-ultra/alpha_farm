@@ -1,0 +1,7 @@
+{
+    "name": "3mVN30_3m_OrderSkewZscore",
+    "timeframe": "3m",
+    "family": "statistical-arbitrage",
+    "description": "Exploits asymmetric order flow by normalizing momentum changes against volatility to identify statistically significant directional shifts in high-volatility sideways regimes.",
+    "macro_blueprint": "zscore(roc(?))"
+}

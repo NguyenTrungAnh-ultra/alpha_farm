@@ -28,65 +28,16 @@ def cmd_generate(args):
         model=args.model
     )
 
-def cmd_convert(args):
-    print("\n[Bước 2/4] Chuyển đổi JSON sang Python Code...")
-    from strategy_workflows.ConvertLegacyIdeas import main as convert_main
-    convert_main()
+def cmd_mcts(args):
+    print("\n[Bước 2/3] Tầng 2 & 3: Biên dịch Blueprint & MCTS Brute-force...")
+    from strategy_workflows.RunMCTS import run_mcts_pipeline
+    iterations = getattr(args, 'iterations', 500)
+    run_mcts_pipeline(iterations=iterations)
 
-def cmd_optimize(args):
-    print("\n[Bước 3/4] Tối ưu hóa tham số (Optimization V2)...")
-    from strategy_workflows.OptimizeV2 import XNOOptimizerV2
-    from core_engine.PlatformEmulator import XNOPlatformEmulator
-    import pandas as pd
-    
-    results_dir = os.path.join(PROJECT_ROOT, "results")
-    if not os.path.exists(results_dir):
-        print("Thư mục results không tồn tại.")
-        return
-        
-    py_files = glob.glob(os.path.join(results_dir, "*.py"))
-    py_files = [f for f in py_files if not os.path.basename(f).startswith("__")]
-    
-    report_data = []
-    
-    for filepath in py_files:
-        filename = os.path.basename(filepath)
-        tf_part = filename.split('_')[-1].replace('.py', '')
-        tf = tf_part if tf_part in ['1m', '3m', '5m', '10m', '15m', '30m', '60m'] else '10m'
-        
-        # Simple param space heuristic (can be expanded)
-        param_space = {
-            'window': (5, 60, 5),
-            'fast_period': (3, 20),
-            'slow_period': (10, 50),
-            'multiplier': (0.5, 3.0)
-        }
-        
-        optimizer = XNOOptimizerV2(
-            filepath=filepath,
-            timeframe=tf,
-            param_space=param_space,
-            n_trials=args.n_trials,
-            objective='total_return_pct'
-        )
-        study = optimizer.run()
-        
-        # Check final metrics
-        emulator = XNOPlatformEmulator(verbose=False)
-        final_metrics = emulator.get_metrics(filepath, tf)
-        
-        if final_metrics:
-            final_sharpe = final_metrics.get('sharpe_ratio', 0)
-            final_cagr = final_metrics.get('cagr', 0)
-            
-            if final_sharpe >= QUALITY_THRESHOLDS['sharpe_ratio'] and final_cagr >= QUALITY_THRESHOLDS['cagr']:
-                print(f"✅ PASSED: {filename} (Sharpe: {final_sharpe:.2f}, CAGR: {final_cagr:.1%})")
-            else:
-                print(f"❌ FAILED: {filename} (Sharpe: {final_sharpe:.2f}, CAGR: {final_cagr:.1%})")
-                os.remove(filepath)
+
 
 def cmd_submit(args):
-    print("\n[Bước 4/4] Nộp chiến lược (Auto Submit)...")
+    print("\n[Bước 3/3] Nộp chiến lược (Auto Submit)...")
     from strategy_workflows.SubmitStrategies import run_auto_submit
     
     results_dir = os.path.join(PROJECT_ROOT, "results")
@@ -112,15 +63,10 @@ def cmd_submit(args):
             print(f"❌ FAILED: {filename} - {err_msg}")
         time.sleep(15)
 
-def cmd_mcts(args):
-    print("\nKhởi chạy MCTS Pipeline...")
-    from strategy_workflows.RunMCTS import run_mcts_pipeline
-    run_mcts_pipeline()
-
 def cmd_full(args):
     cmd_generate(args)
-    cmd_convert(args)
-    cmd_optimize(args)
+    cmd_mcts(args)
+    # Tạm bỏ qua Optimize vì MCTS đã quét Scale, có thể tích hợp sau nếu cần
     cmd_submit(args)
 
 def display_interactive_menu(options: list[str], title: str = "Select option:") -> int:
@@ -182,7 +128,7 @@ def retrieve_numerical_input(label: str, default_value: int, value_type: type = 
         return default_value
 
 def select_ai_model() -> str:
-    models = ["deepseek-thinking", "ollama-local", "gemini-2.5-flash"]
+    models = ["deepseek-thinking", "ollama-local", "ollama-9b", "gemini-2.5-flash"]
     selected_idx = display_interactive_menu(models, "Chọn AI Model:")
     return models[selected_idx]
 
@@ -197,12 +143,10 @@ def run_interactive_cli() -> None:
     print("="*80)
     
     commands = [
-        "generate (Sinh ý tưởng từ LLM)",
-        "convert (Dịch JSON sang Python)",
-        "optimize (Tối ưu tham số Optuna)",
-        "submit (Tự động nộp bài)",
-        "mcts (Dò biểu thức toán học MCTS)",
-        "full (Chạy toàn bộ quy trình)",
+        "generate (Tầng 1: Sinh Blueprint JSON bằng LLM)",
+        "mcts (Tầng 2 & 3: Semantic Compiler & MCTS Đào mỏ)",
+        "submit (Tự động nộp chiến lược lên XNO)",
+        "full (Chạy toàn bộ quy trình: Generate -> MCTS -> Submit)",
         "Exit (Thoát)"
     ]
     
@@ -221,8 +165,8 @@ def run_interactive_cli() -> None:
         args_dict["n_strategies"] = retrieve_numerical_input("Số lượng chiến lược sinh ra", 20, int)
         args_dict["model"] = select_ai_model()
         
-    if selected_cmd in ("optimize", "full"):
-        args_dict["n_trials"] = retrieve_numerical_input("Số lần chạy thử nghiệm tối ưu (Optuna trials)", 30, int)
+    if selected_cmd in ("mcts", "full"):
+        args_dict["iterations"] = retrieve_numerical_input("Số lượng vòng lặp MCTS (iterations)", 500, int)
         
     args = InteractiveArgs(**args_dict)
     
@@ -232,14 +176,10 @@ def run_interactive_cli() -> None:
     
     if selected_cmd == "generate":
         cmd_generate(args)
-    elif selected_cmd == "convert":
-        cmd_convert(args)
-    elif selected_cmd == "optimize":
-        cmd_optimize(args)
-    elif selected_cmd == "submit":
-        cmd_submit(args)
     elif selected_cmd == "mcts":
         cmd_mcts(args)
+    elif selected_cmd == "submit":
+        cmd_submit(args)
     elif selected_cmd == "full":
         cmd_full(args)
 
@@ -253,24 +193,21 @@ def main():
     parser_gen.add_argument("--model", type=str, default="deepseek-thinking", help="LLM Model")
     parser_gen.add_argument("--no_cookies", action="store_true", help="Skip cookie check")
     
-    # Convert
-    parser_conv = subparsers.add_parser("convert", help="Convert generated ideas to code")
+    # Convert (DEPRECATED)
+    # parser_conv = subparsers.add_parser("convert", help="Deprecated in 3-Tier Architecture")
     
-    # Optimize
-    parser_opt = subparsers.add_parser("optimize", help="Run V2 Optimization")
-    parser_opt.add_argument("--n_trials", type=int, default=30, help="Number of optuna trials")
+    # MCTS
+    parser_mcts = subparsers.add_parser("mcts", help="Run Tầng 2 & 3 (Compiler + MCTS)")
+    parser_mcts.add_argument("--iterations", type=int, default=500, help="Number of MCTS iterations")
     
     # Submit
     parser_sub = subparsers.add_parser("submit", help="Auto submit valid strategies")
     
-    # MCTS
-    parser_mcts = subparsers.add_parser("mcts", help="Run MCTS Pipeline")
-    
     # Full
-    parser_full = subparsers.add_parser("full", help="Run full pipeline (generate -> convert -> optimize -> submit)")
+    parser_full = subparsers.add_parser("full", help="Run full pipeline (generate -> mcts -> submit)")
     parser_full.add_argument("--n_strategies", type=int, default=20)
     parser_full.add_argument("--model", type=str, default="deepseek-thinking")
-    parser_full.add_argument("--n_trials", type=int, default=30)
+    parser_full.add_argument("--iterations", type=int, default=500, help="Number of MCTS iterations")
     parser_full.add_argument("--no_cookies", action="store_true")
     
     args = parser.parse_args()
@@ -292,14 +229,10 @@ def main():
     
     if args.command == "generate":
         cmd_generate(args)
-    elif args.command == "convert":
-        cmd_convert(args)
-    elif args.command == "optimize":
-        cmd_optimize(args)
-    elif args.command == "submit":
-        cmd_submit(args)
     elif args.command == "mcts":
         cmd_mcts(args)
+    elif args.command == "submit":
+        cmd_submit(args)
     elif args.command == "full":
         cmd_full(args)
 

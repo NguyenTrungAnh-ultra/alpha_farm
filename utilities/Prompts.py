@@ -12,29 +12,50 @@ Design principles:
 """
 
 # ─── Available talib & SDK indicators (curated for futures) ────────────────
-TALIB_INDICATORS = """
+DIMENSIONAL_FUNCTIONS = """
 ## Available Indicators (called via self.feat.xxx())
 
-**Trend**: sma, ema, dema, tema, wma, kama, t3, trima, midpoint, midprice, sar, linearreg, linearreg_slope
-**Momentum**: rsi, stoch, stochf, stochrsi, macd, mom, roc, rocp, willr, cci, cmo, mfi, ultosc, trix, adx, adxr, aroon, aroonosc, dx, minus_di, plus_di, apo, ppo, bop
-**Volatility**: atr, natr, trange, bbands (upper/middle/lower)
-**Volume**: ad, adosc, obv, cmf, rolling_vwap
-**Pattern (Use EXACT names below, DO NOT use cdl_ prefix)**: piercing_pattern, engulfing_pattern, harami_pattern, harami_cross_pattern, hikkake_pattern, modified_hikkake_pattern, in_neck_pattern, on_neck_pattern
-**Math/Rolling**: max, min, stddev, linearreg_angle, rolling_mean, rolling_max, rolling_min, rolling_std, rolling_sum
-**Advanced/Statistical**: rolling_zscore, rolling_mad, rolling_correlation, rolling_rank, log_returns
+**[CURRENCY_OUTPUT_FUNCTIONS]**: ema, vwap, macd_line, stddev
+**[RATIO_OUTPUT_FUNCTIONS]**: rsi, adx, roc, pct_change, stoch, var, zscore
+**[CANDLESTICK_FUNCTIONS]**: doji, hammer, three_black_crows, morning_star
 """
 
 # ─── Available operator functions ────────────────────────────────────────
 OPERATOR_FUNCTIONS = """
-## Available Operator Functions (called via self.op.xxx())
+## Available Operator Functions
 
-**Time Series**: shift, diff, pct_change
-**Crossings**: crossed, crossed_above, crossed_below, crossed_above_value, crossed_below_value
-**Utility**: clip, fillna, ffill, abs, where, sign, isna, notna, isfinite, zero_ifna
+**Time-Series**: shift, diff, pct_change
+**[BOOLEAN_OUTPUT_FUNCTIONS]**: crossed, crossed_above, crossed_below, rising, falling, and_, or_, not_, greater_than, less_than
+**Math**: add, sub, mult, div
+**Statistics**: stddev, var, zscore
 """
 
 # ─── Timeframe-specific guidance ────────────────────────────────────
 TIMEFRAME_HINTS = {
+    "1m": """
+**1-Minute Timeframe** — Ultra Fast Scalping:
+- Indicator periods: short-to-medium (5-20 bars)
+- Trades: 10-30/day (high frequency)
+- Suitable for: Fast momentum, micro-breakouts
+- Stop loss: 1-3 points
+- Extremely noisy. Needs very strong noise filters (e.g. volume or ADX confirmation).
+""",
+    "3m": """
+**3-Minute Timeframe** — Fast Scalping/Intraday:
+- Indicator periods: short-to-medium (10-30 bars)
+- Trades: 5-15/day
+- Suitable for: Fast trend following, breakout confirmation
+- Stop loss: 2-5 points
+- Balanced noise and signal speed.
+""",
+    "5m": """
+**5-Minute Timeframe** — Standard Intraday Scalping:
+- Indicator periods: medium (12-30 bars)
+- Trades: 4-10/day
+- Suitable for: Trend pullback, breakout, volatility regimes
+- Stop loss: 3-7 points
+- Very popular timeframe with good liquidity and clean intraday swings.
+""",
     "10m": """
 **10-Minute Timeframe** — Balanced Intraday:
 - Indicator periods: medium-to-long (10-40 bars)
@@ -91,8 +112,11 @@ def build_idea_prompt(
     existing_strategies: list[dict],
     round_num: int,
     total_rounds: int,
+    market_regime: str = "High Volatility, Sideways",
+    investment_thesis: str = "Exploit asymmetric skewness in order flow.",
     experience: str = "",
     tried_names: list[str] = None,
+    fsa_forbidden_patterns: list[str] = None,
 ) -> str:
     """
     Build prompt for generating a strategy idea (JSON).
@@ -102,85 +126,87 @@ def build_idea_prompt(
     existing_section = ""
     if existing_strategies:
         existing_list = "\n".join([f"  - [{s.get('timeframe', '10m')}] {s.get('name', 'Strategy')} ({s.get('family', s.get('template_name', 'unknown'))})" for s in existing_strategies])
-        existing_section = f"## 1. ALREADY ACCEPTED STRATEGIES (DO NOT DUPLICATE)\n{existing_list}\n"
+        existing_section = f"## ALREADY ACCEPTED STRATEGIES (MUST BE UNIQUE)\n{existing_list}\n"
     else:
-        existing_section = "## 1. ALREADY ACCEPTED STRATEGIES\n(None yet. This is the first strategy.)\n"
+        existing_section = "## ALREADY ACCEPTED STRATEGIES\n(None yet. This is the first strategy.)\n"
         
     tried_section = ""
     if tried_names:
         tried_list = ", ".join(sorted(tried_names))
-        tried_section = f"## 2. PREVIOUSLY TRIED & FAILED NAMES (DO NOT REUSE)\n{tried_list}\n"
+        tried_section = f"## PREVIOUSLY TRIED & FAILED NAMES\n{tried_list}\n"
 
     used_families = [s.get('family', '') for s in existing_strategies]
     unused_families = [f for f in STRATEGY_FAMILIES if f not in used_families]
     suggested = f"Suggested unused families: **{', '.join(unused_families[:3])}**" if unused_families else "All families used. Create a unique variation."
 
     tf_hint = TIMEFRAME_HINTS.get(timeframe, "")
-    exp_section = f"## 3. COMBAT EXPERIENCE (MANDATORY)\n{experience}\n" if experience else ""
+    exp_section = f"## COMBAT EXPERIENCE (MANDATORY TO FOLLOW)\n{experience}\n" if experience else ""
+    
+    fsa_section = ""
+    if fsa_forbidden_patterns:
+        fsa_list = ", ".join(fsa_forbidden_patterns)
+        fsa_section = f"\nCRITICAL CONSTRAINT: Do not generate blueprints that share the exact structural topology as the following root patterns: {fsa_list}\n"
 
-    return f"""You are an expert **Quant Researcher** designing trading strategies for the **VN30 Index Futures contract**.
+    static_prefix = f"""You are an expert **Quant Researcher** designing trading strategies for the **VN30 Index Futures contract**.
 
-## Task
-Design 1 intraday trading strategy for the **{timeframe}** timeframe.
-This is round {round_num}/{total_rounds}.
+## REFERENCE LIBRARY
+{DIMENSIONAL_FUNCTIONS}
+{OPERATOR_FUNCTIONS}
+
+## OUTPUT FORMAT
+You MUST return EXACTLY the following JSON structure. 
+
+```json
+{{
+    "name": "StrategyName",
+    "timeframe": "10m",
+    "family": "momentum|mean-reversion|volatility|statistical-arbitrage",
+    "description": "Financial intuition behind the strategy.",
+    "macro_blueprint": "div(macd_line(?), stddev(?))"
+}}
+```
+
+**Few-Shot Examples for macro_blueprint:**
+- Example 1 (Statistical Ratio): `div(sub(vwap(), ema(?)), stddev(?))`
+- Example 2 (Z-Score Normalization): `zscore(roc(?))`
+- Example 3 (Volatility Adjusted): `div(mult(rsi(?), var(?)), stddev(?))`
+
+## CRITICAL RULES (MUST FOLLOW STRICTLY)
+1. **CONTINUOUS SIGNAL ROOT**: The root (outermost function) of your macro_blueprint MUST evaluate to a RATIO or CURRENCY (e.g., div, zscore, rsi, pct_change). DO NOT use functions that output Dimension.ANY (such as add, sub, mult, ema, stddev) or BOOLEAN functions (like crossed_above, and_) as the final root.
+2. **Valid Functions ONLY**: RESTRICT YOURSELF EXCLUSIVELY to the exact names listed in the REFERENCE LIBRARY.
+3. **No Hardcoded Numbers**: REPLACE ALL numerical parameters with `?` (e.g., `ema(?)`). Keep NO hardcoded numbers.
+4. **Syntax & Depth Limit**: DO NOT nest functions deeper than 3 levels. Ensure all parentheses are closed. Only use `?` for the main data series arguments, DO NOT pass `?` for constant parameters like timeperiod. For example, `ema(?)` is correct, `ema(?, ?)` is wrong.
+5. **JSON Only**: OUTPUT ONLY a valid JSON block.
+"""
+
+    dynamic_suffix = f"""
+## CURRENT MISSION & MARKET CONTEXT
+- Task: Design 1 intraday trading strategy for the **{timeframe}** timeframe.
+- Round: {round_num}/{total_rounds}
+- **Market Regime**: {market_regime}
+- **Investment Thesis**: {investment_thesis}
+- Family Recommendation: {suggested}
 
 {tf_hint}
 
 {existing_section}
 {tried_section}
+{fsa_section}
 {exp_section}
-## 4. REFERENCE LIBRARY
 
-{TALIB_INDICATORS}
+GIVE ME THE JSON NOW:
+"""
+    return static_prefix + dynamic_suffix
 
-{OPERATOR_FUNCTIONS}
-
-## 5. CRITICAL RULES (MUST FOLLOW STRICTLY)
-1. **Uniqueness**: Your strategy MUST be COMPLETELY DIFFERENT from the accepted ones above. Use different logic, different indicators, or a different family.
-2. **Family**: {suggested}
-3. **Logic Strictness**: You must have CLEAR entry and exit logic, expressed strictly as Python mathematical formulas. NO natural language.
-4. **Complexity**: Must use **at least 2 indicators** (1 primary + 1 filter/confirmation).
-5. **Distinct Exits**: Must have its **own exit logic** (do not just reverse the entry signals).
-6. **Valid Functions ONLY**: You are ONLY allowed to use the indicators and operators listed in the "REFERENCE LIBRARY" above via `self.feat.xxx()` or `self.op.xxx()`. Do NOT invent any functions. Do NOT use Pandas methods like `.rolling()` or `.shift()`.
-7. **Pandas Bitwise Logic**: You MUST use Pandas bitwise operators `&`, `|`, `~` for logical conditions instead of `and`, `or`, `not`. You MUST wrap every condition in parentheses. Example: `(close > MA) & (RSI < 30)`.
-
-## 6. OUTPUT FORMAT
-
-You MUST return EXACTLY the following JSON structure. Do not add any text outside the JSON block.
-
-```json
-{{
-    "name": "StrategyName",
-    "timeframe": "{timeframe}",
-    "family": "trend-following|momentum|mean-reversion|breakout|volatility|multi-indicator|pattern-based|channel|oscillator-divergence|session-based",
-    "description": "Brief description of the strategy logic.",
-    "formula": {{
-        "inputs": ["close", "high", "low", "open_price", "volume"],
-        "indicators": [
-            {{"name": "EMA_fast", "definition": "self.feat.ema(close, timeperiod=10)"}},
-            {{"name": "ATR", "definition": "self.feat.atr(high, low, close, timeperiod=14)"}}
-        ],
-        "entry_long": "(close > EMA_fast) & (ATR > 0.5)",
-        "entry_short": "(close < EMA_fast) & (ATR > 0.5)",
-        "exit_long": "(close < EMA_fast)",
-        "exit_short": "(close > EMA_fast)"
-    }},
-    "param_space": {{
-        "param_name": {{"type": "int|float", "low": 5, "high": 30, "step": 1}},
-        "another_param": {{"type": "float", "low": 0.5, "high": 3.0, "step": 0.1}}
-    }}
-}}
-```"""
-
-def build_correction_prompt(original_json_str: str, error_traceback: str) -> str:
+def build_correction_prompt(failed_json_part_str: str, error_traceback: str) -> str:
     """
     Build prompt for self-correction when a generated strategy fails validation.
     """
     return f"""Your previous generated strategy JSON failed execution validation in our sandbox.
 
-Here is the original JSON you generated:
+Here is the specific part of the JSON that caused the error:
 ```json
-{original_json_str}
+{failed_json_part_str}
 ```
 
 Here is the error traceback from the sandbox:
@@ -192,5 +218,5 @@ CRITICAL RULES FOR CORRECTION:
 1. Identify the source of the error in your formulas or parameter space.
    - For example: syntax errors, incorrect TA-Lib function parameter names (e.g. `period` instead of `timeperiod`), missing required parameters, dividing by zero/volume without offset, or using unallowed functions.
 2. Fix the errors while preserving the core trading concept.
-3. Return ONLY a valid JSON block in the exact same format as before. Do not include any explanations or commentary.
+3. Return ONLY a valid JSON block containing the corrected fields. Do not return the entire original JSON. Do not include any explanations or commentary.
 """

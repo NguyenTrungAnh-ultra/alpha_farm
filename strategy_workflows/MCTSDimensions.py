@@ -44,7 +44,6 @@ OPERATOR_REGISTRY = {
     "diff": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
     "pct_change": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.RATIO},
     
-    # 2. LOGIC (Output is ALWAYS BOOLEAN)
     "crossed": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.BOOLEAN}, # Special check: inputs must match
     "crossed_above": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.BOOLEAN},
     "crossed_below": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.BOOLEAN},
@@ -54,17 +53,25 @@ OPERATOR_REGISTRY = {
     "and_": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.BOOLEAN, Dimension.BOOLEAN], "output_dim": Dimension.BOOLEAN},
     "or_": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.BOOLEAN, Dimension.BOOLEAN], "output_dim": Dimension.BOOLEAN},
     "not_": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.BOOLEAN], "output_dim": Dimension.BOOLEAN},
+    "greater_than": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.BOOLEAN},
+    "less_than": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.BOOLEAN},
+    "equal": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.BOOLEAN},
 
     # 3. OVERLAP (Preserves dimension, heavily pruned to avoid Illusion of Diversity)
     "ema": {"group": OperatorGroup.OVERLAP, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
-    "vwap": {"group": OperatorGroup.OVERLAP, "input_dims": [Dimension.CURRENCY], "output_dim": Dimension.CURRENCY},
-    "bbands": {"group": OperatorGroup.OVERLAP, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
+    "vwap": {"group": OperatorGroup.OVERLAP, "input_dims": [], "output_dim": Dimension.CURRENCY}, # Arity 0, expects h, l, c, v internally
+    "bbands_upper": {"group": OperatorGroup.OVERLAP, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
+    "bbands_middle": {"group": OperatorGroup.OVERLAP, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
+    "bbands_lower": {"group": OperatorGroup.OVERLAP, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
 
     # 4. OSCILLATORS
     "rsi": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.ANY], "output_dim": Dimension.RATIO},
-    "macd": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.CURRENCY], "output_dim": Dimension.CURRENCY},
-    "adx": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.CURRENCY, Dimension.CURRENCY, Dimension.CURRENCY], "output_dim": Dimension.RATIO}, # expects h, l, c
-    "stoch": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.CURRENCY, Dimension.CURRENCY, Dimension.CURRENCY], "output_dim": Dimension.RATIO},
+    "macd_line": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.CURRENCY], "output_dim": Dimension.CURRENCY},
+    "macd_signal": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.CURRENCY], "output_dim": Dimension.CURRENCY},
+    "macd_hist": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.CURRENCY], "output_dim": Dimension.CURRENCY},
+    "adx": {"group": OperatorGroup.OSCILLATOR, "input_dims": [], "output_dim": Dimension.RATIO}, # Arity 0, expects h, l, c internally
+    "stoch_k": {"group": OperatorGroup.OSCILLATOR, "input_dims": [], "output_dim": Dimension.RATIO}, # Arity 0, expects h, l, c internally
+    "stoch_d": {"group": OperatorGroup.OSCILLATOR, "input_dims": [], "output_dim": Dimension.RATIO}, # Arity 0, expects h, l, c internally
 
     # 5. STATISTICS & MATH
     "stddev": {"group": OperatorGroup.STATISTICS, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},

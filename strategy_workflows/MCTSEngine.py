@@ -60,9 +60,12 @@ def ast_to_code(node: ASTNode) -> str:
             return f"({ast_to_code(node.children[0])} / ({ast_to_code(node.children[1])} + 1e-8))"
         return f"({ast_to_code(node.children[0])} {op_map[node.name]} {ast_to_code(node.children[1])})"
         
-    if group == OperatorGroup.LOGIC and node.name in ['and_', 'or_', 'not_']:
+    if group == OperatorGroup.LOGIC and node.name in ['and_', 'or_', 'not_', 'greater_than', 'less_than', 'equal']:
         if node.name == 'not_':
             return f"(~{ast_to_code(node.children[0])})"
+        if node.name in ['greater_than', 'less_than', 'equal']:
+            op_map = {'greater_than': '>', 'less_than': '<', 'equal': '=='}
+            return f"({ast_to_code(node.children[0])} {op_map[node.name]} {ast_to_code(node.children[1])})"
         op_map = {'and_': '&', 'or_': '|'}
         return f"({ast_to_code(node.children[0])} {op_map[node.name]} {ast_to_code(node.children[1])})"
 
@@ -73,17 +76,40 @@ def ast_to_code(node: ASTNode) -> str:
     if group == OperatorGroup.CANDLESTICK:
         return f"{prefix}.{node.name}(open_, high, low, close)"
 
+    # Component Splitting Renderings
+    if node.name == 'macd_line':
+        return f"self.feat.macd({ast_to_code(node.children[0])})[0]"
+    if node.name == 'macd_signal':
+        return f"self.feat.macd({ast_to_code(node.children[0])})[1]"
+    if node.name == 'macd_hist':
+        return f"self.feat.macd({ast_to_code(node.children[0])})[2]"
+    if node.name == 'bbands_upper':
+        return f"self.feat.bbands({ast_to_code(node.children[0])})[0]"
+    if node.name == 'bbands_middle':
+        return f"self.feat.bbands({ast_to_code(node.children[0])})[1]"
+    if node.name == 'bbands_lower':
+        return f"self.feat.bbands({ast_to_code(node.children[0])})[2]"
+
+    # Arity 0 Terminal nodes requiring internal variables
+    if node.name == 'vwap':
+        return "self.feat.vwap(high, low, close, volume)"
+    if node.name == 'adx':
+        return f"self.feat.adx(high, low, close, timeperiod={random.choice(PERIODS)})"
+    if node.name == 'stoch_k':
+        return f"self.feat.stoch(high, low, close)[0]"
+    if node.name == 'stoch_d':
+        return f"self.feat.stoch(high, low, close)[1]"
+
     args = []
     for c in node.children:
         args.append(ast_to_code(c))
     
-    # Add random timeperiod if it requires one but doesn't have a constant
-    # MCTS might not generate constants as children if Arity is strict for fields.
-    # We will assume MCTS fills constants explicitly if required. 
-    # Actually, to simplify, if an operator expects 1 input but needs a period, we inject it.
-    if node.name in ['ema', 'vwap', 'bbands', 'rsi', 'macd', 'adx', 'stoch', 'stddev', 'var', 'zscore', 'shift', 'diff', 'pct_change']:
-        if not any(isinstance(c, ASTNode) and c.name == "Constant" for c in node.children):
+    # Safely inject keyword arguments
+    if not any(isinstance(c, ASTNode) and c.name == "Constant" for c in node.children):
+        if node.name in ['ema', 'rsi', 'stddev', 'var', 'zscore']:
             args.append(f"timeperiod={random.choice(PERIODS)}")
+        elif node.name in ['shift', 'diff', 'pct_change']:
+            args.append(f"periods={random.choice([1, 2, 3, 5, 10])}")
             
     return f"{prefix}.{node.name}({', '.join(args)})"
 
@@ -242,6 +268,9 @@ class DynamicMCTSStrategy(SimpleAlgorithm):
         self.set_positions(long_mask, position=pos_scale)
         self.set_positions(short_mask, position=-pos_scale)
 
+import inspect
+DynamicMCTSStrategy._emulator_source_code = inspect.getsource(DynamicMCTSStrategy)
+
 class MCTSEngine:
     def __init__(self, timeframe: str = '10m', max_depth: int = 4, exploration_c: float = 1.414):
         self.timeframe = timeframe
@@ -276,6 +305,9 @@ class MCTSEngine:
         fwd_returns = close_series.pct_change(1).shift(-1)
         valid = pd.DataFrame({'alpha': alpha_series, 'fwd_ret': fwd_returns}).dropna()
         if len(valid) < 20:
+            return 0.0
+        # Prevent pandas ConstantInput warning when input series is constant (standard deviation is 0)
+        if valid['alpha'].std() == 0.0 or valid['fwd_ret'].std() == 0.0:
             return 0.0
         return valid['alpha'].corr(valid['fwd_ret'], method='spearman')
 

@@ -1,0 +1,7 @@
+{
+    "name": "1mVN30F1M_SkewBreakout",
+    "timeframe": "1m",
+    "family": "volatility|statistical-arbitrage",
+    "description": "Exploits asymmetric skewness in order flow by combining RSI momentum with ADX volatility filtering to identify high-probability breakout signals during sideways regimes.",
+    "macro_blueprint": "div(mult(rsi(?), adx(?)), stddev(?))"
+}

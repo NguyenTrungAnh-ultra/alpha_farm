@@ -1,0 +1,7 @@
+{
+    "name": "VN30F60M_AsymmetricSkewBreakout",
+    "timeframe": "60m",
+    "family": "statistical-arbitrage",
+    "description": "Exploits order flow asymmetry by measuring the skewness of price action relative to volatility, capturing mean-reversion opportunities in sideways regimes.",
+    "macro_blueprint": "div(sub(ema(?), vwap(?)), stddev(?))"
+}

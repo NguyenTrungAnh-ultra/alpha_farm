@@ -1,0 +1,7 @@
+{
+    "name": "15mVN30F15M_AsymmetricSkewZscore",
+    "timeframe": "15m",
+    "family": "statistical-arbitrage",
+    "description": "Exploits order flow asymmetry by measuring the deviation of price momentum from its expected distribution during high volatility sideways regimes.",
+    "macro_blueprint": "zscore(roc(?))"
+}

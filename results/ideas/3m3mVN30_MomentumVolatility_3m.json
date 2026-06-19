@@ -1,0 +1,7 @@
+{
+    "name": "3m3mVN30_MomentumVolatility",
+    "timeframe": "3m",
+    "family": "momentum|mean-reversion",
+    "description": "Exploits asymmetric price movement by combining momentum with volatility normalization to filter noise in high-volatility sideways regimes.",
+    "macro_blueprint": "zscore(add(ema(?), macd(?)))"
+}

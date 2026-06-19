@@ -1,0 +1,7 @@
+{
+    "name": "VN30F15M_MeanReversionZscore",
+    "timeframe": "15m",
+    "family": "mean-reversion",
+    "description": "Exploits mean reversion by identifying when price deviates significantly from the VWAP in a sideways regime, using z-score to normalize distance.",
+    "macro_blueprint": "zscore(sub(close(?), vwap(?)))"
+}

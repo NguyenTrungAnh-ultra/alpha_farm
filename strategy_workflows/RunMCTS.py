@@ -1,6 +1,13 @@
 import os
 import sys
 
+# Fix encoding for Windows subprocesses print statements (emojis, icons)
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
 # Add project root to sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -94,6 +101,12 @@ class CustomStrategy(SimpleAlgorithm):
 
 def process_timeframe(tf: str, iterations: int = 10000):
     """Worker function to run MCTS and Backtesting for a single timeframe."""
+    import logging
+    import warnings
+    warnings.filterwarnings('ignore')
+    logging.getLogger("core_engine.XnoEngine").setLevel(logging.CRITICAL)
+    logging.getLogger("core_engine.RestrictedSeries").setLevel(logging.CRITICAL)
+    
     print(f"\n--- [Worker {tf}] Starting processing ---")
     
     # Instantiate isolated engines for this process
@@ -152,18 +165,12 @@ def process_timeframe(tf: str, iterations: int = 10000):
         
     print(f"\n[Worker {tf}] Found {total_generated} candidates. Running full 5-year backtests with scale optimization...")
     
-    df_full = load_data(tf)
+    df_full = load_data(tf, start='2020-01-01', end='2023-12-31')
     df_full['Volume'] = df_full['Volume'].fillna(0.0)
     
     for cand in candidates:
         expr = cand['expr']
         direction = cand['direction']
-        param_count = cand['param_count']
-        
-        if param_count > 6:
-            print(f"[Worker {tf}] Skipping {expr}: too many parameters ({param_count} > 6).")
-            total_rejected += 1
-            continue
             
         best_scale = None
         best_metrics = None

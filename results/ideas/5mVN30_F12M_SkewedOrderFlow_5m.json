@@ -1,0 +1,7 @@
+{
+    "name": "5mVN30_F12M_SkewedOrderFlow",
+    "timeframe": "5m",
+    "family": "momentum",
+    "description": "Exploits asymmetric skewness in order flow by measuring the deviation of price momentum from its volatility-adjusted mean. The strategy identifies when RSI diverges significantly relative to ADX, signaling a potential reversal or continuation based on market regime.",
+    "macro_blueprint": "div(sub(rsi(?), adx(?)), stddev(ema(?)))"
+}

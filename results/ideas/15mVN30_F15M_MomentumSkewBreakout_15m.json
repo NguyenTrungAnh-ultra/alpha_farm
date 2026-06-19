@@ -1,0 +1,7 @@
+{
+    "name": "15mVN30_F15M_MomentumSkewBreakout",
+    "timeframe": "15m",
+    "family": "momentum|breakout",
+    "description": "Exploits asymmetric order flow by combining MACD momentum with volatility expansion. The strategy identifies when price action deviates significantly from the mean (using z-score) while confirming trend direction via MACD crossover, filtering for high-quality trades in sideways regimes.",
+    "macro_blueprint": "zscore(mult(ema(?), macd(?)))"
+}
