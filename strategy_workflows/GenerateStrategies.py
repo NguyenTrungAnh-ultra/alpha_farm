@@ -1,3 +1,11 @@
+import os
+import sys
+
+# Add project root to sys.path
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from utilities.AppConfig import PROJECT_ROOT
 """
 Strategy Idea Generation Pipeline (XNO Engine)
@@ -28,6 +36,15 @@ if sys.stdout.encoding != 'utf-8':
 # Add project root to path
 from llm_clients.GeminiClient import GeminiChat
 from utilities.Prompts import build_idea_prompt
+from pydantic import BaseModel, Field
+
+class StrategyBlueprint(BaseModel):
+    name: str
+    timeframe: str
+    family: str
+    description: str
+    macro_blueprint: str
+
 
 
 def load_cookies(filepath: str = None) -> str:
@@ -175,119 +192,86 @@ def run_pipeline(
                 tried_names=filtered_tried,
             )
             
-            # Send JSON request
-            raw_text = chat.send(idea_prompt) if hasattr(chat, 'send') else ""
+            # Phân luồng Local / Cloud
+            schema_arg = {}
+            if model == "ollama-local":
+                schema_arg = {"schema": StrategyBlueprint.model_json_schema()}
+                
+            raw_text = chat.send(idea_prompt, **schema_arg) if hasattr(chat, 'send') else ""
             
             from llm_clients.GeminiClient import extract_json
-            idea = extract_json(raw_text)
+            idea_json = extract_json(raw_text)
             
-            if idea is None:
+            if idea_json is None:
                 consecutive_errors += 1
-                print(f"  ❌ Failed to generate idea (consecutive errors: {consecutive_errors})")
+                print(f"  ❌ Failed to extract JSON (consecutive errors: {consecutive_errors})")
                 if consecutive_errors >= 3:
                     print(f"\n  🛑 RATE LIMIT DETECTED — Stopping pipeline.")
                     break
                 errors += 1
                 continue
             
-            # Now, enter the self-correction loop
+            # Pydantic Validation & Self-Correction Loop
             max_correction_attempts = 1
             correction_attempt = 0
             validation_passed = False
             
-            from strategy_workflows.ConvertLegacyIdeas import generate_python_code
-            from core_engine.PlatformEmulator import XNOPlatformEmulator
-            from utilities.Prompts import build_correction_prompt
-            from utilities.SandboxPrefixer import apply_prefixes
-            emulator = XNOPlatformEmulator(verbose=False)
-            
-            while correction_attempt < max_correction_attempts:
-                correction_attempt += 1
-                name = idea.get('name', f'Idea_{round_num}_{tf}')
-                # Clean name to be valid python identifier
-                import re
-                name = re.sub(r'[^a-zA-Z0-9_]', '', name)
-                idea['name'] = name
-                idea['timeframe'] = tf
-                
-                py_code = generate_python_code(idea)
-                # =====================================================================
-                # [THÊM MỚI] KÍCH HOẠT BỨC TƯỜNG PHÒNG NGỰ - SANDBOX PREFIXER
-                # =====================================================================
-                py_code, idea, was_modified, fix_log = apply_prefixes(py_code, idea)
-                
-                if was_modified:
-                    print(f"  [Attempt {correction_attempt}/{max_correction_attempts}] 🛡️ [Prefixed] Đã can thiệp sửa mã bằng sandbox_prefixer:")
-                    for log_item in fix_log:
-                        print(f"  {log_item}")
-                # =====================================================================
-
-                # Define paths
-                ideas_folder = os.path.join(PROJECT_ROOT, "results", "ideas")
-                os.makedirs(ideas_folder, exist_ok=True)
-                
-                json_path = os.path.join(ideas_folder, f"{name}_{tf}.json")
-                py_path = os.path.join(PROJECT_ROOT, "results", f"{name}_{tf}.py")
-                
-                # Write to temp file for sandbox validation
-                with open(py_path, 'w', encoding='utf-8') as f:
-                    f.write(py_code)
-                    
-                print(f"  [Attempt {correction_attempt}/{max_correction_attempts}] Validating {name} in sandbox...")
-                
+            while correction_attempt < max_correction_attempts + 1:
                 try:
-                    metrics = emulator.get_metrics(py_path, tf)
-                    sharpe = metrics.get('sharpe_ratio', 0.0)
-                    cagr = metrics.get('cagr', 0.0)
+                    # Validate JSON against schema
+                    valid_idea = StrategyBlueprint.model_validate(idea_json).model_dump()
                     
-                    if sharpe >= 1.3:
-                        print(f"  ✅ Validation passed! Sharpe: {sharpe:.4f} | CAGR: {cagr*100:.2f}%")
-                        # Write JSON
-                        with open(json_path, 'w', encoding='utf-8') as f:
-                            json.dump(idea, f, indent=4, ensure_ascii=False)
-                        print(f"  💾 Saved JSON to {json_path}")
-                        print(f"  💾 Saved Python to {py_path}")
-                        validation_passed = True
-                        tried_names.add(name)
-                        break
-                    else:
-                        print(f"  ❌ Discarded: Low Sharpe Ratio ({sharpe:.4f} < 1.3)")
-                        # Delete python file and break correction loop (no retry for performance)
-                        if os.path.exists(py_path):
-                            os.remove(py_path)
-                        break
-                except Exception as e:
-                    error_msg = traceback.format_exc()
-                    print(f"  ❌ Sandbox Error: {type(e).__name__}: {e}")
+                    name = valid_idea.get('name', f'Idea_{round_num}_{tf}')
+                    import re
+                    name = re.sub(r'[^a-zA-Z0-9_]', '', name)
+                    valid_idea['name'] = name
+                    valid_idea['timeframe'] = tf
                     
-                    # Clean up the python file
-                    if os.path.exists(py_path):
-                        try:
-                            os.remove(py_path)
-                        except:
-                            pass
-                            
-                    if correction_attempt < max_correction_attempts:
-                        correction_chat = local_chat if local_chat is not None else chat
-                        print(f"  🔄 Retrying self-correction using local model ({getattr(correction_chat, 'model', 'default')})...")
-                        # Build correction prompt
-                        correction_prompt = build_correction_prompt(json.dumps(idea, indent=4), error_msg)
+                    # Define paths
+                    ideas_folder = os.path.join(PROJECT_ROOT, "results", "ideas")
+                    os.makedirs(ideas_folder, exist_ok=True)
+                    json_path = os.path.join(ideas_folder, f"{name}_{tf}.json")
+                    
+                    with open(json_path, 'w', encoding='utf-8') as f:
+                        json.dump(valid_idea, f, indent=4, ensure_ascii=False)
                         
-                        # Send correction prompt to LLM
-                        raw_text = correction_chat.send(correction_prompt) if hasattr(correction_chat, 'send') else ""
+                    print(f"  ✅ Validation passed! Saved JSON to {json_path}")
+                    validation_passed = True
+                    tried_names.add(name)
+                    idea_json = valid_idea
+                    break
+                    
+                except Exception as e:
+                    error_msg = str(e)
+                    print(f"  ❌ Pydantic Validation Error: {error_msg}")
+                    
+                    if correction_attempt < max_correction_attempts:
+                        correction_attempt += 1
+                        correction_chat = local_chat if local_chat is not None else chat
+                        print(f"  🔄 Retrying self-correction using model ({getattr(correction_chat, 'model', 'default')})...")
+                        
+                        from utilities.Prompts import build_correction_prompt
+                        correction_prompt = build_correction_prompt(json.dumps(idea_json, indent=4), error_msg)
+                        
+                        schema_arg_retry = {}
+                        if getattr(correction_chat, 'model', '').startswith("qwen"):
+                            schema_arg_retry = {"schema": StrategyBlueprint.model_json_schema()}
+                            
+                        raw_text = correction_chat.send(correction_prompt, **schema_arg_retry) if hasattr(correction_chat, 'send') else ""
                         corrected_idea = extract_json(raw_text)
                         
                         if corrected_idea:
-                            idea = corrected_idea
+                            idea_json = corrected_idea
                         else:
                             print("  ❌ Failed to parse corrected JSON from LLM.")
                             break
                     else:
                         print("  ❌ Out of correction attempts. Discarding idea.")
+                        break
                         
             if validation_passed:
                 consecutive_errors = 0
-                existing_ideas.append(idea)
+                existing_ideas.append(idea_json)
                 accepted += 1
             else:
                 errors += 1

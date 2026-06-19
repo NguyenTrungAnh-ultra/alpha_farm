@@ -1,3 +1,11 @@
+import os
+import sys
+
+# Add project root to sys.path
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from utilities.AppConfig import PROJECT_ROOT
 # MCTS Pipeline for Alpha Farm
 # Runs MCTS searches across multiple timeframes, filters candidate alphas
@@ -11,7 +19,8 @@ import pandas as pd
 import concurrent.futures
 from typing import List, Dict, Any
 
-from strategy_workflows.MCTSEngine import MCTSEngine, Dimension, ASTNode, DynamicMCTSStrategy
+from strategy_workflows.MCTSEngine import MCTSEngine, Dimension, DynamicMCTSStrategy
+from strategy_workflows.SemanticCompiler import SemanticCompiler, ASTNode
 from core_engine.BacktestEngine import load_data, XNOBacktestEngine
 from core_engine.GenerateReport import compute_metrics
 from strategy_workflows.PortfolioManager import PortfolioManager
@@ -94,11 +103,36 @@ def process_timeframe(tf: str, iterations: int = 10000):
     mcts = MCTSEngine(timeframe=tf, max_depth=4)
     
     # ==========================================
-    # PHẪU THUẬT 1: Cắt tỉa Không gian Lãng phí
-    # Chỉ tập trung đào sâu vào RATIO (Nơi chứa Alpha)
+    # ĐỌC Ý TƯỞNG TỪ TẦNG 1 & BIÊN DỊCH BỞI TẦNG 2
     # ==========================================
-    mcts.run_search(Dimension.RATIO, n_iterations=iterations)
-    # Loại bỏ hoàn toàn mcts.run_search cho CURRENCY và VOLUME
+    ideas_folder = os.path.join(PROJECT_ROOT, "results", "ideas")
+    if not os.path.exists(ideas_folder):
+        print(f"[Worker {tf}] No ideas folder found.")
+        return tf, 0, 0, []
+        
+    import json
+    import glob
+    idea_files = glob.glob(os.path.join(ideas_folder, f"*_{tf}.json"))
+    
+    compiler = SemanticCompiler()
+    
+    for idea_file in idea_files:
+        with open(idea_file, 'r', encoding='utf-8') as f:
+            try:
+                idea_data = json.load(f)
+                blueprint = idea_data.get("macro_blueprint")
+                if not blueprint:
+                    continue
+                    
+                print(f"[Worker {tf}] Compiling Blueprint: {blueprint}")
+                ast_root = compiler.compile_blueprint(blueprint)
+                
+                # ==========================================
+                # TẦNG 3: MCTS BRUTE-FORCE TÌM KIẾM CHIẾN LƯỢC
+                # ==========================================
+                mcts.run_search_from_blueprint(ast_root, n_iterations=iterations)
+            except Exception as e:
+                print(f"[Worker {tf}] SemanticCompiler Error: {e}")
     
     candidates = mcts.get_best_candidates()
     
