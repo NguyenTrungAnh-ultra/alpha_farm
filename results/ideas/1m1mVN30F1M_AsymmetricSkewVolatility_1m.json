@@ -1,0 +1,7 @@
+{
+    "name": "1m1mVN30F1M_AsymmetricSkewVolatility",
+    "timeframe": "1m",
+    "family": "volatility|statistical-arbitrage",
+    "description": "Exploits order flow asymmetry by measuring price momentum relative to volatility, filtering for strong directional moves during high variance periods.",
+    "macro_blueprint": "zscore(roc(?))"
+}

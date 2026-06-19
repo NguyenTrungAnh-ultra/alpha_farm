@@ -1,0 +1,7 @@
+{
+    "name": "VN30_F15M_SkewOrderFlow",
+    "timeframe": "15m",
+    "family": "momentum|volatility",
+    "description": "Exploits asymmetric skewness in order flow by measuring the divergence between momentum and volatility expansion. In high-volatility sideways regimes, this strategy identifies when price acceleration (ROC) deviates significantly from expected variance levels.",
+    "macro_blueprint": "zscore(roc(?))"
+}

@@ -1,0 +1,7 @@
+{
+    "name": "VN30F12M_MeanReversion",
+    "timeframe": "5m",
+    "family": "mean-reversion",
+    "description": "Exploits mean reversion in sideways regimes by trading deviations from VWAP using RSI to confirm overbought/oversold conditions.",
+    "macro_blueprint": "div(sub(rsi(?), 70), var(?))"
+}

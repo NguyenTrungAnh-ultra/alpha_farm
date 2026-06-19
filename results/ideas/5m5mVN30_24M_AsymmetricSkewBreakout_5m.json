@@ -1,0 +1,7 @@
+{
+    "name": "5m5mVN30_24M_AsymmetricSkewBreakout",
+    "timeframe": "5m",
+    "family": "volatility",
+    "description": "Exploits order flow asymmetry during high volatility by combining MACD momentum with standardized variance to identify breakout conditions.",
+    "macro_blueprint": "div(mult(macd(?), var(?)), stddev(?))"
+}

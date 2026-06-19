@@ -1,0 +1,7 @@
+{
+    "name": "VN30F30M_EMAADX_Trend",
+    "timeframe": "30m",
+    "family": "trend-following",
+    "description": "Trend following strategy using EMA crossover for direction and ADX to filter low volatility regimes, preventing trades during choppy markets.",
+    "macro_blueprint": "and_(crossed_above(ema(?), ema(?)), greater_than(adx(?), ?))"
+}

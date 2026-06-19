@@ -10,5 +10,119 @@
         "total_generated": 140,
         "total_rejected": 134,
         "total_discovered": 6
+    },
+    {
+        "timestamp": "2026-06-19T14:52:34.474867",
+        "total_generated": 0,
+        "total_rejected": 0,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T14:53:15.366019",
+        "total_generated": 0,
+        "total_rejected": 0,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T14:53:51.307585",
+        "total_generated": 0,
+        "total_rejected": 0,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T14:54:53.370962",
+        "total_generated": 0,
+        "total_rejected": 0,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T15:01:04.730916",
+        "total_generated": 0,
+        "total_rejected": 0,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T15:21:51.275107",
+        "total_generated": 0,
+        "total_rejected": 0,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T15:28:58.735967",
+        "total_generated": 0,
+        "total_rejected": 0,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T15:29:51.620872",
+        "total_generated": 0,
+        "total_rejected": 0,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T15:31:11.339875",
+        "total_generated": 0,
+        "total_rejected": 0,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T15:32:09.946817",
+        "total_generated": 0,
+        "total_rejected": 0,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T15:36:23.602949",
+        "total_generated": 0,
+        "total_rejected": 0,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T17:23:09.044572",
+        "total_generated": 300,
+        "total_rejected": 300,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T20:24:11.349485",
+        "total_generated": 40,
+        "total_rejected": 40,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T20:24:44.020222",
+        "total_generated": 0,
+        "total_rejected": 0,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T20:25:46.178159",
+        "total_generated": 80,
+        "total_rejected": 80,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T20:53:38.645419",
+        "total_generated": 80,
+        "total_rejected": 80,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T21:00:59.658255",
+        "total_generated": 300,
+        "total_rejected": 300,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-19T22:32:52.002337",
+        "total_generated": 50,
+        "total_rejected": 50,
+        "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-20T00:34:50.694614",
+        "total_generated": 406,
+        "total_rejected": 405,
+        "total_discovered": 1
     }
 ]

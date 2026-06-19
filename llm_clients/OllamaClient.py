@@ -71,15 +71,54 @@ class OllamaChatClient:
                 
         # 2. Nạp Modelfile để tạo mô hình tùy chỉnh
         modelfile_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Modelfile")
-        custom_model = "alpha_farm_qwen"
         created_custom = False
         if os.path.exists(modelfile_path):
-            if self.verbose: print(f"[Ollama] Creating/Updating custom model '{custom_model}' from Modelfile...")
+            base_model = self.model
+            clean_base_model = base_model.replace(":", "_").replace(".", "_").replace("-", "_")
+            custom_model = f"alpha_farm_{clean_base_model}"
+            
+            if self.verbose:
+                print(f"[Ollama] Preparing custom model '{custom_model}' from base '{base_model}'...")
+                
             try:
-                # Chạy build model tùy chỉnh
-                subprocess.run([ollama_cmd, "create", custom_model, "-f", modelfile_path], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                self.model = custom_model
-                created_custom = True
+                # Đọc nội dung Modelfile gốc
+                with open(modelfile_path, "r", encoding="utf-8") as f:
+                    original_content = f.read()
+                
+                # Thay thế hoặc chèn dòng FROM để trỏ tới base_model tương ứng
+                lines = []
+                replaced_from = False
+                for line in original_content.splitlines():
+                    if line.strip().upper().startswith("FROM "):
+                        lines.append(f"FROM {base_model}")
+                        replaced_from = True
+                    else:
+                        lines.append(line)
+                if not replaced_from:
+                    lines.insert(0, f"FROM {base_model}")
+                
+                custom_modelfile_content = "\n".join(lines)
+                
+                # Ghi ra file tạm để build
+                temp_modelfile_path = modelfile_path + f".{clean_base_model}.auto"
+                with open(temp_modelfile_path, "w", encoding="utf-8") as f:
+                    f.write(custom_modelfile_content)
+                
+                if self.verbose:
+                    print(f"[Ollama] Creating/Updating custom model '{custom_model}' using temporary Modelfile...")
+                
+                try:
+                    subprocess.run(
+                        [ollama_cmd, "create", custom_model, "-f", temp_modelfile_path],
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                    self.model = custom_model
+                    created_custom = True
+                finally:
+                    if os.path.exists(temp_modelfile_path):
+                        os.remove(temp_modelfile_path)
             except Exception as e:
                 print(f"[Ollama] Warning: Could not create custom model. Falling back to base model '{self.model}'. Error: {e}")
         
@@ -90,9 +129,10 @@ class OllamaChatClient:
         except Exception:
             pass
             
-    def send(self, prompt: str) -> str:
+    def send(self, prompt: str, schema: dict = None) -> str:
         """
         Gửi prompt tới Ollama và trả về kết quả dưới dạng chuỗi nối tiếp.
+        Nếu truyền schema (được sinh từ Pydantic .model_json_schema()), Ollama sẽ ép output chuẩn JSON.
         """
         url = f"{self.host}/api/generate"
         payload = {
@@ -100,17 +140,25 @@ class OllamaChatClient:
             "prompt": prompt,
             "stream": False,
             "options": {
-                "num_ctx": 16384,
-                "num_predict": -1
+                "num_ctx": 16384
             }
         }
+        if schema:
+            payload["format"] = schema
         
         try:
             if self.verbose: print(f"[Ollama] Generating response using '{self.model}'...")
             response = requests.post(url, json=payload, timeout=300)
             response.raise_for_status()
             data = response.json()
-            return data.get("response", "")
+            
+            resp_text = data.get("response", "")
+            thinking = data.get("thinking", "")
+            
+            if not resp_text and thinking:
+                resp_text = thinking
+                
+            return resp_text
         except Exception as e:
             if self.verbose: print(f"[Ollama] Request failed: {e}")
             raise e

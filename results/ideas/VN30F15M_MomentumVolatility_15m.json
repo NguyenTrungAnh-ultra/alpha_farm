@@ -1,0 +1,7 @@
+{
+    "name": "VN30F15M_MomentumVolatility",
+    "timeframe": "15m",
+    "family": "momentum|volatility",
+    "description": "Exploits asymmetric skewness in order flow by combining momentum divergence with volatility expansion to identify high-probability breakout entries.",
+    "macro_blueprint": "div(mult(roc(?), var(?)), stddev(?))"
+}

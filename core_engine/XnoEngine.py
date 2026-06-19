@@ -14,7 +14,9 @@ def _load_feature_whitelist():
     project_root = os.path.dirname(current_dir)
     possible_paths = [
         os.path.join(project_root, "feature.txt"),
-        "f:/Projects/alpha_farm/feature.txt"
+        os.path.join(project_root, "docs", "feature.txt"),
+        "f:/Projects/alpha_farm/feature.txt",
+        "f:/Projects/alpha_farm/docs/feature.txt"
     ]
     for path in possible_paths:
         if os.path.exists(path):
@@ -65,6 +67,14 @@ TALIB_NAME_MAPPING = {
     "three_stars_in_south": "CDL3STARSINSOUTH",
     "identical_three_crows": "CDLIDENTICAL3CROWS",
     "upside_gap_two_crows": "CDLUPSGAPTWOCROWS",
+    "doji": "CDLDOJI",
+    "hammer": "CDLHAMMER",
+    "morning_star": "CDLMORNINGSTAR",
+    "abandoned_baby": "CDLABANDONEDBABY",
+    "morning_doji_star": "CDLMORNINGDOJISTAR",
+    "evening_doji_star": "CDLEVENINGDOJISTAR",
+    "dragonfly_doji": "CDLDRAGONFLYDOJI",
+    "gravestone_doji": "CDLGRAVESTONEDOJI",
 }
 
 class FeatureEngine:
@@ -706,12 +716,15 @@ class SimpleAlgorithm:
         raise NotImplementedError("Subclass must implement __algorithm__()")
 
     def _validate_sandbox_constraints(self):
+        cls = self.__class__
+        if getattr(cls, '_validated', False):
+            return
+            
         import inspect
         import ast
         import dis
         import sys
         
-        cls = self.__class__
         errors = []
         
         # 1. No __init__ check (in subclass)
@@ -820,6 +833,8 @@ class SimpleAlgorithm:
 
         if errors:
             raise AttributeError("XNO Sandbox Error:\n" + "\n".join(errors))
+
+        cls._validated = True
 
     def run_algorithm(self, df: pd.DataFrame) -> pd.Series:
         logger.debug("Running custom algorithm in XNO SDK Mock Environment")

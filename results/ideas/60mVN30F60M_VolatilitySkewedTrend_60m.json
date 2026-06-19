@@ -1,0 +1,7 @@
+{
+    "name": "60mVN30F60M_VolatilitySkewedTrend",
+    "timeframe": "60m",
+    "family": "volatility|trend-following",
+    "description": "Exploits high volatility by measuring the deviation of price momentum from a moving average, adjusted for standard deviation. The strategy identifies trend direction using MACD and filters signals based on asymmetric skewness in order flow.",
+    "macro_blueprint": "div(sub(ema(?), macd(?)), stddev(?))"
+}

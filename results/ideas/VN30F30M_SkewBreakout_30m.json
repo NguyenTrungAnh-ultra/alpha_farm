@@ -1,0 +1,7 @@
+{
+    "name": "VN30F30M_SkewBreakout",
+    "timeframe": "30m",
+    "family": "momentum|volatility",
+    "description": "Exploits order flow asymmetry by combining momentum (ROC) with volatility normalization. In high-volatility sideways regimes, this captures explosive moves while filtering noise via z-score scaling.",
+    "macro_blueprint": "zscore(roc(?))"
+}

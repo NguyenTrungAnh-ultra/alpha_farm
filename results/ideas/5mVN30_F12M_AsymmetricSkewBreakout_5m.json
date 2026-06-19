@@ -1,0 +1,7 @@
+{
+    "name": "5mVN30_F12M_AsymmetricSkewBreakout",
+    "timeframe": "5m",
+    "family": "volatility",
+    "description": "Exploits asymmetric skewness in order flow by measuring the deviation of price momentum from volatility-adjusted thresholds. In high-volatility sideways regimes, this strategy identifies when mean-reversion forces are overwhelmed by directional pressure.",
+    "macro_blueprint": "div(sub(mult(roc(?), rsi(?))), stddev(?))"
+}

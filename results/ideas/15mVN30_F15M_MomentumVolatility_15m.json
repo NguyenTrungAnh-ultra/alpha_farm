@@ -1,0 +1,7 @@
+{
+    "name": "15mVN30_F15M_MomentumVolatility",
+    "timeframe": "15m",
+    "family": "momentum|volatility",
+    "description": "Exploits asymmetric order flow by combining momentum divergence with volatility expansion to capture high-probability directional moves during sideways regimes.",
+    "macro_blueprint": "div(sub(macd(?), ema(?)), stddev(?))"
+}

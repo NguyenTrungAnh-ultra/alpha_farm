@@ -1,0 +1,7 @@
+{
+    "name": "VN30F60M_RisingSkewedZscore",
+    "timeframe": "60m",
+    "family": "momentum|volatility",
+    "description": "Exploits order flow asymmetry by combining rising momentum with volatility-adjusted z-score normalization. High volatility regime suggests mean-reversion within trend.",
+    "macro_blueprint": "zscore(rising(mult(ema(?), roc(?))))"
+}

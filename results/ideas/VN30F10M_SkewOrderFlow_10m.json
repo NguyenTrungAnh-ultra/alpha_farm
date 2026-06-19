@@ -1,0 +1,7 @@
+{
+    "name": "VN30F10M_SkewOrderFlow",
+    "timeframe": "10m",
+    "family": "volatility|momentum",
+    "description": "Exploits asymmetric skewness in order flow during high volatility sideways regimes by combining momentum and mean-reversion signals.",
+    "macro_blueprint": "div(mult(rsi(?), var(?)), stddev(?))"
+}

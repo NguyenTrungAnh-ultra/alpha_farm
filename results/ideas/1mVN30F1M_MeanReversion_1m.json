@@ -1,0 +1,7 @@
+{
+    "name": "1mVN30F1M_MeanReversion",
+    "timeframe": "1m",
+    "family": "mean-reversion",
+    "description": "Exploits mean reversion during sideways volatility by identifying overbought/oversold conditions using RSI divergence from VWAP, filtered by ADX to avoid trending noise.",
+    "macro_blueprint": "div(sub(rsi(?), vwap(?)), adx(?))"
+}

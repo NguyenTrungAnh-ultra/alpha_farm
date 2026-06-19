@@ -1,0 +1,7 @@
+{
+    "name": "VN30F15M_SkewBreakout",
+    "timeframe": "15m",
+    "family": "momentum|breakout",
+    "description": "Exploits order flow asymmetry by combining MACD trend direction with volatility expansion. When price momentum (MACD) aligns with high variance conditions, it signals a potential breakout in the current regime.",
+    "macro_blueprint": "div(mult(ema(?), var(?)), stddev(?))"
+}

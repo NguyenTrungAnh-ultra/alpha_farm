@@ -1,0 +1,7 @@
+{
+    "name": "VN30F10M_MeanReversionVolatility",
+    "timeframe": "10m",
+    "family": "mean-reversion|volatility",
+    "description": "Exploits mean reversion during sideways volatility by measuring price deviation from VWAP relative to recent standard deviation.",
+    "macro_blueprint": "div(sub(vwap(?), ema(?)), stddev(?))"
+}

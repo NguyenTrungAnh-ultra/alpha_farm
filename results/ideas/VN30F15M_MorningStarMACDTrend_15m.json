@@ -1,0 +1,7 @@
+{
+    "name": "VN30F15M_MorningStarMACDTrend",
+    "timeframe": "15m",
+    "family": "trend-following",
+    "description": "Captures momentum shifts on the 15-minute timeframe by combining a bullish candlestick pattern (Morning Star) with MACD trend confirmation, avoiding ADX-based breakouts and Bollinger Squeeze logic.",
+    "macro_blueprint": "and_(morning_star(), rising(macd(?)))"
+}

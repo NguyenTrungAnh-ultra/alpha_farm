@@ -1,0 +1,7 @@
+{
+    "name": "VN30F60M_MeanReversionVolatility",
+    "timeframe": "60m",
+    "family": "mean-reversion|volatility",
+    "description": "Exploits mean reversion during high volatility by identifying z-score deviations from VWAP, filtering with ADX to avoid trending conditions.",
+    "macro_blueprint": "div(sub(vwap(?), ema(?)), stddev(?))"
+}

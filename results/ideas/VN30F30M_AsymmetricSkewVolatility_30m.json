@@ -1,0 +1,7 @@
+{
+    "name": "VN30F30M_AsymmetricSkewVolatility",
+    "timeframe": "30m",
+    "family": "volatility",
+    "description": "Exploits order flow asymmetry by measuring momentum skewness against volatility expansion. In high-volatility sideways regimes, this captures mean-reversion with directional bias when price action deviates from expected variance.",
+    "macro_blueprint": "div(sub(ema(?), vwap(?)), stddev(?))"
+}

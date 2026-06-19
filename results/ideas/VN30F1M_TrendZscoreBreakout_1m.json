@@ -1,0 +1,7 @@
+{
+    "name": "VN30F1M_TrendZscoreBreakout",
+    "timeframe": "1m",
+    "family": "momentum",
+    "description": "Exploits asymmetric skewness in order flow by combining MACD momentum with Z-score normalization to filter noise during high volatility sideways regimes.",
+    "macro_blueprint": "zscore(mult(ema(?), macd(?)))"
+}
