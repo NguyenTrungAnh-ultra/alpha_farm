@@ -1,0 +1,51 @@
+{
+    "name": "[60m] Cmf_Ema_BbWidth_TrendCross",
+    "timeframe": "60m",
+    "family": "multi-indicator",
+    "description": "A volume-weighted trend-following strategy using EMA for direction, CMF for flow confirmation, and Bollinger Band Width to filter low-volatility chop. Exits occur on price reversal or signal cross.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "ema_fast",
+                "definition": "self.feat.ema(close, timeperiod=20)"
+            },
+            {
+                "name": "cmf_flow",
+                "definition": "self.feat.cmf(open_price, volume, timeperiod=14)"
+            },
+            {
+                "name": "bb_upper",
+                "definition": "self.feat.bbands(high, low, close, timeperiod=20).upper"
+            },
+            {
+                "name": "bb_lower",
+                "definition": "self.feat.bbands(high, low, close, timeperiod=20).lower"
+            }
+        ],
+        "entry_long": "(close > ema_fast) & (cmf_flow >= 0.15) & ((shift(cmf_flow, -1), cmf_flow))",
+        "entry_short": "(close < ema_fast) & (cmf_flow <= -0.15)",
+        "exit_long": "(close < ema_fast) | (cmf_flow < 0)",
+        "exit_short": "(close > ema_fast) | (cmf_flow > 0)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 10,
+            "high": 50,
+            "step": 2
+        },
+        "cmf_threshold": {
+            "type": "float",
+            "low": -0.3,
+            "high": 0.4,
+            "step": 0.05
+        }
+    }
+}

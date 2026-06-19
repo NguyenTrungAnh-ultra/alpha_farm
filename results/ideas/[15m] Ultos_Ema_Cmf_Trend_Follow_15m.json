@@ -1,0 +1,55 @@
+{
+    "name": "[15m] Ultos_Ema_Cmf_Trend_Follow",
+    "timeframe": "15m",
+    "family": "trend-following",
+    "description": "Trend following strategy using Ultra Oscillator (Ultos) for momentum confirmation, EMA for trend direction, and CMF as volume filter. Exits based on Bollinger Bands volatility to comply with 'No Virtual SL' rules.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "ema_fast",
+                "definition": "self.feat.ema(close, timeperiod=20)"
+            },
+            {
+                "name": "ultosc_momentum",
+                "definition": "self.feat.ultrasc(high, low, close, length=14)"
+            },
+            {
+                "name": "cmf_volume",
+                "definition": "self.feat.cmf(open_price, high, low, volume, timeperiod=20)"
+            },
+            {
+                "name": "bb_upper",
+                "definition": "self.feat.bbands(close, 20, 3.0).upper"
+            },
+            {
+                "name": "bb_lower",
+                "definition": "self.feat.bbands(high, low, close, timeperiod=20).lower"
+            }
+        ],
+        "entry_long": "(close >= ema_fast) & (ultosc_momentum > rolling_min(ema_fast, 15)) & (cmf_volume > -0.05)",
+        "entry_short": "(close <= ema_fast) & (ultosc_momentum < rolling_max(ema_fast, 15)) & (cmf_volume < 0.05)",
+        "exit_long": "(close < bb_lower)",
+        "exit_short": "(close > bb_upper)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 14,
+            "high": 30,
+            "step": 2
+        },
+        "cmf_threshold_low": {
+            "type": "float",
+            "low": -0.1,
+            "high": -0.05,
+            "step": 0.01
+        }
+    }
+}

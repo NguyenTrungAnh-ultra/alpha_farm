@@ -1,0 +1,53 @@
+{
+    "name": "[15m] T3_Cmf_Atr_Trend",
+    "timeframe": "15m",
+    "family": "trend-following",
+    "description": "Trend following strategy using Triple Exponential Moving Average (T3) for trend direction, CMF to confirm volume flow support, and ATR-based trailing stop logic. Avoids common EMA/LinearReg Slope combinations.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "T3_Trend",
+                "definition": "self.feat.t3(close, timeperiod=20)"
+            },
+            {
+                "name": "CMF_Flow",
+                "definition": "self.feat.cmf(high, low, close, volume, timeperiod=14)"
+            },
+            {
+                "name": "ATR_Volatility",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close > T3_Trend) & (CMF_Flow >= 0)",
+        "entry_short": "(close < T3_Trend) & (CMF_Flow <= 0)",
+        "exit_long": "(close < (T3_Trend - k * ATR_Volatility))",
+        "exit_short": "(close > (T3_Trend + k * ATR_Volatility))"
+    },
+    "param_space": {
+        "t3_period": {
+            "type": "int",
+            "low": 10,
+            "high": 50,
+            "step": 2
+        },
+        "cmf_threshold": {
+            "type": "float",
+            "low": -0.1,
+            "high": 0.1,
+            "step": 0.05
+        },
+        "atr_multiplier_k": {
+            "type": "float",
+            "low": 0.3,
+            "high": 2.0,
+            "step": 0.1
+        }
+    }
+}

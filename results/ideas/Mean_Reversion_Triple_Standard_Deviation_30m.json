@@ -1,0 +1,81 @@
+{
+    "name": "Mean_Reversion_Triple_Standard_Deviation",
+    "timeframe": "30m",
+    "family": "mean-reversion",
+    "description": "A structural position-intraday mean-reversion strategy engineered for the 30-minute timeframe. It capitalizes on extreme price exhaustion away from institutional value zones while avoiding premature entries. The strategy determines standard deviation bands using a long lookback period to accommodate fewer daily bars. It conditions entry upon an overextended RSI coupled with a structural close outside the wide Bollinger Bands. To maximize safety, it filters against strong trend regimes using the Aroon Oscillator. Exits are dynamically calculated via the rolling median price midpoint to guarantee statistical reversion.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "BB_Upper",
+                "definition": "self.feat.bbands(close, timeperiod=bb_period, nbdevup=bb_mult, nbdevdn=bb_mult)[0]"
+            },
+            {
+                "name": "BB_Lower",
+                "definition": "self.feat.bbands(close, timeperiod=bb_period, nbdevup=bb_mult, nbdevdn=bb_mult)[2]"
+            },
+            {
+                "name": "Midpoint",
+                "definition": "self.feat.midpoint(close, timeperiod=bb_period)"
+            },
+            {
+                "name": "RSI",
+                "definition": "self.feat.rsi(close, timeperiod=rsi_period)"
+            },
+            {
+                "name": "Aroon_Osc",
+                "definition": "self.feat.aroonosc(high, low, timeperiod=aroon_period)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(Aroon_Osc > -70) & (Aroon_Osc < 70) & (RSI < rsi_lower) & (close < BB_Lower)",
+        "entry_short": "(Aroon_Osc > -70) & (Aroon_Osc < 70) & (RSI > rsi_upper) & (close > BB_Upper)",
+        "exit_logic": "Exit Long: (close > Midpoint) or (close < BB_Lower - 1.5 * ATR). Exit Short: (close < Midpoint) or (close > BB_Upper + 1.5 * ATR)."
+    },
+    "param_space": {
+        "bb_period": {
+            "type": "int",
+            "low": 24,
+            "high": 50,
+            "step": 2
+        },
+        "bb_mult": {
+            "type": "float",
+            "low": 2.2,
+            "high": 3.2,
+            "step": 0.1
+        },
+        "rsi_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 1
+        },
+        "rsi_lower": {
+            "type": "float",
+            "low": 20.0,
+            "high": 35.0,
+            "step": 1.0
+        },
+        "rsi_upper": {
+            "type": "float",
+            "low": 65.0,
+            "high": 80.0,
+            "step": 1.0
+        },
+        "aroon_period": {
+            "type": "int",
+            "low": 20,
+            "high": 40,
+            "step": 2
+        }
+    }
+}

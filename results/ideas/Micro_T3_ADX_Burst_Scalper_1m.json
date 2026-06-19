@@ -1,0 +1,79 @@
+{
+    "name": "Micro_T3_ADX_Burst_Scalper",
+    "timeframe": "1m",
+    "family": "trend-following",
+    "description": "Ultra-fast scalping strategy for 1-minute timeframe using T3 moving average as dynamic trend line, ADX as trend strength filter to avoid chop, and ATR-based volatility bands for entry/exit. Only trades when volume expands above recent average to confirm momentum bursts.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "T3",
+                "definition": "T3(close, timeperiod=7, vfactor=0.7)"
+            },
+            {
+                "name": "ATR",
+                "definition": "ATR(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ADX",
+                "definition": "ADX(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "VolumeSMA",
+                "definition": "SMA(volume, timeperiod=10) + 1e-8"
+            }
+        ],
+        "entry_long": "(close > T3 + mult_entry * ATR) and (ADX > adx_threshold) and (volume > vol_mult * VolumeSMA)",
+        "entry_short": "(close < T3 - mult_entry * ATR) and (ADX > adx_threshold) and (volume > vol_mult * VolumeSMA)",
+        "exit_logic": "For long: close < T3 - mult_exit * ATR; For short: close > T3 + mult_exit * ATR"
+    },
+    "param_space": {
+        "t3_period": {
+            "type": "int",
+            "low": 3,
+            "high": 15,
+            "step": 1
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 7,
+            "high": 21,
+            "step": 2
+        },
+        "adx_period": {
+            "type": "int",
+            "low": 7,
+            "high": 21,
+            "step": 2
+        },
+        "mult_entry": {
+            "type": "float",
+            "low": 0.5,
+            "high": 2.0,
+            "step": 0.1
+        },
+        "mult_exit": {
+            "type": "float",
+            "low": 0.5,
+            "high": 2.0,
+            "step": 0.1
+        },
+        "adx_threshold": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        },
+        "vol_mult": {
+            "type": "float",
+            "low": 1.0,
+            "high": 2.5,
+            "step": 0.1
+        }
+    }
+}

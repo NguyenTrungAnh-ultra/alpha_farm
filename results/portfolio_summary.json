@@ -1,0 +1,2888 @@
+{
+  "total_accepted": 131,
+  "last_updated": "2026-06-16T19:43:11.583936",
+  "strategies": [
+    {
+      "name": "Mcts_Willr_43c2",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.willr(high, low, close, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.508,
+        "cagr": 0.1804,
+        "max_drawdown_pct": -9.46,
+        "profit_factor": 1.221,
+        "calmar_ratio": 1.906,
+        "total_trades": 9314,
+        "win_rate": 35.13
+      },
+      "max_correlation_returns": 0.0,
+      "max_correlation_positions": 0.0,
+      "accepted_at": "2026-06-14T12:15:06.430299"
+    },
+    {
+      "name": "Mcts_Atr_4e2d",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.atr(high, low, close, timeperiod=30)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.301,
+        "cagr": 0.1764,
+        "max_drawdown_pct": -15.18,
+        "profit_factor": 1.459,
+        "calmar_ratio": 1.162,
+        "total_trades": 1462,
+        "win_rate": 51.77
+      },
+      "max_correlation_returns": 0.127,
+      "max_correlation_positions": 0.047,
+      "accepted_at": "2026-06-14T12:15:21.850009"
+    },
+    {
+      "name": "Mcts_Price_z_f590",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.price_z(close, timeperiod=60)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.395,
+        "cagr": 0.1986,
+        "max_drawdown_pct": -8.71,
+        "profit_factor": 1.578,
+        "calmar_ratio": 2.279,
+        "total_trades": 1107,
+        "win_rate": 38.81
+      },
+      "max_correlation_returns": 0.296,
+      "max_correlation_positions": 0.301,
+      "accepted_at": "2026-06-14T12:15:39.842360"
+    },
+    {
+      "name": "Mcts_Tema_Atr_4931",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(self.feat.atr(high, low, close, timeperiod=5), timeperiod=30)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 1.326,
+        "cagr": 0.2867,
+        "max_drawdown_pct": -25.72,
+        "profit_factor": 1.62,
+        "calmar_ratio": 1.115,
+        "total_trades": 646,
+        "win_rate": 51.39
+      },
+      "max_correlation_returns": 0.0,
+      "max_correlation_positions": 0.0,
+      "accepted_at": "2026-06-14T15:02:10.740049"
+    },
+    {
+      "name": "Mcts_Cmo_Wma_Tema_3f40",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.cmo(self.feat.wma(self.feat.tema(self.feat.atr(high, low, close, timeperiod=30), timeperiod=10), timeperiod=5), timeperiod=30)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.35,
+        "cagr": 0.1771,
+        "max_drawdown_pct": -13.23,
+        "profit_factor": 1.751,
+        "calmar_ratio": 1.338,
+        "total_trades": 530,
+        "win_rate": 52.08
+      },
+      "max_correlation_returns": 0.828,
+      "max_correlation_positions": 0.803,
+      "accepted_at": "2026-06-14T15:02:10.812412"
+    },
+    {
+      "name": "Mcts_Natr_5899",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=20)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 1.315,
+        "cagr": 0.2055,
+        "max_drawdown_pct": -18.64,
+        "profit_factor": 1.427,
+        "calmar_ratio": 1.102,
+        "total_trades": 1740,
+        "win_rate": 49.08
+      },
+      "max_correlation_returns": 0.892,
+      "max_correlation_positions": 0.881,
+      "accepted_at": "2026-06-14T15:02:16.349607"
+    },
+    {
+      "name": "Mcts_Rsi_f093",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(low, timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 2.381,
+        "cagr": 0.1913,
+        "max_drawdown_pct": -7.39,
+        "profit_factor": 1.44,
+        "calmar_ratio": 2.588,
+        "total_trades": 6741,
+        "win_rate": 40.4
+      },
+      "max_correlation_returns": 0.166,
+      "max_correlation_positions": 0.063,
+      "accepted_at": "2026-06-14T15:04:29.439081"
+    },
+    {
+      "name": "Mcts_Sma_Dema_e664",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.sma(self.feat.dema(self.feat.dema(self.feat.atr(high, low, close, timeperiod=30), timeperiod=10), timeperiod=5), timeperiod=10)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.32,
+        "cagr": 0.1806,
+        "max_drawdown_pct": -13.71,
+        "profit_factor": 1.52,
+        "calmar_ratio": 1.317,
+        "total_trades": 1031,
+        "win_rate": 54.37
+      },
+      "max_correlation_returns": 0.719,
+      "max_correlation_positions": 0.756,
+      "accepted_at": "2026-06-14T15:04:29.637753"
+    },
+    {
+      "name": "Mcts_Dema_bf88",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.dema(low, timeperiod=20)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.1
+      },
+      "metrics": {
+        "sharpe_ratio": 2.374,
+        "cagr": 0.1637,
+        "max_drawdown_pct": -3.52,
+        "profit_factor": 1.379,
+        "calmar_ratio": 4.654,
+        "total_trades": 7809,
+        "win_rate": 32.33
+      },
+      "max_correlation_returns": 0.416,
+      "max_correlation_positions": 0.67,
+      "accepted_at": "2026-06-14T15:20:28.184404"
+    },
+    {
+      "name": "Mcts_Ema_7c2a",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.ema(low, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.1
+      },
+      "metrics": {
+        "sharpe_ratio": 2.28,
+        "cagr": 0.1597,
+        "max_drawdown_pct": -3.14,
+        "profit_factor": 1.375,
+        "calmar_ratio": 5.082,
+        "total_trades": 7504,
+        "win_rate": 31.27
+      },
+      "max_correlation_returns": 0.965,
+      "max_correlation_positions": 0.954,
+      "accepted_at": "2026-06-14T15:20:29.815174"
+    },
+    {
+      "name": "Mcts_Wma_Willr_Atr_e5c4",
+      "timeframe": "3m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.wma((low * self.feat.willr(high, low, close, timeperiod=14)), timeperiod=30) + self.feat.atr(high, low, close, timeperiod=20))",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 2.105,
+        "cagr": 0.1775,
+        "max_drawdown_pct": -9.34,
+        "profit_factor": 1.371,
+        "calmar_ratio": 1.9,
+        "total_trades": 5426,
+        "win_rate": 38.19
+      },
+      "max_correlation_returns": 0.577,
+      "max_correlation_positions": 0.689,
+      "accepted_at": "2026-06-14T15:34:35.238509"
+    },
+    {
+      "name": "Mcts_Rsi_Atr_71ae",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(self.feat.atr(high, low, close, timeperiod=30), timeperiod=20)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.396,
+        "cagr": 0.1697,
+        "max_drawdown_pct": -21.41,
+        "profit_factor": 1.561,
+        "calmar_ratio": 0.793,
+        "total_trades": 1265,
+        "win_rate": 53.79
+      },
+      "max_correlation_returns": 0.892,
+      "max_correlation_positions": 0.868,
+      "accepted_at": "2026-06-14T17:03:19.865773"
+    },
+    {
+      "name": "Mcts_Cmo_Dema_Atr_cd56",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.cmo(self.feat.dema(self.feat.atr(high, low, close, timeperiod=10), timeperiod=20), timeperiod=60)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 1.377,
+        "cagr": 0.2952,
+        "max_drawdown_pct": -25.39,
+        "profit_factor": 1.755,
+        "calmar_ratio": 1.163,
+        "total_trades": 540,
+        "win_rate": 56.3
+      },
+      "max_correlation_returns": 0.884,
+      "max_correlation_positions": 0.885,
+      "accepted_at": "2026-06-14T17:03:20.007519"
+    },
+    {
+      "name": "Mcts_Atr_Wma_Sma_fcf0",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.atr(high, low, close, timeperiod=20) / (self.feat.wma(self.feat.sma(self.feat.ema(open_, timeperiod=60), timeperiod=10), timeperiod=10) + 1e-8))",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 1.376,
+        "cagr": 0.2737,
+        "max_drawdown_pct": -20.2,
+        "profit_factor": 1.46,
+        "calmar_ratio": 1.355,
+        "total_trades": 1743,
+        "win_rate": 51.6
+      },
+      "max_correlation_returns": 0.948,
+      "max_correlation_positions": 0.968,
+      "accepted_at": "2026-06-14T17:03:44.118367"
+    },
+    {
+      "name": "Mcts_Natr_9fda",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=30)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 1.478,
+        "cagr": 0.2895,
+        "max_drawdown_pct": -17.59,
+        "profit_factor": 1.586,
+        "calmar_ratio": 1.646,
+        "total_trades": 1343,
+        "win_rate": 49.7
+      },
+      "max_correlation_returns": 0.955,
+      "max_correlation_positions": 0.957,
+      "accepted_at": "2026-06-14T17:03:46.433747"
+    },
+    {
+      "name": "Mcts_Rolling_rank_Atr_Rsi_40ed",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_rank((self.feat.atr(high, low, close, timeperiod=60) / (self.feat.rsi((close + close), timeperiod=60) + 1e-8)), window=60)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 1.553,
+        "cagr": 0.2406,
+        "max_drawdown_pct": -9.13,
+        "profit_factor": 1.454,
+        "calmar_ratio": 2.637,
+        "total_trades": 2639,
+        "win_rate": 32.29
+      },
+      "max_correlation_returns": 0.658,
+      "max_correlation_positions": 0.58,
+      "accepted_at": "2026-06-14T17:03:49.941849"
+    },
+    {
+      "name": "Mcts_Rolling_rank_89e5",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_rank(open_, window=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 1.887,
+        "cagr": 0.3264,
+        "max_drawdown_pct": -22.66,
+        "profit_factor": 1.226,
+        "calmar_ratio": 1.44,
+        "total_trades": 14431,
+        "win_rate": 45.68
+      },
+      "max_correlation_returns": 0.255,
+      "max_correlation_positions": 0.228,
+      "accepted_at": "2026-06-14T17:07:27.050861"
+    },
+    {
+      "name": "Mcts_Cmo_Rsi_00e6",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (((volume * self.feat.cmo(open_, timeperiod=5)) - ((volume / (2.0 + 1e-8)) * self.feat.rsi(open_, timeperiod=14))) - (((volume + volume) - (volume - volume)) / (2.0 + 1e-8)))",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 1.886,
+        "cagr": 0.2134,
+        "max_drawdown_pct": -17.25,
+        "profit_factor": 1.318,
+        "calmar_ratio": 1.237,
+        "total_trades": 6844,
+        "win_rate": 47.13
+      },
+      "max_correlation_returns": 0.346,
+      "max_correlation_positions": 0.474,
+      "accepted_at": "2026-06-14T17:07:28.294674"
+    },
+    {
+      "name": "Mcts_Tema_Wma_555f",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(self.feat.wma(self.feat.tema(self.feat.wma(low, timeperiod=5), timeperiod=5), timeperiod=10), timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 2.22,
+        "cagr": 0.3019,
+        "max_drawdown_pct": -7.16,
+        "profit_factor": 1.351,
+        "calmar_ratio": 4.218,
+        "total_trades": 8531,
+        "win_rate": 35.15
+      },
+      "max_correlation_returns": 0.919,
+      "max_correlation_positions": 0.931,
+      "accepted_at": "2026-06-14T17:26:02.897194"
+    },
+    {
+      "name": "Mcts_Dema_7777",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.dema(open_, timeperiod=14)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 2.422,
+        "cagr": 0.4242,
+        "max_drawdown_pct": -8.89,
+        "profit_factor": 1.37,
+        "calmar_ratio": 4.77,
+        "total_trades": 9426,
+        "win_rate": 32.75
+      },
+      "max_correlation_returns": 0.951,
+      "max_correlation_positions": 0.96,
+      "accepted_at": "2026-06-14T17:26:05.451011"
+    },
+    {
+      "name": "Mcts_Sma_f655",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.sma(low, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 2.214,
+        "cagr": 0.4687,
+        "max_drawdown_pct": -13.41,
+        "profit_factor": 1.36,
+        "calmar_ratio": 3.496,
+        "total_trades": 7643,
+        "win_rate": 33.58
+      },
+      "max_correlation_returns": 0.971,
+      "max_correlation_positions": 0.978,
+      "accepted_at": "2026-06-14T17:26:08.097678"
+    },
+    {
+      "name": "Mcts_Tema_69cf",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(open_, timeperiod=20)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 2.386,
+        "cagr": 0.3855,
+        "max_drawdown_pct": -7.84,
+        "profit_factor": 1.355,
+        "calmar_ratio": 4.916,
+        "total_trades": 9925,
+        "win_rate": 33.26
+      },
+      "max_correlation_returns": 0.972,
+      "max_correlation_positions": 0.976,
+      "accepted_at": "2026-06-14T17:26:16.191613"
+    },
+    {
+      "name": "Mcts_Tema_1530",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(self.feat.tema(low, timeperiod=20), timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 2.265,
+        "cagr": 0.3722,
+        "max_drawdown_pct": -8.66,
+        "profit_factor": 1.335,
+        "calmar_ratio": 4.3,
+        "total_trades": 9929,
+        "win_rate": 32.06
+      },
+      "max_correlation_returns": 0.971,
+      "max_correlation_positions": 0.988,
+      "accepted_at": "2026-06-14T17:26:18.890206"
+    },
+    {
+      "name": "Mcts_Tema_Dema_Ema_83c0",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.tema(self.feat.dema(self.feat.ema(open_, timeperiod=5), timeperiod=10), timeperiod=10) - self.feat.wma(self.feat.dema(self.feat.atr(high, low, close, timeperiod=14), timeperiod=20), timeperiod=5))",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 2.056,
+        "cagr": 0.2424,
+        "max_drawdown_pct": -5.23,
+        "profit_factor": 1.313,
+        "calmar_ratio": 4.63,
+        "total_trades": 8929,
+        "win_rate": 35.57
+      },
+      "max_correlation_returns": 0.96,
+      "max_correlation_positions": 0.952,
+      "accepted_at": "2026-06-14T17:26:21.705024"
+    },
+    {
+      "name": "Mcts_Tema_265f",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(close, timeperiod=14)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 2.088,
+        "cagr": 0.1956,
+        "max_drawdown_pct": -7.89,
+        "profit_factor": 1.297,
+        "calmar_ratio": 2.478,
+        "total_trades": 11821,
+        "win_rate": 29.22
+      },
+      "max_correlation_returns": 0.963,
+      "max_correlation_positions": 0.969,
+      "accepted_at": "2026-06-14T17:26:24.512044"
+    },
+    {
+      "name": "Mcts_Ema_230d",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.ema(low, timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 2.167,
+        "cagr": 0.395,
+        "max_drawdown_pct": -10.09,
+        "profit_factor": 1.323,
+        "calmar_ratio": 3.913,
+        "total_trades": 10220,
+        "win_rate": 29.0
+      },
+      "max_correlation_returns": 0.918,
+      "max_correlation_positions": 0.964,
+      "accepted_at": "2026-06-14T17:26:32.905488"
+    },
+    {
+      "name": "Mcts_Tema_Dema_bf6f",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(self.feat.dema(close, timeperiod=10), timeperiod=20)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 2.22,
+        "cagr": 0.3684,
+        "max_drawdown_pct": -9.69,
+        "profit_factor": 1.329,
+        "calmar_ratio": 3.803,
+        "total_trades": 9001,
+        "win_rate": 33.78
+      },
+      "max_correlation_returns": 0.922,
+      "max_correlation_positions": 0.96,
+      "accepted_at": "2026-06-14T17:26:35.863952"
+    },
+    {
+      "name": "Mcts_Tema_5572",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(open_, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 2.27,
+        "cagr": 0.3299,
+        "max_drawdown_pct": -5.45,
+        "profit_factor": 1.318,
+        "calmar_ratio": 6.059,
+        "total_trades": 13841,
+        "win_rate": 33.08
+      },
+      "max_correlation_returns": 0.924,
+      "max_correlation_positions": 0.964,
+      "accepted_at": "2026-06-14T17:26:41.793439"
+    },
+    {
+      "name": "Mcts_Sma_Wma_d71e",
+      "timeframe": "3m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.sma(self.feat.wma(self.feat.wma((low - open_), timeperiod=10), timeperiod=14), timeperiod=60)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 1.582,
+        "cagr": 0.2398,
+        "max_drawdown_pct": -10.79,
+        "profit_factor": 1.366,
+        "calmar_ratio": 2.222,
+        "total_trades": 2504,
+        "win_rate": 45.93
+      },
+      "max_correlation_returns": 0.596,
+      "max_correlation_positions": 0.598,
+      "accepted_at": "2026-06-14T17:38:28.599543"
+    },
+    {
+      "name": "Mcts_Price_z_84da",
+      "timeframe": "60m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.price_z(close, timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.442,
+        "cagr": 0.3158,
+        "max_drawdown_pct": -13.65,
+        "profit_factor": 1.344,
+        "calmar_ratio": 2.314,
+        "total_trades": 2851,
+        "win_rate": 40.71
+      },
+      "max_correlation_returns": 0.0,
+      "max_correlation_positions": 0.0,
+      "accepted_at": "2026-06-15T01:20:08.677476"
+    },
+    {
+      "name": "Mcts_Wma_Ema_Atr_858f",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.wma(self.feat.ema(self.feat.atr(high, low, close, timeperiod=5), timeperiod=14), timeperiod=5)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.357,
+        "cagr": 0.1819,
+        "max_drawdown_pct": -18.91,
+        "profit_factor": 1.831,
+        "calmar_ratio": 0.962,
+        "total_trades": 453,
+        "win_rate": 53.98
+      },
+      "max_correlation_returns": 0.175,
+      "max_correlation_positions": 0.063,
+      "accepted_at": "2026-06-15T01:20:14.026181"
+    },
+    {
+      "name": "Mcts_Dema_Atr_57e4",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.dema(self.feat.atr(high, low, close, timeperiod=5), timeperiod=20)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.394,
+        "cagr": 0.2416,
+        "max_drawdown_pct": -17.2,
+        "profit_factor": 1.671,
+        "calmar_ratio": 1.405,
+        "total_trades": 648,
+        "win_rate": 50.31
+      },
+      "max_correlation_returns": 0.874,
+      "max_correlation_positions": 0.858,
+      "accepted_at": "2026-06-15T01:20:14.097597"
+    },
+    {
+      "name": "Mcts_Atr_9287",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.atr(high, low, close, timeperiod=14)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.305,
+        "cagr": 0.1712,
+        "max_drawdown_pct": -14.86,
+        "profit_factor": 1.556,
+        "calmar_ratio": 1.152,
+        "total_trades": 1103,
+        "win_rate": 50.99
+      },
+      "max_correlation_returns": 0.869,
+      "max_correlation_positions": 0.862,
+      "accepted_at": "2026-06-15T01:20:14.157931"
+    },
+    {
+      "name": "Mcts_Natr_29ff",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=20)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.337,
+        "cagr": 0.1763,
+        "max_drawdown_pct": -11.39,
+        "profit_factor": 1.671,
+        "calmar_ratio": 1.548,
+        "total_trades": 882,
+        "win_rate": 49.89
+      },
+      "max_correlation_returns": 0.898,
+      "max_correlation_positions": 0.889,
+      "accepted_at": "2026-06-15T01:20:14.216707"
+    },
+    {
+      "name": "Mcts_Natr_78c2",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=14)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.346,
+        "cagr": 0.1728,
+        "max_drawdown_pct": -15.13,
+        "profit_factor": 1.612,
+        "calmar_ratio": 1.142,
+        "total_trades": 1045,
+        "win_rate": 50.19
+      },
+      "max_correlation_returns": 0.944,
+      "max_correlation_positions": 0.948,
+      "accepted_at": "2026-06-15T01:20:14.281117"
+    },
+    {
+      "name": "Mcts_Atr_b881",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.atr(high, low, close, timeperiod=5)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.528,
+        "cagr": 0.2366,
+        "max_drawdown_pct": -19.13,
+        "profit_factor": 1.444,
+        "calmar_ratio": 1.237,
+        "total_trades": 1958,
+        "win_rate": 52.23
+      },
+      "max_correlation_returns": 0.698,
+      "max_correlation_positions": 0.716,
+      "accepted_at": "2026-06-15T01:20:14.359133"
+    },
+    {
+      "name": "Mcts_Natr_d4ad",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=14)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.4,
+        "cagr": 0.3374,
+        "max_drawdown_pct": -18.48,
+        "profit_factor": 1.429,
+        "calmar_ratio": 1.826,
+        "total_trades": 2113,
+        "win_rate": 50.33
+      },
+      "max_correlation_returns": 0.874,
+      "max_correlation_positions": 0.891,
+      "accepted_at": "2026-06-15T01:20:26.568512"
+    },
+    {
+      "name": "Mcts_Atr_7a03",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.atr(high, low, close, timeperiod=14)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.311,
+        "cagr": 0.1653,
+        "max_drawdown_pct": -13.03,
+        "profit_factor": 1.394,
+        "calmar_ratio": 1.269,
+        "total_trades": 2143,
+        "win_rate": 52.27
+      },
+      "max_correlation_returns": 0.956,
+      "max_correlation_positions": 0.96,
+      "accepted_at": "2026-06-15T01:20:26.886330"
+    },
+    {
+      "name": "Mcts_Rsi_a1c9",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(low, timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 2.289,
+        "cagr": 0.3317,
+        "max_drawdown_pct": -17.19,
+        "profit_factor": 1.467,
+        "calmar_ratio": 1.929,
+        "total_trades": 4742,
+        "win_rate": 41.79
+      },
+      "max_correlation_returns": 0.501,
+      "max_correlation_positions": 0.559,
+      "accepted_at": "2026-06-15T01:20:27.019661"
+    },
+    {
+      "name": "Mcts_Wma_a2c3",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.wma(self.feat.wma((low - open_), timeperiod=14), timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 2.009,
+        "cagr": 0.3592,
+        "max_drawdown_pct": -13.17,
+        "profit_factor": 1.608,
+        "calmar_ratio": 2.727,
+        "total_trades": 1806,
+        "win_rate": 43.96
+      },
+      "max_correlation_returns": 0.597,
+      "max_correlation_positions": 0.531,
+      "accepted_at": "2026-06-15T01:20:27.413072"
+    },
+    {
+      "name": "Mcts_Willr_c218",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.willr(high, low, close, timeperiod=30)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.1
+      },
+      "metrics": {
+        "sharpe_ratio": 2.68,
+        "cagr": 0.1663,
+        "max_drawdown_pct": -2.81,
+        "profit_factor": 1.415,
+        "calmar_ratio": 5.912,
+        "total_trades": 9728,
+        "win_rate": 32.19
+      },
+      "max_correlation_returns": 0.534,
+      "max_correlation_positions": 0.733,
+      "accepted_at": "2026-06-15T01:21:20.192277"
+    },
+    {
+      "name": "Mcts_Willr_a888",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.willr(high, low, close, timeperiod=20)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 2.261,
+        "cagr": 0.1971,
+        "max_drawdown_pct": -5.17,
+        "profit_factor": 1.31,
+        "calmar_ratio": 3.811,
+        "total_trades": 12629,
+        "win_rate": 33.05
+      },
+      "max_correlation_returns": 0.908,
+      "max_correlation_positions": 0.842,
+      "accepted_at": "2026-06-15T01:21:20.463508"
+    },
+    {
+      "name": "Mcts_Sma_Tema_Rsi_65d5",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.sma((self.feat.tema((open_ * 0.01), timeperiod=20) * self.feat.rsi((low / (0.5 + 1e-8)), timeperiod=5)), timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 2.283,
+        "cagr": 0.3668,
+        "max_drawdown_pct": -9.88,
+        "profit_factor": 1.432,
+        "calmar_ratio": 3.713,
+        "total_trades": 6456,
+        "win_rate": 40.18
+      },
+      "max_correlation_returns": 0.521,
+      "max_correlation_positions": 0.65,
+      "accepted_at": "2026-06-15T01:21:20.977323"
+    },
+    {
+      "name": "Mcts_Rsi_f2b7",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(open_, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.341,
+        "cagr": 0.2764,
+        "max_drawdown_pct": -14.17,
+        "profit_factor": 1.226,
+        "calmar_ratio": 1.95,
+        "total_trades": 9390,
+        "win_rate": 40.41
+      },
+      "max_correlation_returns": 0.672,
+      "max_correlation_positions": 0.719,
+      "accepted_at": "2026-06-15T01:21:21.501243"
+    },
+    {
+      "name": "Mcts_Willr_7271",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.willr(high, low, close, timeperiod=14)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 2.095,
+        "cagr": 0.1799,
+        "max_drawdown_pct": -5.96,
+        "profit_factor": 1.268,
+        "calmar_ratio": 3.017,
+        "total_trades": 15225,
+        "win_rate": 34.63
+      },
+      "max_correlation_returns": 0.9,
+      "max_correlation_positions": 0.855,
+      "accepted_at": "2026-06-15T01:21:22.044799"
+    },
+    {
+      "name": "Mcts_Sma_Wma_Dema_54d4",
+      "timeframe": "3m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.sma(self.feat.wma((self.feat.dema(high, timeperiod=30) - self.feat.dema(low, timeperiod=20)), timeperiod=30), timeperiod=30)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 1.991,
+        "cagr": 0.2616,
+        "max_drawdown_pct": -12.91,
+        "profit_factor": 1.426,
+        "calmar_ratio": 2.026,
+        "total_trades": 2951,
+        "win_rate": 49.49
+      },
+      "max_correlation_returns": 0.457,
+      "max_correlation_positions": 0.36,
+      "accepted_at": "2026-06-15T01:22:04.269719"
+    },
+    {
+      "name": "Mcts_Roc_Tema_Atr_71bc",
+      "timeframe": "3m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.roc(self.feat.tema((self.feat.atr(high, low, close, timeperiod=10) + self.feat.tema(close, timeperiod=60)), timeperiod=20), timeperiod=20)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 1.804,
+        "cagr": 0.2432,
+        "max_drawdown_pct": -19.94,
+        "profit_factor": 1.362,
+        "calmar_ratio": 1.22,
+        "total_trades": 3468,
+        "win_rate": 45.33
+      },
+      "max_correlation_returns": 0.586,
+      "max_correlation_positions": 0.527,
+      "accepted_at": "2026-06-15T01:22:04.991494"
+    },
+    {
+      "name": "Mcts_Willr_a7ed",
+      "timeframe": "3m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.willr(high, low, close, timeperiod=30)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 1.681,
+        "cagr": 0.1563,
+        "max_drawdown_pct": -5.15,
+        "profit_factor": 1.223,
+        "calmar_ratio": 3.035,
+        "total_trades": 17290,
+        "win_rate": 30.84
+      },
+      "max_correlation_returns": 0.89,
+      "max_correlation_positions": 0.874,
+      "accepted_at": "2026-06-15T01:22:05.784196"
+    },
+    {
+      "name": "Mcts_Sma_5ab6",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.sma(close, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 2.12,
+        "cagr": 0.3325,
+        "max_drawdown_pct": -14.23,
+        "profit_factor": 1.338,
+        "calmar_ratio": 2.337,
+        "total_trades": 7737,
+        "win_rate": 32.49
+      },
+      "max_correlation_returns": 0.557,
+      "max_correlation_positions": 0.8,
+      "accepted_at": "2026-06-15T01:25:11.314897"
+    },
+    {
+      "name": "Mcts_Low_ea8f",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: low",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.663,
+        "cagr": 0.2672,
+        "max_drawdown_pct": -12.92,
+        "profit_factor": 1.238,
+        "calmar_ratio": 2.068,
+        "total_trades": 20627,
+        "win_rate": 26.73
+      },
+      "max_correlation_returns": 0.813,
+      "max_correlation_positions": 0.867,
+      "accepted_at": "2026-06-15T01:25:12.875823"
+    },
+    {
+      "name": "Mcts_Sma_Tema_Dema_02c4",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.sma(self.feat.tema(self.feat.dema((high + low), timeperiod=14), timeperiod=10), timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.776,
+        "cagr": 0.22,
+        "max_drawdown_pct": -5.48,
+        "profit_factor": 1.271,
+        "calmar_ratio": 4.018,
+        "total_trades": 8673,
+        "win_rate": 36.09
+      },
+      "max_correlation_returns": 0.817,
+      "max_correlation_positions": 0.939,
+      "accepted_at": "2026-06-15T01:25:14.443707"
+    },
+    {
+      "name": "Mcts_Rsi_Atr_74c0",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(self.feat.atr(high, low, close, timeperiod=20), timeperiod=30)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.341,
+        "cagr": 0.1655,
+        "max_drawdown_pct": -22.12,
+        "profit_factor": 1.54,
+        "calmar_ratio": 0.748,
+        "total_trades": 1265,
+        "win_rate": 54.57
+      },
+      "max_correlation_returns": 0.0,
+      "max_correlation_positions": 0.0,
+      "accepted_at": "2026-06-16T11:17:17.991607"
+    },
+    {
+      "name": "Mcts_Rsi_Atr_c458",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(self.feat.atr(high, low, close, timeperiod=60), timeperiod=10)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.398,
+        "cagr": 0.1732,
+        "max_drawdown_pct": -18.41,
+        "profit_factor": 1.5,
+        "calmar_ratio": 0.941,
+        "total_trades": 1600,
+        "win_rate": 53.67
+      },
+      "max_correlation_returns": 0.841,
+      "max_correlation_positions": 0.847,
+      "accepted_at": "2026-06-16T11:17:18.064778"
+    },
+    {
+      "name": "Mcts_Tema_Atr_d691",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(self.feat.atr(high, low, close, timeperiod=5), timeperiod=20)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.409,
+        "cagr": 0.2493,
+        "max_drawdown_pct": -22.37,
+        "profit_factor": 1.606,
+        "calmar_ratio": 1.114,
+        "total_trades": 806,
+        "win_rate": 52.61
+      },
+      "max_correlation_returns": 0.77,
+      "max_correlation_positions": 0.77,
+      "accepted_at": "2026-06-16T11:17:18.129702"
+    },
+    {
+      "name": "Mcts_Cmo_Atr_c581",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.cmo(self.feat.atr(high, low, close, timeperiod=30), timeperiod=30)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.44,
+        "cagr": 0.1783,
+        "max_drawdown_pct": -11.92,
+        "profit_factor": 1.613,
+        "calmar_ratio": 1.495,
+        "total_trades": 1112,
+        "win_rate": 50.09
+      },
+      "max_correlation_returns": 0.89,
+      "max_correlation_positions": 0.875,
+      "accepted_at": "2026-06-16T11:17:18.190928"
+    },
+    {
+      "name": "Mcts_Atr_3eb1",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.atr(high, low, close, timeperiod=30)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 1.301,
+        "cagr": 0.2915,
+        "max_drawdown_pct": -25.53,
+        "profit_factor": 1.459,
+        "calmar_ratio": 1.142,
+        "total_trades": 1462,
+        "win_rate": 51.77
+      },
+      "max_correlation_returns": 0.612,
+      "max_correlation_positions": 0.775,
+      "accepted_at": "2026-06-16T11:17:41.060256"
+    },
+    {
+      "name": "Mcts_Natr_6d33",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=20)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 1.315,
+        "cagr": 0.2872,
+        "max_drawdown_pct": -25.49,
+        "profit_factor": 1.427,
+        "calmar_ratio": 1.126,
+        "total_trades": 1740,
+        "win_rate": 49.08
+      },
+      "max_correlation_returns": 0.889,
+      "max_correlation_positions": 0.881,
+      "accepted_at": "2026-06-16T11:17:41.227339"
+    },
+    {
+      "name": "Mcts_Rolling_rank_Tema_8587",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_rank(self.feat.tema(low, timeperiod=5), window=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 2.199,
+        "cagr": 0.3012,
+        "max_drawdown_pct": -19.27,
+        "profit_factor": 1.305,
+        "calmar_ratio": 1.563,
+        "total_trades": 7735,
+        "win_rate": 40.48
+      },
+      "max_correlation_returns": 0.129,
+      "max_correlation_positions": 0.047,
+      "accepted_at": "2026-06-16T11:17:41.407887"
+    },
+    {
+      "name": "Mcts_Natr_a743",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=30)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 1.478,
+        "cagr": 0.2895,
+        "max_drawdown_pct": -17.59,
+        "profit_factor": 1.586,
+        "calmar_ratio": 1.646,
+        "total_trades": 1343,
+        "win_rate": 49.7
+      },
+      "max_correlation_returns": 0.955,
+      "max_correlation_positions": 0.957,
+      "accepted_at": "2026-06-16T11:17:41.618052"
+    },
+    {
+      "name": "Mcts_Rsi_2a59",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(low, timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 2.381,
+        "cagr": 0.4313,
+        "max_drawdown_pct": -22.52,
+        "profit_factor": 1.44,
+        "calmar_ratio": 1.915,
+        "total_trades": 6741,
+        "win_rate": 40.4
+      },
+      "max_correlation_returns": 0.649,
+      "max_correlation_positions": 0.669,
+      "accepted_at": "2026-06-16T11:20:30.589075"
+    },
+    {
+      "name": "Mcts_Ema_Sma_4f71",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.ema(self.feat.ema(self.feat.sma((low - close), timeperiod=20), timeperiod=30), timeperiod=14)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.37,
+        "cagr": 0.1822,
+        "max_drawdown_pct": -17.94,
+        "profit_factor": 1.578,
+        "calmar_ratio": 1.016,
+        "total_trades": 793,
+        "win_rate": 56.31
+      },
+      "max_correlation_returns": 0.617,
+      "max_correlation_positions": 0.602,
+      "accepted_at": "2026-06-16T11:20:30.812762"
+    },
+    {
+      "name": "Mcts_Dema_ba7b",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.dema(low, timeperiod=20)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.1
+      },
+      "metrics": {
+        "sharpe_ratio": 2.374,
+        "cagr": 0.1637,
+        "max_drawdown_pct": -3.52,
+        "profit_factor": 1.379,
+        "calmar_ratio": 4.654,
+        "total_trades": 7809,
+        "win_rate": 32.33
+      },
+      "max_correlation_returns": 0.426,
+      "max_correlation_positions": 0.67,
+      "accepted_at": "2026-06-16T11:40:52.020345"
+    },
+    {
+      "name": "Mcts_Ema_8f23",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.ema(low, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 2.28,
+        "cagr": 0.3855,
+        "max_drawdown_pct": -9.61,
+        "profit_factor": 1.375,
+        "calmar_ratio": 4.012,
+        "total_trades": 7504,
+        "win_rate": 31.27
+      },
+      "max_correlation_returns": 0.941,
+      "max_correlation_positions": 0.954,
+      "accepted_at": "2026-06-16T11:40:53.758804"
+    },
+    {
+      "name": "Mcts_Tema_4766",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(close, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 2.041,
+        "cagr": 0.19,
+        "max_drawdown_pct": -8.51,
+        "profit_factor": 1.285,
+        "calmar_ratio": 2.232,
+        "total_trades": 13768,
+        "win_rate": 27.83
+      },
+      "max_correlation_returns": 0.799,
+      "max_correlation_positions": 0.89,
+      "accepted_at": "2026-06-16T11:40:55.565724"
+    },
+    {
+      "name": "Mcts_Tema_Ema_Atr_1110",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.tema(self.feat.ema((open_ - open_), timeperiod=10), timeperiod=5) - (self.feat.atr(high, low, close, timeperiod=5) - (self.feat.atr(high, low, close, timeperiod=10) + self.feat.dema(open_, timeperiod=10))))",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 2.237,
+        "cagr": 0.4026,
+        "max_drawdown_pct": -9.13,
+        "profit_factor": 1.329,
+        "calmar_ratio": 4.412,
+        "total_trades": 11165,
+        "win_rate": 32.71
+      },
+      "max_correlation_returns": 0.921,
+      "max_correlation_positions": 0.938,
+      "accepted_at": "2026-06-16T11:40:57.360084"
+    },
+    {
+      "name": "Mcts_Dema_ec25",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.dema(open_, timeperiod=14)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 2.422,
+        "cagr": 0.4242,
+        "max_drawdown_pct": -8.89,
+        "profit_factor": 1.37,
+        "calmar_ratio": 4.77,
+        "total_trades": 9426,
+        "win_rate": 32.75
+      },
+      "max_correlation_returns": 0.967,
+      "max_correlation_positions": 0.967,
+      "accepted_at": "2026-06-16T11:40:59.283687"
+    },
+    {
+      "name": "Mcts_Sma_89ff",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.sma(low, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 2.214,
+        "cagr": 0.4687,
+        "max_drawdown_pct": -13.41,
+        "profit_factor": 1.36,
+        "calmar_ratio": 3.496,
+        "total_trades": 7643,
+        "win_rate": 33.58
+      },
+      "max_correlation_returns": 0.97,
+      "max_correlation_positions": 0.969,
+      "accepted_at": "2026-06-16T11:41:01.153317"
+    },
+    {
+      "name": "Mcts_Rsi_Wma_47bb",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(self.feat.wma(low, timeperiod=20), timeperiod=60)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 1.757,
+        "cagr": 0.3461,
+        "max_drawdown_pct": -12.16,
+        "profit_factor": 1.252,
+        "calmar_ratio": 2.846,
+        "total_trades": 8447,
+        "win_rate": 34.19
+      },
+      "max_correlation_returns": 0.77,
+      "max_correlation_positions": 0.729,
+      "accepted_at": "2026-06-16T11:41:02.970906"
+    },
+    {
+      "name": "Mcts_Cmo_Wma_057c",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.cmo(self.feat.wma(low, timeperiod=20), timeperiod=60)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 1.757,
+        "cagr": 0.3461,
+        "max_drawdown_pct": -12.16,
+        "profit_factor": 1.252,
+        "calmar_ratio": 2.846,
+        "total_trades": 8447,
+        "win_rate": 34.19
+      },
+      "max_correlation_returns": 1.0,
+      "max_correlation_positions": 1.0,
+      "accepted_at": "2026-06-16T11:41:04.816263"
+    },
+    {
+      "name": "Mcts_Wma_Dema_e50c",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.wma(self.feat.dema(open_, timeperiod=14), timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 2.141,
+        "cagr": 0.3668,
+        "max_drawdown_pct": -9.64,
+        "profit_factor": 1.334,
+        "calmar_ratio": 3.805,
+        "total_trades": 8251,
+        "win_rate": 34.35
+      },
+      "max_correlation_returns": 0.971,
+      "max_correlation_positions": 0.969,
+      "accepted_at": "2026-06-16T11:41:06.720237"
+    },
+    {
+      "name": "Mcts_Wma_e20c",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.wma(low, timeperiod=14)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 2.274,
+        "cagr": 0.2185,
+        "max_drawdown_pct": -4.13,
+        "profit_factor": 1.377,
+        "calmar_ratio": 5.285,
+        "total_trades": 7297,
+        "win_rate": 32.91
+      },
+      "max_correlation_returns": 0.972,
+      "max_correlation_positions": 0.984,
+      "accepted_at": "2026-06-16T11:41:08.764847"
+    },
+    {
+      "name": "Mcts_Dema_b5a2",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.dema(low, timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 2.213,
+        "cagr": 0.2005,
+        "max_drawdown_pct": -4.6,
+        "profit_factor": 1.309,
+        "calmar_ratio": 4.355,
+        "total_trades": 14344,
+        "win_rate": 28.57
+      },
+      "max_correlation_returns": 0.928,
+      "max_correlation_positions": 0.964,
+      "accepted_at": "2026-06-16T11:41:10.712051"
+    },
+    {
+      "name": "Mcts_Tema_dc9a",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(open_, timeperiod=20)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 2.386,
+        "cagr": 0.3855,
+        "max_drawdown_pct": -7.84,
+        "profit_factor": 1.355,
+        "calmar_ratio": 4.916,
+        "total_trades": 9925,
+        "win_rate": 33.26
+      },
+      "max_correlation_returns": 0.972,
+      "max_correlation_positions": 0.973,
+      "accepted_at": "2026-06-16T11:41:12.749346"
+    },
+    {
+      "name": "Mcts_Cmo_Ema_Wma_6be8",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.cmo(self.feat.ema(self.feat.wma(close, timeperiod=5), timeperiod=14), timeperiod=60)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.651,
+        "cagr": 0.2058,
+        "max_drawdown_pct": -6.45,
+        "profit_factor": 1.239,
+        "calmar_ratio": 3.19,
+        "total_trades": 8269,
+        "win_rate": 33.43
+      },
+      "max_correlation_returns": 0.931,
+      "max_correlation_positions": 0.966,
+      "accepted_at": "2026-06-16T11:41:14.813295"
+    },
+    {
+      "name": "Mcts_Dema_9feb",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.dema(low, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 2.252,
+        "cagr": 0.2548,
+        "max_drawdown_pct": -5.99,
+        "profit_factor": 1.328,
+        "calmar_ratio": 4.25,
+        "total_trades": 10745,
+        "win_rate": 30.36
+      },
+      "max_correlation_returns": 0.939,
+      "max_correlation_positions": 0.976,
+      "accepted_at": "2026-06-16T11:41:16.897331"
+    },
+    {
+      "name": "Mcts_Dema_76ef",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.dema(low, timeperiod=14)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 2.321,
+        "cagr": 0.4155,
+        "max_drawdown_pct": -8.79,
+        "profit_factor": 1.355,
+        "calmar_ratio": 4.729,
+        "total_trades": 9224,
+        "win_rate": 31.14
+      },
+      "max_correlation_returns": 0.984,
+      "max_correlation_positions": 0.977,
+      "accepted_at": "2026-06-16T11:41:18.929600"
+    },
+    {
+      "name": "Mcts_Wma_Ema_Tema_705a",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.wma((self.feat.ema((low - open_), timeperiod=20) + self.feat.tema(close, timeperiod=5)), timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 2.102,
+        "cagr": 0.3623,
+        "max_drawdown_pct": -15.81,
+        "profit_factor": 1.324,
+        "calmar_ratio": 2.292,
+        "total_trades": 9030,
+        "win_rate": 30.06
+      },
+      "max_correlation_returns": 0.918,
+      "max_correlation_positions": 0.965,
+      "accepted_at": "2026-06-16T11:41:21.060314"
+    },
+    {
+      "name": "Mcts_Ema_9cca",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.ema(low, timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 2.167,
+        "cagr": 0.395,
+        "max_drawdown_pct": -10.09,
+        "profit_factor": 1.323,
+        "calmar_ratio": 3.913,
+        "total_trades": 10220,
+        "win_rate": 29.0
+      },
+      "max_correlation_returns": 0.961,
+      "max_correlation_positions": 0.972,
+      "accepted_at": "2026-06-16T11:41:23.237519"
+    },
+    {
+      "name": "Mcts_Dema_Tema_805f",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.dema(self.feat.tema(high, timeperiod=14), timeperiod=14)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 2.16,
+        "cagr": 0.3615,
+        "max_drawdown_pct": -9.58,
+        "profit_factor": 1.319,
+        "calmar_ratio": 3.772,
+        "total_trades": 9005,
+        "win_rate": 33.98
+      },
+      "max_correlation_returns": 0.921,
+      "max_correlation_positions": 0.958,
+      "accepted_at": "2026-06-16T11:41:25.432466"
+    },
+    {
+      "name": "Mcts_Tema_cb74",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(close, timeperiod=20)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.1
+      },
+      "metrics": {
+        "sharpe_ratio": 2.206,
+        "cagr": 0.1503,
+        "max_drawdown_pct": -5.99,
+        "profit_factor": 1.323,
+        "calmar_ratio": 2.509,
+        "total_trades": 9970,
+        "win_rate": 30.38
+      },
+      "max_correlation_returns": 0.938,
+      "max_correlation_positions": 0.973,
+      "accepted_at": "2026-06-16T11:41:27.585290"
+    },
+    {
+      "name": "Mcts_Tema_e90c",
+      "timeframe": "3m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(self.feat.tema((self.feat.tema(high, timeperiod=5) - self.feat.sma(low, timeperiod=14)), timeperiod=5), timeperiod=60)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 1.882,
+        "cagr": 0.2368,
+        "max_drawdown_pct": -9.47,
+        "profit_factor": 1.324,
+        "calmar_ratio": 2.499,
+        "total_trades": 4658,
+        "win_rate": 42.08
+      },
+      "max_correlation_returns": 0.551,
+      "max_correlation_positions": 0.681,
+      "accepted_at": "2026-06-16T11:50:30.281674"
+    },
+    {
+      "name": "Mcts_Rsi_Atr_3b66",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(self.feat.atr(high, low, close, timeperiod=20), timeperiod=30)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.341,
+        "cagr": 0.1655,
+        "max_drawdown_pct": -22.12,
+        "profit_factor": 1.54,
+        "calmar_ratio": 0.748,
+        "total_trades": 1265,
+        "win_rate": 54.57
+      },
+      "max_correlation_returns": 0.0,
+      "max_correlation_positions": 0.0,
+      "accepted_at": "2026-06-16T17:13:23.148766"
+    },
+    {
+      "name": "Mcts_Rolling_rank_a079",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_rank((high - close), window=20)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 2.006,
+        "cagr": 0.1802,
+        "max_drawdown_pct": -18.2,
+        "profit_factor": 1.282,
+        "calmar_ratio": 0.99,
+        "total_trades": 7035,
+        "win_rate": 49.49
+      },
+      "max_correlation_returns": 0.18,
+      "max_correlation_positions": 0.082,
+      "accepted_at": "2026-06-16T17:13:23.218599"
+    },
+    {
+      "name": "Mcts_Ema_Atr_38d9",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.ema(self.feat.atr(high, low, close, timeperiod=5), timeperiod=10)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.417,
+        "cagr": 0.1798,
+        "max_drawdown_pct": -15.96,
+        "profit_factor": 1.702,
+        "calmar_ratio": 1.126,
+        "total_trades": 668,
+        "win_rate": 51.5
+      },
+      "max_correlation_returns": 0.758,
+      "max_correlation_positions": 0.684,
+      "accepted_at": "2026-06-16T17:13:23.283274"
+    },
+    {
+      "name": "Mcts_Wma_Atr_457c",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.wma(self.feat.atr(high, low, close, timeperiod=10), timeperiod=5)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 1.348,
+        "cagr": 0.207,
+        "max_drawdown_pct": -16.58,
+        "profit_factor": 1.663,
+        "calmar_ratio": 1.248,
+        "total_trades": 694,
+        "win_rate": 52.45
+      },
+      "max_correlation_returns": 0.963,
+      "max_correlation_positions": 0.959,
+      "accepted_at": "2026-06-16T17:13:23.356012"
+    },
+    {
+      "name": "Mcts_Tema_Atr_c3a8",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.tema(self.feat.atr(high, low, close, timeperiod=5), timeperiod=20)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.409,
+        "cagr": 0.2493,
+        "max_drawdown_pct": -22.37,
+        "profit_factor": 1.606,
+        "calmar_ratio": 1.114,
+        "total_trades": 806,
+        "win_rate": 52.61
+      },
+      "max_correlation_returns": 0.866,
+      "max_correlation_positions": 0.859,
+      "accepted_at": "2026-06-16T17:13:23.445251"
+    },
+    {
+      "name": "Mcts_Rolling_zscore_84eb",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_zscore((high - close), window=5)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.553,
+        "cagr": 0.1712,
+        "max_drawdown_pct": -15.13,
+        "profit_factor": 1.238,
+        "calmar_ratio": 1.132,
+        "total_trades": 6714,
+        "win_rate": 49.38
+      },
+      "max_correlation_returns": 0.791,
+      "max_correlation_positions": 0.732,
+      "accepted_at": "2026-06-16T17:13:23.569276"
+    },
+    {
+      "name": "Mcts_Rolling_rank_125e",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_rank((open_ - low), window=5)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.417,
+        "cagr": 0.2404,
+        "max_drawdown_pct": -33.0,
+        "profit_factor": 1.203,
+        "calmar_ratio": 0.728,
+        "total_trades": 7258,
+        "win_rate": 48.58
+      },
+      "max_correlation_returns": 0.66,
+      "max_correlation_positions": 0.545,
+      "accepted_at": "2026-06-16T17:13:23.925664"
+    },
+    {
+      "name": "Mcts_Rsi_5a1b",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi((low - open_), timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 1.68,
+        "cagr": 0.1772,
+        "max_drawdown_pct": -17.98,
+        "profit_factor": 1.296,
+        "calmar_ratio": 0.985,
+        "total_trades": 4963,
+        "win_rate": 46.06
+      },
+      "max_correlation_returns": 0.644,
+      "max_correlation_positions": 0.671,
+      "accepted_at": "2026-06-16T17:13:24.075015"
+    },
+    {
+      "name": "Mcts_Atr_f84e",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.atr(high, low, close, timeperiod=14)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.305,
+        "cagr": 0.1712,
+        "max_drawdown_pct": -14.86,
+        "profit_factor": 1.556,
+        "calmar_ratio": 1.152,
+        "total_trades": 1103,
+        "win_rate": 50.99
+      },
+      "max_correlation_returns": 0.933,
+      "max_correlation_positions": 0.914,
+      "accepted_at": "2026-06-16T17:13:24.183725"
+    },
+    {
+      "name": "Mcts_Atr_e578",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.atr(high, low, close, timeperiod=30)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 1.301,
+        "cagr": 0.2915,
+        "max_drawdown_pct": -25.53,
+        "profit_factor": 1.459,
+        "calmar_ratio": 1.142,
+        "total_trades": 1462,
+        "win_rate": 51.77
+      },
+      "max_correlation_returns": 0.639,
+      "max_correlation_positions": 0.801,
+      "accepted_at": "2026-06-16T17:14:32.523459"
+    },
+    {
+      "name": "Mcts_Natr_76c0",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=20)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 1.315,
+        "cagr": 0.2872,
+        "max_drawdown_pct": -25.49,
+        "profit_factor": 1.427,
+        "calmar_ratio": 1.126,
+        "total_trades": 1740,
+        "win_rate": 49.08
+      },
+      "max_correlation_returns": 0.889,
+      "max_correlation_positions": 0.881,
+      "accepted_at": "2026-06-16T17:14:32.713249"
+    },
+    {
+      "name": "Mcts_Natr_c1bd",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=30)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 1.478,
+        "cagr": 0.2895,
+        "max_drawdown_pct": -17.59,
+        "profit_factor": 1.586,
+        "calmar_ratio": 1.646,
+        "total_trades": 1343,
+        "win_rate": 49.7
+      },
+      "max_correlation_returns": 0.955,
+      "max_correlation_positions": 0.957,
+      "accepted_at": "2026-06-16T17:14:32.915276"
+    },
+    {
+      "name": "Mcts_Natr_b1fe",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.natr(high, low, close, timeperiod=30) * (1.0 * 1.0))",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 1.478,
+        "cagr": 0.2895,
+        "max_drawdown_pct": -17.59,
+        "profit_factor": 1.586,
+        "calmar_ratio": 1.646,
+        "total_trades": 1343,
+        "win_rate": 49.7
+      },
+      "max_correlation_returns": 1.0,
+      "max_correlation_positions": 1.0,
+      "accepted_at": "2026-06-16T17:14:33.152689"
+    },
+    {
+      "name": "Mcts_Ema_7bb0",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.ema((low - high), timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 1.472,
+        "cagr": 0.2573,
+        "max_drawdown_pct": -23.53,
+        "profit_factor": 1.331,
+        "calmar_ratio": 1.094,
+        "total_trades": 3259,
+        "win_rate": 51.13
+      },
+      "max_correlation_returns": 0.627,
+      "max_correlation_positions": 0.628,
+      "accepted_at": "2026-06-16T17:14:33.358092"
+    },
+    {
+      "name": "Mcts_Natr_4658",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=14)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.4,
+        "cagr": 0.3374,
+        "max_drawdown_pct": -18.48,
+        "profit_factor": 1.429,
+        "calmar_ratio": 1.826,
+        "total_trades": 2113,
+        "win_rate": 50.33
+      },
+      "max_correlation_returns": 0.874,
+      "max_correlation_positions": 0.891,
+      "accepted_at": "2026-06-16T17:14:33.568124"
+    },
+    {
+      "name": "Mcts_Cci_Mfi_7bc0",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.cci(high, low, close, timeperiod=5) + self.feat.mfi(high, low, close, volume, timeperiod=10))",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.81,
+        "cagr": 0.371,
+        "max_drawdown_pct": -21.36,
+        "profit_factor": 1.28,
+        "calmar_ratio": 1.737,
+        "total_trades": 8822,
+        "win_rate": 39.73
+      },
+      "max_correlation_returns": 0.353,
+      "max_correlation_positions": 0.312,
+      "accepted_at": "2026-06-16T17:14:33.772405"
+    },
+    {
+      "name": "Mcts_Rolling_zscore_e71b",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_zscore(low, window=14)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.804,
+        "cagr": 0.2467,
+        "max_drawdown_pct": -15.39,
+        "profit_factor": 1.314,
+        "calmar_ratio": 1.603,
+        "total_trades": 6603,
+        "win_rate": 40.99
+      },
+      "max_correlation_returns": 0.609,
+      "max_correlation_positions": 0.619,
+      "accepted_at": "2026-06-16T17:15:08.450401"
+    },
+    {
+      "name": "Mcts_Rsi_Dema_9d9b",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(self.feat.dema(low, timeperiod=5), timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 2.03,
+        "cagr": 0.23,
+        "max_drawdown_pct": -11.55,
+        "profit_factor": 1.368,
+        "calmar_ratio": 1.991,
+        "total_trades": 5395,
+        "win_rate": 37.52
+      },
+      "max_correlation_returns": 0.719,
+      "max_correlation_positions": 0.71,
+      "accepted_at": "2026-06-16T17:15:08.755004"
+    },
+    {
+      "name": "Mcts_Rolling_zscore_Dema_8aa6",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_zscore(self.feat.dema(low, timeperiod=5), window=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 1.655,
+        "cagr": 0.1606,
+        "max_drawdown_pct": -9.37,
+        "profit_factor": 1.211,
+        "calmar_ratio": 1.713,
+        "total_trades": 10773,
+        "win_rate": 39.97
+      },
+      "max_correlation_returns": 0.723,
+      "max_correlation_positions": 0.701,
+      "accepted_at": "2026-06-16T17:15:09.502710"
+    },
+    {
+      "name": "Mcts_Cmo_2519",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.cmo(open_, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 2.436,
+        "cagr": 0.27,
+        "max_drawdown_pct": -8.32,
+        "profit_factor": 1.542,
+        "calmar_ratio": 3.246,
+        "total_trades": 4649,
+        "win_rate": 43.99
+      },
+      "max_correlation_returns": 0.72,
+      "max_correlation_positions": 0.714,
+      "accepted_at": "2026-06-16T17:15:10.179231"
+    },
+    {
+      "name": "Mcts_Sma_7830",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.sma((close - high), timeperiod=20)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.409,
+        "cagr": 0.2381,
+        "max_drawdown_pct": -15.53,
+        "profit_factor": 1.36,
+        "calmar_ratio": 1.533,
+        "total_trades": 3064,
+        "win_rate": 41.68
+      },
+      "max_correlation_returns": 0.532,
+      "max_correlation_positions": 0.537,
+      "accepted_at": "2026-06-16T17:15:10.573591"
+    },
+    {
+      "name": "Mcts_Rolling_zscore_Tema_bbb0",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_zscore(self.feat.tema(low, timeperiod=10), window=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 1.789,
+        "cagr": 0.2378,
+        "max_drawdown_pct": -15.78,
+        "profit_factor": 1.284,
+        "calmar_ratio": 1.508,
+        "total_trades": 6436,
+        "win_rate": 41.5
+      },
+      "max_correlation_returns": 0.826,
+      "max_correlation_positions": 0.785,
+      "accepted_at": "2026-06-16T17:15:10.925404"
+    },
+    {
+      "name": "Mcts_Rolling_zscore_Dema_4f9b",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_zscore(self.feat.dema(low, timeperiod=5), window=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.656,
+        "cagr": 0.2523,
+        "max_drawdown_pct": -26.2,
+        "profit_factor": 1.26,
+        "calmar_ratio": 0.963,
+        "total_trades": 6925,
+        "win_rate": 41.34
+      },
+      "max_correlation_returns": 0.916,
+      "max_correlation_positions": 0.904,
+      "accepted_at": "2026-06-16T17:15:11.752278"
+    },
+    {
+      "name": "Mcts_Willr_d50a",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.willr(high, low, close, timeperiod=30)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.1
+      },
+      "metrics": {
+        "sharpe_ratio": 2.68,
+        "cagr": 0.1663,
+        "max_drawdown_pct": -2.81,
+        "profit_factor": 1.415,
+        "calmar_ratio": 5.912,
+        "total_trades": 9728,
+        "win_rate": 32.19
+      },
+      "max_correlation_returns": 0.611,
+      "max_correlation_positions": 0.797,
+      "accepted_at": "2026-06-16T17:19:45.116528"
+    },
+    {
+      "name": "Mcts_Rolling_rank_Wma_f34d",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_rank(self.feat.wma(low, timeperiod=5), window=14)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 1.872,
+        "cagr": 0.185,
+        "max_drawdown_pct": -9.27,
+        "profit_factor": 1.255,
+        "calmar_ratio": 1.996,
+        "total_trades": 9950,
+        "win_rate": 36.78
+      },
+      "max_correlation_returns": 0.663,
+      "max_correlation_positions": 0.789,
+      "accepted_at": "2026-06-16T17:19:45.994975"
+    },
+    {
+      "name": "Mcts_Rolling_rank_Tema_6a3f",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_rank(self.feat.tema(low, timeperiod=30), window=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 2.411,
+        "cagr": 0.4105,
+        "max_drawdown_pct": -16.0,
+        "profit_factor": 1.326,
+        "calmar_ratio": 2.565,
+        "total_trades": 9210,
+        "win_rate": 33.76
+      },
+      "max_correlation_returns": 0.861,
+      "max_correlation_positions": 0.849,
+      "accepted_at": "2026-06-16T17:19:47.203630"
+    },
+    {
+      "name": "Mcts_Cmo_Ema_d81d",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.cmo(self.feat.ema(low, timeperiod=5), timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 2.035,
+        "cagr": 0.4287,
+        "max_drawdown_pct": -19.46,
+        "profit_factor": 1.309,
+        "calmar_ratio": 2.203,
+        "total_trades": 8350,
+        "win_rate": 34.77
+      },
+      "max_correlation_returns": 0.867,
+      "max_correlation_positions": 0.87,
+      "accepted_at": "2026-06-16T17:19:48.056855"
+    },
+    {
+      "name": "Mcts_Rolling_zscore_Dema_90bd",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_zscore(self.feat.dema(low, timeperiod=5), window=20)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 1.556,
+        "cagr": 0.254,
+        "max_drawdown_pct": -19.56,
+        "profit_factor": 1.257,
+        "calmar_ratio": 1.298,
+        "total_trades": 7591,
+        "win_rate": 39.81
+      },
+      "max_correlation_returns": 0.76,
+      "max_correlation_positions": 0.815,
+      "accepted_at": "2026-06-16T17:19:48.928913"
+    },
+    {
+      "name": "Mcts_Rsi_ac05",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(low, timeperiod=20)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.875,
+        "cagr": 0.3734,
+        "max_drawdown_pct": -19.39,
+        "profit_factor": 1.367,
+        "calmar_ratio": 1.926,
+        "total_trades": 6671,
+        "win_rate": 33.79
+      },
+      "max_correlation_returns": 0.723,
+      "max_correlation_positions": 0.747,
+      "accepted_at": "2026-06-16T17:19:49.791600"
+    },
+    {
+      "name": "Mcts_Mfi_Rsi_5c49",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.mfi(high, low, close, volume, timeperiod=30) + self.feat.rsi(low, timeperiod=10))",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 1.946,
+        "cagr": 0.2961,
+        "max_drawdown_pct": -11.54,
+        "profit_factor": 1.356,
+        "calmar_ratio": 2.565,
+        "total_trades": 7446,
+        "win_rate": 34.5
+      },
+      "max_correlation_returns": 0.833,
+      "max_correlation_positions": 0.802,
+      "accepted_at": "2026-06-16T17:19:50.734546"
+    },
+    {
+      "name": "Mcts_Willr_2d19",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.willr(high, low, close, timeperiod=20)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 2.261,
+        "cagr": 0.1971,
+        "max_drawdown_pct": -5.17,
+        "profit_factor": 1.31,
+        "calmar_ratio": 3.811,
+        "total_trades": 12629,
+        "win_rate": 33.05
+      },
+      "max_correlation_returns": 0.908,
+      "max_correlation_positions": 0.842,
+      "accepted_at": "2026-06-16T17:19:51.562075"
+    },
+    {
+      "name": "Mcts_Cmo_45a2",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.cmo((close - high), timeperiod=60)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.79,
+        "cagr": 0.2254,
+        "max_drawdown_pct": -18.06,
+        "profit_factor": 1.393,
+        "calmar_ratio": 1.248,
+        "total_trades": 3960,
+        "win_rate": 50.64
+      },
+      "max_correlation_returns": 0.0,
+      "max_correlation_positions": 0.0,
+      "accepted_at": "2026-06-16T17:52:52.272473"
+    },
+    {
+      "name": "Mcts_Dema_270e",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: ((low - open_) / (self.feat.dema(open_, timeperiod=20) + 1e-8))",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.83,
+        "cagr": 0.2047,
+        "max_drawdown_pct": -19.27,
+        "profit_factor": 1.394,
+        "calmar_ratio": 1.062,
+        "total_trades": 3684,
+        "win_rate": 51.6
+      },
+      "max_correlation_returns": 0.596,
+      "max_correlation_positions": 0.565,
+      "accepted_at": "2026-06-16T17:52:52.364812"
+    },
+    {
+      "name": "Mcts_Dema_05f3",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.dema(low, timeperiod=10) / (low + 1e-8))",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 2.233,
+        "cagr": 0.3791,
+        "max_drawdown_pct": -10.95,
+        "profit_factor": 1.515,
+        "calmar_ratio": 3.461,
+        "total_trades": 3405,
+        "win_rate": 47.75
+      },
+      "max_correlation_returns": 0.438,
+      "max_correlation_positions": 0.373,
+      "accepted_at": "2026-06-16T17:52:52.432467"
+    },
+    {
+      "name": "Mcts_Natr_428c",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=60)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.309,
+        "cagr": 0.3406,
+        "max_drawdown_pct": -19.65,
+        "profit_factor": 1.368,
+        "calmar_ratio": 1.733,
+        "total_trades": 1986,
+        "win_rate": 45.46
+      },
+      "max_correlation_returns": 0.181,
+      "max_correlation_positions": 0.151,
+      "accepted_at": "2026-06-16T17:52:52.501195"
+    },
+    {
+      "name": "Mcts_Rolling_rank_0894",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_rank((close - open_), window=14)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 2.07,
+        "cagr": 0.2454,
+        "max_drawdown_pct": -16.42,
+        "profit_factor": 1.366,
+        "calmar_ratio": 1.495,
+        "total_trades": 6035,
+        "win_rate": 47.59
+      },
+      "max_correlation_returns": 0.515,
+      "max_correlation_positions": 0.437,
+      "accepted_at": "2026-06-16T17:52:52.569378"
+    },
+    {
+      "name": "Mcts_Price_z_f4c3",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.price_z(close, timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.3
+      },
+      "metrics": {
+        "sharpe_ratio": 1.748,
+        "cagr": 0.2263,
+        "max_drawdown_pct": -18.66,
+        "profit_factor": 1.319,
+        "calmar_ratio": 1.212,
+        "total_trades": 4758,
+        "win_rate": 43.61
+      },
+      "max_correlation_returns": 0.61,
+      "max_correlation_positions": 0.535,
+      "accepted_at": "2026-06-16T17:52:52.635688"
+    },
+    {
+      "name": "Mcts_Natr_Mfi_9f9c",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.natr(high, low, close, timeperiod=14) / (self.feat.mfi(high, low, close, volume, timeperiod=60) + 1e-8))",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 1.346,
+        "cagr": 0.2118,
+        "max_drawdown_pct": -9.2,
+        "profit_factor": 1.35,
+        "calmar_ratio": 2.303,
+        "total_trades": 2491,
+        "win_rate": 43.68
+      },
+      "max_correlation_returns": 0.701,
+      "max_correlation_positions": 0.632,
+      "accepted_at": "2026-06-16T17:52:52.961717"
+    },
+    {
+      "name": "Mcts_Willr_0ef9",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.willr(high, low, close, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 1.855,
+        "cagr": 0.1536,
+        "max_drawdown_pct": -7.37,
+        "profit_factor": 1.428,
+        "calmar_ratio": 2.085,
+        "total_trades": 3037,
+        "win_rate": 42.5
+      },
+      "max_correlation_returns": 0.63,
+      "max_correlation_positions": 0.568,
+      "accepted_at": "2026-06-16T17:52:53.118445"
+    },
+    {
+      "name": "Mcts_Natr_157e",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=60)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.309,
+        "cagr": 0.3406,
+        "max_drawdown_pct": -19.65,
+        "profit_factor": 1.368,
+        "calmar_ratio": 1.733,
+        "total_trades": 1986,
+        "win_rate": 45.46
+      },
+      "max_correlation_returns": 0.0,
+      "max_correlation_positions": 0.0,
+      "accepted_at": "2026-06-16T18:11:53.678101"
+    },
+    {
+      "name": "Mcts_Cmo_a9c0",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.cmo(low, timeperiod=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 2.646,
+        "cagr": 0.3055,
+        "max_drawdown_pct": -13.17,
+        "profit_factor": 1.489,
+        "calmar_ratio": 2.32,
+        "total_trades": 5715,
+        "win_rate": 43.25
+      },
+      "max_correlation_returns": 0.14,
+      "max_correlation_positions": 0.037,
+      "accepted_at": "2026-06-16T18:12:15.965298"
+    },
+    {
+      "name": "Mcts_Cmo_Sma_e2ea",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.cmo(close, timeperiod=14) - self.feat.cmo(self.feat.sma(self.feat.atr(high, low, close, timeperiod=20), timeperiod=60), timeperiod=60))",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 1.997,
+        "cagr": 0.233,
+        "max_drawdown_pct": -9.68,
+        "profit_factor": 1.345,
+        "calmar_ratio": 2.408,
+        "total_trades": 6650,
+        "win_rate": 34.15
+      },
+      "max_correlation_returns": 0.55,
+      "max_correlation_positions": 0.631,
+      "accepted_at": "2026-06-16T18:12:31.216263"
+    },
+    {
+      "name": "Mcts_Willr_Rsi_Tema_a6c4",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.willr(high, low, close, timeperiod=60) + self.feat.rsi(self.feat.tema(self.feat.ema(open_, timeperiod=5), timeperiod=10), timeperiod=20))",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 2.049,
+        "cagr": 0.1763,
+        "max_drawdown_pct": -5.74,
+        "profit_factor": 1.267,
+        "calmar_ratio": 3.072,
+        "total_trades": 10107,
+        "win_rate": 34.94
+      },
+      "max_correlation_returns": 0.534,
+      "max_correlation_positions": 0.678,
+      "accepted_at": "2026-06-16T18:14:01.424459"
+    },
+    {
+      "name": "Mcts_Roc_Sma_Atr_37d9",
+      "timeframe": "3m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.roc(self.feat.sma(((close + close) + self.feat.atr(high, low, close, timeperiod=14)), timeperiod=30), timeperiod=60)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 2.932,
+        "cagr": 0.3234,
+        "max_drawdown_pct": -12.27,
+        "profit_factor": 1.523,
+        "calmar_ratio": 2.636,
+        "total_trades": 4835,
+        "win_rate": 45.91
+      },
+      "max_correlation_returns": 0.433,
+      "max_correlation_positions": 0.505,
+      "accepted_at": "2026-06-16T18:22:48.363144"
+    },
+    {
+      "name": "Mcts_Natr_66ef",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.natr(high, low, close, timeperiod=60)",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.309,
+        "cagr": 0.3406,
+        "max_drawdown_pct": -19.65,
+        "profit_factor": 1.368,
+        "calmar_ratio": 1.733,
+        "total_trades": 1986,
+        "win_rate": 45.46
+      },
+      "max_correlation_returns": 0.0,
+      "max_correlation_positions": 0.0,
+      "accepted_at": "2026-06-16T18:33:49.161456"
+    },
+    {
+      "name": "Mcts_Volume_z_Cmo_52a8",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: ((((volume - volume) - volume) / (((volume - volume) * self.feat.volume_z(volume, timeperiod=60)) + 1e-8)) * self.feat.cmo(low, timeperiod=5))",
+      "params": {
+        "direction": -1.0,
+        "position_scale": 0.25
+      },
+      "metrics": {
+        "sharpe_ratio": 2.339,
+        "cagr": 0.2358,
+        "max_drawdown_pct": -11.33,
+        "profit_factor": 1.402,
+        "calmar_ratio": 2.08,
+        "total_trades": 6415,
+        "win_rate": 45.6
+      },
+      "max_correlation_returns": 0.019,
+      "max_correlation_positions": 0.019,
+      "accepted_at": "2026-06-16T18:34:11.038734"
+    },
+    {
+      "name": "Mcts_Rsi_9f6c",
+      "timeframe": "10m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(open_, timeperiod=10)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.2
+      },
+      "metrics": {
+        "sharpe_ratio": 2.576,
+        "cagr": 0.2627,
+        "max_drawdown_pct": -9.13,
+        "profit_factor": 1.422,
+        "calmar_ratio": 2.876,
+        "total_trades": 7658,
+        "win_rate": 45.23
+      },
+      "max_correlation_returns": 0.434,
+      "max_correlation_positions": 0.541,
+      "accepted_at": "2026-06-16T18:34:26.032234"
+    },
+    {
+      "name": "Mcts_Rolling_rank_Wma_ca37",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rolling_rank(self.feat.wma(self.feat.wma(self.feat.dema(high, timeperiod=30), timeperiod=30), timeperiod=30), window=5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.4
+      },
+      "metrics": {
+        "sharpe_ratio": 1.577,
+        "cagr": 0.1984,
+        "max_drawdown_pct": -15.84,
+        "profit_factor": 1.4,
+        "calmar_ratio": 1.253,
+        "total_trades": 2031,
+        "win_rate": 53.4
+      },
+      "max_correlation_returns": 0.192,
+      "max_correlation_positions": 0.259,
+      "accepted_at": "2026-06-16T18:35:58.006216"
+    },
+    {
+      "name": "Mcts_Roc_Sma_Atr_fd02",
+      "timeframe": "3m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.roc(self.feat.sma((self.feat.atr(high, low, close, timeperiod=10) + close), timeperiod=30), timeperiod=60)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.15
+      },
+      "metrics": {
+        "sharpe_ratio": 3.018,
+        "cagr": 0.2736,
+        "max_drawdown_pct": -8.88,
+        "profit_factor": 1.546,
+        "calmar_ratio": 3.082,
+        "total_trades": 4855,
+        "win_rate": 45.82
+      },
+      "max_correlation_returns": 0.36,
+      "max_correlation_positions": 0.496,
+      "accepted_at": "2026-06-16T18:44:33.940884"
+    },
+    {
+      "name": "Mcts_Rsi_Ema_c48f",
+      "timeframe": "1m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: self.feat.rsi(self.feat.ema(self.feat.ema(low, timeperiod=5), timeperiod=60), timeperiod=60)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.35
+      },
+      "metrics": {
+        "sharpe_ratio": 1.978,
+        "cagr": 0.3637,
+        "max_drawdown_pct": -11.86,
+        "profit_factor": 1.267,
+        "calmar_ratio": 3.067,
+        "total_trades": 11173,
+        "win_rate": 32.92
+      },
+      "max_correlation_returns": 0.473,
+      "max_correlation_positions": 0.646,
+      "accepted_at": "2026-06-16T19:43:10.351824"
+    }
+  ]
+}

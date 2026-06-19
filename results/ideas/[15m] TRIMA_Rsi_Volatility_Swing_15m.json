@@ -1,0 +1,57 @@
+{
+    "name": "[15m] TRIMA_Rsi_Volatility_Swing",
+    "timeframe": "15m",
+    "family": "trend-following",
+    "description": "A trend-following strategy using TRIMA for direction, RSI for momentum filter to avoid choppy entries in ranging markets. Exit logic uses volatility-based conditions (ATR) rather than hard price stops.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "TRIMA",
+                "definition": "self.feat.trima(close)"
+            },
+            {
+                "name": "SMA_20",
+                "definition": "self.feat.sma(close, timeperiod=20)"
+            },
+            {
+                "name": "RSI",
+                "definition": "self.feat.rsi(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(trima > sma_20) & (rsi < 65)",
+        "entry_short": "(trima < sma_20) & (rsi > 35)",
+        "exit_long": "(close < sma_20 - atr * param1)",
+        "exit_short": "(close > sma_20 + atr * param1)"
+    },
+    "param_space": {
+        "trima_period": {
+            "type": "int",
+            "low": 5,
+            "high": 30,
+            "step": 1
+        },
+        "rsi_threshold_long": {
+            "type": "float",
+            "low": 40.0,
+            "high": 70.0,
+            "step": 2.0
+        },
+        "atr_multiplier": {
+            "type": "float",
+            "low": 0.5,
+            "high": 3.0,
+            "step": 0.1
+        }
+    }
+}

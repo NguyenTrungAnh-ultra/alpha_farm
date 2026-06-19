@@ -1,0 +1,47 @@
+{
+    "name": "MACD_NATR_Momentum_Enforcer",
+    "timeframe": "10m",
+    "family": "multi-indicator",
+    "description": "A momentum strategy using MACD histogram for direction and NATR to filter noise, confirmed by EMA trend alignment. Exits on signal reversal or price crossing below the moving average.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "MACD_Hist",
+                "definition": "self.feat.macd(close)"
+            },
+            {
+                "name": "EMA_Trend",
+                "definition": "self.feat.ema(close, timeperiod=param_ema_period)"
+            },
+            {
+                "name": "NATR_Vol",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(MACD_Hist > 0) & (close >= EMA_Trend)",
+        "entry_short": "(MACD_Hist < 0) & (close <= EMA_Trend)",
+        "exit_long": "(MACD_Hist < 0) | (close < EMA_Trend)",
+        "exit_short": "(MACD_Hist > 0) | (close > EMA_Trend)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 14,
+            "high": 50,
+            "step": 2
+        },
+        "macd_threshold": {
+            "type": "float",
+            "low": -0.5,
+            "high": 0.5,
+            "step": 0.1
+        }
+    }
+}

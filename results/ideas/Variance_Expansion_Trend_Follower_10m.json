@@ -1,0 +1,67 @@
+{
+    "name": "Variance_Expansion_Trend_Follower",
+    "timeframe": "10m",
+    "family": "trend-following",
+    "description": "Enters trend-following positions when short-term EMA crosses above long-term EMA (golden cross) and price is above fast EMA, but only if rolling price variance is above its own moving average, indicating expanding volatility that favors trend continuation. Exits on opposite cross or when variance contracts below a threshold. This avoids choppy sideways markets and captures strong trending moves.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "EMA_fast",
+                "definition": "self.feat.ema(close, timeperiod=10)"
+            },
+            {
+                "name": "EMA_slow",
+                "definition": "self.feat.ema(close, timeperiod=30)"
+            },
+            {
+                "name": "VAR_short",
+                "definition": "self.feat.var(close, timeperiod=20)"
+            },
+            {
+                "name": "VAR_MA",
+                "definition": "self.feat.sma(VAR_short, timeperiod=50)"
+            }
+        ],
+        "entry_long": "(EMA_fast > EMA_slow) & (close > EMA_fast) & (VAR_short > VAR_MA)",
+        "entry_short": "(EMA_fast < EMA_slow) & (close < EMA_fast) & (VAR_short > VAR_MA)",
+        "exit_logic": "Exit Long: (EMA_fast < EMA_slow) | (VAR_short < VAR_MA * 0.8). Exit Short: (EMA_fast > EMA_slow) | (VAR_short < VAR_MA * 0.8)."
+    },
+    "param_space": {
+        "fast_period": {
+            "type": "int",
+            "low": 5,
+            "high": 20,
+            "step": 1
+        },
+        "slow_period": {
+            "type": "int",
+            "low": 20,
+            "high": 50,
+            "step": 2
+        },
+        "var_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "var_ma_period": {
+            "type": "int",
+            "low": 30,
+            "high": 70,
+            "step": 5
+        },
+        "var_contraction_mult": {
+            "type": "float",
+            "low": 0.5,
+            "high": 0.9,
+            "step": 0.05
+        }
+    }
+}

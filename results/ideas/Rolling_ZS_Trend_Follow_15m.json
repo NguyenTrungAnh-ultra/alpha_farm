@@ -1,0 +1,41 @@
+{
+    "name": "Rolling_ZS_Trend_Follow",
+    "timeframe": "15m",
+    "family": "trend-following",
+    "description": "Enters when price deviates significantly from the mean (Z-Score > Threshold) while maintaining a positive trend slope. Exits on reversion to mean or negative Z-Score.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "rolling_zscore",
+                "definition": "self.feat.rolling_zscore(close, timeperiod=30)"
+            },
+            {
+                "name": "linearreg_slope",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=20)"
+            }
+        ],
+        "entry_long": "(rolling_zscore > 1.5) & (slope > 0)",
+        "exit_short": "(close < sma(close)) | rolling_zscore < -1.0",
+        "stop_loss": null,
+        "take_profit": null
+    },
+    "param_space": {
+        "z_score_threshold": {
+            "type": "float",
+            "low": 1.0,
+            "high": 2.5,
+            "step": 0.1
+        },
+        "slope_period": {
+            "type": "int",
+            "low": 14,
+            "high": 30,
+            "step": 1
+        }
+    }
+}

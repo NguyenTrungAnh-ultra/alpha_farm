@@ -1,0 +1,57 @@
+{
+    "name": "TasukiGap_ADX_Continuation",
+    "timeframe": "5m",
+    "family": "pattern-based",
+    "description": "Continuation strategy based on Tasuki Gap candlestick patterns (bullish/bearish) confirmed by ADX trend strength. Enters on pattern detection when ADX > threshold, exits using ATR-based trailing stop from recent price extremes.",
+    "formula": {
+        "inputs": [
+            "open",
+            "high",
+            "low",
+            "close"
+        ],
+        "indicators": [
+            {
+                "name": "ADX",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Bullish_Tasuki",
+                "definition": "self.feat.cdl_tasukigap(open, high, low, close) == 100"
+            },
+            {
+                "name": "Bearish_Tasuki",
+                "definition": "self.feat.cdl_tasukigap(open, high, low, close) == -100"
+            },
+            {
+                "name": "Rolling_High_Max",
+                "definition": "self.feat.max(high, timeperiod=10)"
+            },
+            {
+                "name": "Rolling_Low_Min",
+                "definition": "self.feat.min(low, timeperiod=10)"
+            }
+        ],
+        "entry_long": "(Bullish_Tasuki) & (ADX > adx_threshold)",
+        "entry_short": "(Bearish_Tasuki) & (ADX > adx_threshold)",
+        "exit_logic": "Exit Long: close < (Rolling_High_Max - atr_exit_mult * ATR). Exit Short: close > (Rolling_Low_Min + atr_exit_mult * ATR)."
+    },
+    "param_space": {
+        "adx_threshold": {
+            "type": "int",
+            "low": 20,
+            "high": 30,
+            "step": 2
+        },
+        "atr_exit_mult": {
+            "type": "float",
+            "low": 1.5,
+            "high": 3.0,
+            "step": 0.25
+        }
+    }
+}

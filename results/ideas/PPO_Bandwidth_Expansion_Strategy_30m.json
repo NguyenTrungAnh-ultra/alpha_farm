@@ -1,0 +1,96 @@
+{
+    "name": "PPO_Bandwidth_Expansion_Strategy",
+    "timeframe": "30m",
+    "family": "volatility",
+    "description": "Combines Percentage Price Oscillator (PPO) momentum signal with Bollinger Bandwidth expansion to identify high-volatility trend initiation points. Enters long when PPO crosses above its signal line and bandwidth expands above its recent average; enters short on opposite crossover. Exits when momentum reverses (PPO crosses zero) or volatility contracts (bandwidth falls below average). Designed for 30m VN30F1M to capture major swings with 0-2 trades per day.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "PPO",
+                "definition": "PPO(close, fastperiod=12, slowperiod=26, matype=0)"
+            },
+            {
+                "name": "PPO_signal",
+                "definition": "EMA(PPO, timeperiod=9)"
+            },
+            {
+                "name": "BB_upper",
+                "definition": "BBANDS(close, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)[0]"
+            },
+            {
+                "name": "BB_lower",
+                "definition": "BBANDS(close, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)[1]"
+            },
+            {
+                "name": "BB_middle",
+                "definition": "BBANDS(close, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)[2]"
+            },
+            {
+                "name": "Bandwidth",
+                "definition": "(BB_upper - BB_lower) / BB_middle"
+            },
+            {
+                "name": "Bandwidth_ma",
+                "definition": "SMA(Bandwidth, timeperiod=20)"
+            }
+        ],
+        "entry_long": "PPO > PPO_signal AND Bandwidth > Bandwidth_ma * 1.2",
+        "entry_short": "PPO < PPO_signal AND Bandwidth > Bandwidth_ma * 1.2",
+        "exit_logic": "For long: exit when PPO < 0 OR Bandwidth < Bandwidth_ma * 0.8; For short: exit when PPO > 0 OR Bandwidth < Bandwidth_ma * 0.8"
+    },
+    "param_space": {
+        "fastperiod": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "slowperiod": {
+            "type": "int",
+            "low": 20,
+            "high": 40,
+            "step": 2
+        },
+        "signalperiod": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "bb_period": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        },
+        "bb_std": {
+            "type": "float",
+            "low": 1.5,
+            "high": 3.0,
+            "step": 0.1
+        },
+        "bandwidth_lookback": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "expansion_factor": {
+            "type": "float",
+            "low": 1.1,
+            "high": 1.5,
+            "step": 0.05
+        },
+        "contraction_factor": {
+            "type": "float",
+            "low": 0.7,
+            "high": 0.9,
+            "step": 0.05
+        }
+    }
+}

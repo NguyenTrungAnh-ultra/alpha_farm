@@ -1,17 +1,16 @@
+from utilities.AppConfig import PROJECT_ROOT
 import json
 import os
 import sys
 
-# Đảm bảo đường dẫn import
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+# Fix Windows terminal UTF-8 encoding issue
+sys.stdout.reconfigure(encoding='utf-8')
 
-from agent.convert_ideas import generate_python_code
+from strategy_workflows.ConvertLegacyIdeas import generate_python_code
 
 def test_conversion():
     # Chọn ngẫu nhiên 1 tệp JSON có sẵn
-    idea_path = os.path.join(PROJECT_ROOT, "agent", "results", "ideas", "Absolute_Directional_MFI_Reversal_10m.json")
+    idea_path = os.path.join(PROJECT_ROOT, "results", "ideas", "Kama_Atr_Breakout_Trend_15m.json")
     
     if not os.path.exists(idea_path):
         print("Không tìm thấy tệp JSON.")

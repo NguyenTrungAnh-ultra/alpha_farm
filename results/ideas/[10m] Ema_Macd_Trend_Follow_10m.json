@@ -1,0 +1,47 @@
+{
+    "name": "[10m] Ema_Macd_Trend_Follow",
+    "timeframe": "10m",
+    "family": "trend-following",
+    "description": "Trend following strategy using EMA for direction and MACD cross for entry confirmation. Avoids ADX/Slope filters to reduce multicollinearity with accepted strategies.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "EMA_fast",
+                "definition": "self.feat.ema(close, timeperiod=20)"
+            },
+            {
+                "name": "MACD_Line",
+                "definition": "self.feat.macd(close, fast_period=12, slow_period=26)"
+            },
+            {
+                "name": "Signal_Line",
+                "definition": "self.feat.macd_signal_line(close)"
+            }
+        ],
+        "entry_long": "(close > ema_fast) & (macd_crossed_above(signal))",
+        "entry_short": "(close < ema_fast) & (macd_crossed_below(signal))",
+        "exit_long": "(close <= ema_fast)",
+        "exit_short": "(close >= ema_fast)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 10,
+            "high": 50,
+            "step": 2
+        },
+        "macd_signal_threshold": {
+            "type": "float",
+            "low": -0.1,
+            "high": 0.1,
+            "step": 0.05
+        }
+    }
+}

@@ -1,0 +1,43 @@
+{
+    "name": "MACD_NATR_Divergence",
+    "timeframe": "15m",
+    "family": "oscillator-divergence",
+    "description": "Detects price-high divergence against MACD histogram momentum, filtered by NATR volatility regime to avoid choppy markets.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "MACD_Line",
+                "definition": "self.feat.macd(close)"
+            },
+            {
+                "name": "NATR",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close > ema(close)) & (macd_line < shift(macd_line, 2)) & (natr > natr_rolling_mean)",
+        "entry_short": "(close < ema(close)) & (shift(macd_line, -1) < macd_line) & (natr > natr_rolling_mean)",
+        "exit_long": "(macd_line >= shift(macd_line, 2))",
+        "exit_short": "(macd_line <= shift(macd_line, 2))"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 10,
+            "high": 50,
+            "step": 1
+        },
+        "natr_window": {
+            "type": "float",
+            "low": 3.0,
+            "high": 8.0,
+            "step": 0.5
+        }
+    }
+}

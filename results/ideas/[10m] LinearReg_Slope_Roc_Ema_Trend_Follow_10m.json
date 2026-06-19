@@ -1,0 +1,53 @@
+{
+    "name": "[10m] LinearReg_Slope_Roc_Ema_Trend_Follow",
+    "timeframe": "10m",
+    "family": "trend-following",
+    "description": "Identifies trend direction using linear regression slope and confirms momentum with rate of change. Exits when price closes below the EMA to avoid trailing stop loss issues.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "slope",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=20)"
+            },
+            {
+                "name": "roc",
+                "definition": "self.feat.roc(close, timeperiod=14)"
+            },
+            {
+                "name": "ema_fast",
+                "definition": "self.feat.ema(close, timeperiod=50)"
+            }
+        ],
+        "entry_long": "(slope > 2) & (roc > 0)",
+        "entry_short": "(slope < -2) & (roc < 0)",
+        "exit_long": "(close < ema_fast)",
+        "exit_short": "(close > ema_fast)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 15,
+            "high": 80,
+            "step": 2
+        },
+        "roc_period": {
+            "type": "int",
+            "low": 6,
+            "high": 30,
+            "step": 2
+        },
+        "slope_threshold": {
+            "type": "float",
+            "low": -5.0,
+            "high": 10.0,
+            "step": 1
+        }
+    }
+}

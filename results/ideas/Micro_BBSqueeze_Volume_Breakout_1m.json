@@ -1,0 +1,59 @@
+{
+    "name": "Micro_BBSqueeze_Volume_Breakout",
+    "timeframe": "1m",
+    "family": "breakout",
+    "description": "Ultra-fast scalping strategy capitalizing on Bollinger Band squeeze breakouts with volume confirmation. Enters long when bandwidth is extremely low (squeeze) and price closes above upper band with above-average volume; short when price closes below lower band with volume burst. Exits when price crosses back below/above the middle band, capturing small momentum bursts.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "BB_upper",
+                "definition": "self.feat.bbands(close, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0).upper"
+            },
+            {
+                "name": "BB_middle",
+                "definition": "self.feat.bbands(close, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0).middle"
+            },
+            {
+                "name": "BB_lower",
+                "definition": "self.feat.bbands(close, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0).lower"
+            },
+            {
+                "name": "bandwidth",
+                "definition": "(BB_upper - BB_lower) / (BB_middle + 1e-8)"
+            },
+            {
+                "name": "volume_sma",
+                "definition": "self.feat.sma(volume, timeperiod=10)"
+            }
+        ],
+        "entry_long": "(bandwidth < squeeze_threshold) & (close > BB_upper) & (volume > volume_sma * vol_multiplier)",
+        "entry_short": "(bandwidth < squeeze_threshold) & (close < BB_lower) & (volume > volume_sma * vol_multiplier)",
+        "exit_logic": "Exit Long: close < BB_middle. Exit Short: close > BB_middle."
+    },
+    "param_space": {
+        "bb_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "squeeze_threshold": {
+            "type": "float",
+            "low": 0.02,
+            "high": 0.15,
+            "step": 0.01
+        },
+        "vol_multiplier": {
+            "type": "float",
+            "low": 1.0,
+            "high": 3.0,
+            "step": 0.2
+        }
+    }
+}

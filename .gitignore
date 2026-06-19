@@ -27,3 +27,4 @@ ENV/
 .mypy_cache/
 .coverage
 htmlcov/
+.env

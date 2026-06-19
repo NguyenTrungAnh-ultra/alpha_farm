@@ -1,0 +1,75 @@
+{
+    "name": "Micro_Williams_Linear_Volume_Scalper",
+    "timeframe": "1m",
+    "family": "momentum",
+    "description": "Ultra-fast scalping strategy for 1-minute timeframe using Williams %R oversold/overbought cross with linear regression slope direction confirmation and volume surge filter. Entries are taken when momentum extreme aligns with short-term slope and abnormal volume. Exits when momentum returns to neutral zone or slope reverses direction.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "WILLR",
+                "definition": "WILLR(high, low, close, timeperiod=willr_period)"
+            },
+            {
+                "name": "SLOPE",
+                "definition": "LINEARREG_SLOPE(close, timeperiod=slope_period)"
+            },
+            {
+                "name": "VOL_SMA",
+                "definition": "SMA(volume, timeperiod=vol_sma_period)"
+            }
+        ],
+        "entry_long": "(WILLR < willr_oversold) AND (SLOPE > 0) AND (volume > vol_mult * VOL_SMA)",
+        "entry_short": "(WILLR > willr_overbought) AND (SLOPE < 0) AND (volume > vol_mult * VOL_SMA)",
+        "exit_logic": "For long positions: exit when (WILLR > willr_exit) OR (SLOPE < 0). For short positions: exit when (WILLR < willr_exit) OR (SLOPE > 0)."
+    },
+    "param_space": {
+        "willr_period": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "slope_period": {
+            "type": "int",
+            "low": 5,
+            "high": 12,
+            "step": 1
+        },
+        "vol_sma_period": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "vol_mult": {
+            "type": "float",
+            "low": 1.0,
+            "high": 2.0,
+            "step": 0.1
+        },
+        "willr_oversold": {
+            "type": "int",
+            "low": -90,
+            "high": -80,
+            "step": 1
+        },
+        "willr_overbought": {
+            "type": "int",
+            "low": -20,
+            "high": -10,
+            "step": 1
+        },
+        "willr_exit": {
+            "type": "int",
+            "low": -60,
+            "high": -40,
+            "step": 5
+        }
+    }
+}

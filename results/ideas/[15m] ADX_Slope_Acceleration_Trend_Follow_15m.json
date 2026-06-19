@@ -1,0 +1,47 @@
+{
+    "name": "[15m] ADX_Slope_Acceleration_Trend_Follow",
+    "timeframe": "15m",
+    "family": "trend-following",
+    "description": "A trend-following strategy for VN30F1M that filters trades based on market regime (ADX) and momentum acceleration (Linear Regression Slope). It avoids mean-reversion logic to combat noise, focusing purely on high-quality directional moves. Entry requires positive slope confirmation alongside ADX strength, avoiding low volatility chop.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "slope_val",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=15)"
+            },
+            {
+                "name": "adx_val",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14, smoothbar=35)"
+            },
+            {
+                "name": "ema_20",
+                "definition": "self.feat.ema(close, timeperiod=20)"
+            }
+        ],
+        "entry_long": "(close > open_price) & (slope_val >= 0) & (adx_val >= adx_threshold)",
+        "entry_short": "(close < open_price) & (slope_val <= 0) & (adx_val >= adx_threshold)",
+        "exit_long": "(short_entry_signal_triggered OR close < ema_20 AND slope_val < -1.5)",
+        "exit_short": "(long_entry_signal_triggered OR close > ema_20 AND slope_val > 1.5)"
+    },
+    "param_space": {
+        "adx_threshold": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        },
+        "slope_threshold_long": {
+            "type": "float",
+            "low": -2.0,
+            "high": 5.0,
+            "step": 0.5
+        }
+    }
+}

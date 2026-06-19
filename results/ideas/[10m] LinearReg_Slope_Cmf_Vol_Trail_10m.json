@@ -1,0 +1,43 @@
+{
+    "name": "[10m] LinearReg_Slope_Cmf_Vol_Trail",
+    "timeframe": "10m",
+    "family": "trend-following",
+    "description": "A trend-following strategy that uses the slope of a linear regression to identify direction, confirmed by Cumulative Flow (CMF) volume support. It avoids ADX/MACD/RSI heavy combos found in other strategies.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "LRS_Slope",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=20)"
+            },
+            {
+                "name": "CMF_Flow",
+                "definition": "self.feat.cmf(high, low, close, open_price, volume, timeperiod=50)"
+            }
+        ],
+        "entry_long": "(LRS_Slope > 0.1) & (CMF_Flow >= -1)",
+        "entry_short": "(LRS_Slope < -0.1) & (CMF_Flow <= 1)",
+        "exit_long": "(LRS_Slope < 0) | (CMF_Flow < -2)",
+        "exit_short": "(LRS_Slope > 0) | (CMF_Flow > 2)"
+    },
+    "param_space": {
+        "slope_period": {
+            "type": "int",
+            "low": 15,
+            "high": 35,
+            "step": 5
+        },
+        "cmf_threshold": {
+            "type": "float",
+            "low": -2.0,
+            "high": 0.0,
+            "step": 0.5
+        }
+    }
+}

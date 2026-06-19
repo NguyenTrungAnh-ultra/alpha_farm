@@ -1,0 +1,63 @@
+{
+    "name": "TEMA_Aroonosc_NATR_Trend_Follower",
+    "timeframe": "10m",
+    "family": "trend-following",
+    "description": "Combines TEMA as dynamic trend direction, Aroon Oscillator to measure trend strength and conviction, and NATR to filter out low-volatility chop. Enters long when price is above TEMA and Aroonosc shows strong uptrend ( > threshold) while volatility is sufficient. Exits when Aroonosc loses momentum (crosses zero) or price violates TEMA.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "TEMA",
+                "definition": "self.feat.tema(close, timeperiod=tema_period)"
+            },
+            {
+                "name": "AROONOSC",
+                "definition": "self.feat.aroonosc(high, low, timeperiod=aroon_period)"
+            },
+            {
+                "name": "NATR",
+                "definition": "self.feat.natr(high, low, close, timeperiod=natr_period)"
+            }
+        ],
+        "entry_long": "(close > TEMA) & (AROONOSC > aroon_threshold) & (NATR > natr_min)",
+        "entry_short": "(close < TEMA) & (AROONOSC < -aroon_threshold) & (NATR > natr_min)",
+        "exit_logic": "Exit Long: (AROONOSC < 0) | (close < TEMA). Exit Short: (AROONOSC > 0) | (close > TEMA)."
+    },
+    "param_space": {
+        "tema_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "aroon_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "aroon_threshold": {
+            "type": "int",
+            "low": 10,
+            "high": 50,
+            "step": 5
+        },
+        "natr_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 2
+        },
+        "natr_min": {
+            "type": "float",
+            "low": 0.5,
+            "high": 2.0,
+            "step": 0.2
+        }
+    }
+}

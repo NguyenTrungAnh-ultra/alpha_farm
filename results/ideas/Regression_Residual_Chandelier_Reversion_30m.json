@@ -1,0 +1,78 @@
+{
+    "name": "Regression_Residual_Chandelier_Reversion",
+    "timeframe": "30m",
+    "family": "mean-reversion",
+    "description": "Mean-reversion strategy using linear regression residual to identify oversold/overbought conditions during low-trend regimes (ADX < threshold). Enters long when price is significantly below the regression line, short when significantly above. Exits via Chandelier stop (highest high minus ATR for longs, lowest low plus ATR for shorts) or when residual crosses zero, locking in mean-reversion profits while limiting downside in case of trend emergence.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "reg_line",
+                "definition": "self.feat.linearreg(close, timeperiod=reg_period)"
+            },
+            {
+                "name": "residual",
+                "definition": "close - reg_line"
+            },
+            {
+                "name": "resid_std",
+                "definition": "self.feat.stddev(residual, timeperiod=reg_period).clip(lower=1e-8)"
+            },
+            {
+                "name": "ADX",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "highest_high",
+                "definition": "self.feat.max(high, timeperiod=chandelier_period)"
+            },
+            {
+                "name": "lowest_low",
+                "definition": "self.feat.min(low, timeperiod=chandelier_period)"
+            }
+        ],
+        "entry_long": "(residual < -resid_mult * resid_std) & (ADX < adx_threshold)",
+        "entry_short": "(residual > resid_mult * resid_std) & (ADX < adx_threshold)",
+        "exit_logic": "Exit Long: (close < (highest_high - atr_multiplier * ATR)) | (residual > 0). Exit Short: (close > (lowest_low + atr_multiplier * ATR)) | (residual < 0)."
+    },
+    "param_space": {
+        "reg_period": {
+            "type": "int",
+            "low": 20,
+            "high": 60,
+            "step": 5
+        },
+        "resid_mult": {
+            "type": "float",
+            "low": 1.5,
+            "high": 3.0,
+            "step": 0.1
+        },
+        "adx_threshold": {
+            "type": "int",
+            "low": 15,
+            "high": 25,
+            "step": 1
+        },
+        "atr_multiplier": {
+            "type": "float",
+            "low": 2.0,
+            "high": 4.0,
+            "step": 0.2
+        },
+        "chandelier_period": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 2
+        }
+    }
+}

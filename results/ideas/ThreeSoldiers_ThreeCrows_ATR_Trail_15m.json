@@ -1,0 +1,79 @@
+{
+    "name": "ThreeSoldiers_ThreeCrows_ATR_Trail",
+    "timeframe": "15m",
+    "family": "pattern-based",
+    "description": "Uses bullish Three White Soldiers and bearish Three Black Crows candlestick patterns as primary entry signals, confirmed by a trend filter (price relative to EMA) and a volatility regime filter (ATR above its moving average). Exits use a Chandelier-style trailing stop based on highest highs and lowest lows scaled by ATR, ensuring exits occur only at bar close.",
+    "formula": {
+        "inputs": [
+            "open",
+            "high",
+            "low",
+            "close"
+        ],
+        "indicators": [
+            {
+                "name": "EMA_trend",
+                "definition": "EMA(close, timeperiod=50)"
+            },
+            {
+                "name": "ATR",
+                "definition": "ATR(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR_ma",
+                "definition": "SMA(ATR, timeperiod=20)"
+            },
+            {
+                "name": "chandelier_long_stop",
+                "definition": "MAX(high, 22) - ATR * 3.0"
+            },
+            {
+                "name": "chandelier_short_stop",
+                "definition": "MIN(low, 22) + ATR * 3.0"
+            },
+            {
+                "name": "bullish_pattern",
+                "definition": "CDL3WHITESOLDIERS(open, high, low, close)"
+            },
+            {
+                "name": "bearish_pattern",
+                "definition": "CDL3BLACKCROWS(open, high, low, close)"
+            }
+        ],
+        "entry_long": "(bullish_pattern > 0) AND (close > EMA_trend) AND (ATR > ATR_ma)",
+        "entry_short": "(bearish_pattern < 0) AND (close < EMA_trend) AND (ATR > ATR_ma)",
+        "exit_logic": "For long positions: EXIT when close < chandelier_long_stop. For short positions: EXIT when close > chandelier_short_stop."
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 30,
+            "high": 60,
+            "step": 5
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 2
+        },
+        "atr_smoothing": {
+            "type": "int",
+            "low": 15,
+            "high": 25,
+            "step": 5
+        },
+        "trail_period": {
+            "type": "int",
+            "low": 18,
+            "high": 26,
+            "step": 2
+        },
+        "trail_multiplier": {
+            "type": "float",
+            "low": 2.5,
+            "high": 4.0,
+            "step": 0.5
+        }
+    }
+}

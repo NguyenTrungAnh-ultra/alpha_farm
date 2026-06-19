@@ -1,0 +1,63 @@
+{
+    "name": "Micro_TrueRange_Volume_Burst_Breakout",
+    "timeframe": "1m",
+    "family": "breakout",
+    "description": "Scalping strategy that enters on price expansion beyond a volatility threshold (fast ATR) confirmed by a volume surge above its weighted moving average. Exits using a trailing stop based on rolling high/low with a slower ATR multiple, capturing quick momentum bursts while filtering low-volume noise.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "ATR_fast",
+                "definition": "self.feat.atr(high, low, close, timeperiod=5)"
+            },
+            {
+                "name": "ATR_slow",
+                "definition": "self.feat.atr(high, low, close, timeperiod=10)"
+            },
+            {
+                "name": "volume_wma",
+                "definition": "self.feat.wma(volume, timeperiod=10)"
+            },
+            {
+                "name": "rolling_high_5",
+                "definition": "self.feat.max(high, timeperiod=5)"
+            },
+            {
+                "name": "rolling_low_5",
+                "definition": "self.feat.min(low, timeperiod=5)"
+            },
+            {
+                "name": "shift_close",
+                "definition": "self.feat.shift(close, 1)"
+            }
+        ],
+        "entry_long": "(close > (shift_close + param_a * ATR_fast)) & (volume > param_b * volume_wma)",
+        "entry_short": "(close < (shift_close - param_a * ATR_fast)) & (volume > param_b * volume_wma)",
+        "exit_logic": "Exit Long: close < (rolling_high_5 - param_c * ATR_slow). Exit Short: close > (rolling_low_5 + param_c * ATR_slow)."
+    },
+    "param_space": {
+        "param_a": {
+            "type": "float",
+            "low": 0.5,
+            "high": 2.0,
+            "step": 0.1
+        },
+        "param_b": {
+            "type": "float",
+            "low": 1.0,
+            "high": 3.0,
+            "step": 0.2
+        },
+        "param_c": {
+            "type": "float",
+            "low": 1.0,
+            "high": 3.0,
+            "step": 0.2
+        }
+    }
+}

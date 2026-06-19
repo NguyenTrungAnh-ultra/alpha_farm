@@ -1,0 +1,43 @@
+{
+    "name": "[10m] Cmf_Roc_Vol_Momentum_Follow",
+    "timeframe": "10m",
+    "family": "momentum",
+    "description": "A momentum strategy using Cumulative Flow Volume (CMF) and Rate of Change (ROC). It enters when volume flow is positive while price momentum remains above a threshold, exiting on reversal or loss of momentum. Designed to avoid division-by-zero errors by relying on library functions.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "CMF",
+                "definition": "self.feat.cmf(volume, close, timeperiod=20)"
+            },
+            {
+                "name": "ROC",
+                "definition": "self.feat.roc(close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(cmf > param_cmft) & (roc > param_roct)",
+        "entry_short": "(cmf < -param_cmft) & (roc < -param_roct)",
+        "exit_long": "(cmf < 0.5 * param_exit_thresh) | (roc <= 0)",
+        "exit_short": "(cmf > 0.5 * param_exit_thresh_neg) | (roc >= 0)"
+    },
+    "param_space": {
+        "param_cmft": {
+            "type": "float",
+            "low": -1.0,
+            "high": 2.0,
+            "step": 0.1
+        },
+        "param_roct": {
+            "type": "int",
+            "low": -5,
+            "high": 30,
+            "step": 1
+        }
+    }
+}

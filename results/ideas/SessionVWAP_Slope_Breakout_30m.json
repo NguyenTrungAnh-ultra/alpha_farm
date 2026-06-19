@@ -1,0 +1,53 @@
+{
+    "name": "SessionVWAP_Slope_Breakout",
+    "timeframe": "30m",
+    "family": "session-based",
+    "description": "Uses a rolling VWAP over the typical session length (e.g., 8 bars) as a dynamic reference, combined with ATR volatility and linear regression slope to capture breakout moves during the session. Enters long when price breaks above VWAP plus ATR band with positive slope, and short when price breaks below VWAP minus ATR band with negative slope. Exits when price returns to VWAP or slope reverses.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "VWAP",
+                "definition": "self.feat.rolling_vwap(high, low, close, volume, timeperiod=vwap_period)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Slope",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=slope_period)"
+            }
+        ],
+        "entry_long": "(close > (VWAP + atr_mult * ATR)) & (Slope > 0) & (ATR > 0.5)",
+        "entry_short": "(close < (VWAP - atr_mult * ATR)) & (Slope < 0) & (ATR > 0.5)",
+        "exit_long": "(close < VWAP) | (Slope < 0)",
+        "exit_short": "(close > VWAP) | (Slope > 0)"
+    },
+    "param_space": {
+        "vwap_period": {
+            "type": "int",
+            "low": 6,
+            "high": 12,
+            "step": 1
+        },
+        "atr_mult": {
+            "type": "float",
+            "low": 0.3,
+            "high": 1.5,
+            "step": 0.1
+        },
+        "slope_period": {
+            "type": "int",
+            "low": 6,
+            "high": 12,
+            "step": 1
+        }
+    }
+}

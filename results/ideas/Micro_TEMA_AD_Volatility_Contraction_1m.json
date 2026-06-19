@@ -1,0 +1,75 @@
+{
+    "name": "Micro_TEMA_AD_Volatility_Contraction",
+    "timeframe": "1m",
+    "family": "multi-indicator",
+    "description": "Scalping strategy on 1-minute VN30F1M using TEMA as trend filter, Chaikin A/D line for volume-weighted accumulation/distribution, and volatility contraction (ATR ratio) to avoid choppy markets. Entries occur when price crosses TEMA with AD confirming momentum and low volatility regime. Exits on opposite TEMA cross or AD reversal.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "TEMA",
+                "definition": "TEMA(close, timeperiod=tema_period)"
+            },
+            {
+                "name": "AD",
+                "definition": "IF (high - low == 0) THEN 0 ELSE ((close - low) - (high - close)) / (high - low + 1e-8) * volume"
+            },
+            {
+                "name": "AD_SMA",
+                "definition": "SMA(AD, timeperiod=ad_sma_period)"
+            },
+            {
+                "name": "ATR_fast",
+                "definition": "ATR(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ATR_slow",
+                "definition": "ATR(high, low, close, timeperiod=28)"
+            },
+            {
+                "name": "vol_contraction",
+                "definition": "ATR_fast / (ATR_slow + 1e-8) < vol_ratio_threshold"
+            }
+        ],
+        "entry_long": "close > TEMA AND AD > AD_SMA * ad_long_mult AND vol_contraction",
+        "entry_short": "close < TEMA AND AD < AD_SMA * ad_short_mult AND vol_contraction",
+        "exit_logic": "For long: exit when close < TEMA OR AD < AD_SMA; For short: exit when close > TEMA OR AD > AD_SMA"
+    },
+    "param_space": {
+        "tema_period": {
+            "type": "int",
+            "low": 3,
+            "high": 15,
+            "step": 1
+        },
+        "ad_sma_period": {
+            "type": "int",
+            "low": 5,
+            "high": 20,
+            "step": 1
+        },
+        "vol_ratio_threshold": {
+            "type": "float",
+            "low": 0.7,
+            "high": 0.95,
+            "step": 0.05
+        },
+        "ad_long_mult": {
+            "type": "float",
+            "low": 1.02,
+            "high": 1.1,
+            "step": 0.01
+        },
+        "ad_short_mult": {
+            "type": "float",
+            "low": 0.9,
+            "high": 0.98,
+            "step": 0.01
+        }
+    }
+}

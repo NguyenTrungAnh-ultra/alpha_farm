@@ -1,0 +1,67 @@
+{
+    "name": "Marubozu_ATR_RSI_Confirmation",
+    "timeframe": "10m",
+    "family": "pattern-based",
+    "description": "Uses Marubozu candlestick patterns (strong directional bars with little or no wicks) as primary entry signals, confirmed by EMA trend direction and RSI regime filter. Exits on overbought/oversold RSI levels or ATR-based trailing stop to capture momentum bursts while managing risk.",
+    "formula": {
+        "inputs": [
+            "open",
+            "high",
+            "low",
+            "close"
+        ],
+        "indicators": [
+            {
+                "name": "marubozu",
+                "definition": "self.feat.cdl_marubozu(open, high, low, close)"
+            },
+            {
+                "name": "ema_fast",
+                "definition": "self.feat.ema(close, timeperiod=EMA_period)"
+            },
+            {
+                "name": "rsi",
+                "definition": "self.feat.rsi(close, timeperiod=14)"
+            },
+            {
+                "name": "atr",
+                "definition": "self.feat.atr(high, low, close, timeperiod=ATR_period)"
+            }
+        ],
+        "entry_long": "(marubozu == 100) & (rsi > 50) & (close > ema_fast)",
+        "entry_short": "(marubozu == -100) & (rsi < 50) & (close < ema_fast)",
+        "exit_logic": "Exit Long: (rsi > rsi_exit_upper) | (close < (ema_fast - atr_multiplier * atr)). Exit Short: (rsi < rsi_exit_lower) | (close > (ema_fast + atr_multiplier * atr))."
+    },
+    "param_space": {
+        "EMA_period": {
+            "type": "int",
+            "low": 10,
+            "high": 40,
+            "step": 2
+        },
+        "ATR_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "atr_multiplier": {
+            "type": "float",
+            "low": 1.0,
+            "high": 3.0,
+            "step": 0.2
+        },
+        "rsi_exit_upper": {
+            "type": "int",
+            "low": 70,
+            "high": 85,
+            "step": 1
+        },
+        "rsi_exit_lower": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        }
+    }
+}

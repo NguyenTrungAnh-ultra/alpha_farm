@@ -1,0 +1,43 @@
+{
+    "name": "[10m] Session_LinearReg_Stochrsi_Trend_Follow",
+    "timeframe": "10m",
+    "family": "session-based",
+    "description": "Intraday trend-following strategy using Linear Regression Slope for direction and Stochastic RSI for pullback confirmation. Designed to avoid the 'Willr/NATR' combination used in previous accepted strategies by utilizing a momentum oscillator (StochRSI) instead.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "slope",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=40)"
+            },
+            {
+                "name": "stochrsi_val",
+                "definition": "self.feat.stochrsi(midprice)"
+            }
+        ],
+        "entry_long": "(slope > 1.5) & (close < midpoint + slope_threshold)",
+        "entry_short": "(slope < -1.5) & (close > midpoint - slope_threshold)",
+        "exit_long": "(stochrsi_val > 80) | (slope < -2.0)",
+        "exit_short": "(stochrsi_val < 20) | (slope > 2.0)"
+    },
+    "param_space": {
+        "slope_threshold": {
+            "type": "float",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "stochrsi_low": {
+            "type": "int",
+            "low": 30,
+            "high": 80,
+            "step": 5
+        }
+    }
+}

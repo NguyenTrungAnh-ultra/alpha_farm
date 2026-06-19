@@ -1,0 +1,76 @@
+{
+    "name": "Micro_Linear_Slope_BOP_Alpha_Scalper",
+    "timeframe": "1m",
+    "family": "multi-indicator",
+    "description": "An ultra-fast 1-minute scalping strategy that exploits momentary institutional micro-trends in the VN30F1M contract. It tracks instantaneous direction using the slope of a short-term linear regression curve. To protect against the pitfalls of noisy fakeouts and frequent zero-volume or flat bars, true underlying accumulation is confirmed via the Balance of Power (BOP) indicator smoothed with a short WMA. A standard deviation filter acts as a baseline volatility floor, forcing the system to bypass sideways markets. Array-based vectorized exits track tight rolling channels anchored to historical price extremes.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume",
+            "open"
+        ],
+        "indicators": [
+            {
+                "name": "Slope_Fast",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=slope_period)"
+            },
+            {
+                "name": "BOP",
+                "definition": "self.feat.bop(open, high, low, close)"
+            },
+            {
+                "name": "BOP_Smooth",
+                "definition": "self.feat.wma(BOP, timeperiod=5)"
+            },
+            {
+                "name": "Volatility_Floor",
+                "definition": "self.feat.stddev(close, timeperiod=10)"
+            },
+            {
+                "name": "Micro_High",
+                "definition": "self.feat.max(high, timeperiod=exit_period)"
+            },
+            {
+                "name": "Micro_Low",
+                "definition": "self.feat.min(low, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(Slope_Fast > slope_trigger) & (BOP_Smooth > bop_threshold) & (Volatility_Floor > noise_threshold)",
+        "entry_short": "(Slope_Fast < -slope_trigger) & (BOP_Smooth < -bop_threshold) & (Volatility_Floor > noise_threshold)",
+        "exit_logic": "Exit Long: (close < Micro_Low) or (Slope_Fast < 0.0). Exit Short: (close > Micro_High) or (Slope_Fast > 0.0)."
+    },
+    "param_space": {
+        "slope_period": {
+            "type": "int",
+            "low": 5,
+            "high": 12,
+            "step": 1
+        },
+        "slope_trigger": {
+            "type": "float",
+            "low": 0.04,
+            "high": 0.22,
+            "step": 0.02
+        },
+        "bop_threshold": {
+            "type": "float",
+            "low": 0.05,
+            "high": 0.25,
+            "step": 0.05
+        },
+        "noise_threshold": {
+            "type": "float",
+            "low": 0.3,
+            "high": 1.1,
+            "step": 0.1
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 3,
+            "high": 5,
+            "step": 1
+        }
+    }
+}

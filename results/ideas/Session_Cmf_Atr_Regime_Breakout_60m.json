@@ -1,0 +1,47 @@
+{
+    "name": "Session_Cmf_Atr_Regime_Breakout",
+    "timeframe": "60m",
+    "family": "session-based",
+    "description": "Strategy designed to capture breakout opportunities during session hours using Cumulative Flow (CMF) direction and ATR volatility expansion. It avoids hard stop losses by exiting at candle close when trend signal reverses, ensuring robustness against zero volume bars.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "EMA_fast",
+                "definition": "self.feat.ema(close, timeperiod=10)"
+            },
+            {
+                "name": "CMF",
+                "definition": "self.feat.cmf(volume, close, timeperiod=5)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close > EMA_fast) & (CMF.crossed_above(0)) & (ATR < rolling_max(ATR, period=20).shift(-1))",
+        "entry_short": "(close < EMA_fast) & (CMF.crossed_below(0)) & (ATR < rolling_min(ATR, period=20).shift(-1))",
+        "exit_long": "(close <= EMA_fast)",
+        "exit_short": "(close >= EMA_fast)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 5,
+            "high": 30,
+            "step": 1
+        },
+        "cmf_threshold": {
+            "type": "float",
+            "low": -0.2,
+            "high": 0.8,
+            "step": 0.1
+        }
+    }
+}

@@ -1,0 +1,45 @@
+{
+    "name": "Slope_Ema_Natr_Trend_Follow",
+    "timeframe": "30m",
+    "family": "trend-following",
+    "description": "Trend following strategy using Price Slope and EMA direction, filtered by Natural ATR volatility to avoid choppy markets. Exits on trend reversal candle close.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "EMA_fast",
+                "definition": "self.feat.ema(close, timeperiod=20)"
+            },
+            {
+                "name": "Slope_Trend",
+                "definition": "self.feat.linearreg_slope(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "NATR_Volatility",
+                "definition": "self.feat.natr(high, low, close, timeperiod=20)"
+            }
+        ],
+        "entry_long": "(close > ema_fast) & (slope_trend > 0.5)",
+        "entry_short": "(close < ema_fast) & (slope_trend < -0.5)",
+        "exit_long": "(close <= ema_fast) | (slope_trend <= 0)",
+        "exit_short": "(close >= ema_fast) | (slope_trend > 0)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 14,
+            "high": 35,
+            "step": 2
+        },
+        "slope_threshold": {
+            "type": "float",
+            "low": -1.0,
+            "high": 1.0,
+            "step": 0.1
+        }
+    }
+}

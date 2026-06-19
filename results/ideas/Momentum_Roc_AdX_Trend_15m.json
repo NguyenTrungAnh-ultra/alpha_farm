@@ -1,0 +1,53 @@
+{
+    "name": "Momentum_Roc_AdX_Trend",
+    "timeframe": "15m",
+    "family": "momentum",
+    "description": "Uses Rate of Change (ROC) for momentum entry, EMA for trend direction, and ADX as a volatility regime filter to avoid choppy markets on VN30 15m timeframe.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "EMA_Trend",
+                "definition": "self.feat.ema(close, timeperiod=20)"
+            },
+            {
+                "name": "ROC_Mom",
+                "definition": "self.feat.roc(close, timeperiod=14)"
+            },
+            {
+                "name": "ADX_Regime",
+                "definition": "self.feat.adx(high, low, close, timeperiod=20)"
+            }
+        ],
+        "entry_long": "(close >= EMA_Trend) & (ROC_Mom > 5.0) & (ADX_Regime > 18)",
+        "entry_short": "(close <= EMA_Trend) & (-ROC_Mom < -5.0) & (ADX_Regime > 18)",
+        "exit_long": "(close < EMA_Trend) | (ROC_Mom <= 0)",
+        "exit_short": "(close > EMA_Trend) | (-ROC_Mom >= 0)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 14,
+            "high": 35,
+            "step": 2
+        },
+        "roc_threshold": {
+            "type": "float",
+            "low": -8.0,
+            "high": 15.0,
+            "step": 1.0
+        },
+        "adx_threshold": {
+            "type": "int",
+            "low": 14,
+            "high": 35,
+            "step": 2
+        }
+    }
+}

@@ -1,0 +1,56 @@
+{
+    "name": "Midpoint_SAR_LinearSlope_Trail",
+    "timeframe": "5m",
+    "family": "trend-following",
+    "description": "Uses Midpoint (average of highest high and lowest low over period) as dynamic threshold, Linear Regression Slope to confirm trend direction, and Parabolic SAR as trailing stop exit. Long when price closes above midpoint with positive slope and above SAR; short when below midpoint with negative slope and below SAR. Exit when SAR flips side.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "MIDPOINT",
+                "definition": "MIDPOINT(high, low, timeperiod=20)"
+            },
+            {
+                "name": "SLOPE",
+                "definition": "LINEARREG_SLOPE(close, timeperiod=20)"
+            },
+            {
+                "name": "SAR",
+                "definition": "SAR(high, low, acceleration=0.02, maximum=0.2)"
+            }
+        ],
+        "entry_long": "close > MIDPOINT AND SLOPE > 0 AND close > SAR",
+        "entry_short": "close < MIDPOINT AND SLOPE < 0 AND close < SAR",
+        "exit_logic": "For long: close < SAR; for short: close > SAR"
+    },
+    "param_space": {
+        "midpoint_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "slope_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "sar_acceleration": {
+            "type": "float",
+            "low": 0.01,
+            "high": 0.05,
+            "step": 0.01
+        },
+        "sar_maximum": {
+            "type": "float",
+            "low": 0.1,
+            "high": 0.3,
+            "step": 0.05
+        }
+    }
+}

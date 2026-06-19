@@ -1,0 +1,60 @@
+{
+    "name": "TEMA_Variance_Burst_Trend",
+    "timeframe": "5m",
+    "family": "trend-following",
+    "description": "Captures volatility expansion bursts confirmed by TEMA trend direction. Uses variance of close to detect sharp price movements, entering when variance expands above its moving average and price aligns with TEMA. Exits when variance contracts or trend reverses.",
+    "formula": {
+        "inputs": [
+            "close"
+        ],
+        "indicators": [
+            {
+                "name": "TEMA_fast",
+                "definition": "TEMA(close, timeperiod=tema_period)"
+            },
+            {
+                "name": "var_raw",
+                "definition": "VAR(close, timeperiod=var_period)"
+            },
+            {
+                "name": "var_sma",
+                "definition": "SMA(var_raw, timeperiod=var_sma_period)"
+            }
+        ],
+        "entry_long": "close > TEMA_fast AND var_raw > expansion_factor * var_sma",
+        "entry_short": "close < TEMA_fast AND var_raw > expansion_factor * var_sma",
+        "exit_logic": "exit_long = (close <= TEMA_fast) OR (var_raw < contraction_factor * var_sma); exit_short = (close >= TEMA_fast) OR (var_raw < contraction_factor * var_sma)"
+    },
+    "param_space": {
+        "tema_period": {
+            "type": "int",
+            "low": 5,
+            "high": 30,
+            "step": 1
+        },
+        "var_period": {
+            "type": "int",
+            "low": 5,
+            "high": 20,
+            "step": 1
+        },
+        "var_sma_period": {
+            "type": "int",
+            "low": 10,
+            "high": 40,
+            "step": 2
+        },
+        "expansion_factor": {
+            "type": "float",
+            "low": 1.2,
+            "high": 2.5,
+            "step": 0.1
+        },
+        "contraction_factor": {
+            "type": "float",
+            "low": 0.5,
+            "high": 0.9,
+            "step": 0.05
+        }
+    }
+}

@@ -1,0 +1,81 @@
+{
+    "name": "SessionBreakout_NATR_Volume",
+    "timeframe": "60m",
+    "family": "session-based",
+    "description": "Breakout strategy using prior session high/low (rolling window). Confirms breakout with NATR volatility filter and volume surge. Exits when price crosses a short-term EMA, capturing reversal.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "natr",
+                "definition": "self.feat.natr(high, low, close, timeperiod=atr_period)"
+            },
+            {
+                "name": "rolling_high",
+                "definition": "self.feat.rolling_max(high, window=session_window)"
+            },
+            {
+                "name": "rolling_low",
+                "definition": "self.feat.rolling_min(low, window=session_window)"
+            },
+            {
+                "name": "prev_high",
+                "definition": "self.op.shift(rolling_high, 1)"
+            },
+            {
+                "name": "prev_low",
+                "definition": "self.op.shift(rolling_low, 1)"
+            },
+            {
+                "name": "volume_sma",
+                "definition": "self.feat.sma(volume, timeperiod=volume_sma_period)"
+            },
+            {
+                "name": "ema_exit",
+                "definition": "self.feat.ema(close, timeperiod=exit_ema_period)"
+            }
+        ],
+        "entry_long": "(close > prev_high) & (natr > natr_threshold) & (volume > volume_sma)",
+        "entry_short": "(close < prev_low) & (natr > natr_threshold) & (volume > volume_sma)",
+        "exit_long": "(close < ema_exit)",
+        "exit_short": "(close > ema_exit)"
+    },
+    "param_space": {
+        "session_window": {
+            "type": "int",
+            "low": 4,
+            "high": 8,
+            "step": 1
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 1
+        },
+        "volume_sma_period": {
+            "type": "int",
+            "low": 5,
+            "high": 20,
+            "step": 1
+        },
+        "natr_threshold": {
+            "type": "float",
+            "low": 0.3,
+            "high": 1.0,
+            "step": 0.1
+        },
+        "exit_ema_period": {
+            "type": "int",
+            "low": 3,
+            "high": 10,
+            "step": 1
+        }
+    }
+}

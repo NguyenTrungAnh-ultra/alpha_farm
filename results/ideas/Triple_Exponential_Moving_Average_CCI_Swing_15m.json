@@ -1,0 +1,89 @@
+{
+    "name": "Triple_Exponential_Moving_Average_CCI_Swing",
+    "timeframe": "15m",
+    "family": "oscillator-divergence",
+    "description": "A high-quality 15-minute swing intraday strategy designed to harvest clean structural momentum arcs on the VN30F1M index while filtering out false trend starts. It tracks the institutional direction baseline using a medium-period Triple Exponential Moving Average (TEMA) to mitigate lag without sacrificing stability. Direct cyclical momentum reversals are tracked via a smoothed Commodity Channel Index (CCI). To insulate the strategy from flat, low-liquidity zones or thin bars, execution requires a definitive structural volatility expansion confirmation where the fast price standard deviation breaks out past its trailing baseline. Array-based vectorized exits use trailing price channels anchored to standard ATR multipliers.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "TEMA",
+                "definition": "self.feat.tema(close, timeperiod=tema_period)"
+            },
+            {
+                "name": "CCI_Raw",
+                "definition": "self.feat.cci(high, low, close, timeperiod=cci_period)"
+            },
+            {
+                "name": "CCI_Smooth",
+                "definition": "self.feat.wma(CCI_Raw, timeperiod=5)"
+            },
+            {
+                "name": "Volatility_Fast",
+                "definition": "self.feat.stddev(close, timeperiod=10)"
+            },
+            {
+                "name": "Volatility_Base",
+                "definition": "self.feat.sma(Volatility_Fast, timeperiod=30)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "Rolling_Max",
+                "definition": "self.feat.max(high, timeperiod=exit_period)"
+            },
+            {
+                "name": "Rolling_Min",
+                "definition": "self.feat.min(low, timeperiod=exit_period)"
+            }
+        ],
+        "entry_long": "(close > TEMA) & (CCI_Smooth > cci_bound) & (Volatility_Fast > Volatility_Base * expansion_mult)",
+        "entry_short": "(close < TEMA) & (CCI_Smooth < -cci_bound) & (Volatility_Fast > Volatility_Base * expansion_mult)",
+        "exit_logic": "Exit Long: (close < TEMA) or (close < Rolling_Max - (exit_mult * ATR)). Exit Short: (close > TEMA) or (close > Rolling_Min + (exit_mult * ATR))."
+    },
+    "param_space": {
+        "tema_period": {
+            "type": "int",
+            "low": 20,
+            "high": 44,
+            "step": 2
+        },
+        "cci_period": {
+            "type": "int",
+            "low": 12,
+            "high": 24,
+            "step": 1
+        },
+        "cci_bound": {
+            "type": "float",
+            "low": 70.0,
+            "high": 110.0,
+            "step": 5.0
+        },
+        "expansion_mult": {
+            "type": "float",
+            "low": 1.05,
+            "high": 1.55,
+            "step": 0.05
+        },
+        "exit_period": {
+            "type": "int",
+            "low": 10,
+            "high": 22,
+            "step": 1
+        },
+        "exit_mult": {
+            "type": "float",
+            "low": 2.0,
+            "high": 4.0,
+            "step": 0.1
+        }
+    }
+}

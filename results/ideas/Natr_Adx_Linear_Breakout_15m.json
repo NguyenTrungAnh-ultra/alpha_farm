@@ -1,0 +1,51 @@
+{
+    "name": "Natr_Adx_Linear_Breakout",
+    "timeframe": "15m",
+    "family": "breakout",
+    "description": "Captures breakouts above the dynamic regression line during high volatility regimes. Exits based on price reversion relative to a volatility-adjusted pivot.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "LinearReg_Pivot",
+                "definition": "self.feat.linearreg(close, timeperiod=20)"
+            },
+            {
+                "name": "NATR_Filter",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ADX_Regime",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close >= LinearReg_Pivot + NATR_Filter * 0.5) & (ADX_Regime > 20)",
+        "entry_short": "(close <= LinearReg_Pivot - NATR_Filter * 0.5) & (ADX_Regime > 20)",
+        "exit_long": "(close < LinearReg_Pivot - NATR_Filter * 1.5)",
+        "exit_short": "(close > LinearReg_Pivot + NATR_Filter * 1.5)"
+    },
+    "param_space": {
+        "LinearPeriod": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "NATR_Period": {
+            "type": "int",
+            "low": 8,
+            "high": 25,
+            "step": 1
+        },
+        "ADX_Threshold": {
+            "type": "float",
+            "low": 15.0,
+            "high": 40.0,
+            "step": 1.0
+        }
+    }
+}

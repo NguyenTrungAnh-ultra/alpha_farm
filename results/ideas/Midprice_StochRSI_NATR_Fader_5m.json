@@ -1,0 +1,67 @@
+{
+    "name": "Midprice_StochRSI_NATR_Fader",
+    "timeframe": "5m",
+    "family": "mean-reversion",
+    "description": "Mean-reversion strategy that fades deviations from the midprice (high+low)/2. Enters long when price closes below midprice minus ATR multiple, StochRSI is oversold, and NATR indicates sufficient volatility. Enters short symmetrically. Exits when price returns toward midprice or StochRSI reaches neutral levels.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "midprice",
+                "definition": "MIDPRICE(high, low)"
+            },
+            {
+                "name": "atr",
+                "definition": "ATR(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "natr",
+                "definition": "NATR(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "stochrsi_k",
+                "definition": "STOCHRSI(close, timeperiod=14, fastk_period=5, fastd_period=3, 0)"
+            }
+        ],
+        "entry_long": "(close < midprice - entry_mult * atr) AND (stochrsi_k < oversold_threshold) AND (natr > natr_min)",
+        "entry_short": "(close > midprice + entry_mult * atr) AND (stochrsi_k > overbought_threshold) AND (natr > natr_min)",
+        "exit_logic": "For long: (close > midprice + exit_mult * atr) OR (stochrsi_k > 70) ; For short: (close < midprice - exit_mult * atr) OR (stochrsi_k < 30)"
+    },
+    "param_space": {
+        "entry_mult": {
+            "type": "float",
+            "low": 0.3,
+            "high": 1.0,
+            "step": 0.1
+        },
+        "exit_mult": {
+            "type": "float",
+            "low": 0.1,
+            "high": 0.5,
+            "step": 0.1
+        },
+        "oversold_threshold": {
+            "type": "int",
+            "low": 15,
+            "high": 25,
+            "step": 5
+        },
+        "overbought_threshold": {
+            "type": "int",
+            "low": 75,
+            "high": 85,
+            "step": 5
+        },
+        "natr_min": {
+            "type": "float",
+            "low": 0.3,
+            "high": 1.0,
+            "step": 0.1
+        }
+    }
+}

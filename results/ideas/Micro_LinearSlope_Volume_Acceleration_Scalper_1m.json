@@ -1,0 +1,75 @@
+{
+    "name": "Micro_LinearSlope_Volume_Acceleration_Scalper",
+    "timeframe": "1m",
+    "family": "momentum",
+    "description": "Ultra-fast scalping strategy that enters on zero-line cross of linear regression slope (momentum change) confirmed by volume surge above TRIMA and volatility expansion (ATR rising). Exits using ATR trailing stop or opposite slope cross.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "lin_slope",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=5)"
+            },
+            {
+                "name": "vol_trima",
+                "definition": "self.feat.trima(volume, timeperiod=10)"
+            },
+            {
+                "name": "atr",
+                "definition": "self.feat.atr(high, low, close, timeperiod=7)"
+            },
+            {
+                "name": "atr_sma",
+                "definition": "self.feat.sma(atr, timeperiod=5)"
+            },
+            {
+                "name": "trailing_high",
+                "definition": "self.feat.max(high, timeperiod=5).shift(1)"
+            },
+            {
+                "name": "trailing_low",
+                "definition": "self.feat.min(low, timeperiod=5).shift(1)"
+            }
+        ],
+        "entry_long": "(lin_slope > 0) & (lin_slope.shift(1) <= 0) & (volume > vol_trima) & (atr > atr_sma)",
+        "entry_short": "(lin_slope < 0) & (lin_slope.shift(1) >= 0) & (volume > vol_trima) & (atr > atr_sma)",
+        "exit_logic": "Exit Long: (close < (trailing_high - 1.5 * atr)) | (lin_slope < 0). Exit Short: (close > (trailing_low + 1.5 * atr)) | (lin_slope > 0)."
+    },
+    "param_space": {
+        "lin_slope_period": {
+            "type": "int",
+            "low": 3,
+            "high": 10,
+            "step": 1
+        },
+        "vol_trima_period": {
+            "type": "int",
+            "low": 5,
+            "high": 20,
+            "step": 1
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 5,
+            "high": 14,
+            "step": 1
+        },
+        "atr_sma_period": {
+            "type": "int",
+            "low": 3,
+            "high": 10,
+            "step": 1
+        },
+        "trailing_mult": {
+            "type": "float",
+            "low": 1.0,
+            "high": 3.0,
+            "step": 0.1
+        }
+    }
+}

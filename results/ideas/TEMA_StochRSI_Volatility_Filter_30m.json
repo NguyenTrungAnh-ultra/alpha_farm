@@ -1,0 +1,90 @@
+{
+    "name": "TEMA_StochRSI_Volatility_Filter",
+    "timeframe": "30m",
+    "family": "momentum",
+    "description": "30-minute momentum strategy using TEMA trend direction and StochRSI oversold/overbought conditions with volatility filter. Entries require TEMA slope confirmation, StochRSI extreme levels, and minimum ATR threshold. Exits using Donchian channel low/high break.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "TEMA",
+                "definition": "TEMA(close, timeperiod=tema_period)"
+            },
+            {
+                "name": "TEMA_prev",
+                "definition": "shift(TEMA, 1)"
+            },
+            {
+                "name": "StochRSI_k",
+                "definition": "STOCHRSI(close, timeperiod=stochrsi_period, fastk_period=3, fastd_period=3).fastk"
+            },
+            {
+                "name": "ATR",
+                "definition": "ATR(high, low, close, timeperiod=atr_period)"
+            },
+            {
+                "name": "ATR_MA",
+                "definition": "SMA(ATR, timeperiod=20)"
+            },
+            {
+                "name": "Donchian_low",
+                "definition": "LOWEST(low, donchian_exit_period)"
+            },
+            {
+                "name": "Donchian_high",
+                "definition": "HIGHEST(high, donchian_exit_period)"
+            }
+        ],
+        "entry_long": "(close > TEMA) AND (TEMA > TEMA_prev) AND (StochRSI_k < os_level) AND (ATR > vol_filter_factor * ATR_MA)",
+        "entry_short": "(close < TEMA) AND (TEMA < TEMA_prev) AND (StochRSI_k > ob_level) AND (ATR > vol_filter_factor * ATR_MA)",
+        "exit_logic": "Exit Long when close < Donchian_low; Exit Short when close > Donchian_high"
+    },
+    "param_space": {
+        "tema_period": {
+            "type": "int",
+            "low": 20,
+            "high": 60,
+            "step": 5
+        },
+        "stochrsi_period": {
+            "type": "int",
+            "low": 14,
+            "high": 28,
+            "step": 2
+        },
+        "os_level": {
+            "type": "int",
+            "low": 20,
+            "high": 40,
+            "step": 5
+        },
+        "ob_level": {
+            "type": "int",
+            "low": 60,
+            "high": 80,
+            "step": 5
+        },
+        "donchian_exit_period": {
+            "type": "int",
+            "low": 4,
+            "high": 10,
+            "step": 1
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 2
+        },
+        "vol_filter_factor": {
+            "type": "float",
+            "low": 0.5,
+            "high": 1.2,
+            "step": 0.1
+        }
+    }
+}

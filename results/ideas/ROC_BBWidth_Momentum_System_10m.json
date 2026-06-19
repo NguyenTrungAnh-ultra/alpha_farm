@@ -1,0 +1,96 @@
+{
+    "name": "ROC_BBWidth_Momentum_System",
+    "timeframe": "10m",
+    "family": "momentum",
+    "description": "Captures momentum bursts confirmed by volatility expansion and trend alignment. Uses Rate of Change (ROC) as primary momentum signal, Bollinger Bandwidth (BBW) to filter low-volatility sideways regimes, and Triangular Moving Average (TRIMA) for trend direction. Exits when momentum fades (ROC crosses zero) or price violates trailing ATR stop.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "ROC",
+                "definition": "ROCP(close, timeperiod=roc_period) * 100"
+            },
+            {
+                "name": "TRIMA",
+                "definition": "TRIMA(close, timeperiod=trima_period)"
+            },
+            {
+                "name": "BB_UPPER",
+                "definition": "BBANDS(close, timeperiod=bb_period, nbdevup=bb_stddev, nbdevdn=bb_stddev, matype=0)[0]"
+            },
+            {
+                "name": "BB_LOWER",
+                "definition": "BBANDS(close, timeperiod=bb_period, nbdevup=bb_stddev, nbdevdn=bb_stddev, matype=0)[1]"
+            },
+            {
+                "name": "BB_MIDDLE",
+                "definition": "BBANDS(close, timeperiod=bb_period, nbdevup=bb_stddev, nbdevdn=bb_stddev, matype=0)[2]"
+            },
+            {
+                "name": "BBW",
+                "definition": "(BB_UPPER - BB_LOWER) / BB_MIDDLE"
+            },
+            {
+                "name": "ATR",
+                "definition": "ATR(high, low, close, timeperiod=atr_period)"
+            }
+        ],
+        "entry_long": "ROC > roc_threshold AND close > TRIMA AND BBW > bbw_threshold",
+        "entry_short": "ROC < -roc_threshold AND close < TRIMA AND BBW > bbw_threshold",
+        "exit_logic": "For long: exit when ROC < 0 OR close < TRIMA - exit_atr_mult * ATR; For short: exit when ROC > 0 OR close > TRIMA + exit_atr_mult * ATR"
+    },
+    "param_space": {
+        "roc_period": {
+            "type": "int",
+            "low": 8,
+            "high": 20,
+            "step": 1
+        },
+        "trima_period": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        },
+        "bb_period": {
+            "type": "int",
+            "low": 15,
+            "high": 25,
+            "step": 1
+        },
+        "bb_stddev": {
+            "type": "float",
+            "low": 1.5,
+            "high": 2.5,
+            "step": 0.1
+        },
+        "roc_threshold": {
+            "type": "float",
+            "low": 0.3,
+            "high": 1.5,
+            "step": 0.1
+        },
+        "bbw_threshold": {
+            "type": "float",
+            "low": 0.02,
+            "high": 0.1,
+            "step": 0.005
+        },
+        "exit_atr_mult": {
+            "type": "float",
+            "low": 0.5,
+            "high": 2.0,
+            "step": 0.1
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 1
+        }
+    }
+}

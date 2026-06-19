@@ -1,0 +1,51 @@
+{
+    "name": "[60m] BB_Width_NATR_ADX_Regime",
+    "timeframe": "60m",
+    "family": "volatility",
+    "description": "Strategy detects volatility regime change using Bollinger Band width expansion combined with NATR and ADX trend strength. Avoids hard stop losses by exiting when price closes back inside the channel or volatility contracts.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "BB_Width",
+                "definition": "(self.feat.bbands.upper - self.feat.bbands.lower)"
+            },
+            {
+                "name": "EMA_BBWid",
+                "definition": "self.feat.ema(self.indicators[0], timeperiod=20)"
+            },
+            {
+                "name": "NATR",
+                "definition": "self.feat.natr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "ADX",
+                "definition": "self.feat.adx(close, high, low, volume, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(BB_Width > EMA_BBWid) & (NATR > self.indicators[2]) & (ADX > 20)",
+        "entry_short": "(close < BB_Width - EMA_BBWid) & (NATR > self.indicators[3]) & (ADX > 15)",
+        "exit_long": "(BB_Width < EMA_BBWid) | (natr < ema(natr))",
+        "exit_short": "(close > bbands.upper) | (natr < ema(natr))"
+    },
+    "param_space": {
+        "adx_threshold_low": {
+            "type": "int",
+            "low": 10,
+            "high": 45,
+            "step": 2
+        },
+        "ema_period_wide": {
+            "type": "int",
+            "low": 15,
+            "high": 60,
+            "step": 3
+        }
+    }
+}

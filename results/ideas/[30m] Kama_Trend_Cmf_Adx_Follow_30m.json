@@ -1,0 +1,47 @@
+{
+    "name": "[30m] Kama_Trend_Cmf_Adx_Follow",
+    "timeframe": "30m",
+    "family": "trend-following",
+    "description": "Trend following strategy using KAMA for adaptive trend direction, ADX as regime filter to avoid choppy markets, and CMF volume confirmation. Exits on price crossing back below/above the Kama line.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "KAMA_Trend",
+                "definition": "self.feat.kama(close, timeperiod=20)"
+            },
+            {
+                "name": "ADX_Strength",
+                "definition": "self.feat.adx(high, low, close, volume, timeperiod=14)"
+            },
+            {
+                "name": "CMF_Volume",
+                "definition": "self.feat.cmf(volume, timeperiod=5)"
+            }
+        ],
+        "entry_long": "(close > KAMA_Trend) & (ADX_Strength >= 20)",
+        "entry_short": "(close < KAMA_Trend) & (ADX_Strength >= 20)",
+        "exit_long": "(close <= KAMA_Trend)",
+        "exit_short": "(close >= KAMA_Trend)"
+    },
+    "param_space": {
+        "kama_period": {
+            "type": "int",
+            "low": 5,
+            "high": 30,
+            "step": 1
+        },
+        "adx_threshold": {
+            "type": "float",
+            "low": 20.0,
+            "high": 40.0,
+            "step": 1.0
+        }
+    }
+}

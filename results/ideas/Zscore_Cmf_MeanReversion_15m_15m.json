@@ -1,0 +1,43 @@
+{
+    "name": "Zscore_Cmf_MeanReversion_15m",
+    "timeframe": "15m",
+    "family": "mean-reversion",
+    "description": "Strategy that buys when price is significantly below the rolling mean (oversold) confirmed by positive cumulative flow, and sells on overbought conditions. Uses Z-Score for distance from mean to avoid fixed band noise.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "rolling_zscore",
+                "definition": "self.feat.rolling_zscore(close, timeperiod=20)"
+            },
+            {
+                "name": "cmf",
+                "definition": "self.feat.cmf(volume)"
+            }
+        ],
+        "entry_long": "(rolling_zscore < -1.5) & (cmf > 0)",
+        "entry_short": "(rolling_zscore > 1.5) & (cmf < 0)",
+        "exit_long": "(close >= rolling_mean(close, timeperiod=20))",
+        "exit_short": "(close <= rolling_mean(close, timeperiod=20))"
+    },
+    "param_space": {
+        "zscore_threshold": {
+            "type": "float",
+            "low": 1.5,
+            "high": 3.0,
+            "step": 0.1
+        },
+        "cmf_min_level": {
+            "type": "float",
+            "low": -0.2,
+            "high": 0.4,
+            "step": 0.05
+        }
+    }
+}

@@ -1,0 +1,71 @@
+{
+    "name": "Slope_CMO_ADXR_Trend",
+    "timeframe": "10m",
+    "family": "trend-following",
+    "description": "Combines linear regression slope for directional bias, Chande Momentum Oscillator (CMO) for momentum confirmation, and ADXR (smoothed ADX) for trend strength. Enters long when slope positive, CMO above threshold, and ADXR above threshold. Exits when CMO drops below zero or ADXR falls below threshold. Short logic is symmetric.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "lin_slope",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=20)"
+            },
+            {
+                "name": "cmo",
+                "definition": "self.feat.cmo(close, timeperiod=14)"
+            },
+            {
+                "name": "adxr",
+                "definition": "self.feat.adxr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "atr",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "rolling_max_close",
+                "definition": "self.feat.max(close, timeperiod=10)"
+            }
+        ],
+        "entry_long": "(lin_slope > 0) & (cmo > cmo_threshold) & (adxr > adxr_threshold)",
+        "entry_short": "(lin_slope < 0) & (cmo < -cmo_threshold) & (adxr > adxr_threshold)",
+        "exit_logic": "Exit Long: (cmo < 0) | (adxr < adxr_threshold) | (close < (rolling_max_close - 2 * atr)). Exit Short: (cmo > 0) | (adxr < adxr_threshold) | (close > (rolling_max_close + 2 * atr))."
+    },
+    "param_space": {
+        "cmo_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "adxr_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "slope_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 2
+        },
+        "cmo_threshold": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 5
+        },
+        "adxr_threshold": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 5
+        }
+    }
+}

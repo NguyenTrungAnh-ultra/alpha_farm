@@ -1,8 +1,8 @@
+from utilities.AppConfig import PROJECT_ROOT
 import os
 import sys
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-deepseek_dir = os.path.join(PROJECT_ROOT, "agent", "util", "deepseek4free")
+deepseek_dir = os.path.join(PROJECT_ROOT, "utilities", "deps", "deepseek4free")
 if deepseek_dir not in sys.path:
     sys.path.insert(0, deepseek_dir)
 

@@ -1,0 +1,67 @@
+{
+    "name": "VWAP_ZScore_MeanReversion",
+    "timeframe": "10m",
+    "family": "mean-reversion",
+    "description": "Mean-reversion strategy using rolling VWAP as adaptive mean. Enters long when price is significantly below VWAP (negative z-score) and ADX confirms a ranging market (low trend strength). Enters short when price is significantly above VWAP. Exits when price reverts to within a tighter z-score band around VWAP.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "volume_safe",
+                "definition": "volume + 1e-8"
+            },
+            {
+                "name": "vwap",
+                "definition": "self.op.rolling_sum(close * volume, period) / self.op.rolling_sum(volume_safe, period)"
+            },
+            {
+                "name": "std_price",
+                "definition": "self.op.rolling_std(close, period)"
+            },
+            {
+                "name": "zscore",
+                "definition": "(close - vwap) / std_price"
+            },
+            {
+                "name": "adx",
+                "definition": "self.feat.adx(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(zscore < -entry_threshold) & (adx < adx_threshold)",
+        "entry_short": "(zscore > entry_threshold) & (adx < adx_threshold)",
+        "exit_long": "(zscore > -exit_threshold)",
+        "exit_short": "(zscore < exit_threshold)"
+    },
+    "param_space": {
+        "period": {
+            "type": "int",
+            "low": 20,
+            "high": 50,
+            "step": 5
+        },
+        "entry_threshold": {
+            "type": "float",
+            "low": 1.5,
+            "high": 3.0,
+            "step": 0.1
+        },
+        "exit_threshold": {
+            "type": "float",
+            "low": 0.3,
+            "high": 1.0,
+            "step": 0.1
+        },
+        "adx_threshold": {
+            "type": "float",
+            "low": 15,
+            "high": 25,
+            "step": 1
+        }
+    }
+}

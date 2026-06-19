@@ -1,0 +1,43 @@
+{
+    "name": "Session_VWAP_CMF_Flow_Breakout",
+    "timeframe": "60m",
+    "family": "session-based",
+    "description": "Intraday session strategy trading around VWAP with Volume Flow confirmation, avoiding noise by filtering on institutional flow direction.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "VWAP_Sess",
+                "definition": "self.feat.rolling_vwap(close, timeperiod=20)"
+            },
+            {
+                "name": "CMF_Flows",
+                "definition": "self.feat.cmf(volume)"
+            }
+        ],
+        "entry_long": "(close > VWAP_Sess) & (CMF_Flows > 0)",
+        "entry_short": "(close < VWAP_Sess) & (CMF_Flows < 0)",
+        "exit_long": "(close <= VWAP_Sess)",
+        "exit_short": "(close >= VWAP_Sess)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 5,
+            "high": 30,
+            "step": 1
+        },
+        "cmf_threshold": {
+            "type": "float",
+            "low": -2.0,
+            "high": 2.0,
+            "step": 0.5
+        }
+    }
+}

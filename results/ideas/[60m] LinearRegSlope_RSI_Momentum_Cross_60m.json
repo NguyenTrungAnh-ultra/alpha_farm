@@ -1,0 +1,41 @@
+{
+    "name": "[60m] LinearRegSlope_RSI_Momentum_Cross",
+    "timeframe": "60m",
+    "family": "momentum|trend-following",
+    "description": "A momentum strategy that uses the slope of a linear regression (20-period) to identify trend strength and RSI cross signals for entry/exit. It avoids ADX, MACD, EMA combinations found in accepted strategies.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "LinearRegSlope_20",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=20)"
+            },
+            {
+                "name": "RSI_14",
+                "definition": "self.feat.rsi(close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(LinearRegSlope_20 > 1.5) & (rsi_crossed_above(50))",
+        "entry_short": "(LinearRegSlope_20 < -1.5) & (rsi_crossed_below(-30))",
+        "exit_long": "(rsi_crossed_below(50)) | (LinearRegSlope_20 <= 1)",
+        "exit_short": "(rsi_crossed_above(-30)) | (LinearRegSlope_20 >= -1)"
+    },
+    "param_space": {
+        "slope_threshold_low": {
+            "type": "float",
+            "low": -5.0,
+            "high": 5.0,
+            "step": 0.1
+        },
+        "rsi_cross_level_high": {
+            "type": "int",
+            "low": 40,
+            "high": 60,
+            "step": 2
+        }
+    }
+}

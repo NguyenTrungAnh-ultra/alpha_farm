@@ -1,0 +1,51 @@
+{
+    "name": "[10m] LinearReg_Slope_Stochrsi_ATR_Continuation",
+    "timeframe": "10m",
+    "family": "trend-following",
+    "description": "A trend continuation strategy using linear regression slope for direction, StochRSI for momentum pullback confirmation (buy dip in uptrend), and ATR for volatility filter. Avoids volume division issues common on VN30F1M.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "EMA_fast",
+                "definition": "self.feat.ema(close, timeperiod=20)"
+            },
+            {
+                "name": "Slope",
+                "definition": "self.feat.linearreg_slope(open_price, close, timeperiod=14)"
+            },
+            {
+                "name": "StochRSI",
+                "definition": "self.feat.stochrsi(close, k1=5, l2=3)}"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close > EMA_fast) & (Slope > 0.0) & (StochRSI < Stochrsi_threshold)",
+        "entry_short": "(close < EMA_fast) & (Slope < -0.5) & (StochRSI > Stochrsi_overbought)",
+        "exit_long": "(close < EMA_fast) | (Slope <= 0.0)",
+        "exit_short": "(close > EMA_fast) | (Slope >= -0.5)"
+    },
+    "param_space": {
+        "slope_threshold": {
+            "type": "float",
+            "low": 0.1,
+            "high": 2.0,
+            "step": 0.1
+        },
+        "stochrsi_overbought": {
+            "type": "int|float",
+            "low": 80,
+            "high": 95,
+            "step": 5
+        }
+    }
+}

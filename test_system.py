@@ -3,13 +3,9 @@ import os
 from pathlib import Path
 
 # Thêm thư mục gốc vào đường dẫn hệ thống
-PROJECT_ROOT = str(Path(__file__).parent)
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
-from agent.pipeline import run_pipeline, load_cookies
-from agent.convert_ideas import main as convert_main
-from optimize_all_v2 import main as optimize_main
+from strategy_workflows.GenerateStrategies import run_pipeline, load_cookies
+from strategy_workflows.ConvertLegacyIdeas import main as convert_main
+from main import cmd_optimize
 
 def test_system():
     print("="*80)
@@ -41,7 +37,9 @@ def test_system():
 
     print("\n--- BƯỚC 3: TỐI ƯU HÓA BAYESIAN ---")
     try:
-        optimize_main()
+        class Args:
+            n_trials = 5
+        cmd_optimize(Args())
     except Exception as e:
         print(f"Lỗi bước tối ưu hóa: {e}")
 

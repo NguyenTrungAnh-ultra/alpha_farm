@@ -1,11 +1,11 @@
-﻿import os
+import os
 import sys
 import glob
 sys.path.insert(0, 'f:/Projects/alpha_farm')
-from xno_sdk.emulator import XNOPlatformEmulator
+from core_engine.PlatformEmulator import XNOPlatformEmulator
 
 emulator = XNOPlatformEmulator(verbose=False)
-files = glob.glob('f:/Projects/alpha_farm/agent/results/failed/*.py')
+files = glob.glob('f:/Projects/alpha_farm/results/failed/*.py')
 for f in files:
     print(f"Testing {os.path.basename(f)}:")
     try:

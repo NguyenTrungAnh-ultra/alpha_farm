@@ -1,0 +1,86 @@
+{
+    "name": "TRIX_ADX_Trail_System",
+    "timeframe": "10m",
+    "family": "trend-following",
+    "description": "Uses TRIX (Triple Exponential Average) zero-line crossing as primary momentum signal, filtered by ADX to avoid sideways markets. Exits employ a trailing ATR stop and ADX decay condition, designed for VN30F1M 10min to capture medium-term swings with 2-5 trades per day.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low"
+        ],
+        "indicators": [
+            {
+                "name": "TRIX",
+                "definition": "trix(close, timeperiod=trix_period)"
+            },
+            {
+                "name": "ADX",
+                "definition": "adx(high, low, close, timeperiod=adx_period)"
+            },
+            {
+                "name": "ATR",
+                "definition": "atr(high, low, close, timeperiod=atr_period)"
+            },
+            {
+                "name": "TRIX_prev",
+                "definition": "shift(TRIX, 1)"
+            },
+            {
+                "name": "highest_high",
+                "definition": "max(high, exit_lookback)"
+            },
+            {
+                "name": "lowest_low",
+                "definition": "min(low, exit_lookback)"
+            }
+        ],
+        "entry_long": "(TRIX > 0) AND (TRIX_prev <= 0) AND (ADX > adx_entry_threshold)",
+        "entry_short": "(TRIX < 0) AND (TRIX_prev >= 0) AND (ADX > adx_entry_threshold)",
+        "exit_logic": "For long: (close < (highest_high - atr_mult * ATR)) OR (ADX < adx_exit_threshold). For short: (close > (lowest_low + atr_mult * ATR)) OR (ADX < adx_exit_threshold)."
+    },
+    "param_space": {
+        "trix_period": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        },
+        "adx_period": {
+            "type": "int",
+            "low": 12,
+            "high": 20,
+            "step": 1
+        },
+        "adx_entry_threshold": {
+            "type": "float",
+            "low": 20.0,
+            "high": 30.0,
+            "step": 1.0
+        },
+        "adx_exit_threshold": {
+            "type": "float",
+            "low": 15.0,
+            "high": 25.0,
+            "step": 1.0
+        },
+        "exit_lookback": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "atr_mult": {
+            "type": "float",
+            "low": 1.5,
+            "high": 3.0,
+            "step": 0.1
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 10,
+            "high": 20,
+            "step": 1
+        }
+    }
+}

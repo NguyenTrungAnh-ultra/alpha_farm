@@ -1,0 +1,91 @@
+{
+    "name": "Micro_APO_ADXR_Volume_Burst_Scalper",
+    "timeframe": "1m",
+    "family": "momentum",
+    "description": "Ultra-fast scalping strategy combining Absolute Price Oscillator (APO) zero-line cross and momentum acceleration with ADXR trend strength filter and volume burst confirmation. Entries on strong directional momentum with volume surge; exits on momentum reversal or price trailing below fast EMA minus ATR.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "EMA_fast",
+                "definition": "self.feat.ema(close, timeperiod=fast_period)"
+            },
+            {
+                "name": "APO",
+                "definition": "self.feat.apo(close, fastperiod=fast_period, slowperiod=slow_period, matype=0)"
+            },
+            {
+                "name": "APO_rising",
+                "definition": "self.feat.delta(APO) > 0"
+            },
+            {
+                "name": "ADXR",
+                "definition": "self.feat.adxr(high, low, close, timeperiod=adxr_period)"
+            },
+            {
+                "name": "vol_sma",
+                "definition": "self.feat.sma(volume, timeperiod=vol_lookback)"
+            },
+            {
+                "name": "ATR",
+                "definition": "self.feat.atr(high, low, close, timeperiod=atr_period)"
+            },
+            {
+                "name": "volume_burst",
+                "definition": "(volume + 1e-8) > (vol_sma * vol_mult)"
+            }
+        ],
+        "entry_long": "(APO > 0) & (APO_rising) & (ADXR > adxr_threshold) & (volume_burst)",
+        "entry_short": "(APO < 0) & (~APO_rising) & (ADXR > adxr_threshold) & (volume_burst)",
+        "exit_logic": "Exit Long: (APO < 0) | (close < (EMA_fast - ATR)). Exit Short: (APO > 0) | (close > (EMA_fast + ATR))."
+    },
+    "param_space": {
+        "fast_period": {
+            "type": "int",
+            "low": 3,
+            "high": 15,
+            "step": 1
+        },
+        "slow_period": {
+            "type": "int",
+            "low": 10,
+            "high": 30,
+            "step": 1
+        },
+        "adxr_period": {
+            "type": "int",
+            "low": 8,
+            "high": 20,
+            "step": 1
+        },
+        "adxr_threshold": {
+            "type": "int",
+            "low": 15,
+            "high": 30,
+            "step": 1
+        },
+        "vol_lookback": {
+            "type": "int",
+            "low": 5,
+            "high": 15,
+            "step": 1
+        },
+        "vol_mult": {
+            "type": "float",
+            "low": 1.2,
+            "high": 2.5,
+            "step": 0.1
+        },
+        "atr_period": {
+            "type": "int",
+            "low": 7,
+            "high": 14,
+            "step": 1
+        }
+    }
+}

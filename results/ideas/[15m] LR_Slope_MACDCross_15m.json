@@ -1,0 +1,43 @@
+{
+    "name": "[15m] LR_Slope_MACDCross",
+    "timeframe": "15m",
+    "family": "trend-following",
+    "description": "Uses Linear Regression Slope for trend direction and MACD Histogram crossing for momentum confirmation. Exits on Momentum Reversal (MACD Cross) to differentiate from Price/Regression breakouts.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "Slope_Value",
+                "definition": "self.feat.linearreg_slope(close, timeperiod=20)"
+            },
+            {
+                "name": "MACD_Hist",
+                "definition": "self.feat.macd(close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(slope_val > 5.0) & (macd_hist > 0)",
+        "entry_short": "(slope_val < -5.0) & (macd_hist < 0)",
+        "exit_long": "(macd_hist <= 0) | (close < self.feat.linearreg(close, timeperiod=20))",
+        "exit_short": "(macd_hist >= 0) | (close > self.feat.linearreg(close, timeperiod=20))"
+    },
+    "param_space": {
+        "slope_threshold": {
+            "type": "float",
+            "low": -10.0,
+            "high": 5.0,
+            "step": 1
+        },
+        "macd_threshold": {
+            "type": "int",
+            "low": 3,
+            "high": 20,
+            "step": 1
+        }
+    }
+}

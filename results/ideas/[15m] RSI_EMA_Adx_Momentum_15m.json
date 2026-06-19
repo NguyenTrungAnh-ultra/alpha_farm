@@ -1,0 +1,47 @@
+{
+    "name": "[15m] RSI_EMA_Adx_Momentum",
+    "timeframe": "15m",
+    "family": "momentum",
+    "description": "Trend-following strategy using EMA direction, ADX regime filter, and RSI momentum confirmation. Avoids the 'Slope' family which is heavily used in accepted strategies.",
+    "formula": {
+        "inputs": [
+            "close",
+            "high",
+            "low",
+            "open_price",
+            "volume"
+        ],
+        "indicators": [
+            {
+                "name": "EMA_fast",
+                "definition": "self.feat.ema(close, timeperiod=20)"
+            },
+            {
+                "name": "ADX_Trend",
+                "definition": "self.fead.adx(high, low, close, timeperiod=14)"
+            },
+            {
+                "name": "RSI_Mom",
+                "definition": "self.feat.rsi(close, timeperiod=14)"
+            }
+        ],
+        "entry_long": "(close > EMA_fast) & (ADX_Trend >= 20.0)",
+        "entry_short": "(close < EMA_fast) & (ADX_Trend >= 20.0)",
+        "exit_long": "(close <= EMA_fast)",
+        "exit_short": "(close >= EMA_fast)"
+    },
+    "param_space": {
+        "ema_period": {
+            "type": "int",
+            "low": 14,
+            "high": 30,
+            "step": 2
+        },
+        "adx_threshold": {
+            "type": "float",
+            "low": 5.0,
+            "high": 30.0,
+            "step": 1.0
+        }
+    }
+}
