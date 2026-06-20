@@ -570,7 +570,7 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                         
                         if metrics and len(metrics) > 0:
                             logger.info(f"[AutoSubmit] Extracted {len(metrics)} metrics: {metrics}")
-                            csv_path = os.path.join(os.path.dirname(__file__), "results", "leaderboard.csv")
+                            csv_path = os.path.join(PROJECT_ROOT, "results", "leaderboard.csv")
                             strat_name = os.path.basename(filepath) if filepath else "Unknown"
                             
                             row_data = {"Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Strategy": strat_name}
@@ -636,9 +636,9 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
             }""")
             
             if not strategy_ids:
-                logger.warning("[AutoSubmit] Failed to get strategy ID from localStorage. Treating as simulated-only.")
+                logger.warning("[AutoSubmit] Failed to get strategy ID from localStorage.")
                 page.close()
-                return True, "Simulated successfully but failed to get strategy ID from localStorage"
+                return False, "Simulated successfully but failed to get strategy ID from localStorage"
                 
             strategy_id = strategy_ids[0]
             logger.info(f"[AutoSubmit] Strategy ID found: {strategy_id}")
@@ -664,9 +664,9 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                 page.wait_for_selector(submit_item_selector, timeout=10000)
                 page.click(submit_item_selector, force=True)
             except Exception as e:
-                logger.warning("[AutoSubmit] Submit Alpha option not found in menu or timed out. Treating as simulated-only.")
+                logger.warning("[AutoSubmit] Submit Alpha option not found in menu or timed out.")
                 page.close()
-                return True, f"Simulated successfully but Submit Alpha option not found: {e}"
+                return False, f"Simulated successfully but Submit Alpha option not found: {e}"
                 
             page.wait_for_timeout(1500)
             
@@ -696,7 +696,7 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                 msg = f"Simulated successfully but failed during confirmation. Modal text: '{error_details}'. Exception: {e}"
                 logger.warning(f"[AutoSubmit] {msg}")
                 page.close()
-                return True, msg
+                return False, msg
             
             logger.info(f"[AutoSubmit] Result: {submission_result}")
             page.close()
