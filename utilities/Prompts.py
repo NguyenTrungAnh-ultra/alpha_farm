@@ -15,8 +15,8 @@ Design principles:
 DIMENSIONAL_FUNCTIONS = """
 ## Available Indicators (called via self.feat.xxx())
 
-**[CURRENCY_OUTPUT_FUNCTIONS]**: ema, vwap, macd_line, stddev
-**[RATIO_OUTPUT_FUNCTIONS]**: rsi, adx, roc, pct_change, stoch, var, zscore
+**[CURRENCY_OUTPUT_FUNCTIONS]**: ema, vwap, macd_line, macd_signal, macd_hist, bbands_upper, bbands_middle, bbands_lower, stddev
+**[RATIO_OUTPUT_FUNCTIONS]**: rsi, adx, roc, pct_change, stoch_k, stoch_d, var, zscore
 **[CANDLESTICK_FUNCTIONS]**: doji, hammer, three_black_crows, morning_star
 """
 
@@ -25,7 +25,7 @@ OPERATOR_FUNCTIONS = """
 ## Available Operator Functions
 
 **Time-Series**: shift, diff, pct_change
-**[BOOLEAN_OUTPUT_FUNCTIONS]**: crossed, crossed_above, crossed_below, rising, falling, and_, or_, not_, greater_than, less_than
+**[BOOLEAN_OUTPUT_FUNCTIONS]**: crossed, crossed_above, crossed_below, rising, falling, between, and_, or_, not_, greater_than, less_than, equal
 **Math**: add, sub, mult, div
 **Statistics**: stddev, var, zscore
 """
@@ -172,7 +172,7 @@ You MUST return EXACTLY the following JSON structure.
 - Example 3 (Volatility Adjusted): `div(mult(rsi(?), var(?)), stddev(?))`
 
 ## CRITICAL RULES (MUST FOLLOW STRICTLY)
-1. **CONTINUOUS SIGNAL ROOT**: The root (outermost function) of your macro_blueprint MUST evaluate to a RATIO or CURRENCY (e.g., div, zscore, rsi, pct_change). DO NOT use functions that output Dimension.ANY (such as add, sub, mult, ema, stddev) or BOOLEAN functions (like crossed_above, and_) as the final root.
+1. **CONTINUOUS SIGNAL ROOT**: The root (outermost function) of your macro_blueprint MUST evaluate to a RATIO or CURRENCY (e.g., div, zscore, rsi, pct_change). DO NOT use functions that output Dimension.ANY (such as add, sub, mult, ema, stddev) or BOOLEAN functions (like crossed_above, and_) as the final root. *(Note: The engine automatically applies a dynamic rolling Z-Score filter to your output signal to generate trade positions).*
 2. **Valid Functions ONLY**: RESTRICT YOURSELF EXCLUSIVELY to the exact names listed in the REFERENCE LIBRARY.
 3. **No Hardcoded Numbers**: REPLACE ALL numerical parameters with `?` (e.g., `ema(?)`). Keep NO hardcoded numbers.
 4. **Syntax & Depth Limit**: DO NOT nest functions deeper than 3 levels. Ensure all parentheses are closed. Only use `?` for the main data series arguments, DO NOT pass `?` for constant parameters like timeperiod. For example, `ema(?)` is correct, `ema(?, ?)` is wrong.

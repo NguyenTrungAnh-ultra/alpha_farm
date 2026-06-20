@@ -19,15 +19,19 @@ logger = logging.getLogger(__name__)
 
 def load_credentials_from_arch() -> tuple:
     """
-    Read email and password credentials from ARCH.md in the project root.
+    Read email and password credentials from environment variables or ARCH.md in the project root.
     """
     try:
-        # ARCH.md is in the project root (parent directory of agent)
+        # 1. Try to load from environment variables (centralized config)
+        account = os.getenv("XNO_ACCOUNT")
+        password = os.getenv("XNO_PASSWORD")
+        if account and password:
+            return account.strip(), password.strip()
+            
+        # 2. Fallback to ARCH.md
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(current_dir)
         arch_path = os.path.join(project_root, "ARCH.md")
-        account = None
-        password = None
         if os.path.exists(arch_path):
             with open(arch_path, 'r', encoding='utf-8') as f:
                 content = f.read()
@@ -39,7 +43,7 @@ def load_credentials_from_arch() -> tuple:
                     password = pwd_match.group(1).strip()
         return account, password
     except Exception as e:
-        logger.error(f"[AutoSubmit] Failed to load credentials from ARCH.md: {e}")
+        logger.error(f"[AutoSubmit] Failed to load credentials: {e}")
         return None, None
 
 
@@ -342,11 +346,11 @@ def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: di
                 page = context.new_page()
                 page.on("console", log_console_message)
                 
-                # Load credentials from ARCH.md
+                # Load credentials from environment variables or ARCH.md
                 account, password = load_credentials_from_arch()
                 if not account or not password:
-                    logger.error("[AutoSubmit] Could not find account credentials in ARCH.md")
-                    return False, "Could not find account credentials in ARCH.md"
+                    logger.error("[AutoSubmit] Could not find account credentials in environment variables or ARCH.md")
+                    return False, "Could not find account credentials in environment variables or ARCH.md"
                 
                 logger.info("[AutoSubmit] Navigating to build page...")
                 page.goto("https://alpha.xnoquant.io/build")
