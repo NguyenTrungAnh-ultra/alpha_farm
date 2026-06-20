@@ -1,7 +1,0 @@
-{
-    "name": "VN30F15M_MeanReversionADXTrend",
-    "timeframe": "15m",
-    "family": "mean-reversion|momentum",
-    "description": "Exploits mean reversion during sideways regimes by combining ADX to filter trend strength and RSI for entry signals.",
-    "macro_blueprint": "div(sub(rsi(?), ema(?)), adx(?))"
-}

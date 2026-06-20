@@ -1,7 +1,0 @@
-{
-    "name": "30mVN30F_AsymmetricSkewBreakout",
-    "timeframe": "30m",
-    "family": "momentum|breakout",
-    "description": "Exploits order flow asymmetry during high volatility by combining momentum and breakout signals. The strategy identifies when price action deviates significantly from the mean (z-score) while maintaining upward momentum, triggering entry on confirmed breakouts above VWAP.",
-    "macro_blueprint": "div(zscore(roc(?)), greater_than(crossed_above(vwap(?), ema(?))))"
-}

@@ -31,7 +31,7 @@ def ast_to_code(node: ASTNode) -> str:
     if node.name == "?":
         return '?'
     
-    if node.name == "Constant":
+    if node.name in ["Constant", "z_score", "window"]:
         return str(node.value)
         
     if node.name in DATA_FIELD_DIMENSIONS:

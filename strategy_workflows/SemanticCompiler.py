@@ -70,7 +70,8 @@ class SemanticCompiler:
         if out_dim in (Dimension.RATIO, Dimension.CURRENCY):
             # Auto-wrap RATIO and CURRENCY to produce a BOOLEAN signal via Z-score cut
             zscore_node = ASTNode(name="zscore", children=[root_node])
-            constant_node = ASTNode(name="Constant", value=1.0)
+            # Pass '?' so MCTS can search over [0.5, 1.0, 1.5, 2.0, 2.5] instead of hardcoding 1.0
+            constant_node = ASTNode(name="z_score", value="?")
             root_node = ASTNode(name="greater_than", children=[zscore_node, constant_node])
             out_dim = Dimension.BOOLEAN
             

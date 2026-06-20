@@ -209,7 +209,7 @@ def main():
     parser_gen.add_argument("--no_cookies", action="store_true", help="Skip cookie check")
     
     # Convert (DEPRECATED)
-    # parser_conv = subparsers.add_parser("convert", help="Deprecated in 3-Tier Architecture")
+    # Convert phase has been removed in 3-Tier Architecture.
     
     # MCTS
     parser_mcts = subparsers.add_parser("mcts", help="Run Tầng 2 & 3 (Compiler + MCTS)")

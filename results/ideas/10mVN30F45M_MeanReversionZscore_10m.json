@@ -1,0 +1,7 @@
+{
+    "name": "10mVN30F45M_MeanReversionZscore",
+    "timeframe": "10m",
+    "family": "mean-reversion",
+    "description": "Exploits mean reversion during sideways regimes by using z-score normalized price action to identify overextended conditions.",
+    "macro_blueprint": "zscore(pct_change(?))"
+}

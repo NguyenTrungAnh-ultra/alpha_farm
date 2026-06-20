@@ -1,7 +1,0 @@
-{
-    "name": "VN30F1M_ADX_TrendBreakout",
-    "timeframe": "15m",
-    "family": "trend-following|breakout",
-    "description": "A trend-following strategy that waits for ADX to confirm a strong trend, then enters on price crossing the EMA after filtering out choppy markets.",
-    "macro_blueprint": "and_(crossed_above(ema(?), ema(?)), greater_than(adx(?), ?))"
-}

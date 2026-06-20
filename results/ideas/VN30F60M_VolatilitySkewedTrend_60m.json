@@ -1,0 +1,7 @@
+{
+    "name": "VN30F60M_VolatilitySkewedTrend",
+    "timeframe": "60m",
+    "family": "volatility|trend-following",
+    "description": "Exploits order flow asymmetry by combining MACD momentum with volatility-adjusted z-score signals to capture skewed price movements during high-volatility sideways regimes.",
+    "macro_blueprint": "div(mult(ema(?), var(?)), stddev(?))"
+}

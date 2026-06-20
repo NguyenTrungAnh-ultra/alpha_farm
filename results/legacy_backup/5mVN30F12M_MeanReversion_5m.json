@@ -1,7 +1,0 @@
-{
-    "name": "5mVN30F12M_MeanReversion",
-    "timeframe": "5m",
-    "family": "mean-reversion",
-    "description": "Exploits mean reversion in sideways volatility by using RSI divergence with MACD signal.",
-    "macro_blueprint": "div(sub(rsi(?), macd(?)), stddev(?))"
-}

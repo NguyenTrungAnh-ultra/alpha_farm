@@ -50,6 +50,9 @@ Dưới đây là các giới hạn và quy định chung để chiến lược 
 - `PlatformEmulator.py`: Khung kiểm thử được tinh chỉnh để mô phỏng chính xác trình biên dịch mã của nền tảng Web.
 - `BacktestEngine.py` $\rightarrow$ `XNOBacktestEngine.run()`: Nhận mảng vị thế từ chiến lược và mô phỏng giao dịch bar-by-bar, xử lý đóng/mở hợp đồng, trừ phí giao dịch. Tốc độ cực cao (Vectorized).
 - `CalculateMetrics.py`: Cung cấp bộ tính toán chỉ số hiệu năng (Sharpe, Sortino, VaR, CAGR, Max Drawdown).
+- `XnoEngine.py`: Lớp Wrapper cấp cao gom BacktestEngine và CalculateMetrics để thực thi và đánh giá chiến lược độc lập.
+- `RestrictedSeries.py`: Cấu trúc dữ liệu giới hạn ngăn việc rò rỉ dữ liệu (Look-ahead bias) trong quá trình backtest.
+- `GenerateReport.py`: Module hỗ trợ sinh báo cáo thống kê kết quả backtest.
 
 ## 4. Liên Kết Hệ Thống (Master Pipeline 3 Tầng)
 
@@ -59,19 +62,20 @@ Quy trình tự động hóa được chia làm 3 tầng (3-Tier Architecture) t
 2. **Phase 2 (MCTS Brute-force & Compile)**: Động cơ MCTS nạp các Blueprint, nhét các tham số hợp lệ vào các điểm `?`, biên dịch thành mã Python và chạy giả lập Backtest Sandbox để kiểm tra Sharpe (`python main.py mcts`).
 3. **Phase 3 (Auto Submit)**: Quét toàn bộ chiến lược thành công, đẩy lên Web và dời file hoàn thành vào `results/pushed/` (`python main.py submit`).
 
-## 5. Hệ Thống Phân Loại & Sửa Lỗi Sandbox
+## 5. Hệ Thống Phân Loại & Sửa Lỗi (Self-Correction & Prefixing)
 
-Khi `strategy_workflows/CorrectFailedIdeas.py` xử lý một idea thất bại, lỗi được phân vào 4 tầng:
+Kiến trúc 3-Tier đã loại bỏ hoàn toàn cơ chế sửa lỗi Post-Generation bằng LLM (trước đây là `CorrectFailedIdeas.py`). Thay vào đó, việc sửa lỗi và chuẩn hóa được nhúng trực tiếp vào các khâu trong đường ống:
 
-| Tầng | Loại lỗi | Xử lý | Module |
-|------|----------|-------|--------|
-| 1 | **Cú pháp Python** — SyntaxError, IndentationError | ✅ Tự sửa (Regex + AST) | `SandboxPrefixer.py` |
-| 2a | **NameError / API sai** — `rolling_max` không có prefix, `self.param_xxx`, `np.abs`, `&&` | ✅ Tự sửa (Regex) | `SandboxPrefixer.py` |
-| 2b | **API sai không phát hiện được** — sai thứ tự tham số, gọi hàm không tồn tại | ⚙️ LLM self-correction (3 attempts) | `CorrectFailedIdeas.py` |
-| 3 | **Runtime Error** — ZeroDivision, NaN/Inf, TypeError | ⚙️ LLM self-correction (3 attempts) | `CorrectFailedIdeas.py` |
-| **4** | **Logic tài chính kém** — Sharpe < 1.3 (code chạy nhưng chiến lược dở) | ⏭ **BỎ QUA** — không retry LLM | — |
+### 5.1. Tự Động Tiền Xử Lý (Pre-processing)
+| Loại lỗi | Xử lý | Module |
+|------|----------|-------|
+| **Cú pháp Python / API sai** — `rolling_max` không có prefix, `self.param_xxx`, `np.abs` | ✅ Tự sửa bằng Regex / AST tiêm `self.op.` và `self.feat.` | `utilities/SandboxPrefixer.py` |
 
-### Ghi chú Tầng 4 (Bỏ qua, không auto-fix)
+### 5.2. Vòng Lặp Self-Correction Trong Quá Trình Sinh Ý Tưởng
+Khi `GenerateStrategies.py` yêu cầu LLM tạo Macro-Blueprint, mã JSON sinh ra sẽ bị kiểm tra ngay:
+- **Macro-Blueprint Semantic Error**: Sai cấu trúc hàm, rò rỉ thứ nguyên (Dimensional Bleeding).
+- **Quy trình xử lý**: Lỗi được bắt bởi `SemanticCompiler.py`. Dữ liệu lỗi được gửi lại vào LLM (Local hoặc Cloud) để tự sửa. Nếu quá số lần retry, ý tưởng bị hủy để tiết kiệm thời gian.
 
-- **Nguyên nhân thường gặp**: Tín hiệu entry/exit ngược chiều, tautology (`exit = close != close`), tham số quá agressive, quá nhiều trade (fee ăn hết lợi nhuận), không bao giờ vào lệnh (`n_trades = 0`).
-- **Lý do không auto-fix**: Sửa được cú pháp không đồng nghĩa cải thiện được Sharpe. Cần tái sinh idea mới từ MCTS hoặc LLM generation.
+### 5.3. MCTS Sandboxing
+- **Runtime Error / Logic tài chính kém** — ZeroDivision, NaN/Inf, hoặc Sharpe < 1.3.
+- **Xử lý**: ⏭ **BỎ QUA**. Các chiến lược không vượt qua Sandbox Engine sẽ bị loại bỏ hoàn toàn. Động cơ MCTS ưu tiên khám phá nhánh mới thay vì cố cứu những bộ quy tắc có nền tảng toán học kém. Sửa code chạy được không đồng nghĩa với việc cải thiện được Sharpe.

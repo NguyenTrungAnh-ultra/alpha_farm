@@ -1,0 +1,7 @@
+{
+    "name": "VN30F60M_AsymmetricSkewness",
+    "timeframe": "60m",
+    "family": "statistical-arbitrage",
+    "description": "Exploits order flow asymmetry by measuring the skew between price momentum and volatility expansion. In high volatility sideways regimes, this captures mean-reversion with a directional bias.",
+    "macro_blueprint": "div(sub(ema(?), ema(?)), stddev(?))"
+}

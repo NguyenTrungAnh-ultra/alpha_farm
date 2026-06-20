@@ -1,7 +1,0 @@
-{
-    "name": "VN30F1M_ADXZScoreBreakout",
-    "timeframe": "1m",
-    "family": "momentum",
-    "description": "Captures high-frequency momentum bursts by filtering ADX confirmation to avoid false signals in sideways volatility, then scaling entry via Z-score normalization of MACD divergence.",
-    "macro_blueprint": "div(mult(rsi(?), adx(?)), zscore(ema(?)))"
-}

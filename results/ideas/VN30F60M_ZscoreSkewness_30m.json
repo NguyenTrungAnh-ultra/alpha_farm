@@ -1,0 +1,7 @@
+{
+    "name": "VN30F60M_ZscoreSkewness",
+    "timeframe": "30m",
+    "family": "statistical-arbitrage",
+    "description": "Exploits order flow asymmetry by normalizing momentum against volatility, capturing high-probability directional moves during sideways regimes.",
+    "macro_blueprint": "zscore(roc(?))"
+}

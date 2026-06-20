@@ -1,7 +1,0 @@
-{
-    "name": "3mVN30F_MeanReversion",
-    "timeframe": "3m",
-    "family": "mean-reversion",
-    "description": "Exploits mean reversion in sideways regimes by trading z-score deviations from VWAP.",
-    "macro_blueprint": "zscore(sub(vwap(?), ema(?)))"
-}
