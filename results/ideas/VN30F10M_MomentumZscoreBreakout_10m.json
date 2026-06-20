@@ -1,0 +1,7 @@
+{
+    "name": "VN30F10M_MomentumZscoreBreakout",
+    "timeframe": "10m",
+    "family": "momentum",
+    "description": "Captures asymmetric momentum spikes during sideways volatility by combining MACD direction with normalized price velocity.",
+    "macro_blueprint": "div(mult(rsi(?), var(?)), stddev(?))"
+}

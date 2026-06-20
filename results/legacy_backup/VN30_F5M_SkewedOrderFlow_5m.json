@@ -1,7 +1,0 @@
-{
-    "name": "VN30_F5M_SkewedOrderFlow",
-    "timeframe": "5m",
-    "family": "momentum",
-    "description": "Captures asymmetric price movements by combining MACD momentum with volatility normalization to identify directional bias during high-volatility sideways regimes.",
-    "macro_blueprint": "div(macd(?), stddev(?))"
-}

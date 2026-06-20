@@ -1,7 +1,0 @@
-{
-    "name": "VN30_FastBreakout",
-    "timeframe": "3m",
-    "family": "breakout",
-    "description": "Exploits order flow asymmetry by detecting momentum divergence from volatility bands.",
-    "macro_blueprint": "div(sub(ema(?), vwap(?)), stddev(?))"
-}

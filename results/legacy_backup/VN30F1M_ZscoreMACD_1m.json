@@ -1,7 +1,0 @@
-{
-    "name": "VN30F1M_ZscoreMACD",
-    "timeframe": "1m",
-    "family": "momentum",
-    "description": "Exploits asymmetric momentum by scaling MACD signal strength against market noise. High volatility regime requires strong trend confirmation before entry.",
-    "macro_blueprint": "zscore(mult(ema(?), macd(?)))"
-}

@@ -1,0 +1,7 @@
+{
+    "name": "VN30_3m_OrderFlowZscore",
+    "timeframe": "3m",
+    "family": "momentum",
+    "description": "Exploits order flow asymmetry by measuring momentum deviation from mean using z-score normalization on ROC, filtering for high volatility conditions.",
+    "macro_blueprint": "zscore(roc(?))"
+}

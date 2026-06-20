@@ -1,7 +1,0 @@
-{
-    "name": "30mVN30F_MomentumVolatility",
-    "timeframe": "30m",
-    "family": "momentum|volatility",
-    "description": "Exploits order flow asymmetry by measuring momentum deviation from volatility-adjusted mean. Captures directional moves during high-volatility sideways regimes.",
-    "macro_blueprint": "div(sub(ema(?), vwap(?)), stddev(?))"
-}

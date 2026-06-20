@@ -1,7 +1,0 @@
-{
-    "name": "3m3mVN30_3m_VolatilitySkewness",
-    "timeframe": "3m",
-    "family": "volatility|statistical-arbitrage",
-    "description": "Exploits order flow asymmetry by measuring the divergence between price momentum and volatility expansion. The strategy identifies when high volatility is accompanied by skewed returns, signaling potential mean-reversion or breakout continuation.",
-    "macro_blueprint": "div(sub(ema(?), vwap(?)), stddev(?))"
-}

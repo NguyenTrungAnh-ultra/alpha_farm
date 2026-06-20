@@ -1,7 +1,0 @@
-{
-    "name": "1mVN30F1M_AsymmetricSkewVolatility",
-    "timeframe": "1m",
-    "family": "volatility|statistical-arbitrage",
-    "description": "Exploits order flow asymmetry by combining MACD momentum direction with volatility-adjusted skewness. In high-volatility sideways regimes, the strategy identifies when price action deviates significantly from its mean while maintaining trend alignment.",
-    "macro_blueprint": "div(sub(ema(?), macd(?)), stddev(?))"
-}

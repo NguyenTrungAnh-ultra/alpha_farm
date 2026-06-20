@@ -1,7 +1,0 @@
-{
-    "name": "5m5mVN30_F12M_AsymmetricSkewBreakout",
-    "timeframe": "5m",
-    "family": "volatility",
-    "description": "Exploits high volatility regime by measuring asymmetric price action relative to the mean. Uses RSI divergence with ADX trend strength and standard deviation bands to identify breakout signals.",
-    "macro_blueprint": "div(sub(rsi(?), adx(?)), stddev(?))"
-}

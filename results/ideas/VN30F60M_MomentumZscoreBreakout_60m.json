@@ -1,0 +1,7 @@
+{
+    "name": "VN30F60M_MomentumZscoreBreakout",
+    "timeframe": "60m",
+    "family": "momentum",
+    "description": "Exploits asymmetric order flow by identifying momentum z-scores exceeding volatility thresholds during sideways regimes.",
+    "macro_blueprint": "zscore(roc(?))"
+}

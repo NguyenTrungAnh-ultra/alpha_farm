@@ -1,7 +1,0 @@
-{
-    "name": "VN30F10M_RSIADXSqueeze",
-    "timeframe": "10m",
-    "family": "statistical-arbitrage",
-    "description": "Exploits order flow asymmetry by combining momentum divergence with volatility compression. Uses ADX to filter low-trend noise and RSI for mean-reversion signals during sideways regimes.",
-    "macro_blueprint": "div(sub(rsi(?), ema(?)), adx(?))"
-}

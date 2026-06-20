@@ -89,18 +89,12 @@ TIMEFRAME_HINTS = {
 """,
 }
 
-# ─── Strategy families for diversity ────────────────────────────────
+# ─── Strategy families for diversity (Orthogonal & Quant-focused) ───
 STRATEGY_FAMILIES = [
-    "trend-following",      # EMA crossover, ADX filter, SAR, DEMA
-    "momentum",             # RSI, MACD, Stochastic, TRIX, ROC
-    "mean-reversion",       # Bollinger Bands, RSI extremes, CCI
-    "breakout",             # Donchian, Keltner, range breakout, volatility breakout
-    "volatility",           # ATR-based, Bollinger squeeze, volatility regime
-    "multi-indicator",      # Combining 2-3 uncorrelated indicators
-    "pattern-based",        # Candlestick patterns + confirmation
-    "channel",              # Linear regression channel, price channel
-    "oscillator-divergence",# RSI/MACD divergence, hidden divergence
-    "session-based",        # Opening range breakout, session momentum
+    "statistical-mean-reversion", # Z-score of spread between VWAP and price/EMA
+    "time-series-kinematics",     # 2nd derivative/acceleration (diff, rate of change)
+    "volatility-regime",          # Variance, standard deviation breakouts, Z-Score of variance
+    "cross-dimensional-arbitrage" # Combining momentum ratios with volatility/variance metrics
 ]
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -160,16 +154,16 @@ You MUST return EXACTLY the following JSON structure.
 {{
     "name": "StrategyName",
     "timeframe": "10m",
-    "family": "momentum|mean-reversion|volatility|statistical-arbitrage",
+    "family": "statistical-mean-reversion|time-series-kinematics|volatility-regime|cross-dimensional-arbitrage",
     "description": "Financial intuition behind the strategy.",
-    "macro_blueprint": "div(macd_line(?), stddev(?))"
+    "macro_blueprint": "div(diff(macd_line(?)), stddev(?))"
 }}
 ```
 
 **Few-Shot Examples for macro_blueprint:**
-- Example 1 (Statistical Ratio): `div(sub(vwap(), ema(?)), stddev(?))`
-- Example 2 (Z-Score Normalization): `zscore(roc(?))`
-- Example 3 (Volatility Adjusted): `div(mult(rsi(?), var(?)), stddev(?))`
+- Example 1 (Statistical Mean-Reversion): `zscore(div(sub(ema(?), vwap()), stddev(?)))`
+- Example 2 (Time-Series Kinematics): `div(diff(macd_line(?)), stddev(?))`
+- Example 3 (Volatility Regime Anomalies): `zscore(var(pct_change(?)))`
 
 ## CRITICAL RULES (MUST FOLLOW STRICTLY)
 1. **CONTINUOUS SIGNAL ROOT**: The root (outermost function) of your macro_blueprint MUST evaluate to a RATIO or CURRENCY (e.g., div, zscore, rsi, pct_change). DO NOT use functions that output Dimension.ANY (such as add, sub, mult, ema, stddev) or BOOLEAN functions (like crossed_above, and_) as the final root. *(Note: The engine automatically applies a dynamic rolling Z-Score filter to your output signal to generate trade positions).*

@@ -1,7 +1,0 @@
-{
-    "name": "VN30F60M_RSIADXSqueeze",
-    "timeframe": "30m",
-    "family": "statistical-arbitrage",
-    "description": "Exploits mean-reversion during sideways volatility by detecting RSI divergence and ADX compression, signaling entry when price reverts to the average.",
-    "macro_blueprint": "div(sub(rsi(?), ema(?)), adx(?))"
-}

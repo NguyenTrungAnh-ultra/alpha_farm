@@ -125,27 +125,84 @@ def process_timeframe(tf: str, iterations: int = 50000):
         
     import json
     import glob
+    import shutil
     idea_files = glob.glob(os.path.join(ideas_folder, f"*_{tf}.json"))
     
+    processed_folder = os.path.join(ideas_folder, "processed")
+    os.makedirs(processed_folder, exist_ok=True)
+    
+    # Load portfolio to check for existing names
+    existing_portfolio_names = set()
+    portfolio_file = os.path.join(PROJECT_ROOT, "results", "portfolio_summary.json")
+    if os.path.exists(portfolio_file):
+        try:
+            with open(portfolio_file, 'r', encoding='utf-8') as pf:
+                portfolio_data = json.load(pf)
+                strategies = portfolio_data.get("strategies", [])
+                if isinstance(strategies, list):
+                    for s in strategies:
+                        if isinstance(s, dict) and "name" in s:
+                            existing_portfolio_names.add(s["name"])
+        except Exception as pe:
+            print(f"[Worker {tf}] Warning: Failed to read portfolio_summary.json: {pe}")
+
     compiler = SemanticCompiler()
     
     for idea_file in idea_files:
-        with open(idea_file, 'r', encoding='utf-8') as f:
-            try:
+        filename = os.path.basename(idea_file)
+        dest_path = os.path.join(processed_folder, filename)
+        
+        idea_data = None
+        try:
+            with open(idea_file, 'r', encoding='utf-8') as f:
                 idea_data = json.load(f)
-                blueprint = idea_data.get("macro_blueprint")
-                if not blueprint:
-                    continue
-                    
-                print(f"[Worker {tf}] Compiling Blueprint: {blueprint}")
-                ast_root = compiler.compile_blueprint(blueprint)
+        except Exception as e:
+            print(f"[Worker {tf}] Error reading {filename}: {e}")
+            try:
+                shutil.move(idea_file, dest_path)
+            except Exception:
+                pass
+            continue
+            
+        try:
+            name = idea_data.get("name")
+            blueprint = idea_data.get("macro_blueprint")
+            if not blueprint:
+                shutil.move(idea_file, dest_path)
+                continue
+            
+            # Check if this strategy is already in portfolio or failed lists
+            failed_py_path = os.path.join(PROJECT_ROOT, "results", "failed", f"{name}_{tf}.py")
+            failed_conv_path = os.path.join(PROJECT_ROOT, "results", "failed_conversions", f"{name}_{tf}.py")
+            
+            # If we have a general/unassigned failed strategy name as well
+            failed_base_path = os.path.join(PROJECT_ROOT, "results", "failed", f"{name}.py")
+            
+            is_duplicate = (name in existing_portfolio_names) or \
+                           os.path.exists(failed_py_path) or \
+                           os.path.exists(failed_conv_path) or \
+                           os.path.exists(failed_base_path)
+                           
+            if is_duplicate:
+                print(f"[Worker {tf}] ⏩ Skipping MCTS for '{name}' (Already processed as success or failed).")
+                shutil.move(idea_file, dest_path)
+                continue
                 
-                # ==========================================
-                # TẦNG 3: MCTS BRUTE-FORCE TÌM KIẾM CHIẾN LƯỢC
-                # ==========================================
-                mcts.run_search_from_blueprint(ast_root, n_iterations=iterations)
-            except Exception as e:
-                print(f"[Worker {tf}] SemanticCompiler Error: {e}")
+            print(f"[Worker {tf}] Compiling Blueprint: {blueprint}")
+            ast_root = compiler.compile_blueprint(blueprint)
+            
+            # ==========================================
+            # TẦNG 3: MCTS BRUTE-FORCE TÌM KIẾM CHIẾN LƯỢC
+            # ==========================================
+            mcts.run_search_from_blueprint(ast_root, n_iterations=iterations)
+            shutil.move(idea_file, dest_path)
+        except Exception as e:
+            print(f"[Worker {tf}] Error processing {filename}: {e}")
+            # Move the file even on compilation failure to avoid blocking the pipeline next time
+            try:
+                shutil.move(idea_file, dest_path)
+            except Exception:
+                pass
     
     candidates = mcts.get_best_candidates()
     

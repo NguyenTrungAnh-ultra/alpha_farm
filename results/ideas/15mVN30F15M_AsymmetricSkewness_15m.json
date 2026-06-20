@@ -1,0 +1,7 @@
+{
+    "name": "15mVN30F15M_AsymmetricSkewness",
+    "timeframe": "15m",
+    "family": "momentum|volatility",
+    "description": "Exploits order flow asymmetry by measuring the divergence between momentum and volatility expansion. In high-volatility sideways regimes, this strategy identifies when price action deviates significantly from its mean relative to recent variance.",
+    "macro_blueprint": "zscore(roc(?))"
+}

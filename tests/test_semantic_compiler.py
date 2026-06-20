@@ -58,8 +58,8 @@ def test_compiler_auto_wrap_ratio_root():
     assert len(ast.children) == 2
     assert ast.children[0].name == "zscore"
     assert ast.children[0].children[0].name == "rsi"
-    assert ast.children[1].name == "Constant"
-    assert ast.children[1].value == 1.0
+    assert ast.children[1].name == "z_score"
+    assert ast.children[1].value == "?"
 
 def test_compiler_few_shot_examples():
     compiler = SemanticCompiler()
