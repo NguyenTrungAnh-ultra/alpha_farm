@@ -1,0 +1,7 @@
+{
+    "name": "AsymmetricSkewOutbreak",
+    "timeframe": "3m",
+    "family": "momentum",
+    "description": "Captures high-frequency directional moves by measuring the skewness of price momentum relative to volatility, filtering out noise during sideways regimes.",
+    "macro_blueprint": "zscore(roc(?))"
+}

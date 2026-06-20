@@ -1,0 +1,7 @@
+{
+    "name": "SkewedOrderFlowDivergencemomentum",
+    "timeframe": "15m",
+    "family": "volatility",
+    "description": "Exploits asymmetric skewness in order flow by measuring the deviation of price momentum from its volatility-adjusted mean. In high-volatility sideways regimes, this captures rare breakout events where directional pressure exceeds normal dispersion.",
+    "macro_blueprint": "div(mult(roc(?), var(?)), stddev(?))"
+}

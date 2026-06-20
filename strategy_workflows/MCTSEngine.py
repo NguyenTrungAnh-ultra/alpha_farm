@@ -124,6 +124,8 @@ def find_first_placeholder(node: ASTNode) -> Optional[ASTNode]:
     """Depth-first search to find the first placeholder node ('?')."""
     if node.name == '?':
         return node
+    if node.name in ('window', 'z_score') and node.value == '?':
+        return node
     for child in node.children:
         ph = find_first_placeholder(child)
         if ph is not None:
@@ -186,6 +188,11 @@ class MCTSState:
         ph = find_first_placeholder(self.ast_tree)
         if ph is None:
             return []
+            
+        if ph.name == 'window':
+            return [ASTNode(name='window', value=v) for v in [5, 10, 14, 20, 30, 40, 60]]
+        if ph.name == 'z_score':
+            return [ASTNode(name='z_score', value=v) for v in [0.5, 1.0, 1.5, 2.0, 2.5]]
         
         # The expected dimension was stashed in the placeholder's value field
         req_dim = ph.value if isinstance(ph.value, Dimension) else Dimension.ANY
@@ -200,9 +207,12 @@ class MCTSState:
         new_tree = clone_ast(self.ast_tree)
         ph = find_first_placeholder(new_tree)
         if ph is not None:
-            ph.name = action_node.name
-            ph.children = [clone_ast(child) for child in action_node.children]
-            ph.value = action_node.value
+            if ph.name in ('window', 'z_score'):
+                ph.value = action_node.value
+            else:
+                ph.name = action_node.name
+                ph.children = [clone_ast(child) for child in action_node.children]
+                ph.value = action_node.value
         return MCTSState(new_tree, self.max_depth)
 
 class MCTSNode:
@@ -223,11 +233,17 @@ class MCTSNode:
 
 class DynamicMCTSStrategy(SimpleAlgorithm):
     position_scale = 0.2
+    window = 20
+    z_score_threshold = 1.0
 
     def __algorithm__(self):
         expr_str = self.expr_str
         direction = self.direction
         pos_scale = self.position_scale
+        
+        # Get dynamically discovered parameters, fallback to defaults
+        window = self.window
+        z_score_threshold = self.z_score_threshold
         
         close = self.data.pv_close
         high = self.data.pv_high
@@ -251,14 +267,13 @@ class DynamicMCTSStrategy(SimpleAlgorithm):
             self.alpha_series = close * 0.0
             alpha_val = close * 0.0
 
-        window = 20
         r_mean = self.feat.rolling_mean(alpha_val, window)
         r_std = self.feat.rolling_std(alpha_val, window) + 1e-8
         
         z_score = (alpha_val - r_mean) / r_std
         z_score = z_score * direction
 
-        raw_pos = self.op.where(z_score > 1.0, pos_scale, self.op.where(z_score < -1.0, -pos_scale, 0.0))
+        raw_pos = self.op.where(z_score > z_score_threshold, pos_scale, self.op.where(z_score < -z_score_threshold, -pos_scale, 0.0))
         
         flat_mask = raw_pos == 0.0
         long_mask = raw_pos == pos_scale
@@ -312,12 +327,22 @@ class MCTSEngine:
         return valid['alpha'].corr(valid['fwd_ret'], method='spearman')
 
     def evaluate_expression(self, ast_tree: ASTNode) -> tuple:
-        expr_str = ast_to_code(ast_tree)
-        if expr_str in self.cache:
-            return self.cache[expr_str]
+        if ast_tree.name == "strategy_root":
+            window = ast_tree.children[0].value
+            z_score = ast_tree.children[1].value
+            alpha_node = ast_tree.children[2]
+            expr_str = ast_to_code(alpha_node)
+        else:
+            window = 20
+            z_score = 1.0
+            expr_str = ast_to_code(ast_tree)
+            
+        cache_key = f"{expr_str}_{window}_{z_score}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
             
         # FSA Check - Penalty for genetic duplication
-        if self.is_in_fsa_cache(expr_str):
+        if self.is_in_fsa_cache(cache_key):
             return -100.0, 1.0, {} # Massive penalty for identical subtree
             
         best_reward = -10.0
@@ -326,7 +351,7 @@ class MCTSEngine:
         
         for direction in [1.0, -1.0]:
             try:
-                strategy = DynamicMCTSStrategy(expr_str=expr_str, direction=direction)
+                strategy = DynamicMCTSStrategy(expr_str=expr_str, direction=direction, window=window, z_score_threshold=z_score)
                 result = self.backtest_engine.run(strategy, self.df_search)
                 metrics = compute_metrics(result)
                 
@@ -348,15 +373,22 @@ class MCTSEngine:
                     best_direction = direction
                     best_metrics = metrics
                     best_metrics['rank_ic'] = rank_ic
+                    best_metrics['window'] = window
+                    best_metrics['z_score_threshold'] = z_score
             except Exception as e:
                 pass
                 
-        self.cache[expr_str] = (best_reward, best_direction, best_metrics)
+        self.cache[cache_key] = (best_reward, best_direction, best_metrics)
         return best_reward, best_direction, best_metrics
 
     def run_search_from_blueprint(self, root_ast: ASTNode, n_iterations: int = 100):
         """Unified Compiler Architecture: Starts from an AST parsed from LLM Blueprint JSON."""
-        root_state = MCTSState(root_ast, self.max_depth)
+        # Wrap root_ast to enable MCTS to discover window and z_score parameters
+        window_node = ASTNode(name="window", value="?")
+        z_node = ASTNode(name="z_score", value="?")
+        new_root = ASTNode(name="strategy_root", children=[window_node, z_node, root_ast])
+        
+        root_state = MCTSState(new_root, self.max_depth)
         root_node = MCTSNode(root_state)
         
         print(f"[MCTS] Starting unified search from Blueprint | Depth: {self.max_depth} | Iterations: {n_iterations}")
@@ -386,12 +418,21 @@ class MCTSEngine:
             reward, direction, metrics = self.evaluate_expression(terminal_state.ast_tree)
             
             if terminal_state.is_terminal():
-                expr_code = ast_to_code(terminal_state.ast_tree)
-                self.update_leaderboard(expr_code, reward, direction, metrics)
+                if terminal_state.ast_tree.name == "strategy_root":
+                    expr_code = ast_to_code(terminal_state.ast_tree.children[2])
+                    window = terminal_state.ast_tree.children[0].value
+                    z_score = terminal_state.ast_tree.children[1].value
+                else:
+                    expr_code = ast_to_code(terminal_state.ast_tree)
+                    window = 20
+                    z_score = 1.0
+                    
+                self.update_leaderboard(expr_code, reward, direction, metrics, window, z_score)
                 
                 # Update FSA Rolling Window Cache if good reward
                 if reward > 1.0:
-                    self.add_to_fsa_cache(expr_code)
+                    cache_key = f"{expr_code}_{window}_{z_score}"
+                    self.add_to_fsa_cache(cache_key)
                 
             # Risk-Seeking Backpropagation (Tail Quantile)
             for p_node in path:
@@ -432,15 +473,17 @@ class MCTSEngine:
             curr_state = curr_state.apply_action(action)
         return curr_state
 
-    def update_leaderboard(self, expr_str: str, reward: float, direction: float, metrics: dict):
+    def update_leaderboard(self, expr_str: str, reward: float, direction: float, metrics: dict, window: int = 20, z_score: float = 1.0):
         for item in self.leaderboard:
-            if item['expr'] == expr_str:
+            if item['expr'] == expr_str and item.get('window') == window and item.get('z_score') == z_score:
                 return
         
         self.leaderboard.append({
             'expr': expr_str,
             'reward': reward,
             'direction': direction,
+            'window': window,
+            'z_score': z_score,
             'metrics': metrics
         })
         self.leaderboard.sort(key=lambda x: x['reward'], reverse=True)

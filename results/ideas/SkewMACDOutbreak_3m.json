@@ -1,0 +1,7 @@
+{
+    "name": "SkewMACDOutbreak",
+    "timeframe": "3m",
+    "family": "momentum",
+    "description": "Exploits asymmetric order flow by identifying when MACD momentum diverges from volatility, signaling a breakout in high-volatility sideways regimes.",
+    "macro_blueprint": "div(macd_line(?), stddev(?))"
+}

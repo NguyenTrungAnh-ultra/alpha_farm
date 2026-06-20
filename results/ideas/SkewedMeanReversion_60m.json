@@ -1,0 +1,7 @@
+{
+    "name": "SkewedMeanReversion",
+    "timeframe": "60m",
+    "family": "mean-reversion",
+    "description": "Exploits mean reversion during sideways volatility by using z-score normalized returns to identify overextended conditions. The strategy generates signals when the price deviates significantly from its moving average, indicating a high probability of reversal in this regime.",
+    "macro_blueprint": "zscore(roc(?))"
+}

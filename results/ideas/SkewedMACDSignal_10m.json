@@ -1,0 +1,7 @@
+{
+    "name": "SkewedMACDSignal",
+    "timeframe": "10m",
+    "family": "momentum|mean-reversion|volatility|statistical-arbitrage",
+    "description": "Exploits order flow asymmetry by combining MACD trend direction with volatility normalization to filter noise during sideways regimes.",
+    "macro_blueprint": "div(ema(?), stddev(?))"
+}

@@ -1,0 +1,7 @@
+{
+    "name": "SkewedMACDOutbreak",
+    "timeframe": "15m",
+    "family": "momentum",
+    "description": "Exploits order flow asymmetry by combining MACD momentum with volatility normalization to capture breakout signals during high variance regimes.",
+    "macro_blueprint": "div(mult(ema(?), macd_line(?)), stddev(?))"
+}

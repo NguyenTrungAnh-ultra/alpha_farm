@@ -1,0 +1,7 @@
+{
+    "name": "SkewedOrderFlowDivergence",
+    "timeframe": "30m",
+    "family": "momentum",
+    "description": "Exploits asymmetric skewness in order flow by measuring the divergence between momentum and volatility-adjusted trends.",
+    "macro_blueprint": "div(sub(sma(?), ema(?)), stddev(?))"
+}

@@ -1,0 +1,7 @@
+{
+    "name": "SkewROCOutbreak",
+    "timeframe": "3m",
+    "family": "momentum",
+    "description": "Exploits rapid price momentum shifts during high volatility by detecting asymmetric ROC divergence from the mean.",
+    "macro_blueprint": "zscore(roc(?))"
+}

@@ -1,0 +1,7 @@
+{
+    "name": "SkewedMomentumScalper",
+    "timeframe": "10m",
+    "family": "momentum",
+    "description": "Exploits order flow asymmetry by combining momentum with volatility normalization to capture directional moves during high-volatility sideways regimes.",
+    "macro_blueprint": "zscore(roc(?))"
+}

@@ -1,0 +1,7 @@
+{
+    "name": "SkewedMACDSignal",
+    "timeframe": "60m",
+    "family": "momentum|mean-reversion|volatility|statistical-arbitrage",
+    "description": "Exploits asymmetric order flow by measuring the divergence between MACD momentum and volatility-adjusted mean reversion signals.",
+    "macro_blueprint": "div(ema(?), stddev(?))"
+}

@@ -1,0 +1,7 @@
+{
+    "name": "SkewedMACDSignal",
+    "timeframe": "30m",
+    "family": "momentum",
+    "description": "Exploits asymmetric skewness in order flow by measuring the divergence between MACD momentum and volatility-adjusted price action.",
+    "macro_blueprint": "div(ema(?), stddev(?))"
+}
