@@ -31,7 +31,7 @@ def cmd_generate(args):
 def cmd_mcts(args):
     print("\n[Bước 2/3] Tầng 2 & 3: Biên dịch Blueprint & MCTS Brute-force...")
     from strategy_workflows.RunMCTS import run_mcts_pipeline
-    iterations = getattr(args, 'iterations', 500)
+    iterations = getattr(args, 'iterations', 50000)
     run_mcts_pipeline(iterations=iterations)
 
 
@@ -128,9 +128,24 @@ def retrieve_numerical_input(label: str, default_value: int, value_type: type = 
         return default_value
 
 def select_ai_model() -> str:
-    models = ["deepseek-thinking", "ollama-local", "ollama-9b", "gemini-2.5-flash"]
-    selected_idx = display_interactive_menu(models, "Chọn AI Model:")
-    return models[selected_idx]
+    options = [
+        "DeepSeek Web Thinking (Cloud - Yêu cầu token.txt)",
+        "Ollama Qwen3.5 4B (Local - Cần chạy Ollama nền)",
+        "Ollama Qwen3.5 9B (Local - Cần chạy Ollama nền)",
+        "Gemini Web Flash (Cloud - Yêu cầu cookies.txt)",
+        "Gemini Web Pro (Cloud - Yêu cầu cookies.txt)",
+        "Gemini Web Flash Thinking (Cloud - Yêu cầu cookies.txt)"
+    ]
+    keys = [
+        "deepseek-thinking",
+        "ollama-local",
+        "ollama-9b",
+        "flash",
+        "pro",
+        "thinking"
+    ]
+    selected_idx = display_interactive_menu(options, "Chọn AI Model:")
+    return keys[selected_idx]
 
 class InteractiveArgs:
     def __init__(self, **kwargs):
@@ -166,7 +181,7 @@ def run_interactive_cli() -> None:
         args_dict["model"] = select_ai_model()
         
     if selected_cmd in ("mcts", "full"):
-        args_dict["iterations"] = retrieve_numerical_input("Số lượng vòng lặp MCTS (iterations)", 500, int)
+        args_dict["iterations"] = retrieve_numerical_input("Số lượng vòng lặp MCTS (iterations)", 50000, int)
         
     args = InteractiveArgs(**args_dict)
     
@@ -198,7 +213,7 @@ def main():
     
     # MCTS
     parser_mcts = subparsers.add_parser("mcts", help="Run Tầng 2 & 3 (Compiler + MCTS)")
-    parser_mcts.add_argument("--iterations", type=int, default=500, help="Number of MCTS iterations")
+    parser_mcts.add_argument("--iterations", type=int, default=50000, help="Number of MCTS iterations")
     
     # Submit
     parser_sub = subparsers.add_parser("submit", help="Auto submit valid strategies")
@@ -207,7 +222,7 @@ def main():
     parser_full = subparsers.add_parser("full", help="Run full pipeline (generate -> mcts -> submit)")
     parser_full.add_argument("--n_strategies", type=int, default=20)
     parser_full.add_argument("--model", type=str, default="deepseek-thinking")
-    parser_full.add_argument("--iterations", type=int, default=500, help="Number of MCTS iterations")
+    parser_full.add_argument("--iterations", type=int, default=50000, help="Number of MCTS iterations")
     parser_full.add_argument("--no_cookies", action="store_true")
     
     args = parser.parse_args()

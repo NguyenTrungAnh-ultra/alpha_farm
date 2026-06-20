@@ -1,0 +1,7 @@
+{
+    "name": "SkewVWAPDivergence",
+    "timeframe": "5m",
+    "family": "statistical-arbitrage",
+    "description": "Exploits order flow asymmetry by measuring the divergence between VWAP and EMA relative to market volatility, targeting mean-reversion during sideways regimes.",
+    "macro_blueprint": "div(sub(vwap(), ema(?)), stddev(?))"
+}

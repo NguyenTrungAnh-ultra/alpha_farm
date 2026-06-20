@@ -1,0 +1,7 @@
+{
+    "name": "SkewnessBreakoutScalper",
+    "timeframe": "3m",
+    "family": "momentum",
+    "description": "Exploits asymmetric order flow by combining MACD momentum with volatility normalization to identify directional breaks in sideways regimes.",
+    "macro_blueprint": "zscore(mult(ema(?), macd_line(?)))"
+}

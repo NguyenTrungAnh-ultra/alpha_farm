@@ -1,0 +1,7 @@
+{
+    "name": "SkewedOrderFlowDivergence",
+    "timeframe": "60m",
+    "family": "momentum|mean-reversion|volatility|statistical-arbitrage",
+    "description": "Exploits asymmetric skewness in order flow by combining momentum indicators with volatility normalization to capture intraday mean reversion signals during high volatility regimes.",
+    "macro_blueprint": "div(sub(rsi(?), ema(?)), stddev(?))"
+}

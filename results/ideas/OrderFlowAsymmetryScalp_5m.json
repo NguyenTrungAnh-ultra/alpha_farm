@@ -1,0 +1,7 @@
+{
+    "name": "OrderFlowAsymmetryScalp",
+    "timeframe": "5m",
+    "family": "momentum",
+    "description": "Captures asymmetric price movements by measuring the ratio of momentum to volatility, filtering out noise during sideways regimes.",
+    "macro_blueprint": "div(roc(?), stddev(?))"
+}

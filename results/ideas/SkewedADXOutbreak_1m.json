@@ -1,0 +1,7 @@
+{
+    "name": "SkewedADXOutbreak",
+    "timeframe": "1m",
+    "family": "momentum",
+    "description": "Exploits asymmetric order flow by combining MACD momentum with ADX volatility confirmation to filter noise during high-volatility sideways regimes.",
+    "macro_blueprint": "div(mult(roc(?), adx()), stddev(?))"
+}

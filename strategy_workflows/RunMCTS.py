@@ -36,7 +36,7 @@ from strategy_workflows.PortfolioManager import PortfolioManager
 TIMEFRAMES = ["1m", "3m", "5m", "10m", "15m", "30m", "60m"]
 
 # TWEAK: Increase to 1000, 5000, or 10000 to unleash MCTS full power. Higher iterations = deeper search = better formulas, but high CPU/RAM cost.
-ITERATIONS_PER_DIMENSION = 10000
+ITERATIONS_PER_DIMENSION = 50000
 
 # TWEAK: Add smaller/larger scales (e.g., [0.05, 0.1, ..., 0.5]) to give the engine more flexibility in risk management.
 POSITION_SCALES = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5]
@@ -61,7 +61,7 @@ def generate_descriptive_name(expr_str: str) -> str:
             unique_words.append(w)
     return "_".join(unique_words)
 
-def generate_strategy_code(expr_str: str, direction: float, position_scale: float) -> str:
+def generate_strategy_code(expr_str: str, direction: float, position_scale: float, window: int = 20, z_score_threshold: float = 1.0) -> str:
     """Generates a clean CustomStrategy Python source code string."""
     return f"""# [MCTS_DISCOVERY_ENGINE]
 from core_engine.XnoEngine import SimpleAlgorithm
@@ -80,7 +80,7 @@ class CustomStrategy(SimpleAlgorithm):
         alpha_val = {expr_str}
         
         # 3. Standardization (Z-Score)
-        window = 20
+        window = {window}
         r_mean = self.feat.rolling_mean(alpha_val, window)
         r_std = self.feat.rolling_std(alpha_val, window) + 1e-8
         
@@ -88,7 +88,7 @@ class CustomStrategy(SimpleAlgorithm):
         z_score = z_score * {direction}
 
         # 4. Position signals (EXIT first, ENTRY second)
-        raw_pos = self.op.where(z_score > 1.0, {position_scale}, self.op.where(z_score < -1.0, -{position_scale}, 0.0))
+        raw_pos = self.op.where(z_score > {z_score_threshold}, {position_scale}, self.op.where(z_score < -{z_score_threshold}, -{position_scale}, 0.0))
         
         flat_mask = raw_pos == 0.0
         long_mask = raw_pos == {position_scale}
@@ -99,7 +99,7 @@ class CustomStrategy(SimpleAlgorithm):
         self.set_positions(short_mask, position=-{position_scale})
 """
 
-def process_timeframe(tf: str, iterations: int = 10000):
+def process_timeframe(tf: str, iterations: int = 50000):
     """Worker function to run MCTS and Backtesting for a single timeframe."""
     import logging
     import warnings
@@ -171,6 +171,8 @@ def process_timeframe(tf: str, iterations: int = 10000):
     for cand in candidates:
         expr = cand['expr']
         direction = cand['direction']
+        window = cand.get('window', 20)
+        z_score_threshold = cand.get('z_score', 1.0)
             
         best_scale = None
         best_metrics = None
@@ -179,7 +181,7 @@ def process_timeframe(tf: str, iterations: int = 10000):
         
         for scale in POSITION_SCALES:
             try:
-                strategy = DynamicMCTSStrategy(expr_str=expr, direction=direction, position_scale=scale)
+                strategy = DynamicMCTSStrategy(expr_str=expr, direction=direction, position_scale=scale, window=window, z_score_threshold=z_score_threshold)
                 result = full_backtest_engine.run(strategy, df_full)
                 metrics = compute_metrics(result)
                 
@@ -224,6 +226,8 @@ def process_timeframe(tf: str, iterations: int = 10000):
                 "expr": expr,
                 "direction": direction,
                 "best_scale": best_scale,
+                "window": window,
+                "z_score": z_score_threshold,
                 "metrics": best_metrics,
                 "equity_curve": best_result.equity_curve,
                 "positions": best_result.positions
@@ -239,7 +243,7 @@ def process_timeframe(tf: str, iterations: int = 10000):
     print(f"--- [Worker {tf}] Finished processing ---")
     return tf, total_generated, total_rejected, successful_candidates
 
-def run_mcts_pipeline(iterations: int = 10000):
+def run_mcts_pipeline(iterations: int = 50000):
     print("==============================================================")
     print("      STARTING MULTIPROCESSING MCTS ALPHA SEARCH PIPELINE     ")
     print("==============================================================")
@@ -268,7 +272,7 @@ def run_mcts_pipeline(iterations: int = 10000):
                     uid = uuid.uuid4().hex[:4]
                     unique_name = f"{name}_{uid}"
                     
-                    code = generate_strategy_code(cand["expr"], cand["direction"], cand["best_scale"])
+                    code = generate_strategy_code(cand["expr"], cand["direction"], cand["best_scale"], cand["window"], cand["z_score"])
                     
                     accepted, reason = portfolio_manager.evaluate_and_add(
                         name=unique_name,
@@ -276,7 +280,7 @@ def run_mcts_pipeline(iterations: int = 10000):
                         family="MCTS_Discovered",
                         description=f"Alpha discovered via MCTS: {cand['expr']}",
                         code=code,
-                        params={"direction": cand["direction"], "position_scale": cand["best_scale"]},
+                        params={"direction": cand["direction"], "position_scale": cand["best_scale"], "window": cand["window"], "z_score": cand["z_score"]},
                         metrics=cand["metrics"],
                         equity_curve=cand["equity_curve"],
                         positions=cand["positions"]
@@ -322,4 +326,4 @@ if __name__ == "__main__":
     beast_mode_workers = max(1, multiprocessing.cpu_count() - 2)  # Sẽ bằng 10
     
     with concurrent.futures.ProcessPoolExecutor(max_workers=beast_mode_workers) as executor:
-        run_mcts_pipeline(iterations=30000)
+        run_mcts_pipeline(iterations=50000)

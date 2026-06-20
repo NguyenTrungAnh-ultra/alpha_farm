@@ -109,6 +109,9 @@ Ngay khi LLM sinh ra một Blueprint bị sai cú pháp hoặc sai thứ nguyên
 
 ### MCTS Engine Tuning (`strategy_workflows/RunMCTS.py`)
 MCTS thay thế hoàn toàn hệ thống Optuna cũ. MCTS Brute-force không chỉ tối ưu tham số mà còn tự động khám phá và xây dựng cây biểu thức toán học (AST).
+Động cơ MCTS có khả năng tối ưu hóa tham số động (Dynamic Parameter Optimization):
+- **Window Size & Z-Score Threshold**: Không còn bị gán cứng (hardcode), MCTS sẽ tự động tìm kiếm chu kỳ làm mượt (`window`) và ngưỡng kích hoạt chuẩn hóa (`z_score`) tương thích nhất với cấu trúc toán học của từng khung thời gian, phá vỡ giới hạn "mù thời gian" của hệ thống cũ.
+
 Bạn có thể tinh chỉnh sức mạnh bằng cách cấu hình số vòng lặp:
 - **`MCTS_ITERATIONS`**: Tăng số vòng lặp để đào sâu vào các nhánh tham số phức tạp.
 

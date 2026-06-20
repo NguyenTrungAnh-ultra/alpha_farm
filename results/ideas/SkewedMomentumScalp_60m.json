@@ -1,0 +1,7 @@
+{
+    "name": "SkewedMomentumScalp",
+    "timeframe": "60m",
+    "family": "momentum",
+    "description": "Exploits asymmetric order flow by capturing momentum spikes during sideways volatility, using RSI to identify overbought/oversold conditions and MACD for trend confirmation.",
+    "macro_blueprint": "div(mult(rsi(?), var(?)), stddev(?))"
+}

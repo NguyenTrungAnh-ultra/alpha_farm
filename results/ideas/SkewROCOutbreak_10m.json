@@ -1,0 +1,7 @@
+{
+    "name": "SkewROCOutbreak",
+    "timeframe": "10m",
+    "family": "momentum",
+    "description": "Exploits asymmetric price momentum during high volatility by measuring the skewness of rate-of-change (ROC) values relative to standard deviation, capturing directional breaks when order flow becomes skewed.",
+    "macro_blueprint": "zscore(roc(?))"
+}

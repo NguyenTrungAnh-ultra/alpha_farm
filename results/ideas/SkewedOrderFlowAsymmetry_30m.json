@@ -1,0 +1,7 @@
+{
+    "name": "SkewedOrderFlowAsymmetry",
+    "timeframe": "30m",
+    "family": "momentum",
+    "description": "Exploits order flow asymmetry by measuring the divergence between momentum and volatility-adjusted price action to capture high-probability directional moves in sideways regimes.",
+    "macro_blueprint": "div(mult(roc(?), rsi(?)), stddev(?))"
+}
