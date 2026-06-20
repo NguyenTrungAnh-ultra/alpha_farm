@@ -165,7 +165,7 @@ def process_timeframe(tf: str, iterations: int = 50000):
         
     print(f"\n[Worker {tf}] Found {total_generated} candidates. Running full 5-year backtests with scale optimization...")
     
-    df_full = load_data(tf, start='2020-01-01', end='2023-12-31')
+    df_full = load_data(tf)
     df_full['Volume'] = df_full['Volume'].fillna(0.0)
     
     for cand in candidates:
