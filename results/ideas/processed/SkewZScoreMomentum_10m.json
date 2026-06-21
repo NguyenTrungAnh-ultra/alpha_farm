@@ -1,7 +1,0 @@
-{
-    "name": "SkewZScoreMomentum",
-    "timeframe": "10m",
-    "family": "momentum",
-    "description": "Exploits asymmetric price momentum by normalizing returns with volatility, filtering for high skewness in order flow.",
-    "macro_blueprint": "zscore(roc(?))"
-}

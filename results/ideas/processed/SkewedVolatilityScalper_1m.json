@@ -1,7 +1,0 @@
-{
-    "name": "SkewedVolatilityScalper",
-    "timeframe": "1m",
-    "family": "momentum",
-    "description": "Exploits asymmetric price movements by combining momentum with volatility filtering to capture directional breaks in high-volatility sideways markets.",
-    "macro_blueprint": "div(mult(roc(?), rsi(?)), stddev(?))"
-}

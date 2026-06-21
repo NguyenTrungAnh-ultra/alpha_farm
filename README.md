@@ -146,16 +146,61 @@ python main.py generate --model ollama-9b
 
 ---
 
-## 6. Cơ chế chấm điểm nội bộ của MCTS (Reward Function)
+## 6. Cơ chế chấm điểm và Hội tụ nội bộ của MCTS (One-pass Pipeline)
 
-Động cơ MCTS Brute-force sử dụng hệ thống chấm điểm riêng để nhặt ra những công thức toán học tốt nhất. Hàm Reward hiện tại tập trung vào Lợi nhuận và Sức mạnh dự báo gốc:
+```mermaid
+graph TD
+    subgraph Ký ức Toàn cục
+        pm[(portfolio_summary.json)] -->|Load Positions| gm[Global Position Matrix]
+    end
 
-**`Reward = 10.0 * abs(RankIC) + Max(0, Sharpe)`**
+    subgraph MCTS One-pass Pipeline
+        init[Khởi tạo Worker] --> gm
+        gm --> mcts_run{Vòng lặp MCTS}
+        
+        mcts_run -->|Sinh Công thức & Tham số| bt[Backtest Engine 5 năm]
+        bt -->|Kết quả Giao dịch| metrics[Tính Toán Metrics]
+        
+        metrics -->|Calmar < 1.1| reject[Reward = -10.0 <br> Cắt Nhánh]
+        metrics -->|Calmar >= 1.1| reward_calc[Tính Đa Mục Tiêu]
+        
+        reward_calc -->|IC, Calmar| base_score[Base Score]
+        reward_calc -->|Đo tương quan với| gm
+        gm -->|MaxCorr| penalty[S_corr = 1 - MaxCorr]
+        
+        base_score --> final[Reward = Base * S_corr]
+        penalty --> final
+        final --> backprop[Backpropagation]
+        backprop --> entropy{Kiểm tra Shannon Entropy}
+        
+        entropy -->|> 0.15| mcts_run
+        entropy -->|< 0.15| converge[Hội tụ Toán học! Ngắt Sớm]
+        entropy -->|Chạm Max Iterations| converge
+    end
+    
+    subgraph Nghiệm Thu
+        converge --> select[Lọc Top 1 Reward > 0]
+        select --> commit[Lưu thẳng vào Portfolio]
+        commit --> pm
+    end
+
+    style reject fill:#e74c3c,color:#fff
+    style converge fill:#2ecc71,color:#fff
+    style commit fill:#3498db,color:#fff
+    style gm fill:#f39c12,color:#fff
+```
+
+Động cơ MCTS Brute-force sử dụng kiến trúc **One-pass Pipeline** hợp nhất Tầng Khám phá và Tầng Nghiệm thu, với hệ thống chấm điểm đa mục tiêu và hội tụ thông minh:
+
+**`Reward = (0.6 * S_calmar + 0.4 * S_ic) * S_corr`**
 
 **Giải thích các thành phần:**
+- **Máy chém Calmar (Hard Filter)**: Bất kỳ công thức nào có `Calmar < 1.1` sẽ lập tức bị gán Reward = -10.0 để MCTS cắt bỏ nhánh đó. `S_calmar` là hệ số Calmar được chuẩn hóa Min-Max (ngưỡng tối đa 3.0).
+- **`S_ic`**: Hệ số Rank IC đo lường khả năng tiên tri hướng đi của thị trường, chuẩn hóa Min-Max (ngưỡng tối đa 0.15).
+- **`S_corr` (Global Correlation Penalty)**: MCTS được truyền một Ma trận Vị thế Lịch sử (Ký ức toàn cục). `S_corr = 1.0 - MaxCorr`. Nếu công thức sinh ra đạo nhái hoàn toàn một chiến lược đã có, `MaxCorr = 1.0` $\rightarrow$ Reward = 0, ép cây UCT phải rẽ sang hướng khác!
 
-- **`10.0 * abs(RankIC)`**: Trọng số lớn nhất! Hệ số Rank IC đo lường khả năng tiên tri hướng đi của thị trường của tín hiệu.
-- **`Max(0, Sharpe)`**: Thưởng thêm nếu công thức có tỷ lệ Sharpe tốt (lợi nhuận thực tế) khi chạy qua Sandbox.
+**Hội tụ bằng Shannon Entropy (Early Stopping):**
+Thay vì chạy cố định một số lượng vòng lặp, hệ thống theo dõi **Shannon Entropy** của Nút Gốc. Khi Entropy giảm xuống dưới ngưỡng `0.15` (thuật toán đã dồn mọi nguồn lực truy cập vào một công thức tối ưu, không còn "phân vân"), MCTS sẽ tự động ngắt vòng lặp (Hội tụ Toán học), tiết kiệm đáng kể tài nguyên CPU.
 
 **Đặc biệt - Risk-Seeking UCT Optimization:**
 Khi duyệt cây tìm kiếm (UCT), MCTS không sử dụng điểm trung bình (Mean Reward) mà sử dụng **Điểm lớn nhất (Max Reward)**. Đây là kỹ thuật "Tail Quantile Optimization", chấp nhận sự không ổn định để tìm ra những chuỗi tham số "đột biến" mang lại hiệu suất cao nhất.
@@ -168,3 +213,14 @@ Trong pha Lan truyền ngược, hệ thống cập nhật giá trị cho các n
   $$\text{max\_reward}_v \leftarrow \max(\text{max\_reward}_v, R)$$
 
 Cơ chế này giúp giữ lại dấu vết của các công thức "đột biến" (outliers) có hiệu năng vượt trội trong mỗi nhánh tìm kiếm, hướng thuật toán tập trung đào sâu vào các vùng không gian chiến lược chứa Alpha chất lượng cao. Các nhánh công thức vô dụng sẽ bị loại bỏ thông qua cơ chế cấm tự động (FSA Forbidden Patterns / Linear Amnesia Mitigation).
+
+---
+
+## 7. Động Cơ Lõi Vectorized & Chống Rò Rỉ Dữ Liệu (Core Engine)
+
+Hệ thống sở hữu một động cơ giả lập siêu tốc (`XNOBacktestEngine`) được thiết kế đặc trị chuẩn mực cho thị trường Phái sinh VN30F:
+
+- **Vectorized O(1) Execution:** Loại bỏ hoàn toàn vòng lặp Python, sử dụng ma trận Numpy để tính toán trạng thái lệnh và Mark-to-Market PnL tức thời.
+- **VN30F Netting Fee:** Phí giao dịch được trừ chính xác dựa trên Delta hợp đồng (chênh lệch vị thế), cứu vớt các chiến lược DCA/Scale-in khỏi hiện tượng Commission Drag do thuật toán Full Close/Reopen sai lầm của Crypto.
+- **Lookahead Bias Prevention:** Engine tự động `shift(1)` toàn bộ tín hiệu. Lệnh sinh ra ở nến hiện tại sẽ tự động dời điểm khớp lệnh sang nến tiếp theo, chặn đứng 100% rủi ro MCTS tìm ra "Chén thánh giả" ăn gian dữ liệu tương lai.
+- **Constant Returns Metrics:** Các chỉ số rủi ro (Volatility, Sortino, VaR) trong `CalculateMetrics.py` được đo lường bằng lợi nhuận theo vốn cố định (`constant_returns`), phản ánh thực tế giao dịch khối lượng hợp đồng cố định.

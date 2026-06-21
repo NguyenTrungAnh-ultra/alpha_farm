@@ -34,22 +34,22 @@ Dưới đây là các giới hạn và quy định chung để chiến lược 
 
 - `MCTSDimensions.py`: Nơi đăng ký mọi Toán tử và quy tắc chữ ký hàm (Arity). Hệ thống áp dụng triết lý **Component Splitting** (phân rã các chỉ báo Tuple như MACD, BBANDS thành các mảng 1D độc lập) và đưa các chỉ báo nhiều tham số tĩnh (như VWAP, ADX) về Arity 0 (Terminal Nodes) để đảm bảo LLM và MCTS không bao giờ điền sai tham số.
 - `SemanticCompiler.py`: Bộ biên dịch AST thông minh. Không chỉ kiểm tra cú pháp, bộ biên dịch còn thực thi nghiêm ngặt luật chống **Dimensional Bleeding** (Rò rỉ thứ nguyên) để ngăn chặn việc cộng/trừ các đơn vị Giá với Khối lượng hoặc RSI, hủy ngay lập tức các nhánh vô nghĩa về mặt vật lý tài chính.
-- `MCTSEngine.py`: Động cơ lõi sử dụng thuật toán Monte Carlo Tree Search. Tự động lắp ghép các thành phần toán học dựa trên sự cho phép của `SemanticCompiler`. Động cơ tự động tiêm chính xác các tham số cửa sổ (như `timeperiod` hay `periods`) vào đúng hàm. Ngoài ra, MCTS còn sở hữu nốt gốc `strategy_root` để cùng lúc (jointly) khám phá bộ chu kỳ chuẩn hóa (`window`) và ngưỡng kích hoạt (`z_score_threshold`) tối ưu nhất cho từng Alpha, loại bỏ hoàn toàn các điểm nghẽn hardcode gây "mù thời gian".
-- `RunMCTS.py`: Chu trình quét hàng ngàn biểu thức do MCTS sinh ra, dùng giả lập `BacktestEngine` (được giới hạn data từ 2020-2023 để tiết kiệm tài nguyên) để đánh giá Sharpe, Return và lọc bỏ những Alpha có tính tương quan quá cao với những file đã lưu trong `portfolio.json`.
+- `MCTSEngine.py`: Động cơ lõi sử dụng thuật toán Monte Carlo Tree Search. Được trang bị kiến trúc **One-pass Pipeline**, tích hợp Máy chém Calmar (Hard Filter) và tính toán phần thưởng Đa mục tiêu (Multi-objective Reward) có tính đến hệ số tương quan Vị thế với Ký ức toàn cục (Global Position Matrix). Hệ thống còn tích hợp cảm biến **Shannon Entropy** ở Nút Gốc để tự động ngắt vòng lặp khi thuật toán đã hội tụ. MCTS tự động lắp ghép các thành phần toán học và tiêm chính xác các tham số cửa sổ, đồng thời khám phá chu kỳ (`window`) và ngưỡng (`z_score_threshold`) tối ưu nhất.
+- `RunMCTS.py`: Tiến trình Worker (Chạy đa luồng). Ngay khi khởi động, nó nạp Ma trận Vị thế lịch sử (Ký ức toàn cục) từ `portfolio_summary.json` và truyền vào MCTS. MCTS chạy trực tiếp trên toàn bộ **5 năm dữ liệu** thay vì data cắt lát. Cuối cùng, `RunMCTS.py` thực hiện Nghiệm thu một chạm (One-pass Commit): lấy đúng 1 chiến lược Top 1 (Reward > 0) và nộp thẳng vào Portfolio, bỏ qua các bước kiểm tra lại trung gian.
 
 ### Pipeline LLM Sinh Tự Động (`strategy_workflows/` & `llm_clients/`)
 
 - `GenerateStrategies.py`: Trình điều khiển chính của nhóm LLM (Gemini, DeepSeek, Ollama). Nhiệm vụ sinh ra **Macro-Blueprint** chứa cấu trúc chiến lược dạng khung (chứa các dấu `?`). Đặc biệt, tiến trình này nhúng sẵn bộ `SemanticCompiler` để chặn đứng các lỗi cú pháp và lỗi ảo giác (hallucination) ngay lúc sinh mã, đẩy mô hình vào vòng lặp Self-Correction trước khi lưu file JSON.
 - `SemanticCompiler.py`: Bộ biên dịch AST thông minh. Có khả năng "Auto-pad" (đệm tham số còn thiếu), "Auto-fold" (gộp cụm logic) và có bộ từ điển `HALLUCINATION_MAP` để ép các hàm do LLM "bịa ra" về đúng chuẩn hàm của nền tảng.
 - `llm_clients/`: Giao diện gọi API (`GeminiClient.py`, `DeepseekClient.py`, `OllamaClient.py`).
-- `PortfolioManager.py`: Đánh giá các chỉ số tối thiểu (Sharpe, CAGR). Thực hiện cơ chế kiểm tra tương quan chéo (Cross-Correlation) giữa các chiến lược.
+- `PortfolioManager.py`: Sổ cái lưu trữ và quản lý danh mục (Portfolio Ledger). Ở kiến trúc mới (One-pass), các bài kiểm tra rủi ro (Sharpe, CAGR, Calmar, MaxCorr) đã được đẩy vào `MCTSEngine`. MCTS lưu chiến lược thông qua cờ `force_add=True`.
 - `SubmitStrategies.py`: Đóng vai trò tự động nộp bài qua Playwright. Nó tự động nộp các chiến lược Python đã qua bước Sandbox.
 
 ### Sandbox Mocking & Core Engine (`core_engine/`)
 
 - `PlatformEmulator.py`: Khung kiểm thử được tinh chỉnh để mô phỏng chính xác trình biên dịch mã của nền tảng Web.
-- `BacktestEngine.py` $\rightarrow$ `XNOBacktestEngine.run()`: Nhận mảng vị thế từ chiến lược và mô phỏng giao dịch bar-by-bar, xử lý đóng/mở hợp đồng, trừ phí giao dịch. Tốc độ cực cao (Vectorized).
-- `CalculateMetrics.py`: Cung cấp bộ tính toán chỉ số hiệu năng (Sharpe, Sortino, VaR, CAGR, Max Drawdown).
+- `BacktestEngine.py` $\rightarrow$ `XNOBacktestEngine.run()`: Động cơ mô phỏng giao dịch bar-by-bar siêu tốc (**Vectorized Numpy**). Tích hợp cơ chế **VN30F Netting** tính phí theo Delta hợp đồng và thuật toán khóa rò rỉ dữ liệu (Lookahead Bias) bằng lệnh `shift(1)` vị thế.
+- `CalculateMetrics.py`: Cung cấp bộ tính toán chỉ số hiệu năng (Sharpe, Sortino, VaR, CAGR, Max Drawdown). Đặc biệt, hệ số rủi ro (Risk Metrics) được đo lường hoàn toàn dựa trên Constant Returns để phù hợp với đặc thù giao dịch khối lượng hợp đồng cố định.
 - `XnoEngine.py`: Lớp Wrapper cấp cao gom BacktestEngine và CalculateMetrics để thực thi và đánh giá chiến lược độc lập.
 - `RestrictedSeries.py`: Cấu trúc dữ liệu giới hạn ngăn việc rò rỉ dữ liệu (Look-ahead bias) trong quá trình backtest.
 - `GenerateReport.py`: Module hỗ trợ sinh báo cáo thống kê kết quả backtest.

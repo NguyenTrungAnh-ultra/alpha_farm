@@ -1,7 +1,0 @@
-{
-    "name": "SkewVWAPDivergence",
-    "timeframe": "3m",
-    "family": "mean-reversion",
-    "description": "Captures mean reversion when price deviates significantly from VWAP, using skewness of order flow to identify asymmetric pullbacks in high volatility.",
-    "macro_blueprint": "div(sub(vwap(), ema(?)), stddev(?))"
-}

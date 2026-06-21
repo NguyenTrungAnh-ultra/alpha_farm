@@ -32,6 +32,16 @@ import numpy as np
 import pandas as pd
 from utilities.AppConfig import PROJECT_ROOT
 
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
 
 # ─── Competition Criteria ────────────────────────────────────────────
 CRITERIA = {
@@ -242,6 +252,7 @@ class PortfolioManager:
         metrics: dict,
         equity_curve: pd.Series,
         positions: pd.Series = None,
+        force_add: bool = False
     ) -> tuple[bool, str]:
         """
         Evaluate strategy and add to portfolio if it passes.
@@ -257,10 +268,12 @@ class PortfolioManager:
         (accepted, reason)
         """
         # ── Check criteria ──
-        passed, fail_reasons = self.meets_criteria(metrics)
-        if not passed:
-            reason = f"REJECTED (criteria): {'; '.join(fail_reasons)}"
-            return False, reason
+        if not force_add:
+            passed, fail_reasons = self.meets_criteria(metrics)
+            if not passed:
+                return False, f"Failed criteria: {', '.join(fail_reasons)}"
+        else:
+            passed = True
         
         # ── Check correlation ──
         max_corr_returns = self.compute_max_correlation(equity_curve)
@@ -335,7 +348,7 @@ class PortfolioManager:
         }
         path = self.results_dir / "portfolio_summary.json"
         with open(path, 'w', encoding='utf-8') as f:
-            json.dump(summary, f, indent=2, ensure_ascii=False)
+            json.dump(summary, f, indent=2, ensure_ascii=False, cls=NpEncoder)
     
     def list(self) -> list[dict]:
         """Return list of strategy summaries (for prompt)."""

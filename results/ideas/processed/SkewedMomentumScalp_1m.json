@@ -1,7 +1,0 @@
-{
-    "name": "SkewedMomentumScalp",
-    "timeframe": "1m",
-    "family": "momentum",
-    "description": "Exploits asymmetric price movement by combining momentum with volatility filtering to capture high-probability directional breaks in volatile sideways markets.",
-    "macro_blueprint": "div(sub(ema(?), vwap()), stddev(?))"
-}

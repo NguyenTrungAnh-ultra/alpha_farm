@@ -85,14 +85,17 @@ def compute_metrics(result: BacktestResult) -> dict:
     # Resample equity to daily frequency (last bar of each trading day)
     daily_equity = equity.resample('D').last().dropna()
     
-    # XNOQuant computes rolling returns for Volatility, Sortino, VaR, CVaR, etc.
-    daily_returns_rolling = daily_equity.pct_change().fillna(0.0)
-    daily_returns_rolling = daily_returns_rolling.replace([np.inf, -np.inf], 0)
-    
-    # XNOQuant computes constant capital returns specifically for the Sharpe Ratio:
-    # returns_const = pnl_change / initial_capital (where initial_capital = 1,000,000,000)
+    # Calculate daily PnL changes
     daily_pnl_change = daily_equity.diff().fillna(0.0)
+    
+    # FIX: CalculateMetrics flaw
+    # Since position sizing is fixed relative to initial capital, taking percentage 
+    # change of the growing equity curve artificially shrinks risk metrics. 
+    # All rolling and standard risk metrics must be calculated using constant returns.
     daily_returns_const = daily_pnl_change / result.initial_capital
+    
+    # Unified constant returns for all metrics
+    daily_returns_rolling = daily_returns_const
 
     # === PERFORMANCE METRICS ===
     cumulative_return = total_profit_pct

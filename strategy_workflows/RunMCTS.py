@@ -133,11 +133,40 @@ def process_timeframe(tf: str, iterations: int = 50000):
     
     print(f"\n--- [Worker {tf}] Starting processing ---")
     
-    # Instantiate isolated engines for this process
     portfolio_manager = PortfolioManager() # Read-only use to check criteria
     full_backtest_engine = XNOBacktestEngine()
     
-    mcts = MCTSEngine(timeframe=tf, max_depth=4)
+    # ==========================================
+    # GIAI ĐOẠN 1: KHỞI TẠO KÝ ỨC TOÀN CỤC
+    # ==========================================
+    existing_portfolio_names = set()
+    global_position_matrix = pd.DataFrame()
+    pos_series_list = []
+    
+    portfolio_file = os.path.join(PROJECT_ROOT, "results", "portfolio_summary.json")
+    if os.path.exists(portfolio_file):
+        try:
+            import json
+            with open(portfolio_file, 'r', encoding='utf-8') as pf:
+                portfolio_data = json.load(pf)
+                strategies = portfolio_data.get("strategies", [])
+                if isinstance(strategies, list):
+                    for s in strategies:
+                        if isinstance(s, dict) and "name" in s:
+                            name = s["name"]
+                            existing_portfolio_names.add(name)
+                            s_tf = s.get("timeframe", tf)
+                            pos_path = os.path.join(PROJECT_ROOT, "results", f"{name}_{s_tf}_positions.csv")
+                            if os.path.exists(pos_path):
+                                pos_df = pd.read_csv(pos_path, index_col=0, parse_dates=True)
+                                if not pos_df.empty and len(pos_df.columns) > 0:
+                                    pos_series_list.append(pos_df.iloc[:, 0].rename(name))
+            if pos_series_list:
+                global_position_matrix = pd.concat(pos_series_list, axis=1)
+        except Exception as pe:
+            print(f"[Worker {tf}] Warning: Failed to load global position matrix: {pe}")
+
+    mcts = MCTSEngine(timeframe=tf, max_depth=4, global_position_matrix=global_position_matrix)
     
     # ==========================================
     # ĐỌC Ý TƯỞNG TỪ TẦNG 1 & BIÊN DỊCH BỞI TẦNG 2
@@ -154,21 +183,6 @@ def process_timeframe(tf: str, iterations: int = 50000):
     
     processed_folder = os.path.join(ideas_folder, "processed")
     os.makedirs(processed_folder, exist_ok=True)
-    
-    # Load portfolio to check for existing names
-    existing_portfolio_names = set()
-    portfolio_file = os.path.join(PROJECT_ROOT, "results", "portfolio_summary.json")
-    if os.path.exists(portfolio_file):
-        try:
-            with open(portfolio_file, 'r', encoding='utf-8') as pf:
-                portfolio_data = json.load(pf)
-                strategies = portfolio_data.get("strategies", [])
-                if isinstance(strategies, list):
-                    for s in strategies:
-                        if isinstance(s, dict) and "name" in s:
-                            existing_portfolio_names.add(s["name"])
-        except Exception as pe:
-            print(f"[Worker {tf}] Warning: Failed to read portfolio_summary.json: {pe}")
 
     compiler = SemanticCompiler()
     
@@ -234,93 +248,56 @@ def process_timeframe(tf: str, iterations: int = 50000):
     total_rejected = 0
     successful_candidates = []
     
-    # ==========================================
-    # PHẪU THUẬT 2: Khởi tạo Bộ nhớ Ngắn hạn
-    # Lưu trữ đường cong vốn của các chiến lược đã đỗ
-    # ==========================================
-    local_accepted_curves = [] 
-    
     if not candidates:
         print(f"[Worker {tf}] No candidates found.")
         return tf, total_generated, total_rejected, successful_candidates
         
-    print(f"\n[Worker {tf}] Found {total_generated} candidates. Running full 5-year backtests with scale optimization...")
+    print(f"\n[Worker {tf}] Found {total_generated} candidates. Executing One-pass Commit for top candidate...")
     
+    # Lấy Top 1 ứng cử viên có Reward > 0
+    valid_candidates = [c for c in candidates if c.get('reward', -10.0) > 0]
+    
+    if not valid_candidates:
+        print(f"[Worker {tf}] ❌ All candidates failed hard filter (Reward <= 0). Rejected.")
+        total_rejected = total_generated
+        return tf, total_generated, total_rejected, successful_candidates
+        
+    top_cand = valid_candidates[0]
+    
+    expr = top_cand['expr']
+    direction = top_cand['direction']
+    window = top_cand.get('window', 20)
+    z_score_threshold = top_cand.get('z_score', 1.0)
+    best_scale = 0.2  # MCTS mặc định tính ở mức 0.2
+    
+    # Chạy lại 1 lần duy nhất để lấy equity_curve và positions
     df_full = load_data(tf)
     df_full['Volume'] = df_full['Volume'].fillna(0.0)
     
-    for cand in candidates:
-        expr = cand['expr']
-        direction = cand['direction']
-        window = cand.get('window', 20)
-        z_score_threshold = cand.get('z_score', 1.0)
-            
-        best_scale = None
-        best_metrics = None
-        best_result = None
-        best_sharpe = -999.0
-        
-        for scale in POSITION_SCALES:
-            try:
-                strategy = DynamicMCTSStrategy(expr_str=expr, direction=direction, position_scale=scale, window=window, z_score_threshold=z_score_threshold)
-                result = full_backtest_engine.run(strategy, df_full)
-                metrics = compute_metrics(result)
-                
-                passed, reasons = portfolio_manager.meets_criteria(metrics)
-                
-                # ==========================================
-                # PHẪU THUẬT 3: Máy chém Tương quan Động
-                # So sánh chiến lược hiện tại với sổ tay bộ nhớ
-                # ==========================================
-                max_corr = 0.0
-                if local_accepted_curves:
-                    correlations = []
-                    for hist_curve in local_accepted_curves:
-                        # Ghép nối 2 đường cong vốn để loại bỏ giá trị NaN
-                        valid_df = pd.DataFrame({'curr': result.equity_curve, 'hist': hist_curve}).dropna()
-                        # Đảm bảo có đủ dữ liệu và có phương sai (chống lỗi ConstantInput)
-                        if len(valid_df) > 20 and valid_df['curr'].std() > 0 and valid_df['hist'].std() > 0:
-                            corr_value = valid_df['curr'].corr(valid_df['hist'])
-                            correlations.append(corr_value)
-                    
-                    if correlations:
-                        max_corr = max(correlations)
-                
-                # Cài đặt ngưỡng loại bỏ khắc nghiệt (Ví dụ: 0.50)
-                CORR_THRESHOLD = 0.50
-                current_sharpe = metrics.get('sharpe_ratio', -999.0)
-                
-                # Phải thỏa mãn cả 3: Đỗ tiêu chuẩn CƠ BẢN + Độc lập + Sharpe TỐT NHẤT
-                if passed and (max_corr < CORR_THRESHOLD) and (current_sharpe > best_sharpe):
-                    best_sharpe = current_sharpe
-                    best_scale = scale
-                    best_metrics = best_metrics = metrics
-                    best_result = result
-            except Exception as e:
-                pass
-                
-        if best_scale is not None and best_result is not None:
-            cagr = best_metrics.get('cagr', 0.0)
-            print(f"[Worker {tf}] 🎉 FOUND VALID MATH & PERFORMANCE! Best scale {best_scale} -> Sharpe: {best_sharpe:.2f} | CAGR: {cagr*100:.1f}%")
-            
-            successful_candidates.append({
-                "expr": expr,
-                "direction": direction,
-                "best_scale": best_scale,
-                "window": window,
-                "z_score": z_score_threshold,
-                "metrics": best_metrics,
-                "equity_curve": best_result.equity_curve,
-                "positions": best_result.positions
-            })
-            
-            # KẾT THÚC PHẪU THUẬT 3: Lưu lại bằng chứng vào sổ tay bộ nhớ
-            local_accepted_curves.append(best_result.equity_curve)
-            
-        else:
-            print(f"[Worker {tf}] ❌ Formula failed performance or correlation criteria (> 0.50).")
-            total_rejected += 1
-            
+    strategy = DynamicMCTSStrategy(expr_str=expr, direction=direction, position_scale=best_scale, window=window, z_score_threshold=z_score_threshold)
+    result = full_backtest_engine.run(strategy, df_full)
+    metrics = top_cand.get('metrics', {})
+    
+    cagr = metrics.get('cagr', 0.0)
+    sharpe = metrics.get('sharpe_ratio', 0.0)
+    calmar = metrics.get('calmar_ratio', 0.0)
+    reward = top_cand.get('reward', 0.0)
+    
+    print(f"[Worker {tf}] 🎉 ONE-PASS COMMIT! Reward: {reward:.2f} | Calmar: {calmar:.2f} | Sharpe: {sharpe:.2f} | CAGR: {cagr*100:.1f}%")
+    
+    successful_candidates.append({
+        "expr": expr,
+        "direction": direction,
+        "best_scale": best_scale,
+        "window": window,
+        "z_score": z_score_threshold,
+        "metrics": metrics,
+        "equity_curve": result.equity_curve,
+        "positions": result.positions
+    })
+    
+    total_rejected = total_generated - 1
+    
     print(f"--- [Worker {tf}] Finished processing ---")
     return tf, total_generated, total_rejected, successful_candidates
 
@@ -371,12 +348,13 @@ def run_mcts_pipeline(iterations: int = 50000):
                         name=unique_name,
                         timeframe=tf_res,
                         family="MCTS_Discovered",
-                        description=f"Alpha discovered via MCTS: {cand['expr']}",
+                        description=f"Alpha discovered via One-pass MCTS: {cand['expr']}",
                         code=code,
                         params={"direction": cand["direction"], "position_scale": cand["best_scale"], "window": cand["window"], "z_score": cand["z_score"]},
                         metrics=cand["metrics"],
                         equity_curve=cand["equity_curve"],
-                        positions=cand["positions"]
+                        positions=cand["positions"],
+                        force_add=True
                     )
                     
                     print(f"[Main] Saving {tf_res} candidate {unique_name}: {reason}")

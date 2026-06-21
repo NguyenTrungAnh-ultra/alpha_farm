@@ -1,7 +1,0 @@
-{
-    "name": "SkewedTrendIntraday",
-    "timeframe": "30m",
-    "family": "momentum",
-    "description": "Captures asymmetric price movements by combining MACD momentum with volatility normalization to identify directional bias during high variance periods.",
-    "macro_blueprint": "div(mult(ema(?), var(?)), stddev(?))"
-}

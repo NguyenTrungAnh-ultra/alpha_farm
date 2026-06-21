@@ -1,7 +1,0 @@
-{
-    "name": "SkewedOrderFlowDivergence",
-    "timeframe": "1m",
-    "family": "momentum",
-    "description": "Exploits order flow asymmetry by combining MACD momentum with volatility-adjusted skewness to identify directional breaks in high-volatility sideways regimes.",
-    "macro_blueprint": "div(ema(?), stddev(?) )"
-}

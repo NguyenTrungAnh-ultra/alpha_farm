@@ -1,7 +1,0 @@
-{
-    "name": "SkewZScoreMomentum",
-    "timeframe": "3m",
-    "family": "momentum",
-    "description": "Captures asymmetric price movements by normalizing momentum with volatility to identify skewed order flow during sideways regimes.",
-    "macro_blueprint": "zscore(roc(pct_change(?)))"
-}
