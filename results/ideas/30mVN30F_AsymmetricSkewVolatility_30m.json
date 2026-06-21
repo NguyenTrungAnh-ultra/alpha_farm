@@ -1,7 +1,0 @@
-{
-    "name": "30mVN30F_AsymmetricSkewVolatility",
-    "timeframe": "30m",
-    "family": "momentum|volatility",
-    "description": "Exploits order flow asymmetry in high volatility regimes by measuring the skewness of price momentum relative to variance, capturing breakouts with statistical significance.",
-    "macro_blueprint": "div(sub(roc(?), ema(?)), stddev(?))"
-}

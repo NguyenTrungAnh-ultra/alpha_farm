@@ -1,7 +1,0 @@
-{
-    "name": "30m30mVN30F_VolatilitySkewedBreakout",
-    "timeframe": "30m",
-    "family": "momentum|breakout",
-    "description": "Exploits order flow asymmetry by combining momentum acceleration with volatility expansion, filtering for high-probability breakouts in sideways regimes.",
-    "macro_blueprint": "div(mult(roc(?), var(?)), stddev(?))"
-}

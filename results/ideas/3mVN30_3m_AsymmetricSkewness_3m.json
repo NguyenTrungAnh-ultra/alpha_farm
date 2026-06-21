@@ -1,7 +1,0 @@
-{
-    "name": "3mVN30_3m_AsymmetricSkewness",
-    "timeframe": "3m",
-    "family": "momentum|mean-reversion",
-    "description": "Exploits asymmetric order flow by combining momentum (ROC) with volatility normalization. The strategy identifies when price moves deviate significantly from the mean in a high-volatility regime, capturing quick scalps during sideways consolidation.",
-    "macro_blueprint": "zscore(roc(?))"
-}

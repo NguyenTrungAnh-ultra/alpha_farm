@@ -1,7 +1,0 @@
-{
-    "name": "30m30mVN30F_AsymmetricSkewBreakout",
-    "timeframe": "30m",
-    "family": "momentum|breakout",
-    "description": "Exploits order flow asymmetry during high volatility by combining MACD momentum with standardized price deviation. The strategy identifies when the market is trending (MACD positive) and simultaneously exhibits extreme skewness in returns, signaling a breakout potential.",
-    "macro_blueprint": "div(mult(ema(?), zscore(roc(?))), stddev(?))"
-}

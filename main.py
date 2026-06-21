@@ -1,3 +1,15 @@
+"""
+main
+====
+Main command-line interface (CLI) and interactive terminal console for the Alpha Farm system.
+
+Coordinates the multi-stage pipeline:
+1. `generate`: Queries the configured LLM to generate strategy ideas.
+2. `mcts`: Compiles macro blueprints and searches for optimized parameters via MCTS.
+3. `submit`: Submits successful, qualified strategies to XNOQuant using Playwright.
+4. `full`: Runs the entire sequence end-to-end.
+"""
+
 import os
 import sys
 import glob
@@ -9,6 +21,17 @@ from utilities.AppConfig import PROJECT_ROOT, QUALITY_THRESHOLDS
 sys.stdout.reconfigure(encoding='utf-8')
 
 def cmd_generate(args):
+    """
+    Execute the strategy generation stage.
+    
+    Reads credentials and cookies, then triggers GenerateStrategies to query
+    LLM models for initial strategy ideas.
+
+    Parameters
+    ----------
+    args : argparse.Namespace or InteractiveArgs
+        The parsed command-line or interactive menu arguments.
+    """
     print("\n[Bước 1/4] Đang sinh ý tưởng (Ideas Generation)...")
     from strategy_workflows.GenerateStrategies import run_pipeline, load_cookies
     
@@ -29,6 +52,17 @@ def cmd_generate(args):
     )
 
 def cmd_mcts(args):
+    """
+    Execute the MCTS formula discovery and scaling stage.
+    
+    Loads blueprint ideas, runs MCTS mutations to expand the trees, and runs backtests 
+    to filter and scale strategy candidates.
+
+    Parameters
+    ----------
+    args : argparse.Namespace or InteractiveArgs
+        The parsed command-line or interactive menu arguments.
+    """
     print("\n[Bước 2/3] Tầng 2 & 3: Biên dịch Blueprint & MCTS Brute-force...")
     from strategy_workflows.RunMCTS import run_mcts_pipeline
     iterations = getattr(args, 'iterations', 50000)
@@ -37,6 +71,17 @@ def cmd_mcts(args):
 
 
 def cmd_submit(args):
+    """
+    Execute the automatic submission stage.
+    
+    Searches the results directory for accepted Python strategy files and submits 
+    them to XNOQuant.
+
+    Parameters
+    ----------
+    args : argparse.Namespace or InteractiveArgs
+        The parsed command-line or interactive menu arguments.
+    """
     print("\n[Bước 3/3] Nộp chiến lược (Auto Submit)...")
     from strategy_workflows.SubmitStrategies import run_auto_submit
     
@@ -64,12 +109,37 @@ def cmd_submit(args):
         time.sleep(15)
 
 def cmd_full(args):
+    """
+    Execute the full end-to-end pipeline.
+    
+    Runs generate, mcts, and submit stages sequentially.
+
+    Parameters
+    ----------
+    args : argparse.Namespace or InteractiveArgs
+        The parsed command-line or interactive menu arguments.
+    """
     cmd_generate(args)
     cmd_mcts(args)
     # Tạm bỏ qua Optimize vì MCTS đã quét Scale, có thể tích hợp sau nếu cần
     cmd_submit(args)
 
 def display_interactive_menu(options: list[str], title: str = "Select option:") -> int:
+    """
+    Display an interactive terminal menu using ANSI escape sequences and keyboard input.
+
+    Parameters
+    ----------
+    options : list[str]
+        The options to select from.
+    title : str, default "Select option:"
+        The header title of the menu.
+
+    Returns
+    -------
+    int
+        The index of the selected option.
+    """
     import msvcrt
     
     # Enable ANSI escape codes on Windows 10+
@@ -115,6 +185,23 @@ def display_interactive_menu(options: list[str], title: str = "Select option:") 
     return selected_index
 
 def retrieve_numerical_input(label: str, default_value: int, value_type: type = int) -> int:
+    """
+    Retrieve numerical input from the user via terminal prompt with support for defaults.
+
+    Parameters
+    ----------
+    label : str
+        The query label to present.
+    default_value : int
+        The default fallback value if input is empty.
+    value_type : type, default int
+        The numeric parser type.
+
+    Returns
+    -------
+    int
+        The parsed numeric value.
+    """
     os.system("")
     sys.stdout.write(f"\n  \033[1;33m? \033[0m{label} [\033[36mMặc định: {default_value}\033[0m]: ")
     sys.stdout.flush()
@@ -128,6 +215,14 @@ def retrieve_numerical_input(label: str, default_value: int, value_type: type = 
         return default_value
 
 def select_ai_model() -> str:
+    """
+    Display an interactive menu for the user to choose their preferred LLM client.
+
+    Returns
+    -------
+    str
+        The model identifier key matching MODELS or Ollama/DeepSeek specs.
+    """
     options = [
         "DeepSeek Web Thinking (Cloud - Yêu cầu token.txt)",
         "Ollama Qwen3.5 4B (Local - Cần chạy Ollama nền)",
@@ -152,6 +247,12 @@ class InteractiveArgs:
         self.__dict__.update(kwargs)
 
 def run_interactive_cli() -> None:
+    """
+    Start the interactive command-line interface.
+    
+    Guides the user through command selection, configuration input, model selection, 
+    and launches the selected routine.
+    """
     os.system("")
     print("="*80)
     print("  GIAO DIỆN TƯƠNG TÁC XNOQUANT AUTO-FARM ".center(80))
@@ -199,6 +300,13 @@ def run_interactive_cli() -> None:
         cmd_full(args)
 
 def main():
+    """
+    System entry point.
+    
+    Parses command line arguments, handles fallback to the interactive CLI 
+    if no arguments are supplied on a TTY terminal, and routes control 
+    to the requested command.
+    """
     parser = argparse.ArgumentParser(description="XNOQuant Auto-Farm CLI")
     subparsers = parser.add_subparsers(dest="command", required=False)
     

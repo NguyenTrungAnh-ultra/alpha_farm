@@ -1,7 +1,0 @@
-{
-    "name": "3mVN30_3m_TrendSkewZscore",
-    "timeframe": "3m",
-    "family": "momentum|statistical-arbitrage",
-    "description": "Exploits high volatility skewness by combining MACD momentum with Z-score normalized price action to identify asymmetric order flow breaks.",
-    "macro_blueprint": "div(mult(ema(?), zscore(rising(crossed_above()))))"
-}

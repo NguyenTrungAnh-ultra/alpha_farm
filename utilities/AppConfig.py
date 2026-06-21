@@ -1,3 +1,13 @@
+"""
+central_config
+==============
+Central configuration module for Alpha Farm.
+
+Defines global parameters including project roots, environment variables, centralized 
+strategy quality thresholds, backtesting settings, VN30F1M contract specifications, 
+trading fees, leverage margins, default capitals, and CSV pathing templates.
+"""
+
 import os
 from dotenv import load_dotenv
 

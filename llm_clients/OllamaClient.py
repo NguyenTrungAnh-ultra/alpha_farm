@@ -1,3 +1,13 @@
+"""
+OllamaClient
+============
+Client wrapper for local Ollama APIs and running models.
+
+Launches the local Ollama server process automatically, creates customized 
+model configurations from a Modelfile, pre-loads models to VRAM, handles 
+request responses with context boundaries, and unloads/terminates on shutdown.
+"""
+
 import requests
 import json
 import subprocess
@@ -6,7 +16,14 @@ import os
 import shutil
 
 def _find_ollama_cmd():
-    """Tìm đường dẫn tuyệt đối của ollama.exe trên Windows nếu không có trong PATH."""
+    """
+    Search for the absolute path of the Ollama executable on Windows/PATH.
+    
+    Returns
+    -------
+    str
+        The absolute path to the executable, or "ollama" if not found.
+    """
     cmd = shutil.which("ollama")
     if cmd:
         return cmd
@@ -29,8 +46,11 @@ def _find_ollama_cmd():
 
 class OllamaChatClient:
     """
-    Client adapter cho Ollama Local API. Tự động bật Ollama, tạo model từ Modelfile, và tự tắt khi xong.
-    Mô phỏng cấu trúc .send() giống GeminiChat.
+    Client adapter for the local Ollama REST API.
+    
+    Automates starting the local Ollama server, builds/updates a custom model
+    using a Modelfile template, pre-loads the model in VRAM, routes query prompts, 
+    and handles process cleanup on shutdown.
     """
     def __init__(self, model: str = "qwen3.5:4b", host: str = "http://localhost:11434", verbose: bool = True):
         self.model = model
@@ -40,6 +60,14 @@ class OllamaChatClient:
         self._setup()
         
     def _is_server_running(self):
+        """
+        Check if the local Ollama server is currently listening.
+        
+        Returns
+        -------
+        bool
+            True if the server responded to the heartbeat probe, False otherwise.
+        """
         try:
             requests.get(self.host, timeout=2)
             return True
@@ -47,6 +75,13 @@ class OllamaChatClient:
             return False
             
     def _setup(self):
+        """
+        Set up the Ollama server environment, build custom models, and pre-load into VRAM.
+        
+        1. Checks if the server is running, starting it as a background process if necessary.
+        2. Configures a custom Modelfile using the specified base model.
+        3. Pre-loads the model to VRAM via an empty generate call with keepalive set to 24h.
+        """
         ollama_cmd = _find_ollama_cmd()
         
         # 1. Bật Ollama Server nếu chưa chạy
@@ -131,8 +166,24 @@ class OllamaChatClient:
             
     def send(self, prompt: str, schema: dict = None) -> str:
         """
-        Gửi prompt tới Ollama và trả về kết quả dưới dạng chuỗi nối tiếp.
-        Nếu truyền schema (được sinh từ Pydantic .model_json_schema()), Ollama sẽ ép output chuẩn JSON.
+        Send a prompt to the local Ollama model and return the generated text response.
+
+        Parameters
+        ----------
+        prompt : str
+            The input prompt string.
+        schema : dict, optional
+            A JSON Schema dictionary (typically from Pydantic) to enforce structured JSON output.
+
+        Returns
+        -------
+        str
+            The text response from the model.
+
+        Raises
+        ------
+        Exception
+            If the HTTP request to the Ollama server fails.
         """
         url = f"{self.host}/api/generate"
         payload = {
@@ -164,7 +215,12 @@ class OllamaChatClient:
             raise e
 
     def stop_keepalive(self):
-        """Hủy nạp model khỏi VRAM và tắt server nếu nó được mở bởi script này."""
+        """
+        Unload the model from VRAM and terminate the background server process.
+        
+        Sends a keep_alive = 0 request to unload the model from VRAM and terminates
+        the server subprocess if it was spawned during initialization.
+        """
         if self.verbose: print(f"\n[Ollama] Unloading model '{self.model}' from VRAM...")
         try:
             requests.post(f"{self.host}/api/generate", json={"model": self.model, "prompt": "", "keep_alive": 0}, timeout=10)

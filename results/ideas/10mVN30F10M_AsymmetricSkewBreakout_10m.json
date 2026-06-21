@@ -1,7 +1,0 @@
-{
-    "name": "10mVN30F10M_AsymmetricSkewBreakout",
-    "timeframe": "10m",
-    "family": "volatility|momentum",
-    "description": "Exploits high volatility skewness by combining MACD momentum with standardized price deviation. The strategy identifies asymmetric order flow where the mean-reverting component (VWAP) diverges from trend direction, signaling a potential breakout in either direction.",
-    "macro_blueprint": "div(mult(ema(?), var(?)), stddev(?))"
-}

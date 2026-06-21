@@ -1,7 +1,0 @@
-{
-    "name": "1m1mVN30F1M_AsymmetricSkewBreakout",
-    "timeframe": "1m",
-    "family": "volatility|statistical-arbitrage",
-    "description": "Exploits asymmetric skewness in order flow by combining MACD momentum with volatility filtering. The strategy identifies breakouts when the normalized price change exceeds a threshold, adjusted for current market variance.",
-    "macro_blueprint": "zscore(roc(?))"
-}

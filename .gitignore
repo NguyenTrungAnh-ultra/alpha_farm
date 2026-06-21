@@ -10,6 +10,7 @@ api.txt
 log.txt
 agent/results/
 token.txt
+results/*/
 
 # IDE and Editor settings
 .vscode/
@@ -28,3 +29,4 @@ ENV/
 .coverage
 htmlcov/
 .env
+

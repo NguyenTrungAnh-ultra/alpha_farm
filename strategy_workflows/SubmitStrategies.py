@@ -19,7 +19,15 @@ logger = logging.getLogger(__name__)
 
 def load_credentials_from_arch() -> tuple:
     """
-    Read email and password credentials from environment variables or ARCH.md in the project root.
+    Read email and password credentials from environment variables or ARCH.md.
+    
+    Attempts to read `XNO_ACCOUNT` and `XNO_PASSWORD` from the environment first. 
+    If not found, it parses `ARCH.md` in the project root for account and password matches.
+    
+    Returns
+    -------
+    tuple (str, str) or (None, None)
+        A tuple containing (account_email, password) if successful, otherwise (None, None).
     """
     try:
         # 1. Try to load from environment variables (centralized config)
@@ -49,7 +57,22 @@ def load_credentials_from_arch() -> tuple:
 
 def inject_params_to_code(code: str, params: dict) -> str:
     """
-    Replace default parameter values inside __algorithm__ with optimized values.
+    Replace default parameter values inside the strategy's algorithm body with optimized values.
+    
+    Uses regular expressions to find variable assignments in the form of `name = value`
+    and replaces them with the values supplied in the params dictionary.
+    
+    Parameters
+    ----------
+    code : str
+        The original strategy Python code.
+    params : dict
+        A dictionary mapping parameter names to their optimized values.
+        
+    Returns
+    -------
+    str
+        The modified strategy Python code with injected parameter values.
     """
     if not params:
         return code
@@ -62,12 +85,31 @@ def inject_params_to_code(code: str, params: dict) -> str:
 
 def format_code_for_xno(code: str, params: dict = None) -> str:
     """
-    Format the strategy code to comply with XNOQuant rules:
-    1. Strip all lines starting with import or from.
-    2. Rename the strategy class to CustomStrategy.
-    3. Strip the __init__ method entirely.
-    4. Replace getattr(self, 'param', default) with the actual parameter value.
-    5. Clean up any unallowed numpy (np) and pandas (pd) references.
+    Format the strategy code to comply with XNOQuant compilation and sandbox rules.
+    
+    This function cleans and refactors the strategy code by:
+    1. Stripping all lines starting with `import` or `from` to comply with sandbox constraints.
+    2. Renaming the strategy class definition to `CustomStrategy`.
+    3. Stripping the `__init__` constructor method entirely.
+    4. Replacing `getattr(self, 'param', default)` expressions with actual parameter values,
+       or injecting remaining parameters as assignments at the top of `__algorithm__`.
+    5. Translating unallowed Pandas (`pd`) and NumPy (`np`) constructs into native Series methods.
+    6. Replacing `__dict__` fallback checks with direct default values to avoid dunder errors.
+    7. Remapping general rolling features (like `self.feat.max/min`) to valid API names (like
+       `rolling_max/min`) and handling custom technical patterns (like `cdlengulfing` to
+       `engulfing_pattern`).
+       
+    Parameters
+    ----------
+    code : str
+        The original python source code of the discovered strategy.
+    params : dict, optional
+        A dictionary of optimized parameters to inject.
+        
+    Returns
+    -------
+    str
+        The sandbox-compliant formatted strategy Python code.
     """
     # 1. Strip imports and comments
     lines = code.splitlines()
@@ -139,7 +181,20 @@ def format_code_for_xno(code: str, params: dict = None) -> str:
 
 def get_ui_errors(page) -> str:
     """
-    Attempt to extract any visible error, alert, dialog or toast message from the page.
+    Attempt to extract any visible error, alert, dialog, or toast message from the browser page.
+    
+    Uses Playwright to evaluate DOM selectors for Toast notifications, modal error dialogs,
+    text elements with error/danger styles, and the sandbox log panel content.
+    
+    Parameters
+    ----------
+    page : playwright.sync_api.Page
+        The Playwright Page object.
+        
+    Returns
+    -------
+    str
+        A string concatenating all discovered error messages, or a default message if none found.
     """
     try:
         errors = page.evaluate("""() => {
@@ -222,22 +277,30 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
     """
     Automate strategy creation, simulation, and submission on XNOQuant via Playwright CDP.
     
+    This function wraps the core submission routine, attempting rate-limit recovery 
+    and moving files (and their associated equity curves/positions series) to the 
+    corresponding success ("pushed") or "failed" directory.
+    
     Parameters
     ----------
     strategy_code : str
         The strategy python code.
-    timeframe : str
+    timeframe : str, default "15m"
         Timeframe (e.g. "1m", "5m", "10m", "15m", "30m", "60m").
-    timeout_seconds : int
-        Max wait time for simulation.
-    filepath : str
-        Optional. The path of the strategy file. If provided, the file will be moved to agent/results/pushed/ on success, or agent/results/failed/ on failure.
+    params : dict, optional
+        A dictionary of optimized parameters to format and inject.
+    timeout_seconds : int, default 300
+        Max wait time for the simulation to finish.
+    filepath : str, optional
+        The path of the strategy file. If provided, the file will be moved to 
+        `results/pushed/` on success, or `results/failed/` on failure.
         
     Returns
     -------
     tuple (bool, str)
-        success: True if submitted successfully (or simulated successfully), False otherwise.
-        err_msg: Detailed error description/pop-up text if success is False, or None/warning details if True.
+        A tuple of (success, err_msg) where:
+        - success : bool (True if submitted successfully, False otherwise).
+        - err_msg : str (detailed error description if success is False, or None if True).
     """
     max_attempts = 2
     success = False
@@ -295,6 +358,17 @@ def run_auto_submit(strategy_code: str, timeframe: str = "15m", params: dict = N
     return success, err_msg
 
 def log_console_message(msg):
+    """
+    Callback function to log browser console messages.
+    
+    Filters out common accessibility warnings/errors from Radix UI / React 
+    that do not affect script execution.
+    
+    Parameters
+    ----------
+    msg : playwright.sync_api.ConsoleMessage
+        The browser console message object.
+    """
     text = msg.text
     # Filter out common accessibility warnings/errors from Radix UI / React
     # that do not affect the execution of our script.
@@ -303,6 +377,38 @@ def log_console_message(msg):
     logger.info(f"[Browser Console] {msg.type}: {text}")
 
 def _run_auto_submit_core(strategy_code: str, timeframe: str = "15m", params: dict = None, timeout_seconds: int = 300, filepath: str = None) -> tuple:
+    """
+    Core automation logic for connecting to Chrome CDP, running backtest, and submitting strategy.
+    
+    Performs the following steps:
+    1. Formats the strategy code for sandbox compliance.
+    2. Maps the timeframe to the target universe (e.g. VN30F1M-15MIN).
+    3. Connects to the browser over CDP (port 9222) or launches a headless browser.
+    4. Handles login if required.
+    5. Creates a new strategy tab, writes code to Monaco editor, and sets target market/universe.
+    6. Triggers simulation and polls status until completion or timeout.
+    7. Extracts backtest performance metrics and saves them to `results/leaderboard.csv`.
+    8. Retrieves the strategy ID and navigates to details page.
+    9. Automatically submits the strategy to the VQC 2026 competition.
+    
+    Parameters
+    ----------
+    strategy_code : str
+        The strategy python code.
+    timeframe : str, default "15m"
+        Timeframe (e.g. "1m", "5m", "10m", "15m", "30m", "60m").
+    params : dict, optional
+        A dictionary of optimized parameters to format and inject.
+    timeout_seconds : int, default 300
+        Max wait time for the simulation to finish.
+    filepath : str, optional
+        The path of the strategy file.
+        
+    Returns
+    -------
+    tuple (bool, str)
+        A tuple of (success, err_msg) indicating whether submission succeeded.
+    """
     strategy_code = format_code_for_xno(strategy_code, params)
     
     timeframe_map = {

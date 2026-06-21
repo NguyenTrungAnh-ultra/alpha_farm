@@ -1,7 +1,0 @@
-{
-    "name": "10mVN30F10M_SkewBreakout",
-    "timeframe": "10m",
-    "family": "momentum|volatility",
-    "description": "Exploits order flow asymmetry by measuring momentum deviation from volatility-adjusted mean. High skewness signals when price moves significantly faster than expected variance, indicating directional breakout potential.",
-    "macro_blueprint": "div(sub(pct_change(?), ema(?)), stddev(?))"
-}

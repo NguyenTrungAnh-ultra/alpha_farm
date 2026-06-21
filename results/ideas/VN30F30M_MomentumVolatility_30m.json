@@ -1,7 +1,0 @@
-{
-    "name": "VN30F30M_MomentumVolatility",
-    "timeframe": "30m",
-    "family": "momentum|volatility",
-    "description": "Exploits asymmetric skewness in order flow by combining momentum and volatility metrics to identify high-probability breakouts during sideways regimes.",
-    "macro_blueprint": "div(sub(roc(?), ema(?)), stddev(?))"
-}

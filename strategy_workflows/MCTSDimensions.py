@@ -6,11 +6,23 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# Syntax Router & Dimensional Constraints for Unified Compiler Architecture
+"""
+MCTSDimensions
+==============
+Defines the syntax router and dimensional constraints for the Unified Compiler Architecture.
+
+It provides type enumerations for formula dimensions and operator groups, maps standard
+data fields to their respective dimensions, specifies the input/output signatures of all
+supported operators in the system, and implements backward chaining helpers for tree expansion.
+"""
+
 
 from enum import Enum, auto
 
 class Dimension(Enum):
+    """
+    Represents the physical or mathematical unit of measurement/scale for a formula node.
+    """
     CURRENCY = auto()   # Prices
     VOLUME = auto()     # Volume
     RATIO = auto()      # Dimensionless, percentages (RSI, returns)
@@ -19,6 +31,9 @@ class Dimension(Enum):
     ANY = auto()        # Can be anything, preserves input dimension
 
 class OperatorGroup(Enum):
+    """
+    Categorizes operators based on their mathematical or indicator family.
+    """
     TIME_SERIES = auto()
     LOGIC = auto()
     OVERLAP = auto()
@@ -90,7 +105,23 @@ OPERATOR_REGISTRY = {
 }
 
 def get_operators_by_return_dim(target_dim: Dimension):
-    """Backward Chaining: MCTS requests operators that return a specific dimension"""
+    """
+    Perform backward chaining to find all operators returning a target dimension.
+    
+    This is used by MCTS to retrieve operators that can be placed at a position 
+    requiring a specific return type. Operators returning `Dimension.ANY` are 
+    considered compatible with any target dimension.
+    
+    Parameters
+    ----------
+    target_dim : Dimension
+        The required dimension for the node's output.
+        
+    Returns
+    -------
+    list
+        A list of operator name strings matching the target dimension criteria.
+    """
     ops = []
     for op, meta in OPERATOR_REGISTRY.items():
         # If ANY, it can satisfy anything (assuming children match)

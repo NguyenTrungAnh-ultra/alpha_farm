@@ -1,7 +1,7 @@
 """
-XNOQuant Engine — Performance Metrics
-========================================
-Tính toán tất cả chỉ số hiệu suất hiển thị trên nền tảng XNOQuant.
+CalculateMetrics
+================
+Calculates all performance, transaction analysis, and advanced risk metrics for XNOQuant.
 """
 
 import pandas as pd
@@ -11,15 +11,26 @@ from core_engine.BacktestEngine import BacktestResult
 
 def compute_metrics(result: BacktestResult) -> dict:
     """
-    Tính toán toàn bộ performance metrics giống XNOQuant.
+    Calculate performance and risk metrics based on backtest results.
+    
+    Computes three main categories of metrics matching XNOQuant's web UI:
+    1. Transaction Analysis: net equity, profit percentage, fee ratios, win/loss stats,
+       unrealized P&L, and initial capital.
+    2. Performance Metrics: cumulative return, CAGR, win rate, profit factor, 
+       Sharpe ratio (using constant returns based on initial capital), Sortino ratio, 
+       maximum drawdown, Calmar ratio, payoff ratio, and volatility.
+    3. Advanced Metrics: recovery factor, Kelly criterion, Omega ratio, Ulcer index, 
+       Value at Risk (VaR), and Conditional Value at Risk (CVaR).
+
+    Parameters
+    ----------
+    result : BacktestResult
+        The completed backtest result containing transaction records and equity curves.
 
     Returns
     -------
     dict
-        Dictionary chứa 3 nhóm metrics:
-        - Transaction Analysis
-        - Performance Metrics
-        - Advanced Metrics
+        A dictionary of calculated performance and risk metrics.
     """
     trades = result.trades
     equity = result.equity_curve.dropna()
@@ -225,7 +236,19 @@ def compute_metrics(result: BacktestResult) -> dict:
 
 
 def _estimate_bars_per_day(index: pd.DatetimeIndex) -> float:
-    """Ước tính số bar trung bình mỗi ngày giao dịch."""
+    """
+    Estimate the average number of bars per trading day in the historical series.
+
+    Parameters
+    ----------
+    index : pd.DatetimeIndex
+        The datetime index of the data.
+
+    Returns
+    -------
+    float
+        Average number of bars per day.
+    """
     if len(index) < 2:
         return 1
     dates = index.date
@@ -236,7 +259,14 @@ def _estimate_bars_per_day(index: pd.DatetimeIndex) -> float:
 
 
 def print_report(result: BacktestResult) -> None:
-    """In báo cáo hiệu suất giống giao diện XNOQuant."""
+    """
+    Print a formatted performance report mimicking the XNOQuant UI dashboard.
+
+    Parameters
+    ----------
+    result : BacktestResult
+        The backtest result to report on.
+    """
     m = compute_metrics(result)
 
     print()
@@ -288,8 +318,31 @@ def print_report(result: BacktestResult) -> None:
 
 def validate_metrics(metrics: dict, min_sharpe: float = 0.5, max_mdd: float = 20.0, min_trades: int = 10) -> bool:
     """
-    Kiểm tra xem các chỉ số hiệu suất có vượt qua bộ lọc Failed Metrics của web hay không.
-    Trả về True nếu pass, ném ngoại lệ ValueError nếu fail.
+    Validate whether performance metrics satisfy basic filter constraints.
+
+    Checks if the Sharpe ratio, max drawdown, and total trades satisfy minimum 
+    acceptance thresholds.
+
+    Parameters
+    ----------
+    metrics : dict
+        A dictionary containing performance metrics.
+    min_sharpe : float, default 0.5
+        The minimum allowed Sharpe Ratio.
+    max_mdd : float, default 20.0
+        The maximum allowed absolute Drawdown percentage.
+    min_trades : int, default 10
+        The minimum allowed number of trades.
+
+    Returns
+    -------
+    bool
+        True if all metrics pass the validation.
+
+    Raises
+    ------
+    ValueError
+        If one or more metrics fail to meet the configured thresholds.
     """
     import logging
     logger = logging.getLogger("xno_sdk.validator")

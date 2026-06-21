@@ -1,3 +1,13 @@
+"""
+RestrictedSeries
+================
+A custom wrapper around pandas.Series designed to emulate XNOQuant Sandbox AST restrictions.
+
+This class blocks direct calls to standard pandas Series methods (like `.mean()`, `.rolling()`, `.iloc`) 
+and throws Attribute/Type errors, while whitelisting safe operations (like `.shift()`, `.diff()`, 
+`.fillna()`) and supporting arithmetic/boolean operator overloading.
+"""
+
 import pandas as pd
 import numpy as np
 import logging
@@ -6,10 +16,21 @@ logger = logging.getLogger("core_engine.RestrictedSeries")
 
 class RestrictedSeries:
     """
-    A wrapper around pandas.Series that strictly forbids calling pandas methods
-    like .mean(), .iloc, .rolling() to simulate XNOQuant Sandbox AST restrictions.
+    A protected wrapper around pandas.Series.
+    
+    Prevents unauthorized pandas attribute/method access or direct physical indexing 
+    within strategy algorithms, simulating sandbox restrictions. Allows basic math, 
+    logical operations, and select causal methods (e.g. shift, diff, fillna).
     """
     def __init__(self, data):
+        """
+        Initialize the RestrictedSeries.
+
+        Parameters
+        ----------
+        data : RestrictedSeries, pd.Series, or array-like
+            The underlying data series to wrap.
+        """
         if isinstance(data, RestrictedSeries):
             self._data = data._data.copy()
         elif isinstance(data, pd.Series):
@@ -48,6 +69,23 @@ class RestrictedSeries:
         return self._data.index
 
     def __getattr__(self, name):
+        """
+        Intercept attribute and method access to block unapproved pandas methods.
+        
+        Permits access to local private/protected members (starting with '_').
+        Any other method or attribute access throws an AttributeError, directing
+        the user to utilize FeatureEngine or OperatorEngine wrappers.
+
+        Parameters
+        ----------
+        name : str
+            The accessed attribute or method name.
+
+        Raises
+        ------
+        AttributeError
+            Always raised for non-private, non-whitelisted attributes.
+        """
         # Allow access to protected/private members locally
         if name.startswith('_'):
             return self.__dict__[name]
@@ -60,6 +98,14 @@ class RestrictedSeries:
         )
 
     def __getitem__(self, key):
+        """
+        Intercept indexing to block direct element/bar access.
+
+        Raises
+        ------
+        TypeError
+            Always raised to prohibit physical indexing (e.g., series[idx]).
+        """
         logger.error(f"XNO Sandbox Block: attempt to use physical indexing with key '{key}'")
         raise TypeError("XNO Sandbox Error: Physical indexing (e.g. series[idx]) is not allowed. Use boolean masks and numpy where/ffill logic.")
 

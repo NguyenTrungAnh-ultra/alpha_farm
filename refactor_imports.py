@@ -1,3 +1,14 @@
+"""
+refactor_imports
+================
+Refactoring tool to clean up and update python package import paths across the project.
+
+Scans the target repository recursively (excluding version control and environment folders)
+and applies regex substitutions to migrate legacy file imports (e.g. from `agent/`, `backtest/`, 
+`xno_sdk/`) to the unified, structured directories (`core_engine/`, `strategy_workflows/`,
+`llm_clients/`, `utilities/`).
+"""
+
 import os
 import re
 

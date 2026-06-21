@@ -1,7 +1,0 @@
-{
-    "name": "VN30F60M_HighVolSkewedTrend",
-    "timeframe": "60m",
-    "family": "volatility|trend-following",
-    "description": "Exploits asymmetric price movement during high volatility by combining trend direction with skewness-adjusted momentum signals.",
-    "macro_blueprint": "div(mult(roc(?), rsi(?)), var(?))"
-}

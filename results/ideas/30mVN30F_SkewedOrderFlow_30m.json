@@ -1,7 +1,0 @@
-{
-    "name": "30mVN30F_SkewedOrderFlow",
-    "timeframe": "30m",
-    "family": "momentum|volatility",
-    "description": "Exploits order flow asymmetry by combining momentum with volatility normalization. In high-volatility sideways regimes, this strategy identifies when price action deviates significantly from its mean while maintaining directional pressure.",
-    "macro_blueprint": "zscore(roc(?))"
-}

@@ -1,7 +1,0 @@
-{
-    "name": "VN30F10M_AsymmetricVolatilityTrend",
-    "timeframe": "10m",
-    "family": "momentum|volatility",
-    "description": "Captures asymmetric price movements during high volatility by combining momentum divergence with variance expansion.",
-    "macro_blueprint": "div(mult(roc(?), var(?)), stddev(?))"
-}

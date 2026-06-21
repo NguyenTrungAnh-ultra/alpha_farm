@@ -7,12 +7,23 @@ deepseek_dir = os.path.join(PROJECT_ROOT, "utilities", "deps", "deepseek4free")
 if deepseek_dir not in sys.path:
     sys.path.insert(0, deepseek_dir)
 
+"""
+DeepseekClient
+==============
+Adapter client wrapper for the deepseek4free library.
+
+Ensures compatibility with the main strategy generation pipeline by providing 
+a consistent `.send()` signature matching the Gemini client.
+"""
+
 from dsk.api import DeepSeekAPI, AuthenticationError, RateLimitError, CloudflareError, APIError, NetworkError
 
 class DeepseekChatClient:
     """
-    Client adapter cho deepseek4free để tương thích với luồng chạy của pipeline.py.
-    Mô phỏng cấu trúc .send() giống GeminiChat.
+    Client adapter wrapper for deepseek4free API.
+    
+    Provides compatibility with the strategy generation pipeline by exposing 
+    a `.send()` method signature identical to that of GeminiChat.
     """
     def __init__(self, auth_token: str, thinking_enabled: bool = True, search_enabled: bool = False, verbose: bool = True):
         self.auth_token = auth_token
@@ -23,8 +34,25 @@ class DeepseekChatClient:
         
     def send(self, prompt: str) -> str:
         """
-        Gửi prompt và trả về kết quả dưới dạng chuỗi nối tiếp.
-        Tương thích với GeminiChat.send().
+        Send a prompt to the DeepSeek API and return the concatenated text response.
+        
+        Initializes a fresh chat session for each request to prevent context interference.
+        Handles authentication errors, Cloudflare clearance challenges, and rate limits.
+
+        Parameters
+        ----------
+        prompt : str
+            The input prompt string.
+
+        Returns
+        -------
+        str
+            The text response from the model (excluding thinking reasoning chains).
+
+        Raises
+        ------
+        RuntimeError
+            If authentication, Cloudflare bypass, rate-limiting, or general API errors occur.
         """
         try:
             # Luôn tạo session chat mới cho mỗi chiến lược để không bị nhiễu ngữ cảnh
@@ -69,5 +97,7 @@ class DeepseekChatClient:
             raise RuntimeError(f"Lỗi API DeepSeek không mong muốn: {e}")
             
     def stop_keepalive(self):
-        """Hàm dummy để tương thích với GeminiChat.stop_keepalive() nếu có gọi."""
+        """
+        Dummy method to match the GeminiChat.stop_keepalive interface.
+        """
         pass

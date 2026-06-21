@@ -1,8 +1,10 @@
 """
-Reporting Module (Legacy-compatible)
-=====================================
-Wraps metrics.py for backward compatibility with the agent pipeline.
-Maps new XNO metric names to the legacy names used by portfolio/pipeline.
+GenerateReport
+==============
+Legacy-compatible reporting module that wraps and maps performance metrics.
+
+Provides backward compatibility for the portfolio manager and pipeline criteria checks 
+by translation of the new XNO metrics names to legacy parameter formats.
 """
 
 import pandas as pd
@@ -13,9 +15,21 @@ from core_engine.CalculateMetrics import compute_metrics as xno_compute_metrics,
 
 def compute_metrics(result: BacktestResult) -> dict:
     """
-    Compute metrics and return in the format expected by the agent pipeline/portfolio.
+    Calculate and map strategy metrics for backward compatibility with the pipeline.
     
-    Maps XNO metric names → legacy names used by portfolio CRITERIA checks.
+    Translates standard XNO metrics (like CAGR percentages) to decimal formats
+    and adds legacy metrics such as consecutive losses, trades per day, and 
+    trade directions (long/short count).
+
+    Parameters
+    ----------
+    result : BacktestResult
+        The backtest results to compute metrics from.
+
+    Returns
+    -------
+    dict
+        A dictionary containing legacy-formatted performance metrics.
     """
     m = xno_compute_metrics(result)
     
@@ -60,7 +74,19 @@ def compute_metrics(result: BacktestResult) -> dict:
 
 
 def _max_consec_losses(pnls: list) -> int:
-    """Calculate max consecutive losses."""
+    """
+    Calculate the maximum consecutive loss streak in a list of trade PnLs.
+
+    Parameters
+    ----------
+    pnls : list[float]
+        A list of net PnL values.
+
+    Returns
+    -------
+    int
+        The maximum streak of consecutive trades with PnL <= 0.
+    """
     max_streak = 0
     current = 0
     for p in pnls:
@@ -73,19 +99,52 @@ def _max_consec_losses(pnls: list) -> int:
 
 
 def _count_trading_days(equity: pd.Series) -> int:
-    """Count unique trading days in equity curve."""
+    """
+    Count the number of unique calendar trading days in the equity curve.
+
+    Parameters
+    ----------
+    equity : pd.Series
+        The series of equity values over time.
+
+    Returns
+    -------
+    int
+        Number of unique trading days.
+    """
     if len(equity) == 0:
         return 1
     return pd.Series(equity.index.date).nunique()
 
 
 def print_summary(result: BacktestResult) -> None:
-    """Print summary — delegates to XNO print_report."""
+    """
+    Print a complete backtest report summary.
+    
+    Delegates to CalculateMetrics.print_report.
+
+    Parameters
+    ----------
+    result : BacktestResult
+        The backtest result to report.
+    """
     xno_print_report(result)
 
 
 def trades_to_dataframe(trades: list) -> pd.DataFrame:
-    """Convert list of TradeRecord objects to a DataFrame."""
+    """
+    Convert a list of TradeRecord objects to a pandas DataFrame.
+
+    Parameters
+    ----------
+    trades : list[TradeRecord]
+        List of completed trade records.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing formatted trade logs.
+    """
     if not trades:
         return pd.DataFrame()
 
@@ -106,14 +165,36 @@ def trades_to_dataframe(trades: list) -> pd.DataFrame:
 
 
 def export_trades(trades: list, filepath: str) -> None:
-    """Export trade log to CSV."""
+    """
+    Export the log of completed trades to a CSV file.
+
+    Parameters
+    ----------
+    trades : list[TradeRecord]
+        List of completed trade records.
+    filepath : str
+        Target destination path for the exported CSV file.
+    """
     df = trades_to_dataframe(trades)
     df.to_csv(filepath, index=False)
     print(f"Exported {len(df)} trades to {filepath}")
 
 
 def plot_equity_curve(result: BacktestResult, title: str = "Equity Curve") -> None:
-    """Plot equity curve and drawdown chart."""
+    """
+    Generate and save an equity curve and drawdown chart.
+    
+    Plots the daily mark-to-market equity values along with a filled area
+    chart representing peak-to-trough drawdowns. Saves the chart to 
+    `equity_curve.png`.
+
+    Parameters
+    ----------
+    result : BacktestResult
+        The backtest results to plot.
+    title : str, default "Equity Curve"
+        The title header of the chart.
+    """
     try:
         import matplotlib.pyplot as plt
     except ImportError:

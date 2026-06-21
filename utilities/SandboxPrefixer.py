@@ -1,17 +1,17 @@
 """
-sandbox_prefixer.py
-===================
-Deterministic pre-processing layer — Tầng 1 (Syntax) & Tầng 2a (API/NameError).
+SandboxPrefixer
+===============
+Deterministic pre-processing layer — Tier 1 (Syntax) & Tier 2a (API/NameError).
 
-Áp dụng các fix xác định (không cần LLM) lên Python code được sinh ra từ JSON,
-sau đó đồng bộ lại các thay đổi vào JSON idea để các lần chạy sau không lặp lỗi.
+Applies deterministic fixes (without LLM calls) on Python code generated from JSON,
+then synchronizes the changes back to the JSON idea.
 
-Luồng:
+Flow:
     apply_prefixes(code, idea)
-        ├── _apply_regex_rules()    → fix NameError, sai prefix, logic operator
-        ├── _fix_unknown_feat_calls() → fuzzy "did you mean" trên feat whitelist
-        ├── _fix_json_fields()      → sync fixes ngược lại vào idea dict
-        └── _check_ast_syntax()     → verify AST valid sau khi fix
+        ├── _apply_regex_rules()      → fix NameError, incorrect prefix, logical operator
+        ├── _fix_unknown_feat_calls() → fuzzy "did you mean" matches on feature whitelist
+        ├── _fix_json_fields()        → synchronize fixes back to the idea dict
+        └── _check_ast_syntax()       → verify valid AST syntax after fixes
 """
 
 import re
@@ -25,7 +25,14 @@ from typing import Any
 # ── Feature whitelist ──────────────────────────────────────────────────────
 
 def _load_feat_whitelist() -> set[str]:
-    """Load danh sách hàm self.feat.* hợp lệ từ feature.txt hoặc fallback."""
+    """
+    Load list of allowed features for self.feat.* from feature.txt or a hardcoded fallback.
+    
+    Returns
+    -------
+    set[str]
+        A set of lowercase function names whitelisted.
+    """
     whitelist: set[str] = set()
     possible_paths = [
         "f:/Projects/alpha_farm/feature.txt",
@@ -117,8 +124,21 @@ _RAW_RULES: list[tuple[str, str, str, str]] = [
 
 def _safe_prefix_sub(pattern: str, replacement: str, text: str) -> str:
     """
-    Thay thế pattern bằng replacement CHỈ KHI không đã có prefix 'self.feat.' ngay trước.
-    Dùng callback để kiểm tra context.
+    Replace pattern with replacement only if not already prefixed by 'self.feat.' or 'self.op.'.
+
+    Parameters
+    ----------
+    pattern : str
+        The regex pattern to search for.
+    replacement : str
+        The replacement string.
+    text : str
+        The target text to search.
+
+    Returns
+    -------
+    str
+        The modified text.
     """
     compiled = re.compile(pattern)
 
@@ -134,7 +154,22 @@ def _safe_prefix_sub(pattern: str, replacement: str, text: str) -> str:
 
 
 def _apply_regex_rules(text: str, fix_log: list[str]) -> tuple[str, bool]:
-    """Áp dụng tất cả regex rules. Trả về (result, was_changed)."""
+    """
+    Apply all deterministic regex rules to the text code.
+
+    Parameters
+    ----------
+    text : str
+        The code to modify.
+    fix_log : list[str]
+        Accumulator list for logging modifications.
+
+    Returns
+    -------
+    tuple (str, bool)
+        - modified_text : str (the updated code string)
+        - was_changed : bool (True if changes were made)
+    """
     original = text
     for pattern_str, replacement, rule_id, description in _RAW_RULES:
         # Các rule R1x cần safe prefix check
@@ -150,9 +185,22 @@ def _apply_regex_rules(text: str, fix_log: list[str]) -> tuple[str, bool]:
 
 def _fix_unknown_feat_calls(code: str, fix_log: list[str]) -> tuple[str, bool]:
     """
-    Phát hiện self.feat.XYZ khi XYZ không có trong FEAT_WHITELIST.
-    Dùng difflib fuzzy match (cutoff=0.75) để gợi ý tên đúng.
-    Trả về (fixed_code, was_changed).
+    Detect calls to self.feat.XYZ not present in whitelisted features.
+    
+    Uses fuzzy matching to locate close matches and replace them.
+
+    Parameters
+    ----------
+    code : str
+        The code to inspect.
+    fix_log : list[str]
+        Accumulator list for logging changes.
+
+    Returns
+    -------
+    tuple (str, bool)
+        - modified_code : str
+        - was_changed : bool
     """
     changed = False
     # Giữ reference tới code hiện tại để dùng trong closure
@@ -182,7 +230,20 @@ def _fix_unknown_feat_calls(code: str, fix_log: list[str]) -> tuple[str, bool]:
 
 
 def _check_ast_syntax(code: str) -> tuple[bool, str]:
-    """Parse code bằng AST. Trả về (is_valid, error_message)."""
+    """
+    Check code syntax using Python's built-in AST parser.
+
+    Parameters
+    ----------
+    code : str
+        The code to parse.
+
+    Returns
+    -------
+    tuple (bool, str)
+        - is_valid : bool (True if compiles successfully)
+        - error_message : str (syntax error traceback if invalid, else empty)
+    """
     try:
         ast.parse(code)
         return True, ""
@@ -192,8 +253,20 @@ def _check_ast_syntax(code: str) -> tuple[bool, str]:
 
 def _fix_json_fields(idea: dict, fix_log: list[str]) -> tuple[dict, bool]:
     """
-    Áp dụng regex rules lên các field string trong JSON formula để giữ JSON đồng bộ
-    với code đã được fix. Trả về (updated_idea, was_changed).
+    Synchronize regex fixes back to the original JSON idea dictionary.
+
+    Parameters
+    ----------
+    idea : dict
+        The strategy idea dictionary containing formula definitions.
+    fix_log : list[str]
+        Accumulator list for logging modifications.
+
+    Returns
+    -------
+    tuple (dict, bool)
+        - updated_idea : dict
+        - was_changed : bool
     """
     idea = copy.deepcopy(idea)
     changed = False
@@ -236,19 +309,22 @@ def apply_prefixes(
     idea: dict,
 ) -> tuple[str, dict, bool, list[str]]:
     """
-    Entry point chính. Áp dụng tất cả deterministic pre-fixes lên Python code
-    và đồng bộ ngược lại vào idea JSON.
+    Apply all deterministic syntax and prefix fixes on Python code and sync to JSON.
 
-    Args:
-        code:  Python source code được sinh ra từ convert_ideas
-        idea:  Idea dict gốc (sẽ được deep-copy, không mutate trực tiếp)
+    Parameters
+    ----------
+    code : str
+        The python source code generated from the JSON blueprint.
+    idea : dict
+        The original strategy idea dictionary.
 
-    Returns:
-        (fixed_code, updated_idea, was_modified, fix_log)
-        - fixed_code:    Code sau khi fix (có thể giống code gốc nếu không cần fix)
-        - updated_idea:  Idea dict sau khi sync fixes (copy mới)
-        - was_modified:  True nếu có bất kỳ thay đổi nào
-        - fix_log:       Danh sách các bước fix đã áp dụng
+    Returns
+    -------
+    tuple (str, dict, bool, list[str])
+        - fixed_code : str
+        - updated_idea : dict
+        - was_modified : bool
+        - fix_log : list[str]
     """
     fix_log: list[str] = []
     was_modified = False
@@ -280,14 +356,19 @@ def apply_prefixes(
 
 def check_tautology(code: str) -> list[str]:
     """
-    Phát hiện điều kiện luôn-False / luôn-True (tautology).
-    Chỉ mang tính thông báo — KHÔNG auto-fix (Tầng 4, cần LLM hoặc MCTS).
+    Detect logical conditions that are tautological (always True or always False).
 
-    Ví dụ phát hiện:
-        exit_long = close != close   → always False (chỉ True khi NaN)
-        some_flag = x == x           → always True
+    Checks for patterns like `x == x` or `x != x` which usually represent logic bugs.
 
-    Trả về: danh sách cảnh báo (strings).
+    Parameters
+    ----------
+    code : str
+        The strategy source code.
+
+    Returns
+    -------
+    list[str]
+        A list of warnings describing the detected tautologies.
     """
     warnings: list[str] = []
     # Dạng `a != a` — always False (trừ NaN)

@@ -1,7 +1,0 @@
-{
-    "name": "5m5mVN30_F12M_AsymmetricSkewness",
-    "timeframe": "5m",
-    "family": "statistical-arbitrage",
-    "description": "Exploits order flow asymmetry by normalizing price momentum against volatility to identify skewed mean-reversion opportunities during high-volatility sideways regimes.",
-    "macro_blueprint": "zscore(roc(?))"
-}
