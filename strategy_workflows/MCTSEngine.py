@@ -23,6 +23,7 @@ from core_engine.GenerateReport import compute_metrics
 from strategy_workflows.MCTSDimensions import Dimension, OPERATOR_REGISTRY, get_operators_by_return_dim, DATA_FIELD_DIMENSIONS, OperatorGroup
 from strategy_workflows.PortfolioManager import PortfolioManager
 from strategy_workflows.SemanticCompiler import ASTNode
+from utilities.AppConfig import REWARD_WEIGHTS
 
 PERIODS = [5, 10, 14, 20, 30, 60]
 
@@ -314,7 +315,7 @@ class MCTSEngine:
         the engine overrides the state's default `max_depth` of 3 with its own 
         configured depth (typically 4).
     """
-    def __init__(self, timeframe: str = '10m', max_depth: int = 4, exploration_c: float = 1.414):
+    def __init__(self, timeframe: str = '10m', max_depth: int = 4, exploration_c: float = 1.414, global_position_matrix: pd.DataFrame = None):
         """
         Initialize the MCTSEngine.
         
@@ -326,21 +327,28 @@ class MCTSEngine:
             The maximum formula tree depth. Overrides MCTSState's default of 3.
         exploration_c : float, default 1.414
             Exploration constant for UCT child selection.
+        global_position_matrix : Optional[pd.DataFrame], default None
+            Matrix of historical position series used for correlation penalty.
         """
         self.timeframe = timeframe
         self.max_depth = max_depth
         self.exploration_c = exploration_c
+        self.global_position_matrix = global_position_matrix
         
         print(f"[MCTS] Loading data for {timeframe}...")
         self.df = load_data(timeframe)
         self.df['Volume'] = self.df['Volume'].fillna(0.0)
-        self.df_search = self.df['2023-01-01':]
-        if len(self.df_search) < 100:
-            self.df_search = self.df
+        # Use full historical data for MCTS due to vectorized engine speedup
+        self.df_search = self.df
             
         self.backtest_engine = XNOBacktestEngine()
         self.cache: Dict[str, tuple] = {}
+        self.max_cache_size = 50000
         self.leaderboard: List[Dict[str, Any]] = []
+        
+        # Reusable temporary strategy to avoid object-recreation overhead in evaluate_expression
+        self.temp_strat = DynamicMCTSStrategy()
+        self.temp_strat._initialize(self.df_search)
         
         # Frequent Subtree Avoidance (FSA) Rolling Cache
         # Stores SHA256 hashes of AST string representations of top alphas
@@ -397,6 +405,11 @@ class MCTSEngine:
         Also checks the FSA cache to penalize duplicate subtrees with a large
         negative reward.
         
+        Applies One-pass Pipeline rules:
+        - Hard filter: Calmar Ratio < 1.1 -> reward = -10.0
+        - Position correlation penalty against global_position_matrix
+        - Multi-objective reward: (0.6 * S_calmar + 0.4 * S_ic) * S_corr
+        
         Parameters
         ----------
         ast_tree : ASTNode
@@ -405,22 +418,19 @@ class MCTSEngine:
         Returns
         -------
         tuple
-            A tuple of (best_reward, best_direction, best_metrics) where:
-            - best_reward : float (performance score combining Rank IC and Sharpe)
-            - best_direction : float (1.0 for long, -1.0 for short)
-            - best_metrics : dict (portfolio metrics, rank IC, window, and z_score)
+            A tuple of (best_reward, best_direction, best_metrics)
         """
         if ast_tree.name == "strategy_root":
             window = ast_tree.children[0].value
-            z_score = ast_tree.children[1].value
+            z_score_thresh = ast_tree.children[1].value
             alpha_node = ast_tree.children[2]
             expr_str = ast_to_code(alpha_node)
         else:
             window = 20
-            z_score = 1.0
+            z_score_thresh = 1.0
             expr_str = ast_to_code(ast_tree)
             
-        cache_key = f"{expr_str}_{window}_{z_score}"
+        cache_key = f"{expr_str}_{window}_{z_score_thresh}"
         if cache_key in self.cache:
             return self.cache[cache_key]
             
@@ -432,24 +442,83 @@ class MCTSEngine:
         best_direction = 1.0
         best_metrics = {}
         
-        for direction in [1.0, -1.0]:
+        # Fast Dual-Direction Evaluation
+        # Instead of parsing and computing rolling metrics twice, we do it ONCE.
+        try:
+            globals_dict = {
+                'self': self.temp_strat,
+                'close': self.temp_strat.data.pv_close,
+                'high': self.temp_strat.data.pv_high,
+                'low': self.temp_strat.data.pv_low,
+                'open_': self.temp_strat.data.pv_open,
+                'volume': self.temp_strat.data.pv_volume
+            }
+            
             try:
-                strategy = DynamicMCTSStrategy(expr_str=expr_str, direction=direction, window=window, z_score_threshold=z_score)
+                alpha_val = eval(expr_str, {}, globals_dict)
+            except Exception:
+                alpha_val = self.temp_strat.data.pv_close * 0.0
+                
+            r_mean = self.temp_strat.feat.rolling_mean(alpha_val, window)
+            r_std = self.temp_strat.feat.rolling_std(alpha_val, window) + 1e-8
+            z_score_base = (alpha_val - r_mean) / r_std
+            
+            # Rank IC can be computed on the base alpha directly
+            raw_alpha = alpha_val._data if hasattr(alpha_val, '_data') else alpha_val
+            rank_ic = self.compute_rank_ic(raw_alpha, self.df_search['Close'])
+            
+            pos_scale = self.temp_strat.position_scale
+            
+            # Long positions
+            z_long = z_score_base
+            pos_long = self.temp_strat.op.where(z_long > z_score_thresh, pos_scale, self.temp_strat.op.where(z_long < -z_score_thresh, -pos_scale, 0.0))
+            
+            # Short positions
+            z_short = z_score_base * -1.0
+            pos_short = self.temp_strat.op.where(z_short > z_score_thresh, pos_scale, self.temp_strat.op.where(z_short < -z_score_thresh, -pos_scale, 0.0))
+            
+            class PrecalcStrategy:
+                def __init__(self, p):
+                    self.p = p
+                def run_algorithm(self, df):
+                    return self.p
+                    
+            scenarios = [(1.0, pos_long), (-1.0, pos_short)]
+            
+        except Exception:
+            # Syntax error or invalid operator combination
+            return -10.0, 1.0, {}
+            
+        for direction, pos_series in scenarios:
+            try:
+                strategy = PrecalcStrategy(pos_series)
                 result = self.backtest_engine.run(strategy, self.df_search)
                 metrics = compute_metrics(result)
                 
-                raw_alpha = strategy.alpha_series._data if hasattr(strategy.alpha_series, '_data') else strategy.alpha_series
-                rank_ic = self.compute_rank_ic(raw_alpha, self.df_search['Close'])
-                
-                sharpe = metrics.get('sharpe_ratio', 0.0)
-                if np.isnan(sharpe):
-                    sharpe = 0.0
+                calmar = metrics.get('calmar_ratio', 0.0)
+                if calmar is None or np.isnan(calmar):
+                    calmar = 0.0
                     
                 total_trades = metrics.get('total_trades', 0)
-                if total_trades < 15:
-                    reward = 0.0
+                if total_trades < 15 or calmar < 1.1:
+                    reward = -10.0
                 else:
-                    reward = 10.0 * abs(rank_ic) + max(0.0, sharpe)
+                    max_corr = 0.0
+                    if self.global_position_matrix is not None and not self.global_position_matrix.empty:
+                        pos_s = pos_series._data if hasattr(pos_series, '_data') else pos_series
+                        common_idx = pos_s.index.intersection(self.global_position_matrix.index)
+                        if len(common_idx) > 20:
+                            # Align and forward fill inside corrwith if needed, but indices should match
+                            corrs = self.global_position_matrix.loc[common_idx].corrwith(pos_s.loc[common_idx])
+                            max_corr = corrs.abs().max()
+                            if np.isnan(max_corr):
+                                max_corr = 0.0
+                                
+                    s_calmar = min(1.0, max(0.0, (calmar - 1.1) / (REWARD_WEIGHTS['max_calmar'] - 1.1)))
+                    s_ic = min(1.0, abs(rank_ic) / REWARD_WEIGHTS['max_ic'])
+                    s_corr = max(0.0, 1.0 - max_corr)
+                    
+                    reward = (REWARD_WEIGHTS['calmar_weight'] * s_calmar + REWARD_WEIGHTS['ic_weight'] * s_ic) * s_corr
                     
                 if reward > best_reward:
                     best_reward = reward
@@ -457,10 +526,16 @@ class MCTSEngine:
                     best_metrics = metrics
                     best_metrics['rank_ic'] = rank_ic
                     best_metrics['window'] = window
-                    best_metrics['z_score_threshold'] = z_score
-            except Exception as e:
+                    best_metrics['z_score_threshold'] = z_score_thresh
+            except Exception:
                 pass
                 
+        if len(self.cache) > self.max_cache_size:
+            # Evict the oldest 50% of cache entries (FIFO based on insertion order)
+            keys = list(self.cache.keys())
+            for k in keys[:len(keys) // 2]:
+                self.cache.pop(k, None)
+            
         self.cache[cache_key] = (best_reward, best_direction, best_metrics)
         return best_reward, best_direction, best_metrics
 
@@ -477,7 +552,8 @@ class MCTSEngine:
            - Simulation: Performs a random rollout from the new state to a terminal state.
            - Evaluation: Runs a backtest to evaluate the terminal state and checks FSA cache.
            - Backpropagation: Propagates the max reward (risk-seeking) back up the path.
-        3. Updates the leaderboard with successful candidates.
+        3. Monitors Shannon Entropy of root node for early convergence stopping.
+        4. Updates the leaderboard with successful candidates.
         
         Parameters
         ----------
@@ -502,6 +578,23 @@ class MCTSEngine:
                 elapsed = time.time() - start_time
                 print(f"  [MCTS] Iteration {i}/{n_iterations} | Cache size: {len(self.cache)} | Best reward: {max([x['reward'] for x in self.leaderboard]) if self.leaderboard else 'N/A'} | Elapsed: {elapsed:.1f}s")
                 
+            # Entropy Convergence Check
+            if i >= REWARD_WEIGHTS['burn_in'] and i % 500 == 0:
+                total_visits = root_node.visit_count
+                valid_children = [c for c in root_node.children if c.visit_count > 0]
+                k = len(valid_children)
+                if k >= 2:
+                    entropy = 0.0
+                    for child in valid_children:
+                        p_i = child.visit_count / total_visits
+                        if p_i > 0:
+                            entropy -= p_i * math.log2(p_i)
+                    normalized_entropy = entropy / math.log2(k)
+                    if normalized_entropy < REWARD_WEIGHTS['entropy_threshold']:
+                        print(f"\n[MCTS] Hội tụ Toán học tại vòng {i}!")
+                        print(f"[MCTS] Normalized Entropy: {normalized_entropy:.4f} < {REWARD_WEIGHTS['entropy_threshold']}")
+                        break
+                        
             node = root_node
             path = [node]
             while node.is_fully_expanded() and not node.is_leaf():

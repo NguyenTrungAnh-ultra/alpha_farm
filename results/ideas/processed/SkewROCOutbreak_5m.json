@@ -1,7 +1,0 @@
-{
-    "name": "SkewROCOutbreak",
-    "timeframe": "5m",
-    "family": "momentum",
-    "description": "Exploits asymmetric skewness in order flow by measuring the rate of change relative to volatility, capturing breakout signals during high-volatility sideways regimes.",
-    "macro_blueprint": "zscore(roc(?))"
-}

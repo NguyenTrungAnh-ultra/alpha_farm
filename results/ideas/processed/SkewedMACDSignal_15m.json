@@ -1,7 +1,0 @@
-{
-    "name": "SkewedMACDSignal",
-    "timeframe": "15m",
-    "family": "momentum",
-    "description": "Captures asymmetric momentum shifts by normalizing MACD line against volatility to filter noise during sideways regimes.",
-    "macro_blueprint": "zscore(mult(ema(?), macd_line(?)))"
-}

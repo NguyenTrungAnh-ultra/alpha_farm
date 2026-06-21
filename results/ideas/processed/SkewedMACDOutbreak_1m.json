@@ -1,7 +1,0 @@
-{
-    "name": "SkewedMACDOutbreak",
-    "timeframe": "1m",
-    "family": "momentum",
-    "description": "Exploits asymmetric momentum by combining MACD line with volatility normalization to filter noise in high-volatility sideways markets.",
-    "macro_blueprint": "zscore(mult(ema(?), macd_line(?)))"
-}

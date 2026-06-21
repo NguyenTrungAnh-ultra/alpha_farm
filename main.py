@@ -15,7 +15,7 @@ import sys
 import glob
 import time
 import argparse
-from utilities.AppConfig import PROJECT_ROOT, QUALITY_THRESHOLDS
+from utilities.AppConfig import PROJECT_ROOT
 
 # Fix Windows terminal UTF-8 encoding issue
 sys.stdout.reconfigure(encoding='utf-8')
@@ -63,7 +63,7 @@ def cmd_mcts(args):
     args : argparse.Namespace or InteractiveArgs
         The parsed command-line or interactive menu arguments.
     """
-    print("\n[Bước 2/3] Tầng 2 & 3: Biên dịch Blueprint & MCTS Brute-force...")
+    print("\n[Bước 2/3] Tầng 2 & 3: MCTS One-pass Pipeline (Entropy + Correlation)...")
     from strategy_workflows.RunMCTS import run_mcts_pipeline
     iterations = getattr(args, 'iterations', 50000)
     run_mcts_pipeline(iterations=iterations)
@@ -121,7 +121,6 @@ def cmd_full(args):
     """
     cmd_generate(args)
     cmd_mcts(args)
-    # Tạm bỏ qua Optimize vì MCTS đã quét Scale, có thể tích hợp sau nếu cần
     cmd_submit(args)
 
 def display_interactive_menu(options: list[str], title: str = "Select option:") -> int:
@@ -260,7 +259,7 @@ def run_interactive_cli() -> None:
     
     commands = [
         "generate (Tầng 1: Sinh Blueprint JSON bằng LLM)",
-        "mcts (Tầng 2 & 3: Semantic Compiler & MCTS Đào mỏ)",
+        "mcts (Tầng 2 & 3: MCTS One-pass Pipeline)",
         "submit (Tự động nộp chiến lược lên XNO)",
         "full (Chạy toàn bộ quy trình: Generate -> MCTS -> Submit)",
         "Exit (Thoát)"
@@ -282,7 +281,7 @@ def run_interactive_cli() -> None:
         args_dict["model"] = select_ai_model()
         
     if selected_cmd in ("mcts", "full"):
-        args_dict["iterations"] = retrieve_numerical_input("Số lượng vòng lặp MCTS (iterations)", 50000, int)
+        args_dict["iterations"] = retrieve_numerical_input("Giới hạn vòng lặp MCTS tối đa (Max Iterations)", 50000, int)
         
     args = InteractiveArgs(**args_dict)
     

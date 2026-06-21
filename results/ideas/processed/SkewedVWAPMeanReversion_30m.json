@@ -1,7 +1,0 @@
-{
-    "name": "SkewedVWAPMeanReversion",
-    "timeframe": "30m",
-    "family": "mean-reversion",
-    "description": "Captures mean-reverting moves within high volatility by measuring the distance of price from VWAP relative to its standard deviation, exploiting order flow asymmetry during sideways regimes.",
-    "macro_blueprint": "div(sub(vwap(), ema(?)), stddev(?))"
-}

@@ -29,6 +29,16 @@ QUALITY_THRESHOLDS = {
 # General App Config
 MAX_CORRELATION = 0.5
 
+# === MCTS One-pass Pipeline Config ===
+REWARD_WEIGHTS = {
+    'calmar_weight': 0.6,
+    'ic_weight': 0.4,
+    'max_ic': 0.15,
+    'max_calmar': 3.0,
+    'burn_in': 15000,
+    'entropy_threshold': 0.15
+}
+
 # === Thông số hợp đồng VN30F1M ===
 MULTIPLIER = 100_000               # VND/điểm (chuẩn VN30F1M)
 TICK_SIZE = 0.1                    # Bước giá tối thiểu

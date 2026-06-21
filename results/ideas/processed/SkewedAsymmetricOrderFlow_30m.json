@@ -1,7 +1,0 @@
-{
-    "name": "SkewedAsymmetricOrderFlow",
-    "timeframe": "30m",
-    "family": "momentum",
-    "description": "Captures asymmetric order flow by measuring the divergence between price momentum and volatility-adjusted mean reversion signals.",
-    "macro_blueprint": "div(mult(roc(?), rsi(?)), stddev(?))"
-}
