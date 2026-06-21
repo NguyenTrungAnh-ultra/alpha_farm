@@ -1,7 +1,0 @@
-{
-    "name": "VN30F3m_MomentumVolatility",
-    "timeframe": "3m",
-    "family": "momentum|volatility",
-    "description": "Exploits asymmetric skewness in order flow by combining momentum divergence with volatility normalization. The strategy identifies when price action deviates significantly from the mean relative to recent variance, signaling potential reversal or continuation points during high-volatility sideways regimes.",
-    "macro_blueprint": "div(mult(rsi(?), var(?)), stddev(?))"
-}

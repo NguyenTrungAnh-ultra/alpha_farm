@@ -53,8 +53,29 @@ HALLUCINATION_MAP = {
 class SemanticCompiler:
     def compile_blueprint(self, blueprint_str: str) -> ASTNode:
         """
-        Parses a Macro-Blueprint string into an ASTNode tree and validates 
-        Dimensional Consistency (Fail-Fast Drop).
+        Parse a Macro-Blueprint string into an ASTNode tree and validate dimensional consistency.
+        
+        This performs a "Fail-Fast Drop" by analyzing the input expression using Python's
+        built-in ast module. It translates the parsed expression into custom ASTNode representation,
+        verifies that the dimensions match, automatically wraps ratio/currency outputs into boolean
+        signals using a Z-score comparison, and ensures the root node ultimately resolves to a 
+        boolean value.
+        
+        Parameters
+        ----------
+        blueprint_str : str
+            The macro blueprint mathematical/logical formula expression to compile.
+            
+        Returns
+        -------
+        ASTNode
+            The validated and compiled root ASTNode of the formula.
+            
+        Raises
+        ------
+        SemanticCompilerError
+            If there are syntax errors, dimension mismatches, unsupported nodes, or if the
+            root expression cannot be compiled to a boolean signal.
         """
         safe_str = blueprint_str.replace("?", "__HOLE__")
         try:
@@ -81,6 +102,29 @@ class SemanticCompiler:
         return root_node
 
     def _build_node(self, node) -> ASTNode:
+        """
+        Recursively construct a custom ASTNode tree from Python's abstract syntax tree.
+        
+        Maps Python ast objects (ast.Call, ast.Name, ast.Constant, ast.Compare, etc.) 
+        to custom ASTNode instances. This method also handles mapping hallucinated functions
+        to standard operators, stashing placeholder nodes, padding missing arguments, 
+        and parsing comparison and boolean operations.
+        
+        Parameters
+        ----------
+        node : ast.AST
+            The Python AST node to transform.
+            
+        Returns
+        -------
+        ASTNode
+            The constructed custom ASTNode.
+            
+        Raises
+        ------
+        SemanticCompilerError
+            If an unsupported node type is encountered, or operator/argument mismatches occur.
+        """
         if isinstance(node, ast.Call):
             func_name = node.func.id
             if func_name in HALLUCINATION_MAP:
@@ -173,6 +217,29 @@ class SemanticCompiler:
             raise SemanticCompilerError(f"Unsupported AST node type: {type(node)}")
 
     def _check_dimensions(self, node: ASTNode) -> Dimension:
+        """
+        Recursively check the dimensional consistency of an ASTNode tree.
+        
+        Ensures that data fields, operators, and their arguments are compatible
+        based on the definitions in OPERATOR_REGISTRY and DATA_FIELD_DIMENSIONS.
+        Verifies arity matches and guards against dimensional bleeding (mixing different
+        units like volume and price in addition/subtraction or comparison operators).
+        
+        Parameters
+        ----------
+        node : ASTNode
+            The ASTNode to perform dimensional check on.
+            
+        Returns
+        -------
+        Dimension
+            The resolved output dimension of the node.
+            
+        Raises
+        ------
+        SemanticCompilerError
+            If an arity mismatch, dimension mismatch, or dimensional bleeding is detected.
+        """
         if node.name == "?":
             return Dimension.ANY # Placeholders can be anything for now, MCTS will fill them
         elif node.name == "Constant":

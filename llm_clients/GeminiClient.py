@@ -454,7 +454,17 @@ class GeminiChat:
             print(f"[GeminiChat] ✅ Ready | model={model} ({model_info.get('name', '?')}) | {rotate_str} | keepalive=5m")
 
     def _init_session(self):
-        """Fetch SNlM0e nonce value required for POST requests."""
+        """
+        Initialize the session by retrieving the SNlM0e nonce from the Gemini app.
+        
+        SNlM0e nonce and conversation ID (FdrFJe) are required to sign POST requests 
+        under StreamGenerate endpoint.
+        
+        Raises
+        ------
+        ConnectionError
+            If session initialization or page loading fails.
+        """
         try:
             resp = self._session.get(f"{BASE_URL}/app", timeout=self.timeout)
             resp.raise_for_status()
@@ -478,7 +488,12 @@ class GeminiChat:
             raise ConnectionError(f"Failed to init Gemini session: {e}")
 
     def _keepalive_loop(self):
-        """Background loop: ping Gemini every 5 min to keep cookies alive."""
+        """
+        Background daemon loop to periodically ping the Gemini endpoint.
+        
+        Pings every 5 minutes to keep cookies fresh and automatically refreshes 
+        the SNlM0e nonce in the session.
+        """
         while not self._keepalive_stop.wait(self._keepalive_interval):
             try:
                 with self._rotate_lock:
@@ -610,7 +625,19 @@ class GeminiChat:
                     print(f"[GeminiChat] ⚠️ Nonce refresh failed: {e}")
 
     def _send_request(self, prompt: str) -> str:
-        """Send a single request to Gemini and return raw response text."""
+        """
+        Send a raw HTTP POST request to the StreamGenerate endpoint.
+
+        Parameters
+        ----------
+        prompt : str
+            The prompt string to submit.
+
+        Returns
+        -------
+        str
+            The raw string response payload returned by Gemini.
+        """
         params = self._build_params()
         payload = self._build_payload(prompt)
 
@@ -813,8 +840,25 @@ class GeminiChat:
 
     def send(self, prompt: str) -> str:
         """
-        Send prompt and get text response with retry.
-        Auto-recovers from BardErrorInfo by re-initializing session.
+        Send a prompt to Gemini and return the clean text response.
+        
+        This handles auto-retries, rate limiting, cookie rotation, nonce refreshes,
+        session re-initialization on BardErrorInfo, and exponential backoffs.
+
+        Parameters
+        ----------
+        prompt : str
+            The input prompt string.
+
+        Returns
+        -------
+        str
+            The cleaned text content of the response.
+
+        Raises
+        ------
+        ConnectionError
+            If all configured retry attempts fail.
         """
         last_error = None
 
@@ -885,8 +929,22 @@ class GeminiChat:
 
     def send_json(self, prompt: str, retries: int = None) -> Union[dict, list, None]:
         """
-        Send prompt and extract JSON from response.
-        Returns None if all attempts fail (instead of raising).
+        Send a prompt and attempt to parse and return a JSON dictionary or list.
+        
+        Appends styling rules on subsequent retry attempts if no JSON could be
+        extracted on the previous attempt.
+
+        Parameters
+        ----------
+        prompt : str
+            The prompt requesting JSON data.
+        retries : int, optional
+            Number of retries. Defaults to client max_retries.
+
+        Returns
+        -------
+        dict or list or None
+            The parsed JSON object, or None if extraction failed.
         """
         max_attempts = retries or self.max_retries
         last_text = ""

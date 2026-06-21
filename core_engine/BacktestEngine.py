@@ -1,13 +1,13 @@
 """
-XNOQuant Engine — Core Backtest Engine
-========================================
-Vectorized backtest engine mô phỏng chính xác cơ chế XNOQuant.
+BacktestEngine
+==============
+Vectorized and bar-by-bar backtesting engine that simulates the exact behavior of XNOQuant.
 
-Quy trình:
-1. Strategy tạo chuỗi position targets (vectorized)
-2. Engine phát hiện thay đổi vị thế
-3. Tính số HĐ, phí, PnL bar-by-bar
-4. Tạo equity curve mark-to-market
+Workflow:
+1. The strategy generates position target series (vectorized)
+2. The engine detects position changes and records trade transitions
+3. Contracts, fees, and gross/net PnL are calculated bar-by-bar
+4. Mark-to-market valuations are computed at each bar to build the equity curve.
 """
 
 import pandas as pd
@@ -29,7 +29,36 @@ from utilities.AppConfig import (
 
 @dataclass
 class TradeRecord:
-    """Bản ghi một giao dịch hoàn chỉnh."""
+    """
+    Represents a record of a single completed trade.
+    
+    Attributes
+    ----------
+    entry_bar : int
+        Bar index when entering the trade.
+    exit_bar : int
+        Bar index when exiting the trade.
+    entry_time : object
+        Timestamp of entry.
+    exit_time : object
+        Timestamp of exit.
+    direction : float
+        Direction of the trade: +1.0 for long, -1.0 for short.
+    position_size : float
+        Size of position (e.g. 0.2, 0.5, etc.).
+    entry_price : float
+        Entry price (close price at entry bar).
+    exit_price : float
+        Exit price (close price at exit bar).
+    contracts : int
+        Number of contracts traded.
+    gross_pnl : float
+        Gross profit/loss before fees.
+    fee : float
+        Total commission fees (for closing side, and opening side if reversal).
+    net_pnl : float
+        Net profit/loss after fees.
+    """
     entry_bar: int                 # Index bar vào lệnh
     exit_bar: int                  # Index bar ra lệnh
     entry_time: object             # Datetime vào
@@ -46,7 +75,28 @@ class TradeRecord:
 
 @dataclass
 class BacktestResult:
-    """Kết quả backtest hoàn chỉnh."""
+    """
+    Represents the accumulated results of a backtest simulation.
+    
+    Attributes
+    ----------
+    equity_curve : pd.Series
+        The portfolio equity value (mark-to-market) at each bar.
+    positions : pd.Series
+        The target position size at each bar.
+    trades : list[TradeRecord]
+        List of all recorded completed trade transactions.
+    initial_capital : float
+        The initial starting capital.
+    final_equity : float
+        The final portfolio equity value.
+    total_fees : float
+        Total fees incurred during the backtest.
+    total_trades : int
+        Total number of position change events.
+    first_trade_open_fee : float, default 0.0
+        The opening fee of the first trade (used for base adjustments).
+    """
     equity_curve: pd.Series        # Equity tại mỗi bar (mark-to-market)
     positions: pd.Series           # Vị thế target tại mỗi bar
     trades: List[TradeRecord]      # Danh sách giao dịch
@@ -83,9 +133,24 @@ class XNOBacktestEngine:
 
     def calc_contracts(self, position: float, equity: float, price: float) -> int:
         """
-        Tính số hợp đồng theo công thức XNOQuant.
-
-        N = round(|position| × equity / (price × MULTIPLIER × margin_rate))
+        Calculate the number of contracts according to the XNOQuant formula.
+        
+        Formula:
+            N = round(|position| * equity / (price * MULTIPLIER * margin_rate))
+            
+        Parameters
+        ----------
+        position : float
+            Target position size.
+        equity : float
+            Current portfolio equity.
+        price : float
+            Underlying index price.
+            
+        Returns
+        -------
+        int
+            Calculated number of contracts.
         """
         if price <= 0 or equity <= 0:
             return 0
@@ -95,18 +160,26 @@ class XNOBacktestEngine:
 
     def run(self, strategy, df: pd.DataFrame) -> BacktestResult:
         """
-        Chạy backtest.
+        Execute the backtest simulation.
+        
+        1. Runs the strategy algorithm to generate target positions.
+        2. Unwraps RestrictedSeries if necessary.
+        3. Tracks mark-to-market equity bar-by-bar.
+        4. Simulates position reversals (closing old contracts, calculation of fees,
+           and opening new contracts based on the first trade's base contract calculation).
+        5. Returns structured BacktestResult.
 
         Parameters
         ----------
         strategy : SimpleAlgorithm
-            Instance của strategy (subclass SimpleAlgorithm).
+            The strategy instance subclassing SimpleAlgorithm.
         df : pd.DataFrame
-            DataFrame OHLCV (index = Datetime, columns = Open, High, Low, Close, Volume).
+            The OHLCV DataFrame (index = Datetime, columns = Open, High, Low, Close, Volume).
 
         Returns
         -------
         BacktestResult
+            The structured results of the backtest.
         """
         # --- 1. Lấy position targets từ strategy ---
         positions = strategy.run_algorithm(df)
@@ -226,21 +299,25 @@ class XNOBacktestEngine:
 
 def load_data(timeframe: str = '10m', start: str = BACKTEST_START, end: str = BACKTEST_END) -> pd.DataFrame:
     """
-    Tải dữ liệu OHLCV từ file CSV.
+    Load historical OHLCV data from a CSV file.
+    
+    Resolves 60m to 1H files based on the project's data template, reads the CSV
+    from the data directory, parses the 'Datetime' index, and filters the rows
+    between the start and end dates.
 
     Parameters
     ----------
-    timeframe : str
-        Khung thời gian ('1m', '3m', '5m', '10m', '15m', '30m', '60m').
-    start : str
-        Ngày bắt đầu (YYYY-MM-DD).
-    end : str
-        Ngày kết thúc (YYYY-MM-DD).
+    timeframe : str, default '10m'
+        The timeframe representation ('1m', '3m', '5m', '10m', '15m', '30m', '60m').
+    start : str, default BACKTEST_START
+        Start date filter string (YYYY-MM-DD).
+    end : str, default BACKTEST_END
+        End date filter string (YYYY-MM-DD).
 
     Returns
     -------
     pd.DataFrame
-        DataFrame OHLCV với index là Datetime.
+        The filtered OHLCV DataFrame with parsed Datetime index.
     """
     # Map 60m -> 1H for filename
     tf_file = '1H' if timeframe == '60m' else timeframe

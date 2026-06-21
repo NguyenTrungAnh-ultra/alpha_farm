@@ -1,3 +1,13 @@
+"""
+PlatformEmulator
+================
+Emulates the execution environment of the XNOQuant platform.
+
+Allows loading, compiling, and running strategy source code files under 
+the exact sandbox settings of XNOQuant, computing transaction and risk 
+performance metrics.
+"""
+
 import importlib.util
 import os
 import sys
@@ -12,9 +22,11 @@ from core_engine import GenerateReport as reporting
 
 class XNOPlatformEmulator:
     """
-    Giả lập 1:1 môi trường thực thi của nền tảng XNOQuant.
-    Nhận raw source code file (.py), bắt lỗi Sandbox/AST,
-    chạy chiến lược và tính toán metrics chính xác như web.
+    1:1 emulator of the XNOQuant execution environment.
+    
+    Accepts raw python source code files, cleans and formats them for sandbox
+    compliance, performs static AST/bytecode analysis to catch sandbox errors, 
+    executes backtests, and calculates performance metrics.
     """
     
     def __init__(self, verbose: bool = False):
@@ -22,7 +34,33 @@ class XNOPlatformEmulator:
         self.engine = XNOBacktestEngine()
 
     def load_strategy_from_file(self, filepath: str) -> type:
-        """Load class chiến lược từ raw file .py (giống web 100%)."""
+        """
+        Load a strategy class from a raw Python source code file.
+        
+        Reads the raw code, formats it for sandbox compliance (stripping imports,
+        init constructors, and dictionary lookups), dynamically compiles and 
+        loads the module, validates sandbox constraints, and extracts the 
+        SimpleAlgorithm subclass.
+        
+        Parameters
+        ----------
+        filepath : str
+            The path of the source code file to load.
+            
+        Returns
+        -------
+        type
+            The subclass of SimpleAlgorithm defined in the file.
+            
+        Raises
+        ------
+        FileNotFoundError
+            If the file does not exist.
+        ValueError
+            If no subclass of SimpleAlgorithm is found.
+        RuntimeError
+            If compilation or runtime execution fails.
+        """
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"Không tìm thấy file: {filepath}")
             
@@ -71,7 +109,21 @@ class XNOPlatformEmulator:
 
     def run_file(self, filepath: str, timeframe: str) -> BacktestResult:
         """
-        Thực thi toàn bộ flow: load data -> load strategy -> run -> return BacktestResult.
+        Execute the complete simulation pipeline for a strategy file.
+        
+        Loads index data, instantiates the strategy, and executes the backtest engine.
+
+        Parameters
+        ----------
+        filepath : str
+            The path to the strategy source file.
+        timeframe : str
+            The data timeframe to run backtest on (e.g. '10m', '15m').
+
+        Returns
+        -------
+        BacktestResult
+            The results of the strategy backtest.
         """
         # 1. Load data thô (fill Volume NaN bằng 0.0 như xno_sdk, nhưng không xóa nến)
         if self.verbose:
@@ -99,13 +151,36 @@ class XNOPlatformEmulator:
         return result
 
     def get_metrics(self, filepath: str, timeframe: str) -> Dict[str, Any]:
-        """Chạy và lấy dictionary metrics."""
+        """
+        Run backtests on a strategy file and retrieve performance metrics.
+
+        Parameters
+        ----------
+        filepath : str
+            The strategy file path.
+        timeframe : str
+            The timeframe of historical data to use.
+
+        Returns
+        -------
+        dict
+            The dictionary of performance metrics.
+        """
         result = self.run_file(filepath, timeframe)
         metrics = reporting.compute_metrics(result)
         return metrics
 
     def print_report(self, filepath: str, timeframe: str):
-        """In ra bảng report giống định dạng leaderboard."""
+        """
+        Execute and print a formatted performance report summary.
+
+        Parameters
+        ----------
+        filepath : str
+            The strategy file path.
+        timeframe : str
+            The timeframe of historical data to use.
+        """
         result = self.run_file(filepath, timeframe)
         print(f"\n{'='*60}")
         print(f"XNOQUANT EMULATOR REPORT: {os.path.basename(filepath)}")

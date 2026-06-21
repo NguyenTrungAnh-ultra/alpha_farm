@@ -177,7 +177,26 @@ def get_operators_for_dimension(dim: Dimension) -> List[ASTNode]:
     return ops
 
 class MCTSState:
+    """
+    Represents a state in the Monte Carlo Tree Search.
+    
+    Note on Depth:
+        `MCTSState` defaults to a `max_depth` of 3. However, when run from
+        `MCTSEngine`, the engine's `max_depth` (which defaults to 4) is passed
+        down and overrides this default value.
+    """
     def __init__(self, ast_tree: ASTNode, max_depth: int = 3):
+        """
+        Initialize the MCTSState.
+        
+        Parameters
+        ----------
+        ast_tree : ASTNode
+            The current AST tree representing the formula.
+        max_depth : int, default 3
+            The maximum allowed depth for tree expansion. Typically overridden 
+            by MCTSEngine's max_depth (default 4).
+        """
         self.ast_tree = ast_tree
         self.max_depth = max_depth
 
@@ -287,7 +306,27 @@ import inspect
 DynamicMCTSStrategy._emulator_source_code = inspect.getsource(DynamicMCTSStrategy)
 
 class MCTSEngine:
+    """
+    Monte Carlo Tree Search Engine for alpha expression discovery.
+    
+    Note on Depth:
+        `MCTSEngine` defaults to a `max_depth` of 4. When creating an `MCTSState`, 
+        the engine overrides the state's default `max_depth` of 3 with its own 
+        configured depth (typically 4).
+    """
     def __init__(self, timeframe: str = '10m', max_depth: int = 4, exploration_c: float = 1.414):
+        """
+        Initialize the MCTSEngine.
+        
+        Parameters
+        ----------
+        timeframe : str, default '10m'
+            The data timeframe to load and run backtests on.
+        max_depth : int, default 4
+            The maximum formula tree depth. Overrides MCTSState's default of 3.
+        exploration_c : float, default 1.414
+            Exploration constant for UCT child selection.
+        """
         self.timeframe = timeframe
         self.max_depth = max_depth
         self.exploration_c = exploration_c
@@ -308,11 +347,34 @@ class MCTSEngine:
         self.fsa_cache: set = set()
 
     def add_to_fsa_cache(self, ast_str: str):
-        """Adds structure to FSA cache to prevent duplicate genetics."""
+        """
+        Add the SHA256 hash of an AST string to the Frequent Subtree Avoidance (FSA) cache.
+        
+        This cache prevents genetic duplication by tracking structures that have
+        already yielded promising candidates, avoiding redundant search paths.
+        
+        Parameters
+        ----------
+        ast_str : str
+            The string representation of the AST node or expression.
+        """
         h = hashlib.sha256(ast_str.encode()).hexdigest()
         self.fsa_cache.add(h)
         
     def is_in_fsa_cache(self, ast_str: str) -> bool:
+        """
+        Check if the SHA256 hash of an AST string exists in the FSA cache.
+        
+        Parameters
+        ----------
+        ast_str : str
+            The string representation of the AST node or expression to check.
+            
+        Returns
+        -------
+        bool
+            True if the hash exists in the FSA cache, False otherwise.
+        """
         h = hashlib.sha256(ast_str.encode()).hexdigest()
         return h in self.fsa_cache
 
@@ -327,6 +389,27 @@ class MCTSEngine:
         return valid['alpha'].corr(valid['fwd_ret'], method='spearman')
 
     def evaluate_expression(self, ast_tree: ASTNode) -> tuple:
+        """
+        Evaluate the trading performance of an AST tree by running a backtest.
+        
+        Uses an evaluation cache (`self.cache`) to store previous backtest results
+        based on the generated expression string, window, and z-score threshold.
+        Also checks the FSA cache to penalize duplicate subtrees with a large
+        negative reward.
+        
+        Parameters
+        ----------
+        ast_tree : ASTNode
+            The AST tree representing the strategy or formula.
+            
+        Returns
+        -------
+        tuple
+            A tuple of (best_reward, best_direction, best_metrics) where:
+            - best_reward : float (performance score combining Rank IC and Sharpe)
+            - best_direction : float (1.0 for long, -1.0 for short)
+            - best_metrics : dict (portfolio metrics, rank IC, window, and z_score)
+        """
         if ast_tree.name == "strategy_root":
             window = ast_tree.children[0].value
             z_score = ast_tree.children[1].value
@@ -382,7 +465,27 @@ class MCTSEngine:
         return best_reward, best_direction, best_metrics
 
     def run_search_from_blueprint(self, root_ast: ASTNode, n_iterations: int = 100):
-        """Unified Compiler Architecture: Starts from an AST parsed from LLM Blueprint JSON."""
+        """
+        Run MCTS to expand an AST tree blueprint into trading strategies.
+        
+        This search follows the Unified Compiler Architecture:
+        1. Wraps the root AST in a `strategy_root` node containing placeholders
+           for `window` and `z_score`.
+        2. Performs MCTS iterations. In each iteration:
+           - Selection: Navigates the tree to find the best child according to UCT.
+           - Expansion: Adds a new node by choosing an untried expansion action.
+           - Simulation: Performs a random rollout from the new state to a terminal state.
+           - Evaluation: Runs a backtest to evaluate the terminal state and checks FSA cache.
+           - Backpropagation: Propagates the max reward (risk-seeking) back up the path.
+        3. Updates the leaderboard with successful candidates.
+        
+        Parameters
+        ----------
+        root_ast : ASTNode
+            The parsed AST blueprint from LLM JSON to start searching from.
+        n_iterations : int, default 100
+            Number of MCTS iterations to execute.
+        """
         # Wrap root_ast to enable MCTS to discover window and z_score parameters
         window_node = ASTNode(name="window", value="?")
         z_node = ASTNode(name="z_score", value="?")
@@ -443,7 +546,23 @@ class MCTSEngine:
         print(f"[MCTS] Search completed in {time.time() - start_time:.1f}s.")
 
     def select_best_child(self, node: MCTSNode) -> MCTSNode:
-        """Selects child that maximizes UCT using MAX reward (Risk-seeking)."""
+        """
+        Select a child node that maximizes the Upper Confidence Bound for Trees (UCT).
+        
+        This implements a risk-seeking (Tail Quantile) optimization by using 
+        the maximum reward (`max_reward`) of the child node as the exploitation term 
+        instead of the average reward.
+        
+        Parameters
+        ----------
+        node : MCTSNode
+            The parent node.
+            
+        Returns
+        -------
+        MCTSNode
+            The selected child node.
+        """
         best_uct = -1e9
         best_child = None
         log_parent_visits = math.log(node.visit_count)
@@ -464,6 +583,22 @@ class MCTSEngine:
         return best_child or random.choice(node.children)
 
     def rollout(self, state: MCTSState) -> MCTSState:
+        """
+        Perform a random simulation (rollout) from the given MCTS state.
+        
+        Expands the state randomly by choosing a random action from all
+        available actions until a terminal state is reached.
+        
+        Parameters
+        ----------
+        state : MCTSState
+            The state to start the rollout from.
+            
+        Returns
+        -------
+        MCTSState
+            A terminal state resulting from the random simulation.
+        """
         curr_state = state
         while not curr_state.is_terminal():
             actions = curr_state.get_actions()
@@ -474,6 +609,28 @@ class MCTSEngine:
         return curr_state
 
     def update_leaderboard(self, expr_str: str, reward: float, direction: float, metrics: dict, window: int = 20, z_score: float = 1.0):
+        """
+        Update the rolling leaderboard cache with a newly evaluated candidate.
+        
+        Prevents duplicates by checking if the exact expression with the same
+        window and z-score is already present. The leaderboard is sorted in 
+        descending order of reward and capped at 100 candidates.
+        
+        Parameters
+        ----------
+        expr_str : str
+            The code string of the discovered alpha expression.
+        reward : float
+            The reward value computed for the candidate.
+        direction : float
+            The trading direction (1.0 or -1.0).
+        metrics : dict
+            The strategy's performance metrics.
+        window : int, default 20
+            The lookback window size.
+        z_score : float, default 1.0
+            The z-score entry threshold.
+        """
         for item in self.leaderboard:
             if item['expr'] == expr_str and item.get('window') == window and item.get('z_score') == z_score:
                 return

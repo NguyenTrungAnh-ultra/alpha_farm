@@ -1,6 +1,6 @@
 {
-  "total_accepted": 139,
-  "last_updated": "2026-06-20T22:34:58.837029",
+  "total_accepted": 142,
+  "last_updated": "2026-06-21T08:50:38.170426",
   "strategies": [
     {
       "name": "Mcts_Willr_43c2",
@@ -3067,6 +3067,78 @@
       "max_correlation_returns": 0.018,
       "max_correlation_positions": 0.003,
       "accepted_at": "2026-06-20T22:34:58.627828"
+    },
+    {
+      "name": "Mcts_Zscore_Macd_9176",
+      "timeframe": "30m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.zscore(self.feat.zscore((self.op.diff(self.feat.macd(low)[0], periods=2) / (self.feat.stddev(self.feat.ema(self.feat.hammer(open_, high, low, close), timeperiod=30), timeperiod=14) + 1e-8)), timeperiod=14), timeperiod=14) > 1.0)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.3,
+        "window": 14,
+        "z_score": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.933,
+        "cagr": 0.3071,
+        "max_drawdown_pct": -12.98,
+        "profit_factor": 1.425,
+        "calmar_ratio": 2.366,
+        "total_trades": 1904,
+        "win_rate": 50.77
+      },
+      "max_correlation_returns": 0.0,
+      "max_correlation_positions": 0.0,
+      "accepted_at": "2026-06-21T07:02:03.010925"
+    },
+    {
+      "name": "Mcts_Zscore_Macd_Stddev_db95",
+      "timeframe": "15m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.zscore((self.op.diff(self.feat.macd(low)[0], periods=3) / (self.feat.stddev(self.feat.ema(self.feat.hammer(open_, high, low, close), timeperiod=60), timeperiod=14) + 1e-8)), timeperiod=14) > 0.5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.3,
+        "window": 30,
+        "z_score": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.657,
+        "cagr": 0.305,
+        "max_drawdown_pct": -42.01,
+        "profit_factor": 1.266,
+        "calmar_ratio": 0.726,
+        "total_trades": 2791,
+        "win_rate": 45.07
+      },
+      "max_correlation_returns": 0.434,
+      "max_correlation_positions": 0.497,
+      "accepted_at": "2026-06-21T07:37:44.403516"
+    },
+    {
+      "name": "Mcts_Zscore_Ema_fb12",
+      "timeframe": "5m",
+      "family": "MCTS_Discovered",
+      "description": "Alpha discovered via MCTS: (self.feat.zscore(self.feat.zscore((self.feat.ema(low, timeperiod=20) - self.feat.macd(open_)[0]), timeperiod=20), timeperiod=60) > 0.5)",
+      "params": {
+        "direction": 1.0,
+        "position_scale": 0.25,
+        "window": 60,
+        "z_score": 0.5
+      },
+      "metrics": {
+        "sharpe_ratio": 1.402,
+        "cagr": 0.2172,
+        "max_drawdown_pct": -21.25,
+        "profit_factor": 1.24,
+        "calmar_ratio": 1.022,
+        "total_trades": 2701,
+        "win_rate": 40.97
+      },
+      "max_correlation_returns": 0.396,
+      "max_correlation_positions": 0.363,
+      "accepted_at": "2026-06-21T08:50:37.955507"
     }
   ]
 }

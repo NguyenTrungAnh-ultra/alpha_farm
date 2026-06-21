@@ -1,14 +1,11 @@
 """
-Prompt Templates for Strategy Generation (XNO Engine)
-======================================================
-Prompts that produce XNOQuant-compatible strategies using SimpleAlgorithm.
+Prompts
+=======
+Prompt templates and builders for the Alpha Farm strategy generation pipeline.
 
-Design principles:
-    - Self-contained: each prompt includes ALL context needed
-    - Structured output: always request JSON/code in specific format
-    - Domain-aware: VN30F1M futures specifics baked in
-    - Timeframe-adaptive: different guidance per timeframe
-    - Diversity-enforcing: explicit list of existing strategies
+Maintains dictionaries of timeframe hints, library of available indicators/operators, 
+and helper functions to construct structured LLM prompts for generating strategy 
+blueprints and self-correction instructions.
 """
 
 # ─── Available talib & SDK indicators (curated for futures) ────────────────
@@ -113,7 +110,37 @@ def build_idea_prompt(
     fsa_forbidden_patterns: list[str] = None,
 ) -> str:
     """
-    Build prompt for generating a strategy idea (JSON).
+    Build a structured prompt asking the LLM to generate a new trading strategy idea in JSON.
+    
+    Injects context libraries, timeframe specific indicators, diversity requirements (excluding
+    already accepted strategies and previously failed names), and combat experience logs to 
+    guide the LLM.
+    
+    Parameters
+    ----------
+    timeframe : str
+        The target timeframe for the strategy (e.g. '1m', '5m', '10m').
+    existing_strategies : list[dict]
+        A list of currently accepted strategy summaries to enforce uniqueness.
+    round_num : int
+        The current round in the generation pipeline.
+    total_rounds : int
+        The total number of strategies being generated.
+    market_regime : str, default "High Volatility, Sideways"
+        Market environment description.
+    investment_thesis : str, default "Exploit asymmetric skewness in order flow."
+        Financial thesis to test.
+    experience : str, default ""
+        Combat experience log text to enforce rules and prevent repeated bugs.
+    tried_names : list[str], optional
+        List of names that have failed to compile previously.
+    fsa_forbidden_patterns : list[str], optional
+        List of root topology structures that should not be repeated.
+        
+    Returns
+    -------
+    str
+        The fully formatted prompt string.
     """
     
     # Context sections
@@ -194,7 +221,22 @@ GIVE ME THE JSON NOW:
 
 def build_correction_prompt(failed_json_part_str: str, error_traceback: str) -> str:
     """
-    Build prompt for self-correction when a generated strategy fails validation.
+    Build a self-correction prompt for the LLM when validation/compilation fails.
+    
+    Provides the LLM with the invalid part of the strategy JSON and the error traceback
+    from the compiler sandbox, urging it to resolve the syntax or logic violation.
+
+    Parameters
+    ----------
+    failed_json_part_str : str
+        The JSON fragment or parameter subset that caused the failure.
+    error_traceback : str
+        The error traceback message raised by the compiler sandbox.
+
+    Returns
+    -------
+    str
+        The formatted correction prompt string.
     """
     return f"""Your previous generated strategy JSON failed execution validation in our sandbox.
 

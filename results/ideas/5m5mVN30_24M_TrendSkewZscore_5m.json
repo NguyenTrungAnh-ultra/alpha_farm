@@ -1,7 +1,0 @@
-{
-    "name": "5m5mVN30_24M_TrendSkewZscore",
-    "timeframe": "5m",
-    "family": "momentum",
-    "description": "Exploits asymmetric skewness in order flow by measuring the z-score of returns relative to volatility, filtering for trend continuation signals during high-volatility sideways regimes.",
-    "macro_blueprint": "zscore(roc(pct_change(?)))"
-}

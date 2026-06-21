@@ -9,16 +9,16 @@ if PROJECT_ROOT not in sys.path:
 """
 Portfolio Manager
 ==================
-Manages accepted strategies with competition criteria filtering
-and correlation constraint.
+Manages accepted strategies with competition criteria filtering.
 
-Competition criteria:
-    - Sharpe ≥ 1.3
-    - CAGR ≥ 15%
-    - Max Drawdown ≥ -35%
-    - Profit Factor ≥ 1.2
-    - Calmar Ratio ≥ 1.1
-    - Correlation with existing ≤ 0.5
+Note: Although the CRITERIA dictionary defines Sharpe, CAGR, Max Drawdown, 
+Profit Factor, and Calmar, the actual checks in `meets_criteria` and 
+`cleanup_portfolio` are restricted solely to Sharpe Ratio (> 1.3) and 
+CAGR (> 15%). Other metrics are not enforced during strategy filtering.
+
+Additionally, correlation is evaluated for warning/logging purposes only. 
+Strategies exceeding the correlation threshold are NOT rejected or pruned from 
+the portfolio (correlation rejection logic is currently commented out).
 """
 
 import json
@@ -104,7 +104,11 @@ class PortfolioManager:
     
     def meets_criteria(self, metrics: dict) -> tuple[bool, list[str]]:
         """
-        Check if metrics meet extreme competition criteria (Sharpe > 1.3, CAGR > 15%).
+        Check if metrics meet active competition criteria.
+        
+        Note: Currently, only Sharpe Ratio (> 1.3) and CAGR (> 15%) are 
+        enforced. Other metrics defined in the CRITERIA dictionary (such as 
+        Max Drawdown, Profit Factor, and Calmar Ratio) are not verified.
         """
         fail_reasons = []
         
@@ -123,8 +127,11 @@ class PortfolioManager:
     def cleanup_portfolio(self) -> int:
         """
         Quét qua toàn bộ danh mục hiện tại và xóa bỏ các chiến lược 
-        không đạt tiêu chuẩn (Sharpe > 1.3 và CAGR > 0.15).
+        không đạt tiêu chuẩn (chỉ kiểm tra Sharpe > 1.3 và CAGR > 15%).
         Xóa file .py, _equity.csv, _positions.csv và cập nhật lại JSON.
+        
+        Note: Các tiêu chí khác trong CRITERIA như Max Drawdown, Profit Factor, 
+        và Calmar Ratio không được kiểm tra ở đây.
         """
         removed_count = 0
         valid_strategies = []
@@ -238,6 +245,12 @@ class PortfolioManager:
     ) -> tuple[bool, str]:
         """
         Evaluate strategy and add to portfolio if it passes.
+        
+        Note:
+        - Only checks Sharpe (> 1.3) and CAGR (> 15%).
+        - Returns a warning/logs if returns or positions correlation exceeds
+          the max correlation threshold, but does NOT reject the strategy
+          because the rejection logic for correlation is commented out.
         
         Returns
         -------

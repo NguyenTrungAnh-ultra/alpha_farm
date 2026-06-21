@@ -100,7 +100,31 @@ class CustomStrategy(SimpleAlgorithm):
 """
 
 def process_timeframe(tf: str, iterations: int = 50000):
-    """Worker function to run MCTS and Backtesting for a single timeframe."""
+    """
+    Worker function to run MCTS and Backtesting for a single timeframe.
+    
+    This function processes candidate ideas for the given timeframe:
+    1. Loads the historical data for the timeframe.
+    2. Reads macro blueprints from the results/ideas folder.
+    3. Runs MCTSEngine search on each blueprint.
+    4. Evaluates generated candidates through a full backtest.
+    5. Optimizes the candidate's position scale.
+    6. Filters candidates based on basic portfolio criteria and an independent 
+       correlation threshold of 0.50 (CORR_THRESHOLD = 0.50) against already 
+       accepted candidates within the same timeframe processing loop.
+       
+    Parameters
+    ----------
+    tf : str
+        The timeframe to process (e.g. '10m', '1h').
+    iterations : int, default 50000
+        The number of MCTS iterations to perform per dimension.
+        
+    Returns
+    -------
+    tuple
+        (timeframe, total_generated, total_rejected, successful_candidates)
+    """
     import logging
     import warnings
     warnings.filterwarnings('ignore')
@@ -262,8 +286,8 @@ def process_timeframe(tf: str, iterations: int = 50000):
                     if correlations:
                         max_corr = max(correlations)
                 
-                # Cài đặt ngưỡng loại bỏ khắc nghiệt (Ví dụ: 0.70)
-                CORR_THRESHOLD = 0.70
+                # Cài đặt ngưỡng loại bỏ khắc nghiệt (Ví dụ: 0.50)
+                CORR_THRESHOLD = 0.50
                 current_sharpe = metrics.get('sharpe_ratio', -999.0)
                 
                 # Phải thỏa mãn cả 3: Đỗ tiêu chuẩn CƠ BẢN + Độc lập + Sharpe TỐT NHẤT
@@ -294,13 +318,25 @@ def process_timeframe(tf: str, iterations: int = 50000):
             local_accepted_curves.append(best_result.equity_curve)
             
         else:
-            print(f"[Worker {tf}] ❌ Formula failed performance or correlation criteria (> 0.70).")
+            print(f"[Worker {tf}] ❌ Formula failed performance or correlation criteria (> 0.50).")
             total_rejected += 1
             
     print(f"--- [Worker {tf}] Finished processing ---")
     return tf, total_generated, total_rejected, successful_candidates
 
 def run_mcts_pipeline(iterations: int = 50000):
+    """
+    Main entry point for running the parallel MCTS strategy discovery pipeline.
+    
+    Launches worker processes across all configured timeframes. Successful candidates 
+    are validated, checked for correlation warnings (threshold of 0.50), and 
+    formally accepted into the final portfolio manager.
+    
+    Parameters
+    ----------
+    iterations : int, default 50000
+        Number of MCTS iterations per worker.
+    """
     print("==============================================================")
     print("      STARTING MULTIPROCESSING MCTS ALPHA SEARCH PIPELINE     ")
     print("==============================================================")

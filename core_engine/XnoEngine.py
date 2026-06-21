@@ -1,3 +1,20 @@
+"""
+XnoEngine
+=========
+Mock SDK implementation of the XNOQuant Sandbox environment.
+
+This module simulates the sandbox execution container, including:
+1. `FeatureEngine`: Mocks `self.feat.*`, providing standard technical indicators 
+   from TA-Lib, statistical indicators, custom volume-weighted functions, and 
+   parameter normalization / safety wrappers.
+2. `OperatorEngine`: Mocks `self.op.*`, implementing 30 custom logical and causal 
+   operators.
+3. `DataProxy`: Mocks `self.data.*` to provide restricted access to price and volume columns.
+4. `SimpleAlgorithm`: The base class for user-defined strategies (`CustomStrategy`),
+   enforcing sandbox compilation and runtime safety constraints (prohibiting imports,
+   the built-in `open` function, `getattr`, and other causal/sandboxed violations).
+"""
+
 import pandas as pd
 import numpy as np
 import talib
@@ -9,6 +26,18 @@ from .RestrictedSeries import RestrictedSeries
 logger = logging.getLogger("core_engine.XnoEngine")
 
 def _load_feature_whitelist():
+    """
+    Load the whitelist of allowed feature methods for the FeatureEngine.
+    
+    Reads from the `feature.txt` file located in the project root or the `docs`
+    directory. If the file cannot be read or is empty, a default set of standard
+    TA-Lib and custom indicators is returned.
+    
+    Returns
+    -------
+    set[str]
+        A set of lowercase function names permitted under FeatureEngine.
+    """
     whitelist = set()
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(current_dir)
@@ -79,7 +108,8 @@ TALIB_NAME_MAPPING = {
 
 class FeatureEngine:
     """
-    Mock self.feat.*
+    Mock self.feat.* feature engine.
+    
     Includes all TA-Lib indicators and custom rolling/statistical indicators.
     Automatically unwraps RestrictedSeries, computes using pandas/numpy/talib, 
     and wraps the result back to RestrictedSeries.
@@ -99,6 +129,20 @@ class FeatureEngine:
                     setattr(self, name, types.MethodType(wrapped, self))
 
     def _wrap_normalize_params(self, func):
+        """
+        Wrap a function to normalize standard parameters (window/timeperiod) 
+        and filter out unrecognized keyword arguments to prevent crashing.
+        
+        Parameters
+        ----------
+        func : callable
+            The function to wrap.
+            
+        Returns
+        -------
+        callable
+            The wrapped function.
+        """
         import inspect
         try:
             sig = inspect.signature(func)
@@ -335,6 +379,31 @@ class FeatureEngine:
         return self.rolling_min(series, window=timeperiod), self.rolling_max(series, window=timeperiod)
 
     def __getattr__(self, name):
+        """
+        Dynamically resolve missing attributes to standard TA-Lib indicator functions.
+        
+        Checks if the requested method name is present in the feature whitelist.
+        If it is, the name is mapped to its TA-Lib equivalent (e.g. pattern names 
+        translated via TALIB_NAME_MAPPING) and executed against NumPy float64 
+        representation of input series. Includes an argument adaptation fallback 
+        layer for robustness.
+        
+        Parameters
+        ----------
+        name : str
+            The name of the attribute/method to resolve.
+            
+        Returns
+        -------
+        callable
+            A wrapper function around the corresponding TA-Lib function.
+            
+        Raises
+        ------
+        AttributeError
+            If the attribute name starts with '_' or is not present in the feature whitelist,
+            or if the function is not found in the TA-Lib package.
+        """
         if name.startswith('_'):
             raise AttributeError(f"'FeatureEngine' object has no attribute '{name}'")
             
@@ -426,8 +495,12 @@ class FeatureEngine:
 
 class OperatorEngine:
     """
-    Mock self.op.*
-    Includes all 30 custom operators supported by XNOQuant.
+    Mock self.op.* engine for XNOQuant strategy execution.
+    
+    Implements 30 standard logical, comparison, and causal operators. All causal 
+    operators (such as `shift`, `diff`, `pct_change`) enforce causal safety by 
+    requiring periods to be strictly positive (> 0). Similarly, backfilling (`bfill`) 
+    is prohibited to prevent looking forward into the future.
     """
     def _unwrap(self, val):
         if isinstance(val, RestrictedSeries):
@@ -441,6 +514,19 @@ class OperatorEngine:
 
     # 1. crossed
     def crossed(self, series1, series2) -> RestrictedSeries:
+        """
+        Determine when series1 crosses series2 in either direction (above or below).
+        
+        Parameters
+        ----------
+        series1 : RestrictedSeries or pd.Series
+        series2 : RestrictedSeries or pd.Series
+        
+        Returns
+        -------
+        RestrictedSeries
+            A boolean series indicating True on the index where a crossover occurred.
+        """
         logger.debug("OperatorEngine.crossed called")
         s1 = self._unwrap(series1)
         s2 = self._unwrap(series2)
@@ -611,6 +697,20 @@ class OperatorEngine:
 
     # 24. bars_since
     def bars_since(self, condition) -> RestrictedSeries:
+        """
+        Count the number of bars (rows) elapsed since the last time the condition was True.
+        
+        Returns NaN for rows before the first occurrence of the condition.
+        
+        Parameters
+        ----------
+        condition : RestrictedSeries or pd.Series
+        
+        Returns
+        -------
+        RestrictedSeries
+            A numeric series representing the number of bars since the condition was met.
+        """
         logger.debug("OperatorEngine.bars_since called")
         cond = self._unwrap(condition).fillna(False).astype(bool)
         
@@ -666,7 +766,12 @@ class OperatorEngine:
         return self._wrap(~s)
 
 class DataProxy:
-    """Mock self.data.*"""
+    """
+    Mock self.data.* data proxy.
+    
+    Provides strategies with access to Vietnam Future data fields (Open, High, Low, Close, Volume)
+    wrapped in RestrictedSeries to prevent unauthorized operations or data modifications.
+    """
     def __init__(self, df: pd.DataFrame):
         logger.debug("Initializing DataProxy. Mocking pv_volume to all zeros.")
         self._df = df
@@ -684,7 +789,11 @@ class DataProxy:
 
 class SimpleAlgorithm:
     """
-    Mock SimpleAlgorithm for XNOQuant Sandbox.
+    Mock base class for user-defined CustomStrategy execution in XNOQuant.
+    
+    Manages the initialization of the data proxy, feature/operator engines, and
+    enforces sandbox constraints by inspecting both the AST structure and the compiled 
+    bytecode of the subclass definition.
     """
     def __init__(self, **kwargs):
         logger.debug(f"Initializing SimpleAlgorithm with params: {kwargs}")
@@ -716,6 +825,20 @@ class SimpleAlgorithm:
         raise NotImplementedError("Subclass must implement __algorithm__()")
 
     def _validate_sandbox_constraints(self):
+        """
+        Validate sandbox and compiler constraints against the CustomStrategy subclass.
+        
+        Inspects the subclass dictionary, source code AST, and bytecode instructions:
+        1. Prohibits subclassing `__init__` constructor (parameters must be configured in `__algorithm__`).
+        2. Prohibits defining extra user helper functions (only `__algorithm__` is allowed).
+        3. AST-inspects source code to reject imports, `open` built-ins, and `getattr` calls.
+        4. Bytecode-inspects compiled code for safety fallbacks to prevent runtime evasion.
+        
+        Raises
+        ------
+        AttributeError
+            If any sandbox constraint is violated.
+        """
         cls = self.__class__
         if getattr(cls, '_validated', False):
             return

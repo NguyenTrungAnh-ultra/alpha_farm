@@ -1,7 +1,0 @@
-{
-    "name": "VN30F15M_AsymmetricSkewness",
-    "timeframe": "15m",
-    "family": "momentum|volatility",
-    "description": "Exploits order flow asymmetry by normalizing momentum against volatility to capture skew in high-vol sideways regimes.",
-    "macro_blueprint": "zscore(roc(?))"
-}

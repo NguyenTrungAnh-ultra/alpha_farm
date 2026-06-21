@@ -48,7 +48,24 @@ class StrategyBlueprint(BaseModel):
 
 
 def load_cookies(filepath: str = None) -> str:
-    """Read cookie string from cookies.txt (first non-comment line)."""
+    """
+    Read the Gemini cookie string from cookies.txt (the first non-comment line).
+    
+    Parameters
+    ----------
+    filepath : str, optional
+        Path to cookies file. Defaults to `cookies.txt` in the project root.
+        
+    Returns
+    -------
+    str
+        The cookie string.
+        
+    Raises
+    ------
+    ValueError
+        If no cookies are found in the specified file.
+    """
     if filepath is None:
         filepath = os.path.join(PROJECT_ROOT, "cookies.txt")
     with open(filepath, 'r', encoding='utf-8') as f:
@@ -59,7 +76,24 @@ def load_cookies(filepath: str = None) -> str:
     raise ValueError(f"No cookies found in {filepath}")
 
 def load_deepseek_token(filepath: str = None) -> str:
-    """Read auth token from token.txt"""
+    """
+    Read the Deepseek authentication token from token.txt (the first non-comment line).
+    
+    Parameters
+    ----------
+    filepath : str, optional
+        Path to token file. Defaults to `token.txt` in the project root.
+        
+    Returns
+    -------
+    str
+        The authentication token.
+        
+    Raises
+    ------
+    ValueError
+        If no token is found in the specified file.
+    """
     if filepath is None:
         filepath = os.path.join(PROJECT_ROOT, "token.txt")
     with open(filepath, 'r', encoding='utf-8') as f:
@@ -70,6 +104,23 @@ def load_deepseek_token(filepath: str = None) -> str:
     raise ValueError(f"No token found in {filepath}")
 
 def load_experience_log(filepath: str = None) -> str:
+    """
+    Load the quantitative experience log from experience_log.md.
+    
+    This log contains insights from prior strategy failures and successes 
+    and is injected into the LLM prompt to guide generation.
+    
+    Parameters
+    ----------
+    filepath : str, optional
+        Path to the experience log. Defaults to `utilities/experience_log.md`.
+        
+    Returns
+    -------
+    str
+        The raw markdown content of the experience log, or an empty string if 
+        the file does not exist.
+    """
     if filepath is None:
         filepath = os.path.join(PROJECT_ROOT, "utilities", "experience_log.md")
     if os.path.exists(filepath):
@@ -78,6 +129,22 @@ def load_experience_log(filepath: str = None) -> str:
     return ""
 
 def load_existing_ideas(ideas_dir: str) -> list[dict]:
+    """
+    Load all previously generated idea blueprints from the specified ideas directory.
+    
+    Scans the directory for JSON files and attempts to parse their contents 
+    into a list of dictionaries.
+    
+    Parameters
+    ----------
+    ideas_dir : str
+        The path to the directory containing idea JSON files.
+        
+    Returns
+    -------
+    list[dict]
+        A list of parsed strategy blueprints (as dictionaries).
+    """
     ideas = []
     if not os.path.exists(ideas_dir):
         return ideas
@@ -104,6 +171,35 @@ def run_pipeline(
     request_delay: float = 5.0,
     results_dir: str = "results/ideas",
 ):
+    """
+    Execute the main strategy generation pipeline.
+    
+    Queries the LLM (Gemini, Deepseek, or Ollama depending on configuration) for
+    new trading strategy blueprints. Each generated blueprint is validated against
+    the StrategyBlueprint Pydantic model and verified for semantic correctness via the
+    SemanticCompiler. If validation fails, it attempts self-correction using a local
+    or primary LLM chat client. Validated JSON files are saved to `results/ideas/`
+    for the MCTS step.
+    
+    Parameters
+    ----------
+    cookies : str
+        Gemini cookie string (if using Gemini model).
+    n_strategies : int, default 50
+        Number of ideas/strategies to attempt to generate.
+    model : str, default "thinking"
+        The model identifier to use (e.g. "thinking", "deepseek-thinking", 
+        "ollama-local", "ollama-9b").
+    request_delay : float, default 5.0
+        Delay in seconds between LLM requests (primarily for cloud APIs).
+    results_dir : str, default "results/ideas"
+        Directory where generated JSON blueprints will be saved.
+        
+    Returns
+    -------
+    list[dict]
+        The list of all accumulated and validated strategy blueprints.
+    """
     print(f"""
 ╔══════════════════════════════════════════════════════════════╗
 ║           AUTO STRATEGY IDEA GENERATOR                     ║
