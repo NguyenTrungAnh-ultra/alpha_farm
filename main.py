@@ -71,7 +71,8 @@ def cmd_mcts(args):
     REWARD_WEIGHTS['patience'] = patience
     
     iterations = getattr(args, 'iterations', 50000)
-    run_mcts_pipeline(iterations=iterations)
+    retrain_hmm = getattr(args, 'retrain_hmm', False)
+    run_mcts_pipeline(iterations=iterations, retrain_hmm=retrain_hmm)
 
 
 
@@ -288,6 +289,8 @@ def run_interactive_cli() -> None:
     if selected_cmd in ("mcts", "full"):
         args_dict["iterations"] = retrieve_numerical_input("Giới hạn vòng lặp MCTS tối đa (Max Iterations)", 50000, int)
         args_dict["patience"] = retrieve_numerical_input("Ngưỡng Early Stopping Patience", 5000, int)
+        # Bỏ qua tuỳ chọn retrain_hmm ở CLI tương tác cho gọn, mặc định False.
+        args_dict["retrain_hmm"] = False
         
     args = InteractiveArgs(**args_dict)
     
@@ -328,6 +331,7 @@ def main():
     parser_mcts = subparsers.add_parser("mcts", help="Run Tầng 2 & 3 (Compiler + MCTS)")
     parser_mcts.add_argument("--iterations", type=int, default=50000, help="Number of MCTS iterations")
     parser_mcts.add_argument("--patience", type=int, default=5000, help="Early stopping patience limit")
+    parser_mcts.add_argument("--retrain-hmm", action="store_true", help="Force retrain HMM models instead of using cache")
     
     # Submit
     parser_sub = subparsers.add_parser("submit", help="Auto submit valid strategies")
@@ -338,6 +342,7 @@ def main():
     parser_full.add_argument("--model", type=str, default="deepseek-thinking")
     parser_full.add_argument("--iterations", type=int, default=50000, help="Number of MCTS iterations")
     parser_full.add_argument("--patience", type=int, default=5000, help="Early stopping patience limit")
+    parser_full.add_argument("--retrain-hmm", action="store_true", help="Force retrain HMM models instead of using cache")
     parser_full.add_argument("--no_cookies", action="store_true")
     
     args = parser.parse_args()

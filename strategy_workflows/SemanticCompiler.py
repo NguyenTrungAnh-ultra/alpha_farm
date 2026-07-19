@@ -88,13 +88,27 @@ class SemanticCompiler:
         # Fail-Fast Drop: Verify dimensions
         out_dim = self._check_dimensions(root_node)
         
-        if out_dim in (Dimension.RATIO, Dimension.CURRENCY):
-            # Auto-wrap RATIO and CURRENCY to produce a BOOLEAN signal via Z-score cut
-            zscore_node = ASTNode(name="zscore", children=[root_node])
-            # Pass '?' so MCTS can search over [0.5, 1.0, 1.5, 2.0, 2.5] instead of hardcoding 1.0
-            constant_node = ASTNode(name="z_score", value="?")
-            root_node = ASTNode(name="greater_than", children=[zscore_node, constant_node])
-            out_dim = Dimension.BOOLEAN
+        from .MCTSDimensions import TemplateType, DIMENSION_TO_TEMPLATE
+        template = DIMENSION_TO_TEMPLATE.get(out_dim, TemplateType.NORMALIZED)
+        
+        if template == TemplateType.NORMALIZED:
+            root_node = ASTNode(name="normalized_template", children=[
+                root_node,
+                ASTNode(name="window", value="?"),
+                ASTNode(name="z_score", value="?")
+            ])
+        elif template == TemplateType.RATIO:
+            root_node = ASTNode(name="ratio_template", children=[
+                root_node,
+                ASTNode(name="threshold_upper", value="?"),
+                ASTNode(name="threshold_lower", value="?")
+            ])
+        elif template == TemplateType.BOOLEAN:
+            # Boolean giữ nguyên
+            pass
+            
+        # We wrapped it in a template (or it's already boolean), so it resolves to BOOLEAN signal
+        out_dim = Dimension.BOOLEAN
             
         if out_dim != Dimension.BOOLEAN:
             raise SemanticCompilerError(f"Root node must return BOOLEAN, got {out_dim}")

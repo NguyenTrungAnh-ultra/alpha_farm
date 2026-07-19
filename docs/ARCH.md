@@ -33,8 +33,8 @@ Dưới đây là các giới hạn và quy định chung để chiến lược 
 ### MCTS Alpha Discovery Engine (`strategy_workflows/`)
 
 - `MCTSDimensions.py`: Nơi đăng ký mọi Toán tử và quy tắc chữ ký hàm (Arity). Hệ thống áp dụng triết lý **Component Splitting** (phân rã các chỉ báo Tuple như MACD, BBANDS thành các mảng 1D độc lập) và đưa các chỉ báo nhiều tham số tĩnh (như VWAP, ADX) về Arity 0 (Terminal Nodes) để đảm bảo LLM và MCTS không bao giờ điền sai tham số.
-- `SemanticCompiler.py`: Bộ biên dịch AST thông minh. Không chỉ kiểm tra cú pháp, bộ biên dịch còn thực thi nghiêm ngặt luật chống **Dimensional Bleeding** (Rò rỉ thứ nguyên) để ngăn chặn việc cộng/trừ các đơn vị Giá với Khối lượng hoặc RSI, hủy ngay lập tức các nhánh vô nghĩa về mặt vật lý tài chính.
-- `MCTSEngine.py`: Động cơ lõi sử dụng thuật toán Monte Carlo Tree Search. Được trang bị kiến trúc **One-pass Pipeline**, tích hợp Máy chém Calmar (Hard Filter) và tính toán phần thưởng Đa mục tiêu (Multi-objective Reward) có tính đến hệ số tương quan Vị thế với Ký ức toàn cục (Global Position Matrix). Hệ thống còn tích hợp cơ chế ngắt sớm **Early Stopping** (dựa trên cảm biến Shannon Entropy và Patience) để tự động ngắt vòng lặp khi thuật toán không còn khả năng cải thiện hoặc đã hội tụ. MCTS tự động lắp ghép các thành phần toán học và tiêm chính xác các tham số cửa sổ, đồng thời khám phá chu kỳ (`window`) và ngưỡng (`z_score_threshold`) tối ưu nhất.
+- `SemanticCompiler.py`: Bộ biên dịch AST thông minh. Không chỉ kiểm tra cú pháp, bộ biên dịch còn thực thi nghiêm ngặt luật chống **Dimensional Bleeding** (Rò rỉ thứ nguyên) để ngăn chặn việc cộng/trừ các đơn vị Giá với Khối lượng hoặc RSI. Hỗ trợ sinh tự động cây AST cho 3 loại **Template (`BOOLEAN`, `RATIO`, `NORMALIZED`)**: tự động đệm các ngưỡng (`threshold`) đối với `RATIO` và bọc hàm chuẩn hóa (`zscore`) đối với `NORMALIZED`.
+- `MCTSEngine.py`: Động cơ lõi sử dụng thuật toán Monte Carlo Tree Search. Tích hợp Máy chém Calmar (Hard Filter) và tính toán phần thưởng Đa mục tiêu (Multi-objective Reward). Hệ thống tích hợp **Scale-Mismatch Logic** với công thức tỷ lệ `max(2, round(base_period * BASELINE / tf))` để đảm bảo các chu kỳ luôn nội suy chuẩn xác khi chuyển đổi Timeframe. Ngoài ra, MCTS tích hợp bộ kiểm định **HMM Validation (Hidden Markov Model)** để giả lập các kịch bản thị trường bình thường (Normal) và căng thẳng (Stressed) bằng ma trận chuyển trạng thái, loại bỏ những thuật toán chỉ ăn may trong một chu kỳ ngắn.
 - `RunMCTS.py`: Tiến trình Worker (Chạy đa luồng). Ngay khi khởi động, nó nạp Ma trận Vị thế lịch sử (Ký ức toàn cục) từ `portfolio_summary.json` và truyền vào MCTS. MCTS chạy trực tiếp trên toàn bộ **5 năm dữ liệu** thay vì data cắt lát. Cuối cùng, `RunMCTS.py` thực hiện Nghiệm thu một chạm (One-pass Commit): lấy đúng 1 chiến lược Top 1 (Reward > 0) và nộp thẳng vào Portfolio, bỏ qua các bước kiểm tra lại trung gian.
 
 ### Pipeline LLM Sinh Tự Động (`strategy_workflows/` & `llm_clients/`)
@@ -48,11 +48,15 @@ Dưới đây là các giới hạn và quy định chung để chiến lược 
 ### Sandbox Mocking & Core Engine (`core_engine/`)
 
 - `PlatformEmulator.py`: Khung kiểm thử được tinh chỉnh để mô phỏng chính xác trình biên dịch mã của nền tảng Web.
-- `BacktestEngine.py` $\rightarrow$ `XNOBacktestEngine.run()`: Động cơ mô phỏng giao dịch bar-by-bar siêu tốc (**Vectorized Numpy**). Tích hợp cơ chế **VN30F Netting** tính phí theo Delta hợp đồng và thuật toán khóa rò rỉ dữ liệu (Lookahead Bias) bằng lệnh `shift(1)` vị thế.
+- `BacktestEngine.py` $\rightarrow$ `XNOBacktestEngine.run()`: Động cơ mô phỏng giao dịch bar-by-bar siêu tốc (**Vectorized Numpy**). Tích hợp cơ chế **VN30F Netting** tính phí theo Delta hợp đồng, thuật toán khóa rò rỉ dữ liệu (Lookahead Bias) bằng lệnh `shift(1)` vị thế, và hệ thống **Vectorized Margin Call** ngăn chặn ảo tưởng "tài khoản bất tử". Khi Equity lỗ vượt ngưỡng duy trì (Maintenance Margin), động cơ quét râu nến (High/Low) intraday để kích hoạt `Force-sell`, đóng băng Equity, đồng thời sử dụng thuật toán **Virtual Exit Price** để dựng lại lịch sử giao dịch `TradeRecord` ăn khớp hoàn hảo với mức PnL bị cháy.
 - `CalculateMetrics.py`: Cung cấp bộ tính toán chỉ số hiệu năng (Sharpe, Sortino, VaR, CAGR, Max Drawdown). Đặc biệt, hệ số rủi ro (Risk Metrics) được đo lường hoàn toàn dựa trên Constant Returns để phù hợp với đặc thù giao dịch khối lượng hợp đồng cố định.
 - `XnoEngine.py`: Lớp Wrapper cấp cao gom BacktestEngine và CalculateMetrics để thực thi và đánh giá chiến lược độc lập.
 - `RestrictedSeries.py`: Cấu trúc dữ liệu giới hạn ngăn việc rò rỉ dữ liệu (Look-ahead bias) trong quá trình backtest.
 - `GenerateReport.py`: Module hỗ trợ sinh báo cáo thống kê kết quả backtest.
+
+### Testing & Environment (`tests/` & `uv`)
+- Toàn bộ môi trường dự án được khóa chặt ở **Python 3.12** sử dụng **`uv`** để tối ưu hóa tốc độ build các thư viện gốc C++ như `hmmlearn` và `TA-Lib`.
+- Khung kiểm thử sử dụng **`pytest`** bao phủ các module lõi (`core_engine`, `strategy_workflows`, concurrency) với dữ liệu Numpy giả lập để đẩy nhanh tốc độ chạy CI/CD. Động cơ song song `ProcessPoolExecutor` được kiểm thử mô phỏng toàn diện để đảm bảo không bị thắt nút cổ chai (Bottleneck) khi cấp phát các task MCTS.
 
 ## 4. Liên Kết Hệ Thống (Master Pipeline 3 Tầng)
 

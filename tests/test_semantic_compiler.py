@@ -1,6 +1,6 @@
 import pytest
 from strategy_workflows.SemanticCompiler import SemanticCompiler, SemanticCompilerError
-from strategy_workflows.MCTSDimensions import Dimension
+from strategy_workflows.MCTSDimensions import Dimension, TemplateType
 
 def test_compiler_valid_blueprint():
     compiler = SemanticCompiler()
@@ -35,9 +35,7 @@ def test_compiler_arity_mismatch():
 
 def test_compiler_dimension_mismatch():
     compiler = SemanticCompiler()
-    # and_ expects BOOLEAN inputs. ema returns ANY (but it wraps ANY, so if it wraps volume, it returns volume).
-    # But wait, and_(doji(), doji()) is valid.
-    # What if we pass a CURRENCY field directly into and_?
+    # and_ expects BOOLEAN inputs. pv_close is ANY/CURRENCY, so it causes mismatch.
     blueprint = "and_(doji(), pv_close)"
     with pytest.raises(SemanticCompilerError, match="Dimension mismatch"):
         compiler.compile_blueprint(blueprint)
@@ -50,40 +48,39 @@ def test_compiler_invalid_operator():
 
 def test_compiler_auto_wrap_ratio_root():
     compiler = SemanticCompiler()
-    # rsi returns RATIO. It should be auto-wrapped with greater_than(zscore(rsi), 1.0)
+    # rsi returns BOUNDED_RATIO. It should be auto-wrapped with ratio_template
     blueprint = "rsi(?, 14)"
     ast = compiler.compile_blueprint(blueprint)
     
-    assert ast.name == "greater_than"
-    assert len(ast.children) == 2
-    assert ast.children[0].name == "zscore"
-    assert ast.children[0].children[0].name == "rsi"
-    assert ast.children[1].name == "z_score"
+    assert ast.name == "ratio_template"
+    assert len(ast.children) == 3
+    assert ast.children[0].name == "rsi"
+    assert ast.children[1].name == "threshold_upper"
+    assert ast.children[2].name == "threshold_lower"
+
+def test_compiler_auto_wrap_normalized_root():
+    compiler = SemanticCompiler()
+    # macd_line returns NORMALIZED. It should be auto-wrapped with greater_than(zscore(...), z_score)
+    blueprint = "macd_line(?)"
+    ast = compiler.compile_blueprint(blueprint)
+    
+    assert ast.name == "normalized_template"
+    assert len(ast.children) == 3
+    assert ast.children[0].name == "macd_line"
+    assert ast.children[1].name == "window"
     assert ast.children[1].value == "?"
+    assert ast.children[2].name == "z_score"
+    assert ast.children[2].value == "?"
 
 def test_compiler_few_shot_examples():
     compiler = SemanticCompiler()
     
-    # Example 0: div(macd_line(?), stddev(?))
+    # Example 0: div(macd_line(?), stddev(?)) -> NORMALIZED
     ast0 = compiler.compile_blueprint("div(macd_line(?), stddev(?))")
-    assert ast0.name == "greater_than"
-    assert ast0.children[0].name == "zscore"
-    assert ast0.children[0].children[0].name == "div"
+    assert ast0.name == "normalized_template"
+    assert ast0.children[0].name == "div"
     
-    # Example 1: div(sub(vwap(), ema(?)), stddev(?))
-    ast1 = compiler.compile_blueprint("div(sub(vwap(), ema(?)), stddev(?))")
-    assert ast1.name == "greater_than"
-    assert ast1.children[0].children[0].name == "div"
-    
-    # Example 2: zscore(roc(?))
-    ast2 = compiler.compile_blueprint("zscore(roc(?))")
-    assert ast2.name == "greater_than"
-    assert ast2.children[0].children[0].name == "zscore"
-    assert ast2.children[0].children[0].children[0].name == "pct_change" # mapped from roc via HALLUCINATION_MAP
-    
-    # Example 3: div(mult(rsi(?), var(?)), stddev(?))
-    ast3 = compiler.compile_blueprint("div(mult(rsi(?), var(?)), stddev(?))")
-    assert ast3.name == "greater_than"
-    assert ast3.children[0].children[0].name == "div"
-
-
+    # Example 2: roc(?) -> pct_change -> NORMALIZED
+    ast2 = compiler.compile_blueprint("roc(?)")
+    assert ast2.name == "normalized_template"
+    assert ast2.children[0].name == "pct_change" # mapped from roc via HALLUCINATION_MAP

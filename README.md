@@ -37,8 +37,9 @@ graph TD
     subgraph MCTS_Engine ["Tầng 2 & 3: MCTS Brute-force & Sandbox"]
         run_all -->|2. python main.py mcts| mcts(RunMCTS.py)
         save_json -->|Load Blueprints| mcts
-        mcts -->|Check Dimensional Bleeding & Điền tham số ?| mcts_sandbox[PlatformEmulator]
-        mcts_sandbox -->|Backtest 2020-2025 đạt chuẩn| save_success[Lưu Code Python vào results/]
+        mcts -->|Check Dimensional Bleeding & Compile (Multi-template)| mcts_sandbox[PlatformEmulator]
+        mcts_sandbox -->|Backtest 2020-2025 đạt chuẩn| hmm[HMM Regime Validation]
+        hmm -->|Pass Stressed Scenarios| save_success[Lưu Code Python vào results/]
     end
 
     subgraph Web_Environment ["Tầng Nộp chiến lược lên Web"]
@@ -65,7 +66,7 @@ graph TD
 
 ### Yêu cầu hệ thống
 
-- Python 3.10 trở lên.
+- Python 3.12 (Quản lý môi trường bằng `uv` để build các package C++ như `hmmlearn` và `TA-Lib`).
 - Đã cài đặt Chrome hoặc Edge (để chạy tiện ích Playwright).
 - Ollama local.
 
@@ -74,8 +75,8 @@ graph TD
 Chạy lệnh sau để cài đặt toàn bộ các thư viện cần thiết:
 
 ```bash
-pip install -r utilities/deps/deepseek4free/requirements.txt
-pip install python-dotenv
+uv pip install -r utilities/deps/deepseek4free/requirements.txt
+uv pip install python-dotenv hmmlearn TA-Lib
 ```
 
 ### Cấu hình API & Tài khoản (.env)
@@ -139,7 +140,8 @@ Ngay khi LLM sinh ra một Blueprint bị sai cú pháp hoặc sai thứ nguyên
 MCTS thay thế hoàn toàn hệ thống Optuna cũ. MCTS Brute-force không chỉ tối ưu tham số mà còn tự động khám phá và xây dựng cây biểu thức toán học (AST).
 Động cơ MCTS có khả năng tối ưu hóa tham số động (Dynamic Parameter Optimization):
 
-- **Window Size & Z-Score Threshold**: Không còn bị gán cứng (hardcode), MCTS sẽ tự động tìm kiếm chu kỳ làm mượt (`window`) và ngưỡng kích hoạt chuẩn hóa (`z_score`) tương thích nhất với cấu trúc toán học của từng khung thời gian, phá vỡ giới hạn "mù thời gian" của hệ thống cũ.
+- **Window Size & Z-Score Threshold**: Không còn bị gán cứng (hardcode), MCTS sẽ tự động tìm kiếm chu kỳ làm mượt (`window`) và ngưỡng kích hoạt tương thích nhất thông qua cơ chế **Scale-Mismatch Dynamic Tuning** dựa trên timeframe, giúp phá vỡ giới hạn "mù thời gian" của hệ thống cũ. Hệ thống tự động phân loại tín hiệu theo 3 template: **Boolean**, **Ratio**, và **Normalized**.
+- **HMM Regime Validation (Hidden Markov Model)**: Sau khi tìm được tham số tốt nhất, MCTS chuyển chiến lược sang bộ lọc HMM. HMM sẽ dùng thuật toán Monte Carlo để mô phỏng (synthesize) hàng chục kịch bản giá ảo (Synthetic Paths) trong điều kiện bình thường và căng thẳng (Stressed Regime) từ ma trận chuyển trạng thái. Chỉ chiến lược nào sống sót qua cả thị trường thực tế và thị trường giả lập HMM mới được cấp phép.
 
 Bạn có thể tinh chỉnh sức mạnh bằng cách cấu hình số vòng lặp:
 

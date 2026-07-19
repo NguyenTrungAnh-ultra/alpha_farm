@@ -23,11 +23,13 @@ from core_engine.GenerateReport import compute_metrics
 from strategy_workflows.MCTSDimensions import Dimension, OPERATOR_REGISTRY, get_operators_by_return_dim, DATA_FIELD_DIMENSIONS, OperatorGroup
 from strategy_workflows.PortfolioManager import PortfolioManager
 from strategy_workflows.SemanticCompiler import ASTNode
-from utilities.AppConfig import REWARD_WEIGHTS
+from utilities.AppConfig import (
+    REWARD_WEIGHTS, BASE_PERIODS, BASE_WINDOW_SEARCH,
+    BASELINE_TF_MINUTES, TIMEFRAME_MINUTES
+)
 
-PERIODS = [5, 10, 14, 20, 30, 60]
-
-def ast_to_code(node: ASTNode) -> str:
+def ast_to_code(node: ASTNode, scaled_periods: list = None) -> str:
+    periods = scaled_periods or [5, 10, 14, 20, 30, 60]
     """Translates the AST node and its children to Python code string."""
     if node.name == "?":
         return '?'
@@ -58,17 +60,17 @@ def ast_to_code(node: ASTNode) -> str:
     if group == OperatorGroup.STATISTICS and node.name in ['add', 'sub', 'mult', 'div']:
         op_map = {'add': '+', 'sub': '-', 'mult': '*', 'div': '/'}
         if node.name == 'div':
-            return f"({ast_to_code(node.children[0])} / ({ast_to_code(node.children[1])} + 1e-8))"
-        return f"({ast_to_code(node.children[0])} {op_map[node.name]} {ast_to_code(node.children[1])})"
+            return f"({ast_to_code(node.children[0], scaled_periods)} / ({ast_to_code(node.children[1], scaled_periods)} + 1e-8))"
+        return f"({ast_to_code(node.children[0], scaled_periods)} {op_map[node.name]} {ast_to_code(node.children[1], scaled_periods)})"
         
     if group == OperatorGroup.LOGIC and node.name in ['and_', 'or_', 'not_', 'greater_than', 'less_than', 'equal']:
         if node.name == 'not_':
-            return f"(~{ast_to_code(node.children[0])})"
+            return f"(~{ast_to_code(node.children[0], scaled_periods)})"
         if node.name in ['greater_than', 'less_than', 'equal']:
             op_map = {'greater_than': '>', 'less_than': '<', 'equal': '=='}
-            return f"({ast_to_code(node.children[0])} {op_map[node.name]} {ast_to_code(node.children[1])})"
+            return f"({ast_to_code(node.children[0], scaled_periods)} {op_map[node.name]} {ast_to_code(node.children[1], scaled_periods)})"
         op_map = {'and_': '&', 'or_': '|'}
-        return f"({ast_to_code(node.children[0])} {op_map[node.name]} {ast_to_code(node.children[1])})"
+        return f"({ast_to_code(node.children[0], scaled_periods)} {op_map[node.name]} {ast_to_code(node.children[1], scaled_periods)})"
 
     # General function call: self.op or self.feat
     prefix = "self.op" if group in [OperatorGroup.LOGIC, OperatorGroup.TIME_SERIES] else "self.feat"
@@ -79,23 +81,23 @@ def ast_to_code(node: ASTNode) -> str:
 
     # Component Splitting Renderings
     if node.name == 'macd_line':
-        return f"self.feat.macd({ast_to_code(node.children[0])})[0]"
+        return f"self.feat.macd({ast_to_code(node.children[0], scaled_periods)})[0]"
     if node.name == 'macd_signal':
-        return f"self.feat.macd({ast_to_code(node.children[0])})[1]"
+        return f"self.feat.macd({ast_to_code(node.children[0], scaled_periods)})[1]"
     if node.name == 'macd_hist':
-        return f"self.feat.macd({ast_to_code(node.children[0])})[2]"
+        return f"self.feat.macd({ast_to_code(node.children[0], scaled_periods)})[2]"
     if node.name == 'bbands_upper':
-        return f"self.feat.bbands({ast_to_code(node.children[0])})[0]"
+        return f"self.feat.bbands({ast_to_code(node.children[0], scaled_periods)})[0]"
     if node.name == 'bbands_middle':
-        return f"self.feat.bbands({ast_to_code(node.children[0])})[1]"
+        return f"self.feat.bbands({ast_to_code(node.children[0], scaled_periods)})[1]"
     if node.name == 'bbands_lower':
-        return f"self.feat.bbands({ast_to_code(node.children[0])})[2]"
+        return f"self.feat.bbands({ast_to_code(node.children[0], scaled_periods)})[2]"
 
     # Arity 0 Terminal nodes requiring internal variables
     if node.name == 'vwap':
         return "self.feat.vwap(high, low, close, volume)"
     if node.name == 'adx':
-        return f"self.feat.adx(high, low, close, timeperiod={random.choice(PERIODS)})"
+        return f"self.feat.adx(high, low, close, timeperiod={random.choice(periods)})"
     if node.name == 'stoch_k':
         return f"self.feat.stoch(high, low, close)[0]"
     if node.name == 'stoch_d':
@@ -103,12 +105,12 @@ def ast_to_code(node: ASTNode) -> str:
 
     args = []
     for c in node.children:
-        args.append(ast_to_code(c))
+        args.append(ast_to_code(c, scaled_periods))
     
     # Safely inject keyword arguments
     if not any(isinstance(c, ASTNode) and c.name == "Constant" for c in node.children):
         if node.name in ['ema', 'rsi', 'stddev', 'var', 'zscore']:
-            args.append(f"timeperiod={random.choice(PERIODS)}")
+            args.append(f"timeperiod={random.choice(periods)}")
         elif node.name in ['shift', 'diff', 'pct_change']:
             args.append(f"periods={random.choice([1, 2, 3, 5, 10])}")
             
@@ -125,7 +127,7 @@ def find_first_placeholder(node: ASTNode) -> Optional[ASTNode]:
     """Depth-first search to find the first placeholder node ('?')."""
     if node.name == '?':
         return node
-    if node.name in ('window', 'z_score') and node.value == '?':
+    if node.name in ('window', 'z_score', 'threshold_upper', 'threshold_lower') and node.value == '?':
         return node
     for child in node.children:
         ph = find_first_placeholder(child)
@@ -186,7 +188,7 @@ class MCTSState:
         `MCTSEngine`, the engine's `max_depth` (which defaults to 4) is passed
         down and overrides this default value.
     """
-    def __init__(self, ast_tree: ASTNode, max_depth: int = 3):
+    def __init__(self, ast_tree: ASTNode, max_depth: int = 3, scaled_window_search: list = None):
         """
         Initialize the MCTSState.
         
@@ -197,9 +199,12 @@ class MCTSState:
         max_depth : int, default 3
             The maximum allowed depth for tree expansion. Typically overridden 
             by MCTSEngine's max_depth (default 4).
+        scaled_window_search : list, default None
+            Dynamic list of window sizes for MCTS to search.
         """
         self.ast_tree = ast_tree
         self.max_depth = max_depth
+        self.scaled_window_search = scaled_window_search or [5, 10, 14, 20, 30, 40, 60]
 
     def is_terminal(self) -> bool:
         return find_first_placeholder(self.ast_tree) is None
@@ -210,9 +215,13 @@ class MCTSState:
             return []
             
         if ph.name == 'window':
-            return [ASTNode(name='window', value=v) for v in [5, 10, 14, 20, 30, 40, 60]]
+            return [ASTNode(name='window', value=v) for v in self.scaled_window_search]
         if ph.name == 'z_score':
             return [ASTNode(name='z_score', value=v) for v in [0.5, 1.0, 1.5, 2.0, 2.5]]
+        if ph.name == 'threshold_upper':
+            return [ASTNode(name='threshold_upper', value=v) for v in [60.0, 65.0, 70.0, 75.0, 80.0]]
+        if ph.name == 'threshold_lower':
+            return [ASTNode(name='threshold_lower', value=v) for v in [20.0, 25.0, 30.0, 35.0, 40.0]]
         
         # The expected dimension was stashed in the placeholder's value field
         req_dim = ph.value if isinstance(ph.value, Dimension) else Dimension.ANY
@@ -227,13 +236,13 @@ class MCTSState:
         new_tree = clone_ast(self.ast_tree)
         ph = find_first_placeholder(new_tree)
         if ph is not None:
-            if ph.name in ('window', 'z_score'):
+            if ph.name in ('window', 'z_score', 'threshold_upper', 'threshold_lower'):
                 ph.value = action_node.value
             else:
                 ph.name = action_node.name
                 ph.children = [clone_ast(child) for child in action_node.children]
                 ph.value = action_node.value
-        return MCTSState(new_tree, self.max_depth)
+        return MCTSState(new_tree, self.max_depth, self.scaled_window_search)
 
 class MCTSNode:
     def __init__(self, state: MCTSState, parent: Optional['MCTSNode'] = None, action_leading_here: Optional[ASTNode] = None):
@@ -251,7 +260,84 @@ class MCTSNode:
     def is_leaf(self) -> bool:
         return len(self.children) == 0
 
-class DynamicMCTSStrategy(SimpleAlgorithm):
+class BooleanMCTSStrategy(SimpleAlgorithm):
+    position_scale = 0.2
+
+    def __algorithm__(self):
+        expr_str = self.expr_str
+        direction = self.direction
+        pos_scale = self.position_scale
+        
+        close = self.data.pv_close
+        high = self.data.pv_high
+        low = self.data.pv_low
+        open_ = self.data.pv_open
+        volume = self.data.pv_volume
+        
+        globals_dict = {'self': self, 'close': close, 'high': high, 'low': low, 'open_': open_, 'volume': volume}
+        
+        try:
+            alpha_val = eval(expr_str, {}, globals_dict)
+            self.alpha_series = alpha_val
+        except Exception:
+            self.alpha_series = close * 0.0
+            alpha_val = close * 0.0
+
+        raw_pos = self.op.where(alpha_val, pos_scale, -pos_scale)
+        if direction < 0:
+            raw_pos = raw_pos * -1.0
+        
+        flat_mask = raw_pos == 0.0
+        long_mask = raw_pos == pos_scale
+        short_mask = raw_pos == -pos_scale
+        
+        self.set_positions(flat_mask, position=0.0)
+        self.set_positions(long_mask, position=pos_scale)
+        self.set_positions(short_mask, position=-pos_scale)
+
+
+class RatioMCTSStrategy(SimpleAlgorithm):
+    position_scale = 0.2
+    threshold_upper = 70.0
+    threshold_lower = 30.0
+
+    def __algorithm__(self):
+        expr_str = self.expr_str
+        direction = self.direction
+        pos_scale = self.position_scale
+        threshold_upper = self.threshold_upper
+        threshold_lower = self.threshold_lower
+        
+        close = self.data.pv_close
+        high = self.data.pv_high
+        low = self.data.pv_low
+        open_ = self.data.pv_open
+        volume = self.data.pv_volume
+        
+        globals_dict = {'self': self, 'close': close, 'high': high, 'low': low, 'open_': open_, 'volume': volume}
+        
+        try:
+            alpha_val = eval(expr_str, {}, globals_dict)
+            self.alpha_series = alpha_val
+        except Exception:
+            self.alpha_series = close * 0.0
+            alpha_val = close * 0.0
+
+        long_cond = alpha_val > threshold_upper if direction == 1.0 else alpha_val < threshold_lower
+        short_cond = alpha_val < threshold_lower if direction == 1.0 else alpha_val > threshold_upper
+        
+        raw_pos = self.op.where(long_cond, pos_scale, self.op.where(short_cond, -pos_scale, 0.0))
+        
+        flat_mask = raw_pos == 0.0
+        long_mask = raw_pos == pos_scale
+        short_mask = raw_pos == -pos_scale
+        
+        self.set_positions(flat_mask, position=0.0)
+        self.set_positions(long_mask, position=pos_scale)
+        self.set_positions(short_mask, position=-pos_scale)
+
+
+class NormalizedMCTSStrategy(SimpleAlgorithm):
     position_scale = 0.2
     window = 20
     z_score_threshold = 1.0
@@ -260,8 +346,6 @@ class DynamicMCTSStrategy(SimpleAlgorithm):
         expr_str = self.expr_str
         direction = self.direction
         pos_scale = self.position_scale
-        
-        # Get dynamically discovered parameters, fallback to defaults
         window = self.window
         z_score_threshold = self.z_score_threshold
         
@@ -271,14 +355,7 @@ class DynamicMCTSStrategy(SimpleAlgorithm):
         open_ = self.data.pv_open
         volume = self.data.pv_volume
         
-        globals_dict = {
-            'self': self,
-            'close': close,
-            'high': high,
-            'low': low,
-            'open_': open_,
-            'volume': volume
-        }
+        globals_dict = {'self': self, 'close': close, 'high': high, 'low': low, 'open_': open_, 'volume': volume}
         
         try:
             alpha_val = eval(expr_str, {}, globals_dict)
@@ -304,7 +381,9 @@ class DynamicMCTSStrategy(SimpleAlgorithm):
         self.set_positions(short_mask, position=-pos_scale)
 
 import inspect
-DynamicMCTSStrategy._emulator_source_code = inspect.getsource(DynamicMCTSStrategy)
+BooleanMCTSStrategy._emulator_source_code = inspect.getsource(BooleanMCTSStrategy)
+RatioMCTSStrategy._emulator_source_code = inspect.getsource(RatioMCTSStrategy)
+NormalizedMCTSStrategy._emulator_source_code = inspect.getsource(NormalizedMCTSStrategy)
 
 class MCTSEngine:
     """
@@ -335,6 +414,20 @@ class MCTSEngine:
         self.exploration_c = exploration_c
         self.global_position_matrix = global_position_matrix
         
+        tf_minutes = TIMEFRAME_MINUTES.get(timeframe, 10)
+        scale = BASELINE_TF_MINUTES / tf_minutes
+        
+        self.scaled_periods = sorted(set(
+            max(2, round(p * scale)) for p in BASE_PERIODS
+        ))
+        self.scaled_window_search = sorted(set(
+            max(2, round(w * scale)) for w in BASE_WINDOW_SEARCH
+        ))
+        
+        print(f"[MCTS] Timeframe: {timeframe} | Scale: {scale:.1f}x")
+        print(f"[MCTS] Scaled PERIODS: {self.scaled_periods}")
+        print(f"[MCTS] Scaled Window Search: {self.scaled_window_search}")
+        
         print(f"[MCTS] Loading data for {timeframe}...")
         self.df = load_data(timeframe)
         self.df['Volume'] = self.df['Volume'].fillna(0.0)
@@ -347,7 +440,7 @@ class MCTSEngine:
         self.leaderboard: List[Dict[str, Any]] = []
         
         # Reusable temporary strategy to avoid object-recreation overhead in evaluate_expression
-        self.temp_strat = DynamicMCTSStrategy()
+        self.temp_strat = NormalizedMCTSStrategy()
         self.temp_strat._initialize(self.df_search)
         
         # Frequent Subtree Avoidance (FSA) Rolling Cache
@@ -420,17 +513,30 @@ class MCTSEngine:
         tuple
             A tuple of (best_reward, best_direction, best_metrics)
         """
-        if ast_tree.name == "strategy_root":
-            window = ast_tree.children[0].value
-            z_score_thresh = ast_tree.children[1].value
-            alpha_node = ast_tree.children[2]
-            expr_str = ast_to_code(alpha_node)
-        else:
+        if ast_tree.name == "normalized_template":
+            template_type = "NORMALIZED"
+            expr_str = ast_to_code(ast_tree.children[0], self.scaled_periods)
+            window = ast_tree.children[1].value
+            z_score_thresh = ast_tree.children[2].value
+            threshold_upper = 70.0
+            threshold_lower = 30.0
+            cache_key = f"{expr_str}_norm_{window}_{z_score_thresh}"
+        elif ast_tree.name == "ratio_template":
+            template_type = "RATIO"
+            expr_str = ast_to_code(ast_tree.children[0], self.scaled_periods)
             window = 20
             z_score_thresh = 1.0
-            expr_str = ast_to_code(ast_tree)
-            
-        cache_key = f"{expr_str}_{window}_{z_score_thresh}"
+            threshold_upper = ast_tree.children[1].value
+            threshold_lower = ast_tree.children[2].value
+            cache_key = f"{expr_str}_ratio_{threshold_upper}_{threshold_lower}"
+        else:
+            template_type = "BOOLEAN"
+            expr_str = ast_to_code(ast_tree, self.scaled_periods)
+            window = 20
+            z_score_thresh = 1.0
+            threshold_upper = 70.0
+            threshold_lower = 30.0
+            cache_key = f"{expr_str}_bool"
         if cache_key in self.cache:
             return self.cache[cache_key]
             
@@ -459,23 +565,30 @@ class MCTSEngine:
             except Exception:
                 alpha_val = self.temp_strat.data.pv_close * 0.0
                 
-            r_mean = self.temp_strat.feat.rolling_mean(alpha_val, window)
-            r_std = self.temp_strat.feat.rolling_std(alpha_val, window) + 1e-8
-            z_score_base = (alpha_val - r_mean) / r_std
+            pos_scale = self.temp_strat.position_scale
             
             # Rank IC can be computed on the base alpha directly
             raw_alpha = alpha_val._data if hasattr(alpha_val, '_data') else alpha_val
             rank_ic = self.compute_rank_ic(raw_alpha, self.df_search['Close'])
             
-            pos_scale = self.temp_strat.position_scale
-            
-            # Long positions
-            z_long = z_score_base
-            pos_long = self.temp_strat.op.where(z_long > z_score_thresh, pos_scale, self.temp_strat.op.where(z_long < -z_score_thresh, -pos_scale, 0.0))
-            
-            # Short positions
-            z_short = z_score_base * -1.0
-            pos_short = self.temp_strat.op.where(z_short > z_score_thresh, pos_scale, self.temp_strat.op.where(z_short < -z_score_thresh, -pos_scale, 0.0))
+            if template_type == "NORMALIZED":
+                r_mean = self.temp_strat.feat.rolling_mean(alpha_val, window)
+                r_std = self.temp_strat.feat.rolling_std(alpha_val, window) + 1e-8
+                z_score_base = (alpha_val - r_mean) / r_std
+                
+                z_long = z_score_base
+                pos_long = self.temp_strat.op.where(z_long > z_score_thresh, pos_scale, self.temp_strat.op.where(z_long < -z_score_thresh, -pos_scale, 0.0))
+                
+                z_short = z_score_base * -1.0
+                pos_short = self.temp_strat.op.where(z_short > z_score_thresh, pos_scale, self.temp_strat.op.where(z_short < -z_score_thresh, -pos_scale, 0.0))
+                
+            elif template_type == "RATIO":
+                pos_long = self.temp_strat.op.where(alpha_val > threshold_upper, pos_scale, self.temp_strat.op.where(alpha_val < threshold_lower, -pos_scale, 0.0))
+                pos_short = self.temp_strat.op.where(alpha_val > threshold_upper, -pos_scale, self.temp_strat.op.where(alpha_val < threshold_lower, pos_scale, 0.0))
+                
+            else: # BOOLEAN
+                pos_long = self.temp_strat.op.where(alpha_val, pos_scale, -pos_scale)
+                pos_short = self.temp_strat.op.where(alpha_val, -pos_scale, pos_scale)
             
             class PrecalcStrategy:
                 def __init__(self, p):
@@ -544,32 +657,8 @@ class MCTSEngine:
     def run_search_from_blueprint(self, root_ast: ASTNode, n_iterations: int = 100):
         """
         Run MCTS to expand an AST tree blueprint into trading strategies.
-        
-        This search follows the Unified Compiler Architecture:
-        1. Wraps the root AST in a `strategy_root` node containing placeholders
-           for `window` and `z_score`.
-        2. Performs MCTS iterations. In each iteration:
-           - Selection: Navigates the tree to find the best child according to UCT.
-           - Expansion: Adds a new node by choosing an untried expansion action.
-           - Simulation: Performs a random rollout from the new state to a terminal state.
-           - Evaluation: Runs a backtest to evaluate the terminal state and checks FSA cache.
-           - Backpropagation: Propagates the max reward (risk-seeking) back up the path.
-        3. Monitors Shannon Entropy of root node for early convergence stopping.
-        4. Updates the leaderboard with successful candidates.
-        
-        Parameters
-        ----------
-        root_ast : ASTNode
-            The parsed AST blueprint from LLM JSON to start searching from.
-        n_iterations : int, default 100
-            Number of MCTS iterations to execute.
         """
-        # Wrap root_ast to enable MCTS to discover window and z_score parameters
-        window_node = ASTNode(name="window", value="?")
-        z_node = ASTNode(name="z_score", value="?")
-        new_root = ASTNode(name="strategy_root", children=[window_node, z_node, root_ast])
-        
-        root_state = MCTSState(new_root, self.max_depth)
+        root_state = MCTSState(root_ast, self.max_depth, self.scaled_window_search)
         root_node = MCTSNode(root_state)
         
         print(f"[MCTS] Starting unified search from Blueprint | Depth: {self.max_depth} | Iterations: {n_iterations}")
@@ -622,20 +711,24 @@ class MCTSEngine:
             reward, direction, metrics = self.evaluate_expression(terminal_state.ast_tree)
             
             if terminal_state.is_terminal():
-                if terminal_state.ast_tree.name == "strategy_root":
-                    expr_code = ast_to_code(terminal_state.ast_tree.children[2])
-                    window = terminal_state.ast_tree.children[0].value
-                    z_score = terminal_state.ast_tree.children[1].value
+                if terminal_state.ast_tree.name == "normalized_template":
+                    expr_code = ast_to_code(terminal_state.ast_tree.children[0], self.scaled_periods)
+                    window = terminal_state.ast_tree.children[1].value
+                    z_score = terminal_state.ast_tree.children[2].value
+                    cache_key = f"{expr_code}_norm_{window}_{z_score}"
+                elif terminal_state.ast_tree.name == "ratio_template":
+                    expr_code = ast_to_code(terminal_state.ast_tree.children[0], self.scaled_periods)
+                    threshold_upper = terminal_state.ast_tree.children[1].value
+                    threshold_lower = terminal_state.ast_tree.children[2].value
+                    cache_key = f"{expr_code}_ratio_{threshold_upper}_{threshold_lower}"
                 else:
-                    expr_code = ast_to_code(terminal_state.ast_tree)
-                    window = 20
-                    z_score = 1.0
+                    expr_code = ast_to_code(terminal_state.ast_tree, self.scaled_periods)
+                    cache_key = f"{expr_code}_bool"
                     
-                self.update_leaderboard(expr_code, reward, direction, metrics, window, z_score)
+                self.update_leaderboard(expr_code, reward, direction, metrics)
                 
                 # Update FSA Rolling Window Cache if good reward
                 if reward > 1.0:
-                    cache_key = f"{expr_code}_{window}_{z_score}"
                     self.add_to_fsa_cache(cache_key)
                 
             # Risk-Seeking Backpropagation (Tail Quantile)
@@ -722,39 +815,29 @@ class MCTSEngine:
             curr_state = curr_state.apply_action(action)
         return curr_state
 
-    def update_leaderboard(self, expr_str: str, reward: float, direction: float, metrics: dict, window: int = 20, z_score: float = 1.0):
+    def update_leaderboard(self, expr_str: str, reward: float, direction: float, metrics: dict):
         """
         Update the rolling leaderboard cache with a newly evaluated candidate.
-        
-        Prevents duplicates by checking if the exact expression with the same
-        window and z-score is already present. The leaderboard is sorted in 
-        descending order of reward and capped at 100 candidates.
-        
-        Parameters
-        ----------
-        expr_str : str
-            The code string of the discovered alpha expression.
-        reward : float
-            The reward value computed for the candidate.
-        direction : float
-            The trading direction (1.0 or -1.0).
-        metrics : dict
-            The strategy's performance metrics.
-        window : int, default 20
-            The lookback window size.
-        z_score : float, default 1.0
-            The z-score entry threshold.
         """
+        template = metrics.get('template', 'BOOLEAN')
+        window = metrics.get('window', 20)
+        z_score = metrics.get('z_score_threshold', 1.0)
+        threshold_upper = metrics.get('threshold_upper', 70.0)
+        threshold_lower = metrics.get('threshold_lower', 30.0)
+        
         for item in self.leaderboard:
-            if item['expr'] == expr_str and item.get('window') == window and item.get('z_score') == z_score:
+            if item['expr'] == expr_str and item.get('template') == template and item.get('window') == window and item.get('z_score') == z_score and item.get('threshold_upper') == threshold_upper and item.get('threshold_lower') == threshold_lower:
                 return
         
         self.leaderboard.append({
             'expr': expr_str,
+            'template': template,
             'reward': reward,
             'direction': direction,
             'window': window,
             'z_score': z_score,
+            'threshold_upper': threshold_upper,
+            'threshold_lower': threshold_lower,
             'metrics': metrics
         })
         self.leaderboard.sort(key=lambda x: x['reward'], reverse=True)

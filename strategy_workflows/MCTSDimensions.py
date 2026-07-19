@@ -25,10 +25,26 @@ class Dimension(Enum):
     """
     CURRENCY = auto()   # Prices
     VOLUME = auto()     # Volume
-    RATIO = auto()      # Dimensionless, percentages (RSI, returns)
+    RATIO = auto()      # Dimensionless, percentages (returns)
+    BOUNDED_RATIO = auto() # Bounded indicators (RSI, ADX)
     TIME = auto()       # Time periods
     BOOLEAN = auto()    # True/False signals
     ANY = auto()        # Can be anything, preserves input dimension
+
+class TemplateType(Enum):
+    BOOLEAN = auto()
+    RATIO = auto()
+    NORMALIZED = auto()
+
+DIMENSION_TO_TEMPLATE = {
+    Dimension.BOOLEAN: TemplateType.BOOLEAN,
+    Dimension.RATIO: TemplateType.NORMALIZED,
+    Dimension.BOUNDED_RATIO: TemplateType.RATIO,
+    Dimension.ANY: TemplateType.NORMALIZED,
+    Dimension.CURRENCY: TemplateType.NORMALIZED,
+    Dimension.VOLUME: TemplateType.NORMALIZED,
+    Dimension.TIME: TemplateType.NORMALIZED,
+}
 
 class OperatorGroup(Enum):
     """
@@ -80,13 +96,13 @@ OPERATOR_REGISTRY = {
     "bbands_lower": {"group": OperatorGroup.OVERLAP, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
 
     # 4. OSCILLATORS
-    "rsi": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.ANY], "output_dim": Dimension.RATIO},
+    "rsi": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.ANY], "output_dim": Dimension.BOUNDED_RATIO},
     "macd_line": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.CURRENCY], "output_dim": Dimension.CURRENCY},
     "macd_signal": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.CURRENCY], "output_dim": Dimension.CURRENCY},
     "macd_hist": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.CURRENCY], "output_dim": Dimension.CURRENCY},
-    "adx": {"group": OperatorGroup.OSCILLATOR, "input_dims": [], "output_dim": Dimension.RATIO}, # Arity 0, expects h, l, c internally
-    "stoch_k": {"group": OperatorGroup.OSCILLATOR, "input_dims": [], "output_dim": Dimension.RATIO}, # Arity 0, expects h, l, c internally
-    "stoch_d": {"group": OperatorGroup.OSCILLATOR, "input_dims": [], "output_dim": Dimension.RATIO}, # Arity 0, expects h, l, c internally
+    "adx": {"group": OperatorGroup.OSCILLATOR, "input_dims": [], "output_dim": Dimension.BOUNDED_RATIO}, # Arity 0, expects h, l, c internally
+    "stoch_k": {"group": OperatorGroup.OSCILLATOR, "input_dims": [], "output_dim": Dimension.BOUNDED_RATIO}, # Arity 0, expects h, l, c internally
+    "stoch_d": {"group": OperatorGroup.OSCILLATOR, "input_dims": [], "output_dim": Dimension.BOUNDED_RATIO}, # Arity 0, expects h, l, c internally
 
     # 5. STATISTICS & MATH
     "stddev": {"group": OperatorGroup.STATISTICS, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},

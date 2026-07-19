@@ -24,6 +24,7 @@ from utilities.AppConfig import (
     BACKTEST_END,
     DATA_DIR,
     DATA_FILENAME_TEMPLATE,
+    MAINTENANCE_MARGIN_RATE,
 )
 
 
@@ -125,10 +126,12 @@ class XNOBacktestEngine:
         self,
         initial_capital: float = INITIAL_CAPITAL,
         margin_rate: float = MARGIN_RATE,
+        maintenance_margin_rate: float = MAINTENANCE_MARGIN_RATE,
         fee_per_contract: float = FEE_PER_CONTRACT_PER_SIDE,
     ):
         self.initial_capital = initial_capital
         self.margin_rate = margin_rate
+        self.maintenance_margin_rate = maintenance_margin_rate
         self.fee_per_contract = fee_per_contract
 
     def calc_contracts(self, position: float, equity: float, price: float) -> int:
@@ -201,7 +204,7 @@ class XNOBacktestEngine:
         n_bars = len(df)
         index = df.index
 
-        target_pos = positions.values
+        target_pos = positions.to_numpy(copy=True)
         
         # Find first index where target_pos != 0
         active_indices = np.where(target_pos != 0.0)[0]
@@ -240,9 +243,64 @@ class XNOBacktestEngine:
         
         fee_bar = delta_contracts * self.fee_per_contract
         
-        # Cumulative Equity
+        # Cumulative Equity (initial)
         net_bar_pnl = pnl_bar - fee_bar
-        equity = self.initial_capital + np.cumsum(net_bar_pnl)
+        
+        # --- MARGIN CALL LOGIC ---
+        high = df['High'].values
+        low = df['Low'].values
+        prev_close = np.roll(close, 1)
+        prev_close[0] = close[0]
+        
+        worst_price = np.where(prev_direction > 0, low, np.where(prev_direction < 0, high, close))
+        worst_price_diff = worst_price - prev_close
+        worst_pnl_bar = worst_price_diff * prev_contracts * prev_direction * MULTIPLIER
+        worst_net_bar_pnl = worst_pnl_bar - fee_bar
+        
+        cum_pnl = np.cumsum(net_bar_pnl)
+        prev_cum_pnl = np.roll(cum_pnl, 1)
+        prev_cum_pnl[0] = 0.0
+        
+        worst_equity = self.initial_capital + prev_cum_pnl + worst_net_bar_pnl
+        
+        mc_pct = -(self.margin_rate - self.maintenance_margin_rate) / self.margin_rate
+        equity_mc_threshold = self.initial_capital * (1 + mc_pct)
+        
+        breach_mask = worst_equity <= equity_mc_threshold
+        has_breach = breach_mask.any()
+        
+        if has_breach:
+            first_breach_idx = int(np.argmax(breach_mask))
+            
+            # Force-sell: zero out all subsequent positions
+            target_pos[first_breach_idx:] = 0.0
+            contracts[first_breach_idx:] = 0.0
+            direction[first_breach_idx:] = 0.0
+            positions.iloc[first_breach_idx:] = 0.0
+            
+            # Recompute prev arrays to correctly trigger trade closing
+            prev_contracts = np.roll(contracts, 1)
+            prev_contracts[0] = 0.0
+            prev_direction = np.roll(direction, 1)
+            prev_direction[0] = 0.0
+            
+            # Recompute fee and pnl
+            current_signed_contracts = contracts * direction
+            prev_signed_contracts = prev_contracts * prev_direction
+            delta_contracts = np.abs(current_signed_contracts - prev_signed_contracts)
+            fee_bar = delta_contracts * self.fee_per_contract
+            
+            # We don't recalculate price_diff, it stays the same
+            pnl_bar = price_diff * prev_contracts * prev_direction * MULTIPLIER
+            net_bar_pnl = pnl_bar - fee_bar
+            
+            equity = self.initial_capital + np.cumsum(net_bar_pnl)
+            
+            # Freeze equity exactly at threshold
+            equity[first_breach_idx:] = equity_mc_threshold
+        else:
+            first_breach_idx = -1
+            equity = self.initial_capital + cum_pnl
         
         total_fees = np.sum(fee_bar)
         
@@ -270,9 +328,18 @@ class XNOBacktestEngine:
             if current_contracts_held > 0:
                 if d != current_dir:
                     # REVERSAL OR FLAT: Close entire held position
-                    gross = current_dir * (p - current_entry_price) * current_contracts_held * MULTIPLIER
-                    close_fee = current_contracts_held * self.fee_per_contract
-                    net = gross + accum_realized - accum_fee - close_fee
+                    if has_breach and i == first_breach_idx:
+                        # Reverse engineer virtual exit price for margin call
+                        realized_equity_before = self.initial_capital + sum(t.net_pnl for t in trades)
+                        target_net = equity_mc_threshold - realized_equity_before
+                        close_fee = current_contracts_held * self.fee_per_contract
+                        gross = target_net + accum_fee + close_fee - accum_realized
+                        p = current_entry_price + gross / (current_dir * current_contracts_held * MULTIPLIER)
+                        net = target_net
+                    else:
+                        gross = current_dir * (p - current_entry_price) * current_contracts_held * MULTIPLIER
+                        close_fee = current_contracts_held * self.fee_per_contract
+                        net = gross + accum_realized - accum_fee - close_fee
                     
                     trades.append(TradeRecord(
                         entry_bar=current_entry_bar, exit_bar=i,

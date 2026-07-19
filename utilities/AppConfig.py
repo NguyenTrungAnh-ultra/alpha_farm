@@ -40,6 +40,16 @@ REWARD_WEIGHTS = {
     'patience': 5000
 }
 
+# === HMM Monte Carlo Validation Config ===
+HMM_COMPONENTS = 3
+HMM_STRESS_FACTOR = 1.5
+HMM_BLOCK_SIZE = 20
+HMM_PATHS_PER_TF = 3
+HMM_RULE_PERCENTILE = 85.0
+HMM_RULE_SHARPE_RATIO = 0.5
+HMM_RULE_MIN_EDGE = 0.3
+
+
 # === Thông số hợp đồng VN30F1M ===
 MULTIPLIER = 100_000               # VND/điểm (chuẩn VN30F1M)
 TICK_SIZE = 0.1                    # Bước giá tối thiểu
@@ -48,7 +58,8 @@ TICK_SIZE = 0.1                    # Bước giá tối thiểu
 FEE_PER_CONTRACT_PER_SIDE = 6_000  # VND/HĐ/chiều (đã calibrate chính xác)
 
 # === Margin / Leverage ===
-MARGIN_RATE = 0.285                # Tỷ lệ ký quỹ (~28.5%, leverage ~3.5x)
+MARGIN_RATE = 0.285                # Tỷ lệ ký quỹ (28.5%)
+MAINTENANCE_MARGIN_RATE = 0.20     # Tỷ lệ ký quỹ duy trì (Maintenance Margin)
 
 # === Vốn mặc định ===
 INITIAL_CAPITAL = 1_000_000_000    # 1 tỷ VND (chuẩn XNOQuant)
@@ -59,6 +70,22 @@ BACKTEST_END = '2025-01-01'
 
 # === Khung thời gian hỗ trợ ===
 SUPPORTED_TIMEFRAMES = ['1m', '3m', '5m', '10m', '15m', '30m', '60m']
+
+# === MCTS Timeframe Scaling ===
+# Baseline: 10m (scale=1.0). Các khung khác scale theo tỷ lệ phút.
+BASELINE_TF_MINUTES = 10
+
+TIMEFRAME_MINUTES = {
+    '1m': 1, '3m': 3, '5m': 5, '10m': 10,
+    '15m': 15, '30m': 30, '60m': 60
+}
+
+# Base periods (at 10m baseline)
+BASE_PERIODS = [5, 10, 14, 20, 30, 60]
+BASE_WINDOW_SEARCH = [5, 10, 14, 20, 30, 40, 60]
+
+# Configurable MCTS iteration count
+MCTS_ITERATIONS = 50000
 
 # === Data path template ===
 DATA_DIR = 'data'
