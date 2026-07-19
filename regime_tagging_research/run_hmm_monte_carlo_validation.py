@@ -14,13 +14,15 @@ from core_engine.BacktestEngine import load_data
 from core_engine.PlatformEmulator import XNOPlatformEmulator
 
 def fit_hmm_model(df: pd.DataFrame, n_components: int, random_state: int = 42):
-    """Fits Gaussian HMM to returns and rolling volatility features."""
+    """Fits Gaussian HMM to returns, rolling volatility, and relative volume features."""
     df_copy = df.copy()
     df_copy['Log_Ret'] = np.log(df_copy['Close'] / df_copy['Close'].shift(1))
     df_copy['Vol_20'] = df_copy['Log_Ret'].rolling(window=20).std()
+    # Normalize Volume to avoid trend/rollover issues
+    df_copy['Vol_Ratio'] = df_copy['Volume'] / (df_copy['Volume'].rolling(window=20).mean() + 1e-8)
     df_clean = df_copy.dropna().copy()
     
-    X = df_clean[['Log_Ret', 'Vol_20']].values
+    X = df_clean[['Log_Ret', 'Vol_20', 'Vol_Ratio']].values
     hmm = GaussianHMM(n_components=n_components, covariance_type="diag", n_iter=100, random_state=random_state)
     hmm.fit(X)
     
