@@ -22,11 +22,16 @@ def fit_hmm_model(df: pd.DataFrame, n_components: int, random_state: int = 42):
     df_copy['Vol_Ratio'] = df_copy['Volume'] / (df_copy['Volume'].rolling(window=20).mean() + 1e-8)
     df_clean = df_copy.dropna().copy()
     
+    # Z-score scale features to prevent scale-mismatch convergence issues
     X = df_clean[['Log_Ret', 'Vol_20', 'Vol_Ratio']].values
-    hmm = GaussianHMM(n_components=n_components, covariance_type="diag", n_iter=100, random_state=random_state)
-    hmm.fit(X)
+    X_mean = X.mean(axis=0)
+    X_std = X.std(axis=0) + 1e-8
+    X_scaled = (X - X_mean) / X_std
     
-    df_clean['State'] = hmm.predict(X)
+    hmm = GaussianHMM(n_components=n_components, covariance_type="diag", n_iter=100, random_state=random_state)
+    hmm.fit(X_scaled)
+    
+    df_clean['State'] = hmm.predict(X_scaled)
     return hmm, df_clean
 
 def stress_transition_matrix(trans_matrix: np.ndarray, bad_state: int, stress_factor: float = 1.5) -> np.ndarray:

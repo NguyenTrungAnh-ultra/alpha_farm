@@ -1,86 +1,86 @@
 Strategy,Timeframe,Sharpe_Normal,Sharpe_Panic,Classification,Passed
-Mcts_Dema_Ema_Atr_7b17_10m.py,10m,0.588,1.332,All-Weather,False
-Mcts_Ema_Atr_8946_10m.py,10m,0.558,1.476,All-Weather,False
-Mcts_Ema_Atr_fdb6_10m.py,10m,0.551,2.066,All-Weather,False
-Mcts_Ema_Sma_4f71_10m.py,10m,0.739,2.113,All-Weather,False
-Mcts_Ema_Sma_Atr_8e44_10m.py,10m,0.64,0.6,All-Weather,False
-Mcts_Ema_Tema_Atr_8623_10m.py,10m,0.614,0.977,All-Weather,False
-Mcts_Rolling_rank_Wma_885e_10m.py,10m,0.782,3.271,All-Weather,True
-Mcts_Rsi_2a59_10m.py,10m,1.157,3.232,All-Weather,True
-Mcts_Rsi_9f6c_10m.py,10m,0.451,2.879,All-Weather,True
-Mcts_Rsi_f093_10m.py,10m,1.157,3.232,All-Weather,False
-Mcts_Sma_Atr_2d0f_10m.py,10m,0.566,1.763,All-Weather,False
-Mcts_Sma_Atr_711a_10m.py,10m,0.564,0.673,All-Weather,False
-Mcts_Sma_Atr_d600_10m.py,10m,0.645,0.76,All-Weather,False
-Mcts_Sma_Dema_e664_10m.py,10m,0.869,1.307,All-Weather,False
-Mcts_Sma_Dema_Tema_9682_10m.py,10m,0.774,1.193,All-Weather,False
-Mcts_Sma_Ema_Atr_c691_10m.py,10m,0.477,1.367,All-Weather,False
-Mcts_Tema_Dema_Wma_7928_10m.py,10m,0.597,1.646,All-Weather,False
-Mcts_Tema_Ema_Atr_fa7c_10m.py,10m,0.528,1.634,All-Weather,False
-Mcts_Wma_Atr_7956_10m.py,10m,0.57,2.088,All-Weather,False
-Mcts_Wma_Ema_Atr_85cc_10m.py,10m,0.646,0.677,All-Weather,False
-Mcts_Atr_3eb1_15m.py,15m,0.742,0.51,All-Weather,False
-Mcts_Atr_6129_15m.py,15m,0.735,0.611,All-Weather,False
-Mcts_Atr_7a03_15m.py,15m,0.586,0.549,All-Weather,False
-Mcts_Atr_8ce4_15m.py,15m,0.651,0.566,All-Weather,False
-Mcts_Cmo_Ema_b1c2_15m.py,15m,0.573,0.314,All-Weather,False
-Mcts_Cmo_Sma_Atr_31f9_15m.py,15m,0.571,-0.035,Normal/Trend Specialist,False
-Mcts_Dema_Atr_0cd5_15m.py,15m,0.702,0.502,All-Weather,False
-Mcts_Dema_Atr_7436_15m.py,15m,0.655,0.533,All-Weather,False
-Mcts_Dema_Atr_a325_15m.py,15m,0.886,0.214,All-Weather,True
-Mcts_Dema_Atr_ddba_15m.py,15m,0.827,0.404,All-Weather,False
-Mcts_Ema_Atr_c531_15m.py,15m,0.664,0.713,All-Weather,False
-Mcts_Ema_Tema_Atr_6367_15m.py,15m,0.579,0.012,Mixed/Weak,False
-Mcts_Natr_5899_15m.py,15m,0.754,0.708,All-Weather,False
-Mcts_Natr_6d33_15m.py,15m,0.754,0.708,All-Weather,False
-Mcts_Natr_9fda_15m.py,15m,0.781,0.88,All-Weather,False
-Mcts_Natr_a743_15m.py,15m,0.781,0.88,All-Weather,False
-Mcts_Rolling_rank_Atr_Rsi_40ed_15m.py,15m,0.323,0.909,All-Weather,True
-Mcts_Rolling_rank_Tema_8587_15m.py,15m,-0.06,0.622,Panic/Reversion Specialist,True
-Mcts_Rsi_Ema_Sma_bdfe_15m.py,15m,0.456,0.32,All-Weather,False
-Mcts_Volume_z_Cmo_52a8_15m.py,15m,-0.144,1.618,Panic/Reversion Specialist,False
-Mcts_Wma_Atr_9159_15m.py,15m,0.7,0.597,All-Weather,False
-Mcts_Wma_Atr_f0a0_15m.py,15m,0.787,0.457,All-Weather,False
-Mcts_Wma_Dema_Atr_5ff2_15m.py,15m,0.792,0.564,All-Weather,False
-Mcts_Zscore_Rsi_Ema_ac6d_15m.py,15m,0.671,-0.225,Normal/Trend Specialist,True
-Mcts_Atr_361e_30m.py,30m,1.017,0.032,Mixed/Weak,True
-Mcts_Atr_9287_30m.py,30m,1.049,0.865,All-Weather,True
-Mcts_Cmo_Atr_c581_30m.py,30m,0.682,1.593,All-Weather,False
-Mcts_Cmo_Atr_e2a2_30m.py,30m,0.767,1.051,All-Weather,False
-Mcts_Cmo_Ema_Atr_3811_30m.py,30m,0.968,0.417,All-Weather,False
-Mcts_Cmo_Ema_Atr_ef22_30m.py,30m,1.19,-0.006,Normal/Trend Specialist,True
-Mcts_Cmo_Wma_Tema_3f40_30m.py,30m,1.063,1.284,All-Weather,True
-Mcts_Natr_66ef_30m.py,30m,0.628,0.107,Mixed/Weak,True
-Mcts_Roc_Sma_Atr_4a36_30m.py,30m,1.47,-0.589,Normal/Trend Specialist,True
-Mcts_Roc_Tema_Atr_2424_30m.py,30m,1.344,-0.255,Normal/Trend Specialist,False
-Mcts_Roc_Wma_Ema_97aa_30m.py,30m,1.379,-0.697,Normal/Trend Specialist,True
-Mcts_Rolling_rank_Wma_Atr_2dc3_30m.py,30m,1.246,0.342,All-Weather,False
-Mcts_Rolling_rank_Wma_Atr_be2b_30m.py,30m,0.988,0.447,All-Weather,False
-Mcts_Rsi_Atr_5550_30m.py,30m,0.857,0.924,All-Weather,False
-Mcts_Rsi_Atr_74c0_30m.py,30m,0.828,1.071,All-Weather,False
-Mcts_Rsi_Atr_c458_30m.py,30m,0.626,0.754,All-Weather,False
-Mcts_Rsi_Atr_f01a_30m.py,30m,0.767,1.051,All-Weather,False
-Mcts_Rsi_Wma_Atr_8f9b_30m.py,30m,1.037,0.056,Mixed/Weak,True
-Mcts_Rsi_Wma_Ema_81c6_30m.py,30m,0.995,0.302,All-Weather,True
-Mcts_Sma_Atr_63d5_30m.py,30m,0.787,0.326,All-Weather,False
-Mcts_Tema_Atr_9f83_30m.py,30m,1.314,0.21,All-Weather,False
-Mcts_Tema_Atr_b046_30m.py,30m,1.604,0.037,Mixed/Weak,True
-Mcts_Tema_Atr_d691_30m.py,30m,1.604,0.037,Mixed/Weak,True
-Mcts_Zscore_Macd_9176_30m.py,30m,-0.055,2.893,Panic/Reversion Specialist,False
-Mcts_Zscore_Rsi_Ema_fed3_30m.py,30m,2.201,0.114,Mixed/Weak,True
-Mcts_Cmo_Atr_3908_60m.py,60m,1.02,0.199,Mixed/Weak,True
-Mcts_Rolling_rank_Atr_60f5_60m.py,60m,1.842,0.003,Mixed/Weak,True
-Mcts_Rolling_rank_Atr_7002_60m.py,60m,0.949,1.989,All-Weather,True
-Mcts_Rolling_rank_Dema_Atr_9a33_60m.py,60m,0.904,1.617,All-Weather,True
-Mcts_Rolling_rank_Ema_Atr_a74e_60m.py,60m,0.77,0.578,All-Weather,False
-Mcts_Rolling_zscore_Atr_6c0e_60m.py,60m,0.581,0.967,All-Weather,True
-Mcts_Rolling_zscore_Atr_74b3_60m.py,60m,1.295,0.288,All-Weather,True
-Mcts_Rolling_zscore_Atr_77a8_60m.py,60m,1.38,-0.633,Normal/Trend Specialist,True
-Mcts_Rolling_zscore_Atr_8c2b_60m.py,60m,0.581,0.967,All-Weather,True
-Mcts_Rolling_zscore_Atr_c14e_60m.py,60m,0.969,1.182,All-Weather,True
-Mcts_Rolling_zscore_Atr_daa4_60m.py,60m,1.217,1.007,All-Weather,True
-Mcts_Rolling_zscore_Dema_Atr_4fd4_60m.py,60m,0.574,0.343,All-Weather,True
-Mcts_Rsi_Atr_114b_60m.py,60m,1.707,0.258,All-Weather,True
-Mcts_Rsi_Atr_2df7_60m.py,60m,1.07,-0.253,Normal/Trend Specialist,True
-Mcts_Rsi_Atr_3540_60m.py,60m,1.615,0.4,All-Weather,True
-Mcts_Rsi_Atr_e3f0_60m.py,60m,1.121,0.956,All-Weather,True
+Mcts_Dema_Ema_Atr_7b17_10m.py,10m,0.833,0.279,All-Weather,False
+Mcts_Ema_Atr_8946_10m.py,10m,0.573,0.611,All-Weather,False
+Mcts_Ema_Atr_fdb6_10m.py,10m,0.709,0.483,All-Weather,False
+Mcts_Ema_Sma_4f71_10m.py,10m,0.898,0.807,All-Weather,False
+Mcts_Ema_Sma_Atr_8e44_10m.py,10m,0.708,0.274,All-Weather,False
+Mcts_Ema_Tema_Atr_8623_10m.py,10m,0.613,0.471,All-Weather,False
+Mcts_Rolling_rank_Wma_885e_10m.py,10m,0.745,0.926,All-Weather,True
+Mcts_Rsi_2a59_10m.py,10m,1.314,1.162,All-Weather,True
+Mcts_Rsi_9f6c_10m.py,10m,0.46,0.838,All-Weather,False
+Mcts_Rsi_f093_10m.py,10m,1.314,1.162,All-Weather,True
+Mcts_Sma_Atr_2d0f_10m.py,10m,0.606,0.337,All-Weather,False
+Mcts_Sma_Atr_711a_10m.py,10m,0.679,0.292,All-Weather,False
+Mcts_Sma_Atr_d600_10m.py,10m,0.707,0.222,All-Weather,False
+Mcts_Sma_Dema_e664_10m.py,10m,0.845,0.434,All-Weather,False
+Mcts_Sma_Dema_Tema_9682_10m.py,10m,0.817,0.32,All-Weather,False
+Mcts_Sma_Ema_Atr_c691_10m.py,10m,0.581,0.315,All-Weather,False
+Mcts_Tema_Dema_Wma_7928_10m.py,10m,0.639,0.404,All-Weather,False
+Mcts_Tema_Ema_Atr_fa7c_10m.py,10m,0.554,0.594,All-Weather,False
+Mcts_Wma_Atr_7956_10m.py,10m,0.677,0.603,All-Weather,False
+Mcts_Wma_Ema_Atr_85cc_10m.py,10m,0.675,0.272,All-Weather,False
+Mcts_Atr_3eb1_15m.py,15m,0.905,0.686,All-Weather,True
+Mcts_Atr_6129_15m.py,15m,0.888,0.656,All-Weather,True
+Mcts_Atr_7a03_15m.py,15m,0.993,0.439,All-Weather,False
+Mcts_Atr_8ce4_15m.py,15m,1.141,0.457,All-Weather,True
+Mcts_Cmo_Ema_b1c2_15m.py,15m,0.971,0.526,All-Weather,False
+Mcts_Cmo_Sma_Atr_31f9_15m.py,15m,0.893,0.342,All-Weather,False
+Mcts_Dema_Atr_0cd5_15m.py,15m,0.952,0.632,All-Weather,True
+Mcts_Dema_Atr_7436_15m.py,15m,0.949,0.439,All-Weather,False
+Mcts_Dema_Atr_a325_15m.py,15m,1.271,0.262,All-Weather,True
+Mcts_Dema_Atr_ddba_15m.py,15m,1.151,0.427,All-Weather,True
+Mcts_Ema_Atr_c531_15m.py,15m,0.925,0.72,All-Weather,True
+Mcts_Ema_Tema_Atr_6367_15m.py,15m,0.946,0.057,Mixed/Weak,False
+Mcts_Natr_5899_15m.py,15m,1.258,0.588,All-Weather,True
+Mcts_Natr_6d33_15m.py,15m,1.258,0.588,All-Weather,True
+Mcts_Natr_9fda_15m.py,15m,0.915,0.949,All-Weather,True
+Mcts_Natr_a743_15m.py,15m,0.915,0.949,All-Weather,True
+Mcts_Rolling_rank_Atr_Rsi_40ed_15m.py,15m,1.229,0.85,All-Weather,True
+Mcts_Rolling_rank_Tema_8587_15m.py,15m,0.688,0.664,All-Weather,True
+Mcts_Rsi_Ema_Sma_bdfe_15m.py,15m,0.784,0.439,All-Weather,False
+Mcts_Volume_z_Cmo_52a8_15m.py,15m,0.54,1.611,All-Weather,False
+Mcts_Wma_Atr_9159_15m.py,15m,0.929,0.653,All-Weather,False
+Mcts_Wma_Atr_f0a0_15m.py,15m,1.062,0.593,All-Weather,True
+Mcts_Wma_Dema_Atr_5ff2_15m.py,15m,1.044,0.64,All-Weather,False
+Mcts_Zscore_Rsi_Ema_ac6d_15m.py,15m,0.416,0.115,Mixed/Weak,True
+Mcts_Atr_361e_30m.py,30m,0.849,0.39,All-Weather,False
+Mcts_Atr_9287_30m.py,30m,1.07,0.851,All-Weather,False
+Mcts_Cmo_Atr_c581_30m.py,30m,0.417,1.507,All-Weather,False
+Mcts_Cmo_Atr_e2a2_30m.py,30m,0.372,1.241,All-Weather,False
+Mcts_Cmo_Ema_Atr_3811_30m.py,30m,0.788,0.656,All-Weather,False
+Mcts_Cmo_Ema_Atr_ef22_30m.py,30m,1.144,0.337,All-Weather,True
+Mcts_Cmo_Wma_Tema_3f40_30m.py,30m,0.886,1.313,All-Weather,False
+Mcts_Natr_66ef_30m.py,30m,0.534,0.3,All-Weather,True
+Mcts_Roc_Sma_Atr_4a36_30m.py,30m,1.314,0.043,Mixed/Weak,False
+Mcts_Roc_Tema_Atr_2424_30m.py,30m,1.095,0.351,All-Weather,False
+Mcts_Roc_Wma_Ema_97aa_30m.py,30m,1.268,-0.088,Normal/Trend Specialist,False
+Mcts_Rolling_rank_Wma_Atr_2dc3_30m.py,30m,1.104,0.664,All-Weather,False
+Mcts_Rolling_rank_Wma_Atr_be2b_30m.py,30m,0.7,0.8,All-Weather,False
+Mcts_Rsi_Atr_5550_30m.py,30m,0.616,1.044,All-Weather,False
+Mcts_Rsi_Atr_74c0_30m.py,30m,0.535,1.184,All-Weather,False
+Mcts_Rsi_Atr_c458_30m.py,30m,0.419,0.84,All-Weather,False
+Mcts_Rsi_Atr_f01a_30m.py,30m,0.372,1.241,All-Weather,False
+Mcts_Rsi_Wma_Atr_8f9b_30m.py,30m,0.908,0.386,All-Weather,True
+Mcts_Rsi_Wma_Ema_81c6_30m.py,30m,0.601,0.773,All-Weather,False
+Mcts_Sma_Atr_63d5_30m.py,30m,0.747,0.473,All-Weather,False
+Mcts_Tema_Atr_9f83_30m.py,30m,1.301,0.472,All-Weather,False
+Mcts_Tema_Atr_b046_30m.py,30m,1.258,0.682,All-Weather,False
+Mcts_Tema_Atr_d691_30m.py,30m,1.258,0.682,All-Weather,True
+Mcts_Zscore_Macd_9176_30m.py,30m,-0.059,2.056,Panic/Reversion Specialist,True
+Mcts_Zscore_Rsi_Ema_fed3_30m.py,30m,2.176,0.67,All-Weather,True
+Mcts_Cmo_Atr_3908_60m.py,60m,1.145,0.281,All-Weather,True
+Mcts_Rolling_rank_Atr_60f5_60m.py,60m,2.451,-0.113,Normal/Trend Specialist,True
+Mcts_Rolling_rank_Atr_7002_60m.py,60m,1.225,1.48,All-Weather,True
+Mcts_Rolling_rank_Dema_Atr_9a33_60m.py,60m,1.185,1.189,All-Weather,True
+Mcts_Rolling_rank_Ema_Atr_a74e_60m.py,60m,0.872,0.531,All-Weather,False
+Mcts_Rolling_zscore_Atr_6c0e_60m.py,60m,0.997,0.491,All-Weather,True
+Mcts_Rolling_zscore_Atr_74b3_60m.py,60m,1.55,0.308,All-Weather,True
+Mcts_Rolling_zscore_Atr_77a8_60m.py,60m,1.429,-0.177,Normal/Trend Specialist,True
+Mcts_Rolling_zscore_Atr_8c2b_60m.py,60m,0.997,0.491,All-Weather,True
+Mcts_Rolling_zscore_Atr_c14e_60m.py,60m,1.333,0.797,All-Weather,True
+Mcts_Rolling_zscore_Atr_daa4_60m.py,60m,1.52,0.775,All-Weather,True
+Mcts_Rolling_zscore_Dema_Atr_4fd4_60m.py,60m,0.777,0.222,All-Weather,True
+Mcts_Rsi_Atr_114b_60m.py,60m,1.739,0.563,All-Weather,True
+Mcts_Rsi_Atr_2df7_60m.py,60m,1.253,-0.104,Normal/Trend Specialist,True
+Mcts_Rsi_Atr_3540_60m.py,60m,1.532,0.712,All-Weather,True
+Mcts_Rsi_Atr_e3f0_60m.py,60m,1.302,0.839,All-Weather,True
