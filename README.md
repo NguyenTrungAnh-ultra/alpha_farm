@@ -272,21 +272,59 @@ Do tính chất đơn giản hóa của quá trình giả lập và kiểm thử
   * *WorldQuant:* Điều chỉnh tỷ trọng (Rebalance) định kỳ (thường là Daily).
   * *XNOQuant:* Kích hoạt giao dịch ngay lập tức (Intraday) dựa trên ngưỡng biên độ kỹ thuật (Z-Score) tại từng cây nến cụ thể.
 
----
+## 9. Phân rã Template và Cơ chế vào lệnh chi tiết (Position Triggering Mechanism)
 
-## 9. Kế hoạch Nâng cấp & Hoàn thiện (Thesis Roadmap)
+Để tránh hiện tượng méo tín hiệu (signal distortion) và tối ưu hóa theo đặc tính của từng loại chỉ báo kỹ thuật, hệ thống phân rã và áp dụng 3 loại Template kích hoạt vị thế riêng biệt dựa trên chiều (Dimension) đầu ra của biểu thức logic/toán học (AST):
 
-Để giải quyết các rủi ro thống kê và kỹ thuật hiện tại, hệ thống định hướng hai nâng cấp cốt lõi phục vụ đề tài nghiên cứu:
+### 9.1. Boolean Template (Kích hoạt nhị phân trực tiếp)
+- **Mô tả:** Áp dụng cho các chỉ báo hoặc điều kiện logic chỉ trả về hai trạng thái `True` hoặc `False` (ví dụ: mô hình nến Nhật như Harami, Hammer, hoặc giao cắt đường trung bình MA Cross).
+- **Cơ chế vào lệnh:**
+  - Khi biểu thức $\alpha_t$ trả về giá trị `True` (hoặc khác 0):
+    - Hướng Long (`direction = 1.0`): Kích hoạt vị thế mua tối đa: $P_t = \text{position\_scale}$.
+    - Hướng Short (`direction = -1.0`): Kích hoạt vị thế bán tối đa: $P_t = -\text{position\_scale}$.
+  - Khi biểu thức $\alpha_t$ trả về giá trị `False` (hoặc bằng 0):
+    - Hướng Long (`direction = 1.0`): Chuyển vị thế sang bán hoặc đóng vị thế: $P_t = -\text{position\_scale}$.
+    - Hướng Short (`direction = -1.0`): Chuyển vị thế sang mua hoặc đóng vị thế: $P_t = \text{position\_scale}$.
+  - *Đặc điểm:* Luôn giải ngân vị thế 100% đảo chiều liên tục giữa Long và Short, không có trạng thái trung lập (Flat/Cash).
 
-### 9.1. Tích hợp kiểm định DSR (Deflated Sharpe Ratio)
-*   **Vấn đề:** MCTS chạy hàng nghìn vòng lặp ($K$) dễ dẫn đến hiện tượng ăn may lịch sử (Multiple Testing Bias / Overfitting).
-*   **Giải pháp:** Áp dụng công thức DSR dựa trên số lần thử $K$, độ dài dữ liệu $T$, Skewness, Kurtosis và độ lệch chuẩn của các Sharpe đã test. Chỉ chấp nhận các Alpha có $DSR \ge 0.85$.
+### 9.2. Ratio Template (Ngưỡng biên độ tĩnh tuyệt đối)
+- **Mô tả:** Thích hợp cho các chỉ báo dao động có giới hạn miền giá trị xác định (bounded domain) như RSI (\([0, 100]\)), Stochastic, MFI, hoặc các tỷ lệ tương quan phần trăm.
+- **Cơ chế vào lệnh:**
+  Sử dụng hai ngưỡng tĩnh tuyệt đối tìm kiếm bởi MCTS: Ngưỡng trên ($\theta_{\text{upper}}$, mặc định $[60.0 - 80.0]$) và Ngưỡng dưới ($\theta_{\text{lower}}$, mặc định $[20.0 - 40.0]$).
+  - Với cấu hình Long-side (`direction = 1.0`):
+    $$P_t = \begin{cases} 
+      \text{position\_scale} & \text{nếu } \alpha_t > \theta_{\text{upper}} \\ 
+      -\text{position\_scale} & \text{nếu } \alpha_t < \theta_{\text{lower}} \\ 
+      0.0 & \text{khác} 
+    \end{cases}$$
+  - Với cấu hình Short-side (`direction = -1.0`):
+    $$P_t = \begin{cases} 
+      -\text{position\_scale} & \text{nếu } \alpha_t > \theta_{\text{upper}} \\ 
+      \text{position\_scale} & \text{nếu } \alpha_t < \theta_{\text{lower}} \\ 
+      0.0 & \text{khác} 
+    \end{cases}$$
+  - *Đặc điểm:* Hỗ trợ trạng thái Flat/Cash ($P_t = 0$) khi giá trị chỉ báo nằm trong vùng trung tính ở giữa hai ngưỡng, giúp giảm thiểu tần suất giao dịch và tránh nhiễu khi thị trường đi ngang (sideway).
 
-### 9.2. Phân rã Template kích hoạt vị thế theo Kiểu dữ liệu (Multi-template)
-*   **Vấn đề:** Ép tất cả đầu ra (Boolean, RSI, Giá, Volume) qua Z-score gây méo tín hiệu (tạo độ trễ, tự triệt tiêu xu hướng khi tín hiệu xuất hiện liên tục, và khuếch đại nhiễu khi đi ngang).
-*   **Giải pháp:** Chia làm 3 template xử lý vị thế riêng biệt dựa trên Output Dimension:
-    1.  **Boolean Template:** Kích hoạt vị thế trực tiếp bằng True/False mask (cho nến búa, giao cắt).
-    2.  **Ratio Template:** Giao dịch theo ngưỡng tĩnh tuyệt đối (như RSI > 70 hoặc < 30).
-    3.  **Normalized Template (Z-score):** Chỉ dùng Z-score để chuẩn hóa các chuỗi không giới hạn (như Giá, Volume).
+### 9.3. Normalized Template (Z-Score chuẩn hóa động)
+- **Mô tả:** Thiết kế đặc biệt cho các chuỗi dữ liệu đầu ra không có giới hạn biên (unbounded domain) như Giá (Close, High, Low), Khối lượng (Volume), hoặc hiệu số tuyệt đối giữa các chỉ báo (ví dụ: MACD Histogram, Spread).
+- **Cơ chế vào lệnh:**
+  Trước khi so khớp, giá trị thô của biểu thức $\alpha_t$ sẽ được chuẩn hóa động qua cửa sổ trượt (rolling window) chu kỳ $W$ (do MCTS tối ưu hóa):
+  - Tính trung bình trượt động: $\mu_t = \text{rolling\_mean}(\alpha, W)_t$
+  - Tính độ lệch chuẩn trượt động: $\sigma_t = \text{rolling\_std}(\alpha, W)_t + 10^{-8}$
+  - Tính điểm số Z-score chuẩn hóa: $Z_t = \frac{\alpha_t - \mu_t}{\sigma_t}$
+  Vị thế được kích hoạt bằng cách so sánh trị tuyệt đối của $Z_t$ với ngưỡng độ nhạy $Z_{\text{threshold}}$ (do MCTS tối ưu hóa trong khoảng $[0.5 - 2.5]$):
+  - Với cấu hình Long-side (`direction = 1.0`):
+    $$P_t = \begin{cases} 
+      \text{position\_scale} & \text{nếu } Z_t > Z_{\text{threshold}} \\ 
+      -\text{position\_scale} & \text{nếu } Z_t < -Z_{\text{threshold}} \\ 
+      0.0 & \text{khác} 
+    \end{cases}$$
+  - Với cấu hình Short-side (`direction = -1.0`):
+    $$P_t = \begin{cases} 
+      -\text{position\_scale} & \text{nếu } Z_t > Z_{\text{threshold}} \\ 
+      \text{position\_scale} & \text{nếu } Z_t < -Z_{\text{threshold}} \\ 
+      0.0 & \text{khác} 
+    \end{cases}$$
+  - *Đặc điểm:* Giúp san phẳng xu hướng dài hạn và triệt tiêu tính bất định về mặt thứ nguyên của các dữ liệu thô. Vị thế chỉ được kích hoạt (Long/Short) khi xảy ra sự đột biến vượt trội so với phân phối lịch sử gần nhất trong cửa sổ trượt $W$. Khi giá trị dao động bình thường quanh trung bình trượt ($|Z_t| \le Z_{\text{threshold}}$), hệ thống duy trì vị thế Flat ($0.0$) để bảo toàn vốn.
 
 
