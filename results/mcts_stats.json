@@ -178,5 +178,11 @@
         "total_generated": 0,
         "total_rejected": 0,
         "total_discovered": 0
+    },
+    {
+        "timestamp": "2026-06-22T11:33:40.471427",
+        "total_generated": 600,
+        "total_rejected": 594,
+        "total_discovered": 6
     }
 ]

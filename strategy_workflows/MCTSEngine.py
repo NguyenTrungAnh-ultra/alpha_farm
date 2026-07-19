@@ -535,6 +535,8 @@ class MCTSEngine:
             keys = list(self.cache.keys())
             for k in keys[:len(keys) // 2]:
                 self.cache.pop(k, None)
+            import gc
+            gc.collect()
             
         self.cache[cache_key] = (best_reward, best_direction, best_metrics)
         return best_reward, best_direction, best_metrics
@@ -573,7 +575,13 @@ class MCTSEngine:
         print(f"[MCTS] Starting unified search from Blueprint | Depth: {self.max_depth} | Iterations: {n_iterations}")
         
         start_time = time.time()
+        current_best_reward = -float('inf')
+        no_improvement_count = 0
         for i in range(1, n_iterations + 1):
+            if i % 500 == 0:
+                import gc
+                gc.collect()
+                
             if i % 10 == 0:
                 elapsed = time.time() - start_time
                 print(f"  [MCTS] Iteration {i}/{n_iterations} | Cache size: {len(self.cache)} | Best reward: {max([x['reward'] for x in self.leaderboard]) if self.leaderboard else 'N/A'} | Elapsed: {elapsed:.1f}s")
@@ -635,6 +643,19 @@ class MCTSEngine:
                 p_node.visit_count += 1
                 if reward > p_node.max_reward:
                     p_node.max_reward = reward
+                    
+            # Early Stopping (Patience Check)
+            if self.leaderboard:
+                max_reward = max(x['reward'] for x in self.leaderboard)
+                if max_reward > current_best_reward:
+                    current_best_reward = max_reward
+                    no_improvement_count = 0
+                else:
+                    no_improvement_count += 1
+                    
+                if no_improvement_count >= REWARD_WEIGHTS.get('patience', 5000):
+                    print(f"\n[MCTS] Early Stopping triggered after {no_improvement_count} iterations without improvement!")
+                    break
 
         print(f"[MCTS] Search completed in {time.time() - start_time:.1f}s.")
 

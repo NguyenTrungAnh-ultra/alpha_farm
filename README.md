@@ -1,6 +1,22 @@
 # alpha_farm
 
-Hệ thống cung cấp khung sườn tự động (Auto-Gen Framework) để sinh, tự sửa lỗi, tối ưu hóa và thử nghiệm các chiến lược định lượng (Quantitative Strategies) trên thị trường phái sinh Việt Nam, phục vụ nền tảng XNOQuant.
+Hệ thống tự động sinh, tối ưu hóa và thử nghiệm **tín hiệu giao dịch có hướng** (Directional Trading Signals) cho thị trường phái sinh VN30F.
+
+### Câu hỏi nghiên cứu
+
+> *Có thể kết hợp LLM (sinh cấu trúc chiến lược) với MCTS (tối ưu tham số) để tự động hóa việc khám phá các tín hiệu giao dịch có hướng trên hợp đồng tương lai đơn tài sản không?*
+
+### Bản chất tín hiệu được sinh ra
+
+Hệ thống sinh ra **Systematic Directional Signals** — tín hiệu dự đoán hướng đi tuyệt đối (Long/Short/Flat) trên một instrument duy nhất (VN30F), tương tự mô hình CTA/Managed Futures. Đây **không phải** Cross-sectional Alpha theo nghĩa của WorldQuant BRAIN (xếp hạng tương đối giữa hàng nghìn cổ phiếu để tạo danh mục Market Neutral).
+
+| | Hệ thống này (Directional Signal) | WorldQuant BRAIN (Cross-sectional Alpha) |
+|:---|:---|:---|
+| **Input** | 1 instrument (VN30F), 3 chuỗi data | 3000+ cổ phiếu, hàng trăm trường data |
+| **Output** | Quyết định hướng: Long / Short / Flat | Điểm số tương đối cho từng cổ phiếu |
+| **Rủi ro chính** | Directional risk (đoán sai hướng thị trường) | Relative risk (chọn sai cổ phiếu so với nhau) |
+| **Bảo vệ regime** | Phụ thuộc vào cơ chế kích hoạt vị thế (z-score, threshold) | Market Neutral tự nhiên qua Long/Short cân bằng |
+| **Giới hạn diversity** | Hữu hạn — tất cả tín hiệu đều từ cùng 1 chuỗi giá | Rất lớn — tổ hợp chéo giữa hàng nghìn tài sản |
 
 ## 1. Kiến trúc Hệ thống (Dual Engine with Self-Correction)
 
@@ -199,8 +215,10 @@ graph TD
 - **`S_ic`**: Hệ số Rank IC đo lường khả năng tiên tri hướng đi của thị trường, chuẩn hóa Min-Max (ngưỡng tối đa 0.15).
 - **`S_corr` (Global Correlation Penalty)**: MCTS được truyền một Ma trận Vị thế Lịch sử (Ký ức toàn cục). `S_corr = 1.0 - MaxCorr`. Nếu công thức sinh ra đạo nhái hoàn toàn một chiến lược đã có, `MaxCorr = 1.0` $\rightarrow$ Reward = 0, ép cây UCT phải rẽ sang hướng khác!
 
-**Hội tụ bằng Shannon Entropy (Early Stopping):**
-Thay vì chạy cố định một số lượng vòng lặp, hệ thống theo dõi **Shannon Entropy** của Nút Gốc. Khi Entropy giảm xuống dưới ngưỡng `0.15` (thuật toán đã dồn mọi nguồn lực truy cập vào một công thức tối ưu, không còn "phân vân"), MCTS sẽ tự động ngắt vòng lặp (Hội tụ Toán học), tiết kiệm đáng kể tài nguyên CPU.
+**Hội tụ sớm (Early Stopping):**
+Hệ thống sử dụng hai cơ chế ngắt vòng lặp sớm để tiết kiệm tài nguyên:
+1. **Shannon Entropy**: Theo dõi mức độ phân tán của Nút Gốc. Khi Entropy giảm xuống dưới ngưỡng `0.15` (thuật toán không còn "phân vân"), MCTS sẽ tự động ngắt.
+2. **Patience (Kiên nhẫn)**: Nếu điểm số (Reward) tốt nhất không có sự cải thiện trong suốt một số lượng vòng lặp nhất định (mặc định 5000 vòng), hệ thống sẽ chủ động kết thúc quá trình tìm kiếm.
 
 **Đặc biệt - Risk-Seeking UCT Optimization:**
 Khi duyệt cây tìm kiếm (UCT), MCTS không sử dụng điểm trung bình (Mean Reward) mà sử dụng **Điểm lớn nhất (Max Reward)**. Đây là kỹ thuật "Tail Quantile Optimization", chấp nhận sự không ổn định để tìm ra những chuỗi tham số "đột biến" mang lại hiệu suất cao nhất.
@@ -224,3 +242,49 @@ Hệ thống sở hữu một động cơ giả lập siêu tốc (`XNOBacktestE
 - **VN30F Netting Fee:** Phí giao dịch được trừ chính xác dựa trên Delta hợp đồng (chênh lệch vị thế), cứu vớt các chiến lược DCA/Scale-in khỏi hiện tượng Commission Drag do thuật toán Full Close/Reopen sai lầm của Crypto.
 - **Lookahead Bias Prevention:** Engine tự động `shift(1)` toàn bộ tín hiệu. Lệnh sinh ra ở nến hiện tại sẽ tự động dời điểm khớp lệnh sang nến tiếp theo, chặn đứng 100% rủi ro MCTS tìm ra "Chén thánh giả" ăn gian dữ liệu tương lai.
 - **Constant Returns Metrics:** Các chỉ số rủi ro (Volatility, Sortino, VaR) trong `CalculateMetrics.py` được đo lường bằng lợi nhuận theo vốn cố định (`constant_returns`), phản ánh thực tế giao dịch khối lượng hợp đồng cố định.
+
+---
+
+## 8. So Sánh Backtest và Vận Hành Thực Tế (Phái Sinh Việt Nam & WorldQuant)
+
+Do tính chất đơn giản hóa của quá trình giả lập và kiểm thử, kết quả backtest của hệ thống và vận hành thực tế luôn có những điểm sai lệch. Dưới đây là các phân tích chi tiết:
+
+### 8.1. So sánh chi tiết với Thị trường Phái sinh Việt Nam (VN30F1M) thực tế
+
+| Đặc tính phái sinh thực tế | Mức độ giả lập của [XNOBacktestEngine](file:///f:/Projects/alpha_farm/core_engine/BacktestEngine.py#L110) | Giới hạn & Điều kiện biên |
+| :--- | :--- | :--- |
+| **Ký quỹ ban đầu (IM) & Đòn bẩy** | **Có hỗ trợ một phần** | Sử dụng tỷ lệ cố định `MARGIN_RATE = 28.5%` tại [AppConfig.py](file:///f:/Projects/alpha_farm/utilities/AppConfig.py#L51). Thực tế tỷ lệ này có thể được điều chỉnh linh hoạt bởi VSD/Công ty chứng khoán ($17\% - 24\%$). Không mô phỏng ký quỹ duy trì (Maintenance Margin) và cuộc gọi ký quỹ (Margin Call). |
+| **Hạch toán lãi/lỗ (MTM & Settlement)** | **Gần đúng (Bar-by-bar)** | Lãi lỗ được cộng dồn trực tiếp vào `equity` tại mỗi nến (1m, 10m...) thay vì tách biệt "Số dư tiền mặt" và "Lãi/lỗ danh nghĩa chưa thực hiện" hạch toán cuối ngày như VSD. Giao dịch T+0 được hỗ trợ đầy đủ. |
+| **Ngày đáo hạn & Chốt giá chỉ số VN30** | **Không hỗ trợ** | Backtest sử dụng chuỗi dữ liệu nối liền (Continuous/Rolled Futures Data). Hệ thống giả định hợp đồng không bao giờ hết hạn, do đó không có cơ chế cưỡng bức đóng vị thế (Force Settle) vào ngày Thứ Năm lần thứ 3 của tháng và không đổi giá tính PnL sang chỉ số cơ sở VN30 (`pv_vn30_close`). |
+| **Trượt giá (Slippage) & Độ trễ (Latency)** | **Chưa mô phỏng** | Giả định khớp lệnh 100% tại giá Close của nến kế tiếp. Thực tế giao dịch số lượng hợp đồng lớn sẽ bị ảnh hưởng bởi thanh khoản sổ lệnh (Market Impact) và độ trễ truyền nhận lệnh của API công ty chứng khoán. |
+
+### 8.2. So sánh với triết lý quản lý lệnh của WorldQuant (WebSim/BRAIN)
+
+* **Số lượng tài sản (Universe):** 
+  * *WorldQuant:* Quản lý danh mục đa tài sản (hàng nghìn cổ phiếu), tạo ra vector trọng số tương đối (Relative Weights) giữa các mã.
+  * *XNOQuant:* Giao dịch đơn tài sản (VN30F1M), tạo ra tín hiệu hướng tuyệt đối (Long/Short/Cash) tương ứng với giá trị vị thế `[1.0, -1.0, 0.0]`.
+* **Trung hòa danh mục (Neutralization):**
+  * *WorldQuant:* Bắt buộc áp dụng cơ chế Dollar Neutral (Long = Short) và Sector/Industry Neutral. Danh mục luôn được giải ngân đầy đủ (Fully Invested).
+  * *XNOQuant:* Giao dịch định hướng (Directional/Beta), không trung hòa và cho phép rút toàn bộ $100\%$ về tiền mặt.
+* **Tái cơ cấu danh mục (Rebalancing):**
+  * *WorldQuant:* Điều chỉnh tỷ trọng (Rebalance) định kỳ (thường là Daily).
+  * *XNOQuant:* Kích hoạt giao dịch ngay lập tức (Intraday) dựa trên ngưỡng biên độ kỹ thuật (Z-Score) tại từng cây nến cụ thể.
+
+---
+
+## 9. Kế hoạch Nâng cấp & Hoàn thiện (Thesis Roadmap)
+
+Để giải quyết các rủi ro thống kê và kỹ thuật hiện tại, hệ thống định hướng hai nâng cấp cốt lõi phục vụ đề tài nghiên cứu:
+
+### 9.1. Tích hợp kiểm định DSR (Deflated Sharpe Ratio)
+*   **Vấn đề:** MCTS chạy hàng nghìn vòng lặp ($K$) dễ dẫn đến hiện tượng ăn may lịch sử (Multiple Testing Bias / Overfitting).
+*   **Giải pháp:** Áp dụng công thức DSR dựa trên số lần thử $K$, độ dài dữ liệu $T$, Skewness, Kurtosis và độ lệch chuẩn của các Sharpe đã test. Chỉ chấp nhận các Alpha có $DSR \ge 0.85$.
+
+### 9.2. Phân rã Template kích hoạt vị thế theo Kiểu dữ liệu (Multi-template)
+*   **Vấn đề:** Ép tất cả đầu ra (Boolean, RSI, Giá, Volume) qua Z-score gây méo tín hiệu (tạo độ trễ, tự triệt tiêu xu hướng khi tín hiệu xuất hiện liên tục, và khuếch đại nhiễu khi đi ngang).
+*   **Giải pháp:** Chia làm 3 template xử lý vị thế riêng biệt dựa trên Output Dimension:
+    1.  **Boolean Template:** Kích hoạt vị thế trực tiếp bằng True/False mask (cho nến búa, giao cắt).
+    2.  **Ratio Template:** Giao dịch theo ngưỡng tĩnh tuyệt đối (như RSI > 70 hoặc < 30).
+    3.  **Normalized Template (Z-score):** Chỉ dùng Z-score để chuẩn hóa các chuỗi không giới hạn (như Giá, Volume).
+
+

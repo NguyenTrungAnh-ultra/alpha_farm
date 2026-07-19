@@ -36,7 +36,8 @@ REWARD_WEIGHTS = {
     'max_ic': 0.15,
     'max_calmar': 3.0,
     'burn_in': 15000,
-    'entropy_threshold': 0.15
+    'entropy_threshold': 0.15,
+    'patience': 5000
 }
 
 # === Thông số hợp đồng VN30F1M ===

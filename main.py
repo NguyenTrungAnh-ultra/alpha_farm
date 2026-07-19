@@ -64,7 +64,12 @@ def cmd_mcts(args):
         The parsed command-line or interactive menu arguments.
     """
     print("\n[Bước 2/3] Tầng 2 & 3: MCTS One-pass Pipeline (Entropy + Correlation)...")
+    from utilities.AppConfig import REWARD_WEIGHTS
     from strategy_workflows.RunMCTS import run_mcts_pipeline
+    
+    patience = getattr(args, 'patience', 5000)
+    REWARD_WEIGHTS['patience'] = patience
+    
     iterations = getattr(args, 'iterations', 50000)
     run_mcts_pipeline(iterations=iterations)
 
@@ -282,6 +287,7 @@ def run_interactive_cli() -> None:
         
     if selected_cmd in ("mcts", "full"):
         args_dict["iterations"] = retrieve_numerical_input("Giới hạn vòng lặp MCTS tối đa (Max Iterations)", 50000, int)
+        args_dict["patience"] = retrieve_numerical_input("Ngưỡng Early Stopping Patience", 5000, int)
         
     args = InteractiveArgs(**args_dict)
     
@@ -321,6 +327,7 @@ def main():
     # MCTS
     parser_mcts = subparsers.add_parser("mcts", help="Run Tầng 2 & 3 (Compiler + MCTS)")
     parser_mcts.add_argument("--iterations", type=int, default=50000, help="Number of MCTS iterations")
+    parser_mcts.add_argument("--patience", type=int, default=5000, help="Early stopping patience limit")
     
     # Submit
     parser_sub = subparsers.add_parser("submit", help="Auto submit valid strategies")
@@ -330,6 +337,7 @@ def main():
     parser_full.add_argument("--n_strategies", type=int, default=20)
     parser_full.add_argument("--model", type=str, default="deepseek-thinking")
     parser_full.add_argument("--iterations", type=int, default=50000, help="Number of MCTS iterations")
+    parser_full.add_argument("--patience", type=int, default=5000, help="Early stopping patience limit")
     parser_full.add_argument("--no_cookies", action="store_true")
     
     args = parser.parse_args()
