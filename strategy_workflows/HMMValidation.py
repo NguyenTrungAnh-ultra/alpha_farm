@@ -275,10 +275,16 @@ def validate_strategy_with_hmm(strategy, normal_paths: list, stressed_paths: lis
     mc_sharpe_stressed_mean = np.mean(stressed_sharpes)
     hist_percentile = np.mean(norm_sharpes < hist_sharpe) * 100
     
+    # Nhóm A: Chiến lược Trend-following / Mean Reversion chuẩn
+    # Bắt buộc không overfit lịch sử và giữ được phong độ tối thiểu (vá lỗi toán học số âm)
     rule1 = hist_percentile <= HMM_RULE_PERCENTILE
-    rule2 = mc_sharpe_mean >= (HMM_RULE_SHARPE_RATIO * hist_sharpe)
-    rule3 = mc_sharpe_stressed_mean >= mc_sharpe_mean
-    rule4 = mc_sharpe_mean >= HMM_RULE_MIN_EDGE
+    rule2 = mc_sharpe_mean >= max(HMM_RULE_SHARPE_RATIO * hist_sharpe, HMM_RULE_MIN_EDGE)
+    
+    # Nhóm B: Chiến lược Đầu cơ Khủng hoảng (Crisis Alpha / Long Volatility)
+    # Bắt buộc Stressed Sharpe phải bùng nổ (cao hơn bình thường 0.3) và đạt tối thiểu 0.5.
+    # Đổi lại, cho phép Sharpe bình thường được phép âm nhẹ (tối thiểu -0.2)
+    rule3 = mc_sharpe_stressed_mean >= max(mc_sharpe_mean + 0.3, 0.5)
+    rule4 = mc_sharpe_mean >= -0.2
     
     passed = (rule1 and rule2) or (rule3 and rule4)
     
