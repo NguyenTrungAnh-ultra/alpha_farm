@@ -63,8 +63,9 @@ BENCHMARK_BASELINE_PATH = os.path.join(PROJECT_ROOT, 'results', 'benchmark_hmm_b
 MULTIPLIER = 100_000               # VND/điểm (chuẩn VN30F1M)
 TICK_SIZE = 0.1                    # Bước giá tối thiểu
 
-# === Phí giao dịch ===
+# === Phí giao dịch & Đáo hạn ===
 FEE_PER_CONTRACT_PER_SIDE = 6_000  # VND/HĐ/chiều (đã calibrate chính xác)
+ROLLOVER_PENALTY_POINTS = 2.0      # Phí Basis Spread khi giữ lệnh qua ngày đáo hạn (2.0 điểm = 200,000 VND)
 
 # === Margin / Leverage ===
 MARGIN_RATE = 0.285                # Tỷ lệ ký quỹ (28.5%)

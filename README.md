@@ -244,9 +244,10 @@ Cơ chế này giúp giữ lại dấu vết của các công thức "đột bi�
 Hệ thống sở hữu một động cơ giả lập siêu tốc (`XNOBacktestEngine`) được thiết kế đặc trị chuẩn mực cho thị trường Phái sinh VN30F:
 
 - **Vectorized O(1) Execution:** Loại bỏ hoàn toàn vòng lặp Python, sử dụng ma trận Numpy để tính toán trạng thái lệnh và Mark-to-Market PnL tức thời.
-- **VN30F Netting Fee:** Phí giao dịch được trừ chính xác dựa trên Delta hợp đồng (chênh lệch vị thế), cứu vớt các chiến lược DCA/Scale-in khỏi hiện tượng Commission Drag do thuật toán Full Close/Reopen sai lầm của Crypto.
-- **Lookahead Bias Prevention:** Engine tự động `shift(1)` toàn bộ tín hiệu. Lệnh sinh ra ở nến hiện tại sẽ tự động dời điểm khớp lệnh sang nến tiếp theo, chặn đứng 100% rủi ro MCTS tìm ra "Chén thánh giả" ăn gian dữ liệu tương lai.
-- **Constant Returns Metrics:** Các chỉ số rủi ro (Volatility, Sortino, VaR) trong `CalculateMetrics.py` được đo lường bằng lợi nhuận theo vốn cố định (`constant_returns`), phản ánh thực tế giao dịch khối lượng hợp đồng cố định.
+- **VN30F Netting Fee:** Phí giao dịch được trừ chính xác dựa trên Delta hợp đồng (chênh lệch vị thế), cứu vớt các chiến lược DCA/Scale-in khỏi hiện tượng Commission Drag.
+- **Lookahead Bias Prevention (Execution Delay):** Engine tự động `shift(1)` toàn bộ tín hiệu. Lệnh sinh ra ở nến hiện tại sẽ tự động dời điểm khớp lệnh sang nến tiếp theo, mô phỏng hoàn hảo độ trễ tính toán và truyền lệnh. Chặn đứng 100% rủi ro MCTS tìm ra "Chén thánh giả".
+- **Worst-Case Margin Call:** Tự động quét giá trị tồi tệ nhất (Worst Price) của từng cây nến (`Low` cho Long, `High` cho Short). Nếu tài khoản chạm ngưỡng tỷ lệ ký quỹ duy trì, hệ thống kích hoạt **Force-Sell** (bán giải chấp) lập tức bằng các toán tử ma trận, mô phỏng sát sao rủi ro cháy tài khoản do Gap giá ATO/ATC.
+- **Vectorized Rollover Penalty:** Bắt sóng chính xác nến ATC của ngày Thứ Năm lần thứ 3 hàng tháng (Ngày đáo hạn phái sinh). Bất kỳ vị thế nào giữ qua nến này sẽ bị tự động chém phí trượt giá (Basis Spread) và 2 chiều phí giao dịch, ép MCTS phải đối diện với chi phí thực tế của việc gồng lệnh dài hạn (Trend-following).
 
 ---
 
@@ -258,10 +259,10 @@ Do tính chất đơn giản hóa của quá trình giả lập và kiểm thử
 
 | Đặc tính phái sinh thực tế | Mức độ giả lập của [XNOBacktestEngine](file:///f:/Projects/alpha_farm/core_engine/BacktestEngine.py#L110) | Giới hạn & Điều kiện biên |
 | :--- | :--- | :--- |
-| **Ký quỹ ban đầu (IM) & Đòn bẩy** | **Có hỗ trợ đầy đủ** | Sử dụng tỷ lệ cố định `MARGIN_RATE = 28.5%` và `MAINTENANCE_MARGIN_RATE = 22.0%` tại [AppConfig.py](file:///f:/Projects/alpha_farm/utilities/AppConfig.py). Hệ thống mô phỏng đầy đủ cơ chế tính toán Ký quỹ duy trì (Maintenance Margin) và tự động kích hoạt cuộc gọi ký quỹ (Vectorized Margin Call) để thực hiện `Force-sell` ngay lập tức khi Equity vi phạm ngưỡng an toàn. |
-| **Hạch toán lãi/lỗ (MTM & Settlement)** | **Gần đúng (Bar-by-bar)** | Lãi lỗ được cộng dồn trực tiếp vào `equity` tại mỗi nến (1m, 10m...) thay vì tách biệt "Số dư tiền mặt" và "Lãi/lỗ danh nghĩa chưa thực hiện" hạch toán cuối ngày như VSD. Giao dịch T+0 được hỗ trợ đầy đủ. |
-| **Ngày đáo hạn & Chốt giá chỉ số VN30** | **Không hỗ trợ** | Backtest sử dụng chuỗi dữ liệu nối liền (Continuous/Rolled Futures Data). Hệ thống giả định hợp đồng không bao giờ hết hạn, do đó không có cơ chế cưỡng bức đóng vị thế (Force Settle) vào ngày Thứ Năm lần thứ 3 của tháng và không đổi giá tính PnL sang chỉ số cơ sở VN30 (`pv_vn30_close`). |
-| **Trượt giá (Slippage) & Độ trễ (Latency)** | **Chưa mô phỏng** | Giả định khớp lệnh 100% tại giá Close của nến kế tiếp. Thực tế giao dịch số lượng hợp đồng lớn sẽ bị ảnh hưởng bởi thanh khoản sổ lệnh (Market Impact) và độ trễ truyền nhận lệnh của API công ty chứng khoán. |
+| **Ký quỹ ban đầu (IM) & Đòn bẩy** | **Có hỗ trợ đầy đủ** | Sử dụng tỷ lệ cố định `MARGIN_RATE = 28.5%` và `MAINTENANCE_MARGIN_RATE = 20.0%` tại `AppConfig.py`. Mô phỏng đầy đủ cơ chế tính toán Ký quỹ duy trì và tự động kích hoạt Force-sell (Vectorized Margin Call) ngay lập tức khi Worst Equity vi phạm ngưỡng an toàn. |
+| **Hạch toán lãi/lỗ (MTM & Settlement)** | **Gần đúng (Bar-by-bar)** | Lãi lỗ được cộng dồn trực tiếp vào `equity` tại mỗi nến thay vì hạch toán cuối ngày như VSD. Hỗ trợ đầy đủ giao dịch T+0. |
+| **Đáo hạn phái sinh (Rollover)** | **Có hỗ trợ đầy đủ** | Hệ thống tự động xác định cây nến ATC của ngày Thứ Năm lần thứ 3 hàng tháng. Nếu chiến lược giữ lệnh xuyên kỳ đáo hạn, hệ thống tự động trừ phí phạt trượt giá (Basis Spread) và phí vòng quay (Transaction fees) vào vốn, chống lại việc Overfit của MCTS đối với các chiến lược Hold dài hạn. |
+| **Trượt giá (Slippage) & Độ trễ (Latency)** | **Chỉ hỗ trợ Độ trễ** | Tín hiệu được ép trễ 1 cây nến để mô phỏng Execution Delay. Tuy nhiên hệ thống chưa cài đặt Trượt giá động (Explicit Slippage per tick) mà chỉ gộp phí giao dịch 6000đ/chiều. |
 
 ### 8.2. So sánh với triết lý quản lý lệnh của WorldQuant (WebSim/BRAIN)
 
