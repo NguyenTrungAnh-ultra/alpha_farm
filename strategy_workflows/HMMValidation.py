@@ -11,10 +11,13 @@ from utilities.AppConfig import (
     HMM_STRESS_FACTOR, 
     HMM_BLOCK_SIZE, 
     HMM_PATHS_PER_TF,
-    HMM_RULE_PERCENTILE,
-    HMM_RULE_SHARPE_RATIO,
-    HMM_RULE_MIN_EDGE
+    MARGIN_CALL_DD_THRESHOLD,
+    RUIN_RATE_THRESHOLD,
+    COST_COVERAGE_MULTIPLIER,
+    SAVINGS_RATE_ANNUAL,
+    BENCHMARK_BASELINE_PATH
 )
+import json
 from core_engine.BacktestEngine import load_data
 from core_engine.PlatformEmulator import XNOPlatformEmulator
 
@@ -243,22 +246,149 @@ def calculate_metrics_for_result(result):
     
     return sharpe, cagr, max_dd
 
-def validate_strategy_with_hmm(strategy, normal_paths: list, stressed_paths: list, hist_sharpe: float) -> tuple[bool, str]:
+def extract_trade_stats_from_result(result) -> dict:
+    """Trích xuất thống kê lệnh từ BacktestResult để phục vụ Tầng 2 (Kelly, Cost Coverage)."""
+    trades = result.trades
+    if not trades:
+        return {'win_rate': 0.0, 'avg_win': 0.0, 'avg_loss': 0.0,
+                'total_pnl': 0.0, 'total_fees': 0.0, 'n_trades': 0}
+    
+    pnls = [t.net_pnl for t in trades]
+    wins = [p for p in pnls if p > 0]
+    losses = [p for p in pnls if p <= 0]
+    
+    n_trades = len(pnls)
+    win_rate = len(wins) / n_trades if n_trades > 0 else 0.0
+    avg_win = np.mean(wins) if wins else 0.0
+    avg_loss = np.mean(losses) if losses else 0.0
+    
+    return {
+        'win_rate': win_rate,
+        'avg_win': avg_win,
+        'avg_loss': avg_loss,
+        'total_pnl': sum(pnls),
+        'total_fees': result.total_fees,
+        'n_trades': n_trades
+    }
+
+def validate_strategy_with_hmm(strategy, normal_paths: list, stressed_paths: list, hist_sharpe: float) -> tuple[bool, int | None, str, dict]:
     """
-    Validates a compiled strategy using the precomputed synthetic paths.
-    Returns: (passed: bool, reason: str)
+    Validates a compiled strategy using the 3-Tier Realistic Validation Framework.
+    
+    Returns:
+        passed: bool
+        tier_failed: int | None (1, 2, or 3 if failed, None if passed)
+        reason: str
+        details: dict
     """
     emulator = XNOPlatformEmulator()
     
-    norm_sharpes = []
+    # -------------------------------------------------------------
+    # 1. Thu thập dữ liệu từ Normal Paths
+    # -------------------------------------------------------------
+    norm_sharpes, norm_cagrs, norm_dds = [], [], []
+    all_pnls = []
+    total_fees_accum = 0.0
+    total_trades_accum = 0
+    
     for sim_df in normal_paths:
         try:
             res = emulator.engine.run(strategy, sim_df)
             sh, ca, dd = calculate_metrics_for_result(res)
             norm_sharpes.append(sh)
+            norm_cagrs.append(ca)
+            norm_dds.append(dd)
+            
+            # Extract trades for Tier 2 aggregated
+            stats = extract_trade_stats_from_result(res)
+            if stats['n_trades'] > 0:
+                all_pnls.extend([t.net_pnl for t in res.trades])
+                total_fees_accum += stats['total_fees']
+                total_trades_accum += stats['n_trades']
         except Exception:
             norm_sharpes.append(0.0)
+            norm_cagrs.append(-1.0)
+            norm_dds.append(-100.0)
             
+    norm_sharpes = np.array(norm_sharpes)
+    norm_cagrs = np.array(norm_cagrs)
+    norm_dds = np.array(norm_dds)
+    total_paths = len(normal_paths)
+    
+    mc_cagr_mean = np.mean(norm_cagrs)
+    mc_sharpe_mean = np.mean(norm_sharpes)
+    
+    # -------------------------------------------------------------
+    # TẦNG 1: Vật lý - Empirical Risk of Ruin
+    # -------------------------------------------------------------
+    ruin_count = np.sum(norm_dds <= MARGIN_CALL_DD_THRESHOLD)
+    ruin_rate = ruin_count / total_paths if total_paths > 0 else 1.0
+    dd_5th = np.percentile(norm_dds, 5) if total_paths > 0 else -100.0
+    
+    if ruin_rate >= RUIN_RATE_THRESHOLD:
+        reason = f"Failed Tier 1: Risk of Ruin {ruin_rate*100:.1f}% >= {RUIN_RATE_THRESHOLD*100:.1f}% (Margin Call Threshold: {MARGIN_CALL_DD_THRESHOLD}%)"
+        return False, 1, reason, {'ruin_rate': ruin_rate, 'ruin_count': int(ruin_count), 'total_paths': int(total_paths), 'dd_5th_percentile': float(dd_5th)}
+        
+    # -------------------------------------------------------------
+    # TẦNG 2: Xác suất - Kelly Fraction & Cost Coverage
+    # -------------------------------------------------------------
+    kelly_fraction = 0.0
+    avg_pnl_per_trade = 0.0
+    avg_cost_per_trade = 0.0
+    cost_coverage = 0.0
+    
+    if total_trades_accum > 0:
+        wins = [p for p in all_pnls if p > 0]
+        losses = [p for p in all_pnls if p <= 0]
+        win_rate = len(wins) / total_trades_accum
+        avg_win = np.mean(wins) if wins else 0.0
+        avg_loss = np.mean(losses) if losses else 0.0
+        
+        if avg_loss < 0 and avg_win > 0:
+            kelly_fraction = win_rate - ((1.0 - win_rate) / abs(avg_win / avg_loss))
+        elif avg_loss == 0 and avg_win > 0:
+            kelly_fraction = 1.0
+            
+        avg_pnl_per_trade = np.mean(all_pnls)
+        avg_cost_per_trade = total_fees_accum / total_trades_accum
+        if avg_cost_per_trade > 0:
+            cost_coverage = avg_pnl_per_trade / avg_cost_per_trade
+            
+    if kelly_fraction <= 0.0:
+        reason = f"Failed Tier 2: Kelly Fraction {kelly_fraction:.2f} <= 0"
+        return False, 2, reason, {'kelly_fraction': float(kelly_fraction), 'cost_coverage_ratio': float(cost_coverage)}
+        
+    if cost_coverage < COST_COVERAGE_MULTIPLIER:
+        reason = f"Failed Tier 2: Cost Coverage {cost_coverage:.1f}x < {COST_COVERAGE_MULTIPLIER}x"
+        return False, 2, reason, {'kelly_fraction': float(kelly_fraction), 'cost_coverage_ratio': float(cost_coverage), 'avg_pnl': float(avg_pnl_per_trade), 'avg_cost': float(avg_cost_per_trade)}
+
+    # -------------------------------------------------------------
+    # TẦNG 3: Đời thực - Benchmark
+    # -------------------------------------------------------------
+    # 1. So với tiết kiệm an toàn
+    if mc_cagr_mean < SAVINGS_RATE_ANNUAL:
+        reason = f"Failed Tier 3: MC CAGR {mc_cagr_mean*100:.1f}% < Savings Rate {SAVINGS_RATE_ANNUAL*100:.1f}%"
+        return False, 3, reason, {'mc_cagr_mean': float(mc_cagr_mean)}
+        
+    # 2. So với Dummy Buy & Hold (nếu có cache)
+    benchmark_sharpe = -999.0
+    benchmark_cagr = -999.0
+    if os.path.exists(BENCHMARK_BASELINE_PATH):
+        try:
+            with open(BENCHMARK_BASELINE_PATH, 'r') as f:
+                bmark = json.load(f)
+                benchmark_sharpe = bmark.get('sharpe_mean', -999.0)
+                benchmark_cagr = bmark.get('cagr_mean', -999.0)
+        except Exception:
+            pass
+            
+    if benchmark_sharpe != -999.0 and mc_sharpe_mean < benchmark_sharpe:
+        reason = f"Failed Tier 3: MC Sharpe {mc_sharpe_mean:.2f} < Buy&Hold {benchmark_sharpe:.2f}"
+        return False, 3, reason, {'mc_sharpe_mean': float(mc_sharpe_mean), 'benchmark_sharpe': float(benchmark_sharpe)}
+        
+    # -------------------------------------------------------------
+    # Xếp hạng (Stressed Paths)
+    # -------------------------------------------------------------
     stressed_sharpes = []
     for sim_df in stressed_paths:
         try:
@@ -267,30 +397,27 @@ def validate_strategy_with_hmm(strategy, normal_paths: list, stressed_paths: lis
             stressed_sharpes.append(sh)
         except Exception:
             stressed_sharpes.append(0.0)
-            
-    norm_sharpes = np.array(norm_sharpes)
-    stressed_sharpes = np.array(stressed_sharpes)
+    mc_sharpe_stressed_mean = float(np.mean(stressed_sharpes)) if stressed_sharpes else 0.0
+
+    # -------------------------------------------------------------
+    # PASSED ALL TIERS
+    # -------------------------------------------------------------
+    details = {
+        'ruin_rate': float(ruin_rate),
+        'ruin_count': int(ruin_count),
+        'total_paths': int(total_paths),
+        'dd_5th_percentile': float(dd_5th),
+        'kelly_fraction': float(kelly_fraction),
+        'avg_pnl_per_trade': float(avg_pnl_per_trade),
+        'avg_cost_per_trade': float(avg_cost_per_trade),
+        'cost_coverage_ratio': float(cost_coverage),
+        'total_mc_trades': int(total_trades_accum),
+        'mc_cagr_mean': float(mc_cagr_mean),
+        'mc_sharpe_mean': float(mc_sharpe_mean),
+        'benchmark_sharpe': float(benchmark_sharpe),
+        'benchmark_cagr': float(benchmark_cagr),
+        'mc_sharpe_stressed_mean': mc_sharpe_stressed_mean
+    }
     
-    mc_sharpe_mean = np.mean(norm_sharpes)
-    mc_sharpe_stressed_mean = np.mean(stressed_sharpes)
-    hist_percentile = np.mean(norm_sharpes < hist_sharpe) * 100
-    
-    # Nhóm A: Chiến lược Trend-following / Mean Reversion chuẩn
-    # Bắt buộc không overfit lịch sử và giữ được phong độ tối thiểu (vá lỗi toán học số âm)
-    rule1 = hist_percentile <= HMM_RULE_PERCENTILE
-    rule2 = mc_sharpe_mean >= max(HMM_RULE_SHARPE_RATIO * hist_sharpe, HMM_RULE_MIN_EDGE)
-    
-    # Nhóm B: Chiến lược Đầu cơ Khủng hoảng (Crisis Alpha / Long Volatility)
-    # Bắt buộc Stressed Sharpe phải bùng nổ (cao hơn bình thường 0.3) và đạt tối thiểu 0.5.
-    # Đổi lại, cho phép Sharpe bình thường được phép âm nhẹ (tối thiểu -0.2)
-    rule3 = mc_sharpe_stressed_mean >= max(mc_sharpe_mean + 0.3, 0.5)
-    rule4 = mc_sharpe_mean >= -0.2
-    
-    passed = (rule1 and rule2) or (rule3 and rule4)
-    
-    if passed:
-        reason = f"Passed HMM Filter: MC Sharpe={mc_sharpe_mean:.2f}, Stressed={mc_sharpe_stressed_mean:.2f}, %ile={hist_percentile:.1f}%"
-    else:
-        reason = f"Failed HMM Filter: MC Sharpe={mc_sharpe_mean:.2f}, Stressed={mc_sharpe_stressed_mean:.2f}, %ile={hist_percentile:.1f}%"
-        
-    return passed, reason
+    reason = f"Passed 3-Tier HMM: Ruin={ruin_rate*100:.1f}%, Kelly={kelly_fraction:.2f}, Cov={cost_coverage:.1f}x, Sharpe={mc_sharpe_mean:.2f}"
+    return True, None, reason, details

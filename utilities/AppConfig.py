@@ -17,8 +17,8 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Load environment variables
 load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
 
-# Centralized Quality Thresholds
-QUALITY_THRESHOLDS = {
+# Centralized Quality Thresholds for MCTS (Search Gradient)
+MCTS_QUALITY_THRESHOLDS = {
     'sharpe_ratio': 1.3,
     'cagr': 0.15,
     'max_drawdown_pct': -35.0,
@@ -45,11 +45,20 @@ HMM_COMPONENTS = 3
 HMM_STRESS_FACTOR = 1.5
 HMM_BLOCK_SIZE = 20
 HMM_PATHS_PER_TF = 100
-HMM_RULE_PERCENTILE = 85.0
-HMM_RULE_SHARPE_RATIO = 0.5
-HMM_RULE_MIN_EDGE = 0.3
 
+# === 3-Tier Realistic Validation Config ===
+# Tier 1: Margin Call limit (% equity drawdown)
+MARGIN_CALL_DD_THRESHOLD = -23.0
+# Tier 1: Max allowed percentage of paths hitting Margin Call
+RUIN_RATE_THRESHOLD = 0.05
 
+# Tier 2: Cost Coverage multiplier (avg_pnl >= k * avg_cost)
+COST_COVERAGE_MULTIPLIER = 3.0
+
+# Tier 3: Annual risk-free savings rate for opportunity cost comparison
+SAVINGS_RATE_ANNUAL = 0.06
+# Tier 3: Cache path for Dummy Buy & Hold Benchmark
+BENCHMARK_BASELINE_PATH = os.path.join(PROJECT_ROOT, 'results', 'benchmark_hmm_baseline.json')
 # === Thông số hợp đồng VN30F1M ===
 MULTIPLIER = 100_000               # VND/điểm (chuẩn VN30F1M)
 TICK_SIZE = 0.1                    # Bước giá tối thiểu

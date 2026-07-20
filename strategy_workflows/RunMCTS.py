@@ -345,11 +345,11 @@ def process_timeframe(tf: str, iterations: int, synthetic_data: dict):
         normal_paths = synthetic_data['normal']
         stressed_paths = synthetic_data['stressed']
         
-        print(f"[Worker {tf}] Running HMM Monte Carlo Validation...")
-        passed_hmm, hmm_reason = validate_strategy_with_hmm(strategy, normal_paths, stressed_paths, sharpe)
+        print(f"[Worker {tf}] Running HMM 3-Tier Realistic Validation...")
+        passed_hmm, tier_failed, hmm_reason, hmm_details = validate_strategy_with_hmm(strategy, normal_paths, stressed_paths, sharpe)
         
         if not passed_hmm:
-            print(f"[Worker {tf}] ❌ Candidate rejected by HMM Validation: {hmm_reason}")
+            print(f"[Worker {tf}] ❌ Rejected at Tier {tier_failed}: {hmm_reason}")
             total_rejected = total_generated
             return tf, total_generated, total_rejected, successful_candidates
         else:

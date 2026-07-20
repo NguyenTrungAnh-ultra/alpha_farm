@@ -25,7 +25,7 @@ from strategy_workflows.PortfolioManager import PortfolioManager
 from strategy_workflows.SemanticCompiler import ASTNode
 from utilities.AppConfig import (
     REWARD_WEIGHTS, BASE_PERIODS, BASE_WINDOW_SEARCH,
-    BASELINE_TF_MINUTES, TIMEFRAME_MINUTES
+    BASELINE_TF_MINUTES, TIMEFRAME_MINUTES, MCTS_QUALITY_THRESHOLDS
 )
 
 def ast_to_code(node: ASTNode, scaled_periods: list = None) -> str:
@@ -613,7 +613,8 @@ class MCTSEngine:
                     calmar = 0.0
                     
                 total_trades = metrics.get('total_trades', 0)
-                if total_trades < 15 or calmar < 1.1:
+                calmar_threshold = MCTS_QUALITY_THRESHOLDS['calmar_ratio']
+                if total_trades < 15 or calmar < calmar_threshold:
                     reward = -10.0
                 else:
                     max_corr = 0.0
@@ -627,7 +628,7 @@ class MCTSEngine:
                             if np.isnan(max_corr):
                                 max_corr = 0.0
                                 
-                    s_calmar = min(1.0, max(0.0, (calmar - 1.1) / (REWARD_WEIGHTS['max_calmar'] - 1.1)))
+                    s_calmar = min(1.0, max(0.0, (calmar - calmar_threshold) / (REWARD_WEIGHTS['max_calmar'] - calmar_threshold)))
                     s_ic = min(1.0, abs(rank_ic) / REWARD_WEIGHTS['max_ic'])
                     s_corr = max(0.0, 1.0 - max_corr)
                     

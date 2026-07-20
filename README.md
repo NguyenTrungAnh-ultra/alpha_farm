@@ -38,8 +38,8 @@ graph TD
         run_all -->|2. python main.py mcts| mcts(RunMCTS.py)
         save_json -->|Load Blueprints| mcts
         mcts -->|Check Dimensional Bleeding & Compile (Multi-template)| mcts_sandbox[PlatformEmulator]
-        mcts_sandbox -->|Backtest 2020-2025 đạt chuẩn| hmm[HMM Regime Validation]
-        hmm -->|Pass Stressed Scenarios| save_success[Lưu Code Python vào results/]
+        mcts_sandbox -->|Backtest 2020-2025 đạt chuẩn| hmm[3-Tier Realistic Validation <br> (Risk of Ruin/Kelly/Benchmark)]
+        hmm -->|Pass 3 Tiers| save_success[Lưu Code Python vào results/]
     end
 
     subgraph Web_Environment ["Tầng Nộp chiến lược lên Web"]
@@ -141,7 +141,10 @@ MCTS thay thế hoàn toàn hệ thống Optuna cũ. MCTS Brute-force không ch�
 Động cơ MCTS có khả năng tối ưu hóa tham số động (Dynamic Parameter Optimization):
 
 - **Window Size & Z-Score Threshold**: Không còn bị gán cứng (hardcode), MCTS sẽ tự động tìm kiếm chu kỳ làm mượt (`window`) và ngưỡng kích hoạt tương thích nhất thông qua cơ chế **Scale-Mismatch Dynamic Tuning** dựa trên timeframe, giúp phá vỡ giới hạn "mù thời gian" của hệ thống cũ. Hệ thống tự động phân loại tín hiệu theo 3 template: **Boolean**, **Ratio**, và **Normalized**.
-- **HMM Regime Validation (Hidden Markov Model)**: Sau khi tìm được tham số tốt nhất, MCTS chuyển chiến lược sang bộ lọc HMM. HMM sẽ dùng thuật toán Monte Carlo để mô phỏng (synthesize) hàng chục kịch bản giá ảo (Synthetic Paths) trong điều kiện bình thường và căng thẳng (Stressed Regime) từ ma trận chuyển trạng thái. Chỉ chiến lược nào sống sót qua cả thị trường thực tế và thị trường giả lập HMM mới được cấp phép.
+- **3-Tier Realistic Validation (Bộ lọc 3 Tầng Thực tế)**: Backtest lịch sử không bao giờ là đủ vì đường cong vốn (Equity Curve) trên quá khứ thường bị overfit. MCTS tích hợp bộ kiểm định 3 tầng khắt khe ngay sau khi Sandbox trả về kết quả tốt:
+  1. **Tier 1 (Empirical Risk of Ruin)**: Dùng Hidden Markov Model (HMM) để giả lập 100 kịch bản giá ngẫu nhiên (Monte Carlo Paths) bao gồm cả những cú sốc thị trường (Stressed Regimes). Nếu có quá 5% kịch bản khiến tài khoản bị cháy (Margin Call ở mức -23% Drawdown), chiến lược bị loại.
+  2. **Tier 2 (Xác suất & Chi phí)**: Đảm bảo phân số Kelly (Kelly Fraction) > 0 và Tỉ lệ bao phủ chi phí (Cost Coverage Ratio) >= 3x (tức là Tiền lời trung bình mỗi lệnh phải lớn gấp 3 lần chi phí trượt giá và phí giao dịch).
+  3. **Tier 3 (Benchmark Đời thực)**: Chiến lược phải đánh bại Lãi suất tiết kiệm không rủi ro (6%/năm) và chỉ số Sharpe của chiến lược Buy & Hold VN30 thụ động. Hầu hết các "chén thánh" giả mạo đều rơi rụng tại cửa ải này.
 
 Bạn có thể tinh chỉnh sức mạnh bằng cách cấu hình số vòng lặp:
 
