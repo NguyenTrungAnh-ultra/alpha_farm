@@ -44,7 +44,8 @@ REWARD_WEIGHTS = {
 HMM_COMPONENTS = 3
 HMM_STRESS_FACTOR = 1.5
 HMM_BLOCK_SIZE = 20
-HMM_PATHS_PER_TF = 100
+HMM_PATHS_PER_TF = 500
+MC_CACHE_DIR = os.path.join(PROJECT_ROOT, "data", "MCdata")
 
 # === 3-Tier Realistic Validation Config ===
 # Tier 1: Margin Call limit (% equity drawdown)

@@ -85,8 +85,8 @@ def test_precompute_hmm_synthetic_data_caching(mock_load_data, dummy_ohlcv_data,
     # Mock load_data trả về dữ liệu ảo
     mock_load_data.return_value = dummy_ohlcv_data
     
-    # Ép thư mục cache về thư mục giả lập bằng cách ghi đè PROJECT_ROOT
-    monkeypatch.setattr('strategy_workflows.HMMValidation.PROJECT_ROOT', temp_hmm_cache)
+    # Ép thư mục cache về thư mục giả lập bằng cách ghi đè MC_CACHE_DIR
+    monkeypatch.setattr('strategy_workflows.HMMValidation.MC_CACHE_DIR', temp_hmm_cache)
     
     # 1. Chạy lần đầu tiên: Chưa có file cache -> Bắt buộc phải train và sinh file
     timeframes = ['10m', '15m']
@@ -97,7 +97,7 @@ def test_precompute_hmm_synthetic_data_caching(mock_load_data, dummy_ohlcv_data,
     assert '15m' in result_first_run
     
     # Đảm bảo file .pkl đã được sinh ra trên Disk
-    cache_file = os.path.join(temp_hmm_cache, "results", "hmm_cache", "synthetic_data.pkl")
+    cache_file = os.path.join(temp_hmm_cache, "synthetic_data.pkl")
     assert os.path.exists(cache_file)
     
     # 2. Chạy lần thứ 2: Đã có file cache -> Phải load thẳng từ Disk

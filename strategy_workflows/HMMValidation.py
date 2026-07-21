@@ -11,6 +11,7 @@ from utilities.AppConfig import (
     HMM_STRESS_FACTOR, 
     HMM_BLOCK_SIZE, 
     HMM_PATHS_PER_TF,
+    MC_CACHE_DIR,
     MARGIN_CALL_DD_THRESHOLD,
     RUIN_RATE_THRESHOLD,
     COST_COVERAGE_MULTIPLIER,
@@ -160,7 +161,7 @@ def generate_synthetic_ohlcv(
         'Low': sim_low,
         'Close': sim_close,
         'Volume': sim_volume
-    }, index=dates)
+    }, index=dates).astype('float32')
     sim_df.index.name = 'Datetime'
     
     return sim_df
@@ -170,7 +171,7 @@ def precompute_hmm_synthetic_data(timeframes: list, force_retrain: bool = False)
     Fits HMM for all timeframes, generates synthetic paths, and caches them.
     Returns: dict mapping tf to {'normal': [paths], 'stressed': [paths]}
     """
-    cache_dir = os.path.join(PROJECT_ROOT, "results", "hmm_cache")
+    cache_dir = MC_CACHE_DIR
     os.makedirs(cache_dir, exist_ok=True)
     cache_path = os.path.join(cache_dir, "synthetic_data.pkl")
     
