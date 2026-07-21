@@ -28,7 +28,7 @@ from typing import List, Dict, Any
 
 from strategy_workflows.MCTSEngine import MCTSEngine, Dimension, BooleanMCTSStrategy, RatioMCTSStrategy, NormalizedMCTSStrategy
 from strategy_workflows.SemanticCompiler import SemanticCompiler, ASTNode
-from core_engine.BacktestEngine import load_data, XNOBacktestEngine
+from core_engine.BacktestEngine import load_data, AlphaBacktestEngine
 from core_engine.GenerateReport import compute_metrics
 from strategy_workflows.PortfolioManager import PortfolioManager
 
@@ -64,7 +64,7 @@ def generate_strategy_code(expr_str: str, direction: float, position_scale: floa
     """Generates a clean CustomStrategy Python source code string based on template type."""
     if template == "NORMALIZED":
         return f"""# [MCTS_DISCOVERY_ENGINE]
-from core_engine.XnoEngine import SimpleAlgorithm
+from core_engine.AlphaEngine import AlphaStrategy, SimpleAlgorithm
 
 class CustomStrategy(SimpleAlgorithm):
     def __algorithm__(self):
@@ -95,7 +95,7 @@ class CustomStrategy(SimpleAlgorithm):
 """
     elif template == "RATIO":
         return f"""# [MCTS_DISCOVERY_ENGINE]
-from core_engine.XnoEngine import SimpleAlgorithm
+from core_engine.AlphaEngine import AlphaStrategy, SimpleAlgorithm
 
 class CustomStrategy(SimpleAlgorithm):
     def __algorithm__(self):
@@ -126,7 +126,7 @@ class CustomStrategy(SimpleAlgorithm):
 """
     else: # BOOLEAN
         return f"""# [MCTS_DISCOVERY_ENGINE]
-from core_engine.XnoEngine import SimpleAlgorithm
+from core_engine.AlphaEngine import AlphaStrategy, SimpleAlgorithm
 
 class CustomStrategy(SimpleAlgorithm):
     def __algorithm__(self):
@@ -173,13 +173,12 @@ def process_timeframe(tf: str, iterations: int, synthetic_data: dict):
     import logging
     import warnings
     warnings.filterwarnings('ignore')
-    logging.getLogger("core_engine.XnoEngine").setLevel(logging.CRITICAL)
-    logging.getLogger("core_engine.RestrictedSeries").setLevel(logging.CRITICAL)
+    logging.getLogger("core_engine.AlphaEngine").setLevel(logging.CRITICAL)
     
     print(f"\n--- [Worker {tf}] Starting processing ---")
     
     portfolio_manager = PortfolioManager() # Read-only use to check criteria
-    full_backtest_engine = XNOBacktestEngine()
+    full_backtest_engine = AlphaBacktestEngine()
     
     # ==========================================
     # GIAI ĐOẠN 1: KHỞI TẠO KÝ ỨC TOÀN CỤC

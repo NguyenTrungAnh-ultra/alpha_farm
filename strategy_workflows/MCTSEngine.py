@@ -17,9 +17,10 @@ import numpy as np
 from typing import List, Dict, Any, Optional
 import hashlib
 
-from core_engine.XnoEngine import SimpleAlgorithm
-from core_engine.BacktestEngine import XNOBacktestEngine, load_data
-from core_engine.GenerateReport import compute_metrics
+from core_engine.AlphaEngine import AlphaStrategy
+from core_engine.AlphaPrimitives import ts_mean, ts_sum, ts_max, ts_min, ts_rank, ts_corr, ts_zscore, ts_argmax, ts_argmin
+from core_engine.BacktestEngine import AlphaBacktestEngine, load_data
+from core_engine.CalculateMetrics import compute_metrics
 from strategy_workflows.MCTSDimensions import Dimension, OPERATOR_REGISTRY, get_operators_by_return_dim, DATA_FIELD_DIMENSIONS, OperatorGroup
 from strategy_workflows.PortfolioManager import PortfolioManager
 from strategy_workflows.SemanticCompiler import ASTNode
@@ -72,49 +73,22 @@ def ast_to_code(node: ASTNode, scaled_periods: list = None) -> str:
         op_map = {'and_': '&', 'or_': '|'}
         return f"({ast_to_code(node.children[0], scaled_periods)} {op_map[node.name]} {ast_to_code(node.children[1], scaled_periods)})"
 
-    # General function call: self.op or self.feat
-    prefix = "self.op" if group in [OperatorGroup.LOGIC, OperatorGroup.TIME_SERIES] else "self.feat"
-    
-    # Candlestick (Leaf Features)
-    if group == OperatorGroup.CANDLESTICK:
-        return f"{prefix}.{node.name}(open_, high, low, close)"
-
-    # Component Splitting Renderings
-    if node.name == 'macd_line':
-        return f"self.feat.macd({ast_to_code(node.children[0], scaled_periods)})[0]"
-    if node.name == 'macd_signal':
-        return f"self.feat.macd({ast_to_code(node.children[0], scaled_periods)})[1]"
-    if node.name == 'macd_hist':
-        return f"self.feat.macd({ast_to_code(node.children[0], scaled_periods)})[2]"
-    if node.name == 'bbands_upper':
-        return f"self.feat.bbands({ast_to_code(node.children[0], scaled_periods)})[0]"
-    if node.name == 'bbands_middle':
-        return f"self.feat.bbands({ast_to_code(node.children[0], scaled_periods)})[1]"
-    if node.name == 'bbands_lower':
-        return f"self.feat.bbands({ast_to_code(node.children[0], scaled_periods)})[2]"
-
-    # Arity 0 Terminal nodes requiring internal variables
-    if node.name == 'vwap':
-        return "self.feat.vwap(high, low, close, volume)"
-    if node.name == 'adx':
-        return f"self.feat.adx(high, low, close, timeperiod={random.choice(periods)})"
-    if node.name == 'stoch_k':
-        return f"self.feat.stoch(high, low, close)[0]"
-    if node.name == 'stoch_d':
-        return f"self.feat.stoch(high, low, close)[1]"
+    if group == OperatorGroup.TIME_SERIES:
+        if node.name == 'ts_corr':
+            arg1 = ast_to_code(node.children[0], scaled_periods)
+            arg2 = ast_to_code(node.children[1], scaled_periods)
+            d = random.choice(periods)
+            return f"ts_corr({arg1}, {arg2}, {d})"
+        else:
+            arg1 = ast_to_code(node.children[0], scaled_periods)
+            d = random.choice(periods)
+            return f"{node.name}({arg1}, {d})"
 
     args = []
     for c in node.children:
         args.append(ast_to_code(c, scaled_periods))
-    
-    # Safely inject keyword arguments
-    if not any(isinstance(c, ASTNode) and c.name == "Constant" for c in node.children):
-        if node.name in ['ema', 'rsi', 'stddev', 'var', 'zscore']:
-            args.append(f"timeperiod={random.choice(periods)}")
-        elif node.name in ['shift', 'diff', 'pct_change']:
-            args.append(f"periods={random.choice([1, 2, 3, 5, 10])}")
             
-    return f"{prefix}.{node.name}({', '.join(args)})"
+    return f"{node.name}({', '.join(args)})"
 
 def clone_ast(node: ASTNode) -> ASTNode:
     return ASTNode(
@@ -260,7 +234,7 @@ class MCTSNode:
     def is_leaf(self) -> bool:
         return len(self.children) == 0
 
-class BooleanMCTSStrategy(SimpleAlgorithm):
+class BooleanMCTSStrategy(AlphaStrategy):
     position_scale = 0.2
 
     def __algorithm__(self):
@@ -274,7 +248,7 @@ class BooleanMCTSStrategy(SimpleAlgorithm):
         open_ = self.data.pv_open
         volume = self.data.pv_volume
         
-        globals_dict = {'self': self, 'close': close, 'high': high, 'low': low, 'open_': open_, 'volume': volume}
+        globals_dict = {'self': self, 'np': np, 'close': close, 'high': high, 'low': low, 'open_': open_, 'volume': volume, 'ts_mean': ts_mean, 'ts_sum': ts_sum, 'ts_max': ts_max, 'ts_min': ts_min, 'ts_rank': ts_rank, 'ts_corr': ts_corr, 'ts_zscore': ts_zscore, 'ts_argmax': ts_argmax, 'ts_argmin': ts_argmin}
         
         try:
             alpha_val = eval(expr_str, {}, globals_dict)
@@ -283,7 +257,7 @@ class BooleanMCTSStrategy(SimpleAlgorithm):
             self.alpha_series = close * 0.0
             alpha_val = close * 0.0
 
-        raw_pos = self.op.where(alpha_val, pos_scale, -pos_scale)
+        raw_pos = np.where(alpha_val, pos_scale, -pos_scale)
         if direction < 0:
             raw_pos = raw_pos * -1.0
         
@@ -296,7 +270,7 @@ class BooleanMCTSStrategy(SimpleAlgorithm):
         self.set_positions(short_mask, position=-pos_scale)
 
 
-class RatioMCTSStrategy(SimpleAlgorithm):
+class RatioMCTSStrategy(AlphaStrategy):
     position_scale = 0.2
     threshold_upper = 70.0
     threshold_lower = 30.0
@@ -314,7 +288,7 @@ class RatioMCTSStrategy(SimpleAlgorithm):
         open_ = self.data.pv_open
         volume = self.data.pv_volume
         
-        globals_dict = {'self': self, 'close': close, 'high': high, 'low': low, 'open_': open_, 'volume': volume}
+        globals_dict = {'self': self, 'np': np, 'close': close, 'high': high, 'low': low, 'open_': open_, 'volume': volume, 'ts_mean': ts_mean, 'ts_sum': ts_sum, 'ts_max': ts_max, 'ts_min': ts_min, 'ts_rank': ts_rank, 'ts_corr': ts_corr, 'ts_zscore': ts_zscore, 'ts_argmax': ts_argmax, 'ts_argmin': ts_argmin}
         
         try:
             alpha_val = eval(expr_str, {}, globals_dict)
@@ -326,7 +300,7 @@ class RatioMCTSStrategy(SimpleAlgorithm):
         long_cond = alpha_val > threshold_upper if direction == 1.0 else alpha_val < threshold_lower
         short_cond = alpha_val < threshold_lower if direction == 1.0 else alpha_val > threshold_upper
         
-        raw_pos = self.op.where(long_cond, pos_scale, self.op.where(short_cond, -pos_scale, 0.0))
+        raw_pos = np.where(long_cond, pos_scale, np.where(short_cond, -pos_scale, 0.0))
         
         flat_mask = raw_pos == 0.0
         long_mask = raw_pos == pos_scale
@@ -337,7 +311,7 @@ class RatioMCTSStrategy(SimpleAlgorithm):
         self.set_positions(short_mask, position=-pos_scale)
 
 
-class NormalizedMCTSStrategy(SimpleAlgorithm):
+class NormalizedMCTSStrategy(AlphaStrategy):
     position_scale = 0.2
     window = 20
     z_score_threshold = 1.0
@@ -355,7 +329,7 @@ class NormalizedMCTSStrategy(SimpleAlgorithm):
         open_ = self.data.pv_open
         volume = self.data.pv_volume
         
-        globals_dict = {'self': self, 'close': close, 'high': high, 'low': low, 'open_': open_, 'volume': volume}
+        globals_dict = {'self': self, 'np': np, 'close': close, 'high': high, 'low': low, 'open_': open_, 'volume': volume, 'ts_mean': ts_mean, 'ts_sum': ts_sum, 'ts_max': ts_max, 'ts_min': ts_min, 'ts_rank': ts_rank, 'ts_corr': ts_corr, 'ts_zscore': ts_zscore, 'ts_argmax': ts_argmax, 'ts_argmin': ts_argmin}
         
         try:
             alpha_val = eval(expr_str, {}, globals_dict)
@@ -364,13 +338,10 @@ class NormalizedMCTSStrategy(SimpleAlgorithm):
             self.alpha_series = close * 0.0
             alpha_val = close * 0.0
 
-        r_mean = self.feat.rolling_mean(alpha_val, window)
-        r_std = self.feat.rolling_std(alpha_val, window) + 1e-8
-        
-        z_score = (alpha_val - r_mean) / r_std
+        z_score = ts_zscore(alpha_val, window)
         z_score = z_score * direction
 
-        raw_pos = self.op.where(z_score > z_score_threshold, pos_scale, self.op.where(z_score < -z_score_threshold, -pos_scale, 0.0))
+        raw_pos = np.where(z_score > z_score_threshold, pos_scale, np.where(z_score < -z_score_threshold, -pos_scale, 0.0))
         
         flat_mask = raw_pos == 0.0
         long_mask = raw_pos == pos_scale
@@ -434,7 +405,7 @@ class MCTSEngine:
         # Use full historical data for MCTS due to vectorized engine speedup
         self.df_search = self.df
             
-        self.backtest_engine = XNOBacktestEngine()
+        self.backtest_engine = AlphaBacktestEngine()
         self.cache: Dict[str, tuple] = {}
         self.max_cache_size = 50000
         self.leaderboard: List[Dict[str, Any]] = []
@@ -553,11 +524,15 @@ class MCTSEngine:
         try:
             globals_dict = {
                 'self': self.temp_strat,
+                'np': np,
                 'close': self.temp_strat.data.pv_close,
                 'high': self.temp_strat.data.pv_high,
                 'low': self.temp_strat.data.pv_low,
                 'open_': self.temp_strat.data.pv_open,
-                'volume': self.temp_strat.data.pv_volume
+                'volume': self.temp_strat.data.pv_volume,
+                'ts_mean': ts_mean, 'ts_sum': ts_sum, 'ts_max': ts_max, 'ts_min': ts_min, 
+                'ts_rank': ts_rank, 'ts_corr': ts_corr, 'ts_zscore': ts_zscore, 
+                'ts_argmax': ts_argmax, 'ts_argmin': ts_argmin
             }
             
             try:
@@ -572,23 +547,21 @@ class MCTSEngine:
             rank_ic = self.compute_rank_ic(raw_alpha, self.df_search['Close'])
             
             if template_type == "NORMALIZED":
-                r_mean = self.temp_strat.feat.rolling_mean(alpha_val, window)
-                r_std = self.temp_strat.feat.rolling_std(alpha_val, window) + 1e-8
-                z_score_base = (alpha_val - r_mean) / r_std
+                z_score_base = ts_zscore(alpha_val, window)
                 
                 z_long = z_score_base
-                pos_long = self.temp_strat.op.where(z_long > z_score_thresh, pos_scale, self.temp_strat.op.where(z_long < -z_score_thresh, -pos_scale, 0.0))
+                pos_long = np.where(z_long > z_score_thresh, pos_scale, np.where(z_long < -z_score_thresh, -pos_scale, 0.0))
                 
                 z_short = z_score_base * -1.0
-                pos_short = self.temp_strat.op.where(z_short > z_score_thresh, pos_scale, self.temp_strat.op.where(z_short < -z_score_thresh, -pos_scale, 0.0))
+                pos_short = np.where(z_short > z_score_thresh, pos_scale, np.where(z_short < -z_score_thresh, -pos_scale, 0.0))
                 
             elif template_type == "RATIO":
-                pos_long = self.temp_strat.op.where(alpha_val > threshold_upper, pos_scale, self.temp_strat.op.where(alpha_val < threshold_lower, -pos_scale, 0.0))
-                pos_short = self.temp_strat.op.where(alpha_val > threshold_upper, -pos_scale, self.temp_strat.op.where(alpha_val < threshold_lower, pos_scale, 0.0))
+                pos_long = np.where(alpha_val > threshold_upper, pos_scale, np.where(alpha_val < threshold_lower, -pos_scale, 0.0))
+                pos_short = np.where(alpha_val > threshold_upper, -pos_scale, np.where(alpha_val < threshold_lower, pos_scale, 0.0))
                 
             else: # BOOLEAN
-                pos_long = self.temp_strat.op.where(alpha_val, pos_scale, -pos_scale)
-                pos_short = self.temp_strat.op.where(alpha_val, -pos_scale, pos_scale)
+                pos_long = np.where(alpha_val, pos_scale, -pos_scale)
+                pos_short = np.where(alpha_val, -pos_scale, pos_scale)
             
             class PrecalcStrategy:
                 def __init__(self, p):

@@ -6,8 +6,7 @@ Main command-line interface (CLI) and interactive terminal console for the Alpha
 Coordinates the multi-stage pipeline:
 1. `generate`: Queries the configured LLM to generate strategy ideas.
 2. `mcts`: Compiles macro blueprints and searches for optimized parameters via MCTS.
-3. `submit`: Submits successful, qualified strategies to XNOQuant using Playwright.
-4. `full`: Runs the entire sequence end-to-end.
+3. `full`: Runs the entire sequence end-to-end.
 """
 
 import os
@@ -76,49 +75,11 @@ def cmd_mcts(args):
 
 
 
-def cmd_submit(args):
-    """
-    Execute the automatic submission stage.
-    
-    Searches the results directory for accepted Python strategy files and submits 
-    them to XNOQuant.
-
-    Parameters
-    ----------
-    args : argparse.Namespace or InteractiveArgs
-        The parsed command-line or interactive menu arguments.
-    """
-    print("\n[Bước 3/3] Nộp chiến lược (Auto Submit)...")
-    from strategy_workflows.SubmitStrategies import run_auto_submit
-    
-    results_dir = os.path.join(PROJECT_ROOT, "results")
-    py_files = glob.glob(os.path.join(results_dir, "*.py"))
-    py_files = [f for f in py_files if not os.path.basename(f).startswith("__")]
-    
-    if not py_files:
-        print("Không có chiến lược nào để nộp.")
-        return
-        
-    for filepath in py_files:
-        filename = os.path.basename(filepath)
-        tf_part = filename.split('_')[-1].replace('.py', '')
-        tf = tf_part if tf_part in ['1m', '3m', '5m', '10m', '15m', '30m', '60m'] else '10m'
-        
-        with open(filepath, 'r', encoding='utf-8') as f:
-            code = f.read()
-            
-        success, err_msg = run_auto_submit(strategy_code=code, timeframe=tf, filepath=filepath)
-        if success:
-            print(f"✅ SUCCESS: {filename}")
-        else:
-            print(f"❌ FAILED: {filename} - {err_msg}")
-        time.sleep(15)
-
 def cmd_full(args):
     """
     Execute the full end-to-end pipeline.
     
-    Runs generate, mcts, and submit stages sequentially.
+    Runs generate and mcts stages sequentially.
 
     Parameters
     ----------
@@ -127,7 +88,6 @@ def cmd_full(args):
     """
     cmd_generate(args)
     cmd_mcts(args)
-    cmd_submit(args)
 
 def display_interactive_menu(options: list[str], title: str = "Select option:") -> int:
     """
@@ -260,14 +220,13 @@ def run_interactive_cli() -> None:
     """
     os.system("")
     print("="*80)
-    print("  GIAO DIỆN TƯƠNG TÁC XNOQUANT AUTO-FARM ".center(80))
+    print("  GIAO DIỆN TƯƠNG TÁC ALPHA FARM ".center(80))
     print("="*80)
     
     commands = [
         "generate (Tầng 1: Sinh Blueprint JSON bằng LLM)",
         "mcts (Tầng 2 & 3: MCTS One-pass Pipeline)",
-        "submit (Tự động nộp chiến lược lên XNO)",
-        "full (Chạy toàn bộ quy trình: Generate -> MCTS -> Submit)",
+        "full (Chạy toàn bộ quy trình: Generate -> MCTS)",
         "Exit (Thoát)"
     ]
     
@@ -295,15 +254,13 @@ def run_interactive_cli() -> None:
     args = InteractiveArgs(**args_dict)
     
     print("\n" + "="*80)
-    print("  KHỞI ĐỘNG HỆ THỐNG XNOQUANT AUTO-FARM ".center(80))
+    print("  KHỞI ĐỘNG HỆ THỐNG ALPHA FARM ".center(80))
     print("="*80)
     
     if selected_cmd == "generate":
         cmd_generate(args)
     elif selected_cmd == "mcts":
         cmd_mcts(args)
-    elif selected_cmd == "submit":
-        cmd_submit(args)
     elif selected_cmd == "full":
         cmd_full(args)
 
@@ -315,7 +272,7 @@ def main():
     if no arguments are supplied on a TTY terminal, and routes control 
     to the requested command.
     """
-    parser = argparse.ArgumentParser(description="XNOQuant Auto-Farm CLI")
+    parser = argparse.ArgumentParser(description="Alpha Farm CLI")
     subparsers = parser.add_subparsers(dest="command", required=False)
     
     # Generate
@@ -333,11 +290,8 @@ def main():
     parser_mcts.add_argument("--patience", type=int, default=5000, help="Early stopping patience limit")
     parser_mcts.add_argument("--retrain-hmm", action="store_true", help="Force retrain HMM models instead of using cache")
     
-    # Submit
-    parser_sub = subparsers.add_parser("submit", help="Auto submit valid strategies")
-    
     # Full
-    parser_full = subparsers.add_parser("full", help="Run full pipeline (generate -> mcts -> submit)")
+    parser_full = subparsers.add_parser("full", help="Run full pipeline (generate -> mcts)")
     parser_full.add_argument("--n_strategies", type=int, default=20)
     parser_full.add_argument("--model", type=str, default="deepseek-thinking")
     parser_full.add_argument("--iterations", type=int, default=50000, help="Number of MCTS iterations")
@@ -359,15 +313,13 @@ def main():
         sys.exit(0)
         
     print("="*80)
-    print("  KHỞI ĐỘNG HỆ THỐNG XNOQUANT AUTO-FARM ".center(80))
+    print("  KHỞI ĐỘNG HỆ THỐNG ALPHA FARM ".center(80))
     print("="*80)
     
     if args.command == "generate":
         cmd_generate(args)
     elif args.command == "mcts":
         cmd_mcts(args)
-    elif args.command == "submit":
-        cmd_submit(args)
     elif args.command == "full":
         cmd_full(args)
 

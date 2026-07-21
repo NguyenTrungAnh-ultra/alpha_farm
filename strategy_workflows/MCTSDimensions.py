@@ -25,9 +25,7 @@ class Dimension(Enum):
     """
     CURRENCY = auto()   # Prices
     VOLUME = auto()     # Volume
-    RATIO = auto()      # Dimensionless, percentages (returns)
-    BOUNDED_RATIO = auto() # Bounded indicators (RSI, ADX)
-    TIME = auto()       # Time periods
+    RATIO = auto()      # Dimensionless, percentages (returns, correlations, z-scores)
     BOOLEAN = auto()    # True/False signals
     ANY = auto()        # Can be anything, preserves input dimension
 
@@ -38,12 +36,10 @@ class TemplateType(Enum):
 
 DIMENSION_TO_TEMPLATE = {
     Dimension.BOOLEAN: TemplateType.BOOLEAN,
-    Dimension.RATIO: TemplateType.NORMALIZED,
-    Dimension.BOUNDED_RATIO: TemplateType.RATIO,
+    Dimension.RATIO: TemplateType.RATIO,
     Dimension.ANY: TemplateType.NORMALIZED,
     Dimension.CURRENCY: TemplateType.NORMALIZED,
     Dimension.VOLUME: TemplateType.NORMALIZED,
-    Dimension.TIME: TemplateType.NORMALIZED,
 }
 
 class OperatorGroup(Enum):
@@ -52,10 +48,7 @@ class OperatorGroup(Enum):
     """
     TIME_SERIES = auto()
     LOGIC = auto()
-    OVERLAP = auto()
-    OSCILLATOR = auto()
     STATISTICS = auto()
-    CANDLESTICK = auto()
 
 DATA_FIELD_DIMENSIONS = {
     "pv_open": Dimension.CURRENCY,
@@ -66,16 +59,20 @@ DATA_FIELD_DIMENSIONS = {
     "pv_vn30_close": Dimension.CURRENCY,
 }
 
-# The registry defines every operator, its group, arity (number of children),
-# its input signature (what dimensions it expects), and output dimension.
-# Arity is derived from the length of input_dims. Constant parameters (like window size) are ignored for Arity.
 OPERATOR_REGISTRY = {
-    # 1. TIME-SERIES
-    "shift": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
-    "diff": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
-    "pct_change": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.RATIO},
+    # 1. TIME-SERIES (Alpha Primitives)
+    "ts_mean": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
+    "ts_sum": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
+    "ts_max": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
+    "ts_min": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
+    "ts_rank": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.RATIO},
+    "ts_corr": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.RATIO},
+    "ts_zscore": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.RATIO},
+    "ts_argmax": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
+    "ts_argmin": {"group": OperatorGroup.TIME_SERIES, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
     
-    "crossed": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.BOOLEAN}, # Special check: inputs must match
+    # 2. LOGIC
+    "crossed": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.BOOLEAN},
     "crossed_above": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.BOOLEAN},
     "crossed_below": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.BOOLEAN},
     "rising": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY], "output_dim": Dimension.BOOLEAN},
@@ -88,59 +85,19 @@ OPERATOR_REGISTRY = {
     "less_than": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.BOOLEAN},
     "equal": {"group": OperatorGroup.LOGIC, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.BOOLEAN},
 
-    # 3. OVERLAP (Preserves dimension, heavily pruned to avoid Illusion of Diversity)
-    "ema": {"group": OperatorGroup.OVERLAP, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
-    "vwap": {"group": OperatorGroup.OVERLAP, "input_dims": [], "output_dim": Dimension.CURRENCY}, # Arity 0, expects h, l, c, v internally
-    "bbands_upper": {"group": OperatorGroup.OVERLAP, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
-    "bbands_middle": {"group": OperatorGroup.OVERLAP, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
-    "bbands_lower": {"group": OperatorGroup.OVERLAP, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
-
-    # 4. OSCILLATORS
-    "rsi": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.ANY], "output_dim": Dimension.BOUNDED_RATIO},
-    "macd_line": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.CURRENCY], "output_dim": Dimension.CURRENCY},
-    "macd_signal": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.CURRENCY], "output_dim": Dimension.CURRENCY},
-    "macd_hist": {"group": OperatorGroup.OSCILLATOR, "input_dims": [Dimension.CURRENCY], "output_dim": Dimension.CURRENCY},
-    "adx": {"group": OperatorGroup.OSCILLATOR, "input_dims": [], "output_dim": Dimension.BOUNDED_RATIO}, # Arity 0, expects h, l, c internally
-    "stoch_k": {"group": OperatorGroup.OSCILLATOR, "input_dims": [], "output_dim": Dimension.BOUNDED_RATIO}, # Arity 0, expects h, l, c internally
-    "stoch_d": {"group": OperatorGroup.OSCILLATOR, "input_dims": [], "output_dim": Dimension.BOUNDED_RATIO}, # Arity 0, expects h, l, c internally
-
-    # 5. STATISTICS & MATH
-    "stddev": {"group": OperatorGroup.STATISTICS, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
-    "var": {"group": OperatorGroup.STATISTICS, "input_dims": [Dimension.ANY], "output_dim": Dimension.ANY},
-    "zscore": {"group": OperatorGroup.STATISTICS, "input_dims": [Dimension.ANY], "output_dim": Dimension.RATIO},
+    # 3. STATISTICS & MATH
     "add": {"group": OperatorGroup.STATISTICS, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.ANY},
     "sub": {"group": OperatorGroup.STATISTICS, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.ANY},
     "mult": {"group": OperatorGroup.STATISTICS, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.ANY},
     "div": {"group": OperatorGroup.STATISTICS, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.RATIO},
-
-    # 6. CANDLESTICK (Leaf Features) - Arity 0, no child nodes allowed!
-    "doji": {"group": OperatorGroup.CANDLESTICK, "input_dims": [], "output_dim": Dimension.BOOLEAN},
-    "hammer": {"group": OperatorGroup.CANDLESTICK, "input_dims": [], "output_dim": Dimension.BOOLEAN},
-    "three_black_crows": {"group": OperatorGroup.CANDLESTICK, "input_dims": [], "output_dim": Dimension.BOOLEAN},
-    "morning_star": {"group": OperatorGroup.CANDLESTICK, "input_dims": [], "output_dim": Dimension.BOOLEAN},
 }
 
 def get_operators_by_return_dim(target_dim: Dimension):
     """
     Perform backward chaining to find all operators returning a target dimension.
-    
-    This is used by MCTS to retrieve operators that can be placed at a position 
-    requiring a specific return type. Operators returning `Dimension.ANY` are 
-    considered compatible with any target dimension.
-    
-    Parameters
-    ----------
-    target_dim : Dimension
-        The required dimension for the node's output.
-        
-    Returns
-    -------
-    list
-        A list of operator name strings matching the target dimension criteria.
     """
     ops = []
     for op, meta in OPERATOR_REGISTRY.items():
-        # If ANY, it can satisfy anything (assuming children match)
         if meta["output_dim"] == target_dim or meta["output_dim"] == Dimension.ANY:
             ops.append(op)
     return ops

@@ -109,7 +109,7 @@ class BacktestResult:
     first_trade_open_fee: float = 0.0
 
 
-class XNOBacktestEngine:
+class AlphaBacktestEngine:
     """
     Engine backtest mô phỏng chính xác XNOQuant.
 
@@ -179,7 +179,7 @@ class XNOBacktestEngine:
 
         Parameters
         ----------
-        strategy : SimpleAlgorithm
+        strategy : AlphaStrategy
             Bản thể chiến lược sinh ra từ MCTSEngine hoặc Workflow chuẩn.
         df : pd.DataFrame
             DataFrame OHLCV cần Backtest.
@@ -191,10 +191,6 @@ class XNOBacktestEngine:
         """
         # --- 1. Lấy position targets từ strategy ---
         positions = strategy.run_algorithm(df)
-        
-        # Unwrap RestrictedSeries if returned by strategy
-        if type(positions).__name__ == 'RestrictedSeries':
-            positions = positions._data
 
         # FIX: DATA LEAK (LOOKAHEAD BIAS)
         # Shift target positions by 1 so signal generated at close of bar `i` executes at close of bar `i+1`

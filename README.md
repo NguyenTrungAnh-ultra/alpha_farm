@@ -1,4 +1,4 @@
-# alpha_farm
+# Alpha Farm
 
 Hệ thống tự động sinh, tối ưu hóa và thử nghiệm **tín hiệu giao dịch có hướng** (Directional Trading Signals) cho thị trường phái sinh VN30F.
 
@@ -8,15 +8,7 @@ Hệ thống tự động sinh, tối ưu hóa và thử nghiệm **tín hiệu 
 
 ### Bản chất tín hiệu được sinh ra
 
-Hệ thống sinh ra **Systematic Directional Signals** — tín hiệu dự đoán hướng đi tuyệt đối (Long/Short/Flat) trên một instrument duy nhất (VN30F), tương tự mô hình CTA/Managed Futures. Đây **không phải** Cross-sectional Alpha theo nghĩa của WorldQuant BRAIN (xếp hạng tương đối giữa hàng nghìn cổ phiếu để tạo danh mục Market Neutral).
-
-| | Hệ thống này (Directional Signal) | WorldQuant BRAIN (Cross-sectional Alpha) |
-|:---|:---|:---|
-| **Input** | 1 instrument (VN30F), 3 chuỗi data | 3000+ cổ phiếu, hàng trăm trường data |
-| **Output** | Quyết định hướng: Long / Short / Flat | Điểm số tương đối cho từng cổ phiếu |
-| **Rủi ro chính** | Directional risk (đoán sai hướng thị trường) | Relative risk (chọn sai cổ phiếu so với nhau) |
-| **Bảo vệ regime** | Phụ thuộc vào cơ chế kích hoạt vị thế (z-score, threshold) | Market Neutral tự nhiên qua Long/Short cân bằng |
-| **Giới hạn diversity** | Hữu hạn — tất cả tín hiệu đều từ cùng 1 chuỗi giá | Rất lớn — tổ hợp chéo giữa hàng nghìn tài sản |
+Hệ thống sinh ra **Systematic Directional Signals** — tín hiệu dự đoán hướng đi tuyệt đối (Long/Short/Flat) trên một instrument duy nhất (VN30F), tương tự mô hình CTA/Managed Futures.
 
 ## 1. Kiến trúc Hệ thống (Dual Engine with Self-Correction)
 
@@ -34,31 +26,19 @@ graph TD
         semantic_val -->|Hợp lệ| save_json[Lưu Blueprint JSON]
     end
 
-    subgraph MCTS_Engine ["Tầng 2 & 3: MCTS Brute-force & Sandbox"]
+    subgraph MCTS_Engine ["Tầng 2 & 3: MCTS Brute-force & AlphaEngine"]
         run_all -->|2. python main.py mcts| mcts(RunMCTS.py)
         save_json -->|Load Blueprints| mcts
-        mcts -->|Check Dimensional Bleeding & Compile (Multi-template)| mcts_sandbox[PlatformEmulator]
-        mcts_sandbox -->|Backtest 2020-2025 đạt chuẩn| hmm[3-Tier Realistic Validation <br> (Risk of Ruin/Kelly/Benchmark)]
+        mcts -->|Check Dimensional Bleeding & Compile (Multi-template)| mcts_sandbox[AlphaEngine]
+        mcts_sandbox -->|Sử dụng AlphaPrimitives Tốc Độ Cao| hmm[3-Tier Realistic Validation <br> (Risk of Ruin/Kelly/Benchmark)]
         hmm -->|Pass 3 Tiers| save_success[Lưu Code Python vào results/]
-    end
-
-    subgraph Web_Environment ["Tầng Nộp chiến lược lên Web"]
-        auto_sub(SubmitStrategies.py)
-        save_success -->|3. python main.py submit| auto_sub
-        auto_sub -->|Playwright CDP| xno_web((Sàn XNOQuant))
-        auto_sub -->|Thành công| pushed[Di chuyển vào pushed/]
     end
 
     style LLM_Engine stroke:#3498db,stroke-width:2px
     style MCTS_Engine stroke:#9b59b6,stroke-width:2px
-    style Web_Environment stroke:#666,stroke-width:2px
-    style Offline_Tuning stroke:#3498db,stroke-width:2px,stroke-dasharray: 5 5
-    style xno_web fill:#28a745,color:#fff
-    style pushed fill:#f39c12,color:#fff
-    style optuna_tool fill:#2980b9,color:#fff
 ```
 
-Để xem thông tin kỹ thuật chuyên sâu về cấu trúc hệ thống và quy định (Rules) của sân chơi XNOQuant, vui lòng tham khảo file `ARCH.md`.
+Để xem thông tin kỹ thuật chuyên sâu về cấu trúc hệ thống, vui lòng tham khảo file `docs/ARCH.md`.
 
 ---
 
@@ -66,9 +46,8 @@ graph TD
 
 ### Yêu cầu hệ thống
 
-- Python 3.12 (Quản lý môi trường bằng `uv` để build các package C++ như `hmmlearn` và `TA-Lib`).
-- Đã cài đặt Chrome hoặc Edge (để chạy tiện ích Playwright).
-- Ollama local.
+- Python 3.12 (Quản lý môi trường bằng `uv` để build các package C++ như `hmmlearn`).
+- Ollama local (hoặc sử dụng các mô hình API Cloud).
 
 ### Cài đặt thư viện
 
@@ -76,17 +55,10 @@ Chạy lệnh sau để cài đặt toàn bộ các thư viện cần thiết:
 
 ```bash
 uv pip install -r utilities/deps/deepseek4free/requirements.txt
-uv pip install python-dotenv hmmlearn TA-Lib
+uv pip install python-dotenv hmmlearn
 ```
 
 ### Cấu hình API & Tài khoản (.env)
-
-Copy file `.env.example` thành `.env` và điền thông tin tài khoản XNOQuant:
-
-```env
-XNO_ACCOUNT=your_email@gmail.com
-XNO_PASSWORD=your_password
-```
 
 - **Gemini**: Dán cookie lấy từ header vào file `cookies.txt` (nếu dùng mô hình Gemini).
 - **DeepSeek**: Đăng nhập vào chat.deepseek.com, mở F12 (Network), sao chép giá trị của `Authorization` header và dán vào file `token.txt` ở thư mục gốc.
@@ -103,7 +75,7 @@ python main.py --help
 
 ### Cách 1: Chạy Tự Động Toàn Tập (Nhạc Trưởng)
 
-Dành cho việc cắm máy tự động chạy qua toàn bộ quy trình 3 Tầng: Sinh ý tưởng (Generate) $\rightarrow$ Tìm kiếm thông số MCTS (MCTS) $\rightarrow$ Auto Submit.
+Dành cho việc cắm máy tự động chạy qua toàn bộ quy trình: Sinh ý tưởng (Generate) $\rightarrow$ Tìm kiếm thông số MCTS (MCTS).
 
 ```bash
 python main.py full --n_strategies 20 --model deepseek-thinking
@@ -121,10 +93,6 @@ Bạn hoàn toàn có thể chạy riêng từng phần tùy theo nhu cầu đ�
   ```bash
   python main.py generate --n_strategies 20 --model deepseek-thinking
   ```
-- **Tầng 2 & 3 (Compiler & MCTS):** Đọc các Blueprint JSON, biên dịch, tìm kiếm MCTS Brute-force để lắp thông số, đánh giá bằng Sandbox Sandbox và xuất ra file Code Python hoàn chỉnh.
-  ```bash
-  python main.py mcts
-  ```
 
 ---
 
@@ -133,41 +101,22 @@ Bạn hoàn toàn có thể chạy riêng từng phần tùy theo nhu cầu đ�
 ### Tự sửa lỗi Inline (Agentic Self-Correction)
 
 Quá trình tự sửa lỗi hiện tại đã được tích hợp trực tiếp **(Inline)** vào Tầng 1 (`GenerateStrategies.py`).
-Ngay khi LLM sinh ra một Blueprint bị sai cú pháp hoặc sai thứ nguyên, `SemanticCompiler` sẽ ném lỗi và bắt LLM (Local model) sửa ngay lập tức trong bộ nhớ mà không cần lưu ra file riêng lẻ. Bạn không cần phải chạy kịch bản sửa lỗi thủ công như kiến trúc cũ.
+Ngay khi LLM sinh ra một Blueprint bị sai cú pháp hoặc sai thứ nguyên, `SemanticCompiler` sẽ ném lỗi và bắt LLM sửa ngay lập tức trong bộ nhớ.
+Đặc biệt, hệ thống sử dụng **AlphaPrimitives** để mapping ngược các indicator cũ (`sma`, `boll`) thành các toán tử mới (`ts_mean`).
 
 ### MCTS Engine Tuning (`strategy_workflows/RunMCTS.py`)
 
-MCTS thay thế hoàn toàn hệ thống Optuna cũ. MCTS Brute-force không chỉ tối ưu tham số mà còn tự động khám phá và xây dựng cây biểu thức toán học (AST).
-Động cơ MCTS có khả năng tối ưu hóa tham số động (Dynamic Parameter Optimization):
+MCTS Brute-force không chỉ tối ưu tham số mà còn tự động khám phá và xây dựng cây biểu thức toán học (AST).
 
-- **Window Size & Z-Score Threshold**: Không còn bị gán cứng (hardcode), MCTS sẽ tự động tìm kiếm chu kỳ làm mượt (`window`) và ngưỡng kích hoạt tương thích nhất thông qua cơ chế **Scale-Mismatch Dynamic Tuning** dựa trên timeframe, giúp phá vỡ giới hạn "mù thời gian" của hệ thống cũ. Hệ thống tự động phân loại tín hiệu theo 3 template: **Boolean**, **Ratio**, và **Normalized**.
-- **3-Tier Realistic Validation (Bộ lọc 3 Tầng Thực tế)**: Backtest lịch sử không bao giờ là đủ vì đường cong vốn (Equity Curve) trên quá khứ thường bị overfit. MCTS tích hợp bộ kiểm định 3 tầng khắt khe ngay sau khi Sandbox trả về kết quả tốt:
-  1. **Tier 1 (Empirical Risk of Ruin)**: Dùng Hidden Markov Model (HMM) để giả lập 500 kịch bản giá ngẫu nhiên (Monte Carlo Paths) bao gồm cả những cú sốc thị trường (Stressed Regimes). Toàn bộ kịch bản MC được tiền tính toán (precomputed) và lưu trữ dưới dạng binary cache nén (`float32` joblib) tại `data/MCdata/synthetic_data.pkl`, giúp giảm 50% RAM và đưa thời gian nạp dữ liệu ở các lần chạy sau xuống dưới 1 giây. Nếu có quá 5% kịch bản khiến tài khoản bị cháy (Margin Call ở mức -23% Drawdown), chiến lược bị loại.
-  2. **Tier 2 (Xác suất & Chi phí)**: Đảm bảo phân số Kelly (Kelly Fraction) > 0 và Tỉ lệ bao phủ chi phí (Cost Coverage Ratio) >= 3x (tức là Tiền lời trung bình mỗi lệnh phải lớn gấp 3 lần chi phí trượt giá và phí giao dịch).
-  3. **Tier 3 (Benchmark Đời thực)**: Chiến lược phải đánh bại Lãi suất tiết kiệm không rủi ro (6%/năm) và chỉ số Sharpe của chiến lược Buy & Hold VN30 thụ động. Hầu hết các "chén thánh" giả mạo đều rơi rụng tại cửa ải này.
-
-Bạn có thể tinh chỉnh sức mạnh bằng cách cấu hình số vòng lặp:
-
-- **`MCTS_ITERATIONS`**: Tăng số vòng lặp để đào sâu vào các nhánh tham số phức tạp.
+- **Window Size & Z-Score Threshold**: MCTS sẽ tự động tìm kiếm chu kỳ làm mượt (`window`) và ngưỡng kích hoạt tương thích nhất thông qua cơ chế **Scale-Mismatch Dynamic Tuning** dựa trên timeframe.
+- **3-Tier Realistic Validation (Bộ lọc 3 Tầng Thực tế)**: Backtest lịch sử không bao giờ là đủ. MCTS tích hợp bộ kiểm định 3 tầng khắt khe:
+  1. **Tier 1 (Empirical Risk of Ruin)**: Dùng Hidden Markov Model (HMM) để giả lập 500 kịch bản giá ngẫu nhiên (Monte Carlo Paths) bao gồm cả những cú sốc thị trường. 
+  2. **Tier 2 (Xác suất & Chi phí)**: Đảm bảo phân số Kelly (Kelly Fraction) > 0 và Tỉ lệ bao phủ chi phí (Cost Coverage Ratio) >= 3x.
+  3. **Tier 3 (Benchmark Đời thực)**: Chiến lược phải đánh bại Lãi suất tiết kiệm không rủi ro (6%/năm) và chỉ số Sharpe của chiến lược Buy & Hold VN30 thụ động.
 
 ---
 
-## 5. Cấu hình Model & Context Caching
-
-Hệ thống hỗ trợ tự động Cache (bộ nhớ đệm) cho các LLM chạy trên máy cục bộ (như vLLM, Ollama) giúp tốc độ sinh chiến lược cực kỳ nhanh.
-Bạn có thể cấu hình chọn model trực tiếp qua tham số dòng lệnh:
-
-```bash
-# Chạy mô hình tư duy đám mây
-python main.py generate --model deepseek-thinking
-
-# Chạy mô hình tốc độ cao nội bộ (đã tối ưu Context Caching)
-python main.py generate --model ollama-9b
-```
-
----
-
-## 6. Cơ chế chấm điểm và Hội tụ nội bộ của MCTS (One-pass Pipeline)
+## 5. Cơ chế chấm điểm và Hội tụ nội bộ của MCTS (One-pass Pipeline)
 
 ```mermaid
 graph TD
@@ -179,7 +128,7 @@ graph TD
         init[Khởi tạo Worker] --> gm
         gm --> mcts_run{Vòng lặp MCTS}
         
-        mcts_run -->|Sinh Công thức & Tham số| bt[Backtest Engine 5 năm]
+        mcts_run -->|Sinh Công thức & Tham số| bt[AlphaBacktestEngine 5 năm]
         bt -->|Kết quả Giao dịch| metrics[Tính Toán Metrics]
         
         metrics -->|Calmar < 1.1| reject[Reward = -10.0 <br> Cắt Nhánh]
@@ -211,124 +160,36 @@ graph TD
     style gm fill:#f39c12,color:#fff
 ```
 
-Động cơ MCTS Brute-force sử dụng kiến trúc **One-pass Pipeline** hợp nhất Tầng Khám phá và Tầng Nghiệm thu, với hệ thống chấm điểm đa mục tiêu và hội tụ thông minh:
-
 **`Reward = (0.6 * S_calmar + 0.4 * S_ic) * S_corr`**
 
-**Giải thích các thành phần:**
-- **Máy chém Calmar (Hard Filter)**: Bất kỳ công thức nào có `Calmar < 1.1` sẽ lập tức bị gán Reward = -10.0 để MCTS cắt bỏ nhánh đó. `S_calmar` là hệ số Calmar được chuẩn hóa Min-Max (ngưỡng tối đa 3.0).
-- **`S_ic`**: Hệ số Rank IC đo lường khả năng tiên tri hướng đi của thị trường, chuẩn hóa Min-Max (ngưỡng tối đa 0.15).
-- **`S_corr` (Global Correlation Penalty)**: MCTS được truyền một Ma trận Vị thế Lịch sử (Ký ức toàn cục). `S_corr = 1.0 - MaxCorr`. Nếu công thức sinh ra đạo nhái hoàn toàn một chiến lược đã có, `MaxCorr = 1.0` $\rightarrow$ Reward = 0, ép cây UCT phải rẽ sang hướng khác!
-
-**Hội tụ sớm (Early Stopping):**
-Hệ thống sử dụng hai cơ chế ngắt vòng lặp sớm để tiết kiệm tài nguyên:
-1. **Shannon Entropy**: Theo dõi mức độ phân tán của Nút Gốc. Khi Entropy giảm xuống dưới ngưỡng `0.15` (thuật toán không còn "phân vân"), MCTS sẽ tự động ngắt.
-2. **Patience (Kiên nhẫn)**: Nếu điểm số (Reward) tốt nhất không có sự cải thiện trong suốt một số lượng vòng lặp nhất định (mặc định 5000 vòng), hệ thống sẽ chủ động kết thúc quá trình tìm kiếm.
-
-**Đặc biệt - Risk-Seeking UCT Optimization:**
-Khi duyệt cây tìm kiếm (UCT), MCTS không sử dụng điểm trung bình (Mean Reward) mà sử dụng **Điểm lớn nhất (Max Reward)**. Đây là kỹ thuật "Tail Quantile Optimization", chấp nhận sự không ổn định để tìm ra những chuỗi tham số "đột biến" mang lại hiệu suất cao nhất.
-
-**Cơ chế Lan truyền ngược (Backpropagation Formula):**
-Trong pha Lan truyền ngược, hệ thống cập nhật giá trị cho các nút dọc theo đường đi ($v \in \text{path}$) của phiên chạy thử nghiệm thứ $i$ dựa trên phần thưởng thu được $R$:
-* Cập nhật số lượt ghé thăm (visit count):
-  $$\text{visit\_count}_v \leftarrow \text{visit\_count}_v + 1$$
-* Cập nhật giá trị phần thưởng lớn nhất của nút:
-  $$\text{max\_reward}_v \leftarrow \max(\text{max\_reward}_v, R)$$
-
-Cơ chế này giúp giữ lại dấu vết của các công thức "đột biến" (outliers) có hiệu năng vượt trội trong mỗi nhánh tìm kiếm, hướng thuật toán tập trung đào sâu vào các vùng không gian chiến lược chứa Alpha chất lượng cao. Các nhánh công thức vô dụng sẽ bị loại bỏ thông qua cơ chế cấm tự động (FSA Forbidden Patterns / Linear Amnesia Mitigation).
+Hệ thống sử dụng hai cơ chế ngắt vòng lặp sớm để tiết kiệm tài nguyên: **Shannon Entropy** và **Patience**. Khi duyệt cây tìm kiếm (UCT), MCTS sử dụng **Điểm lớn nhất (Max Reward)** để tìm ra các chuỗi tham số "đột biến".
 
 ---
 
-## 7. Động Cơ Lõi Vectorized & Chống Rò Rỉ Dữ Liệu (Core Engine)
+## 6. Động Cơ Lõi Vectorized & Chống Rò Rỉ Dữ Liệu (Core Engine)
 
-Hệ thống sở hữu một động cơ giả lập siêu tốc (`XNOBacktestEngine`) được thiết kế đặc trị chuẩn mực cho thị trường Phái sinh VN30F:
+Hệ thống sở hữu một động cơ giả lập siêu tốc (`AlphaBacktestEngine`) được thiết kế đặc trị chuẩn mực cho thị trường Phái sinh VN30F:
 
-- **Vectorized O(1) Execution:** Loại bỏ hoàn toàn vòng lặp Python, sử dụng ma trận Numpy để tính toán trạng thái lệnh và Mark-to-Market PnL tức thời.
-- **VN30F Netting Fee:** Phí giao dịch được trừ chính xác dựa trên Delta hợp đồng (chênh lệch vị thế), cứu vớt các chiến lược DCA/Scale-in khỏi hiện tượng Commission Drag.
-- **Lookahead Bias Prevention (Execution Delay):** Engine tự động `shift(1)` toàn bộ tín hiệu. Lệnh sinh ra ở nến hiện tại sẽ tự động dời điểm khớp lệnh sang nến tiếp theo, mô phỏng hoàn hảo độ trễ tính toán và truyền lệnh. Chặn đứng 100% rủi ro MCTS tìm ra "Chén thánh giả".
-- **Worst-Case Margin Call:** Tự động quét giá trị tồi tệ nhất (Worst Price) của từng cây nến (`Low` cho Long, `High` cho Short). Nếu tài khoản chạm ngưỡng tỷ lệ ký quỹ duy trì, hệ thống kích hoạt **Force-Sell** (bán giải chấp) lập tức bằng các toán tử ma trận, mô phỏng sát sao rủi ro cháy tài khoản do Gap giá ATO/ATC.
-- **Vectorized Rollover Penalty:** Bắt sóng chính xác nến ATC của ngày Thứ Năm lần thứ 3 hàng tháng (Ngày đáo hạn phái sinh). Bất kỳ vị thế nào giữ qua nến này sẽ bị tự động chém phí trượt giá (Basis Spread) và 2 chiều phí giao dịch, ép MCTS phải đối diện với chi phí thực tế của việc gồng lệnh dài hạn (Trend-following).
+- **AlphaPrimitives & Vectorized O(1) Execution:** Chạy trực tiếp trên mảng Numpy bằng các thư viện `sliding_window_view` với hiệu năng vượt trội gấp hàng trăm lần Pandas `rolling.apply`.
+- **VN30F Netting Fee:** Phí giao dịch được trừ chính xác dựa trên Delta hợp đồng (chênh lệch vị thế).
+- **Lookahead Bias Prevention (Execution Delay):** Tự động `shift(1)` toàn bộ tín hiệu để mô phỏng độ trễ truyền lệnh.
+- **Worst-Case Margin Call:** Tự động quét giá trị tồi tệ nhất (Worst Price) của từng cây nến (`Low` cho Long, `High` cho Short). Kích hoạt **Force-Sell** lập tức bằng các toán tử ma trận nếu chạm ngưỡng duy trì.
+- **Vectorized Rollover Penalty:** Tự động truy vết nến ATC của ngày Thứ Năm lần thứ 3 hàng tháng (Đáo hạn phái sinh) và áp dụng phí phạt Rollover / Basis Spread, ép MCTS phải tối ưu hóa lợi nhuận ròng sau chi phí thực tế.
 
 ---
 
-## 8. So Sánh Backtest và Vận Hành Thực Tế (Phái Sinh Việt Nam & WorldQuant)
+## 7. Phân rã Template và Cơ chế vào lệnh chi tiết (Position Triggering Mechanism)
 
-Do tính chất đơn giản hóa của quá trình giả lập và kiểm thử, kết quả backtest của hệ thống và vận hành thực tế luôn có những điểm sai lệch. Dưới đây là các phân tích chi tiết:
+Hệ thống phân rã và áp dụng 3 loại Template kích hoạt vị thế riêng biệt dựa trên chiều (Dimension) đầu ra của biểu thức toán học:
 
-### 8.1. So sánh chi tiết với Thị trường Phái sinh Việt Nam (VN30F1M) thực tế
+### 7.1. Boolean Template (Kích hoạt nhị phân trực tiếp)
+- Áp dụng cho các chỉ báo trả về `True`/`False` (Ví dụ: `crossed`, `greater_than`).
+- Chuyển lệnh ngay khi Logic điều kiện thỏa mãn. Giải ngân 100% tài khoản vào Long hoặc Short.
 
-| Đặc tính phái sinh thực tế | Mức độ giả lập của [XNOBacktestEngine](file:///f:/Projects/alpha_farm/core_engine/BacktestEngine.py#L110) | Giới hạn & Điều kiện biên |
-| :--- | :--- | :--- |
-| **Ký quỹ ban đầu (IM) & Đòn bẩy** | **Có hỗ trợ đầy đủ** | Sử dụng tỷ lệ cố định `MARGIN_RATE = 28.5%` và `MAINTENANCE_MARGIN_RATE = 20.0%` tại `AppConfig.py`. Mô phỏng đầy đủ cơ chế tính toán Ký quỹ duy trì và tự động kích hoạt Force-sell (Vectorized Margin Call) ngay lập tức khi Worst Equity vi phạm ngưỡng an toàn. |
-| **Hạch toán lãi/lỗ (MTM & Settlement)** | **Gần đúng (Bar-by-bar)** | Lãi lỗ được cộng dồn trực tiếp vào `equity` tại mỗi nến thay vì hạch toán cuối ngày như VSD. Hỗ trợ đầy đủ giao dịch T+0. |
-| **Đáo hạn phái sinh (Rollover)** | **Có hỗ trợ đầy đủ** | Hệ thống tự động xác định cây nến ATC của ngày Thứ Năm lần thứ 3 hàng tháng. Nếu chiến lược giữ lệnh xuyên kỳ đáo hạn, hệ thống tự động trừ phí phạt trượt giá (Basis Spread) và phí vòng quay (Transaction fees) vào vốn, chống lại việc Overfit của MCTS đối với các chiến lược Hold dài hạn. |
-| **Trượt giá (Slippage) & Độ trễ (Latency)** | **Chỉ hỗ trợ Độ trễ** | Tín hiệu được ép trễ 1 cây nến để mô phỏng Execution Delay. Tuy nhiên hệ thống chưa cài đặt Trượt giá động (Explicit Slippage per tick) mà chỉ gộp phí giao dịch 6000đ/chiều. |
+### 7.2. Ratio Template (Ngưỡng biên độ tĩnh tuyệt đối)
+- Thích hợp cho các bộ chỉ báo giới hạn miền (Bounded) như `ts_rank` hoặc tỷ lệ tương quan.
+- Tự động điền ngưỡng trên và ngưỡng dưới (Upper/Lower Threshold). Hỗ trợ trạng thái Flat/Cash.
 
-### 8.2. So sánh với triết lý quản lý lệnh của WorldQuant (WebSim/BRAIN)
-
-* **Số lượng tài sản (Universe):** 
-  * *WorldQuant:* Quản lý danh mục đa tài sản (hàng nghìn cổ phiếu), tạo ra vector trọng số tương đối (Relative Weights) giữa các mã.
-  * *XNOQuant:* Giao dịch đơn tài sản (VN30F1M), tạo ra tín hiệu hướng tuyệt đối (Long/Short/Cash) tương ứng với giá trị vị thế `[1.0, -1.0, 0.0]`.
-* **Trung hòa danh mục (Neutralization):**
-  * *WorldQuant:* Bắt buộc áp dụng cơ chế Dollar Neutral (Long = Short) và Sector/Industry Neutral. Danh mục luôn được giải ngân đầy đủ (Fully Invested).
-  * *XNOQuant:* Giao dịch định hướng (Directional/Beta), không trung hòa và cho phép rút toàn bộ $100\%$ về tiền mặt.
-* **Tái cơ cấu danh mục (Rebalancing):**
-  * *WorldQuant:* Điều chỉnh tỷ trọng (Rebalance) định kỳ (thường là Daily).
-  * *XNOQuant:* Kích hoạt giao dịch ngay lập tức (Intraday) dựa trên ngưỡng biên độ kỹ thuật (Z-Score) tại từng cây nến cụ thể.
-
-## 9. Phân rã Template và Cơ chế vào lệnh chi tiết (Position Triggering Mechanism)
-
-Để tránh hiện tượng méo tín hiệu (signal distortion) và tối ưu hóa theo đặc tính của từng loại chỉ báo kỹ thuật, hệ thống phân rã và áp dụng 3 loại Template kích hoạt vị thế riêng biệt dựa trên chiều (Dimension) đầu ra của biểu thức logic/toán học (AST):
-
-### 9.1. Boolean Template (Kích hoạt nhị phân trực tiếp)
-- **Mô tả:** Áp dụng cho các chỉ báo hoặc điều kiện logic chỉ trả về hai trạng thái `True` hoặc `False` (ví dụ: mô hình nến Nhật như Harami, Hammer, hoặc giao cắt đường trung bình MA Cross).
-- **Cơ chế vào lệnh:**
-  - Khi biểu thức $\alpha_t$ trả về giá trị `True` (hoặc khác 0):
-    - Hướng Long (`direction = 1.0`): Kích hoạt vị thế mua tối đa: $P_t = \text{position\_scale}$.
-    - Hướng Short (`direction = -1.0`): Kích hoạt vị thế bán tối đa: $P_t = -\text{position\_scale}$.
-  - Khi biểu thức $\alpha_t$ trả về giá trị `False` (hoặc bằng 0):
-    - Hướng Long (`direction = 1.0`): Chuyển vị thế sang bán hoặc đóng vị thế: $P_t = -\text{position\_scale}$.
-    - Hướng Short (`direction = -1.0`): Chuyển vị thế sang mua hoặc đóng vị thế: $P_t = \text{position\_scale}$.
-  - *Đặc điểm:* Luôn giải ngân vị thế 100% đảo chiều liên tục giữa Long và Short, không có trạng thái trung lập (Flat/Cash).
-
-### 9.2. Ratio Template (Ngưỡng biên độ tĩnh tuyệt đối)
-- **Mô tả:** Thích hợp cho các chỉ báo dao động có giới hạn miền giá trị xác định (bounded domain) như RSI (\([0, 100]\)), Stochastic, MFI, hoặc các tỷ lệ tương quan phần trăm.
-- **Cơ chế vào lệnh:**
-  Sử dụng hai ngưỡng tĩnh tuyệt đối tìm kiếm bởi MCTS: Ngưỡng trên ($\theta_{\text{upper}}$, mặc định $[60.0 - 80.0]$) và Ngưỡng dưới ($\theta_{\text{lower}}$, mặc định $[20.0 - 40.0]$).
-  - Với cấu hình Long-side (`direction = 1.0`):
-    $$P_t = \begin{cases} 
-      \text{position\_scale} & \text{nếu } \alpha_t > \theta_{\text{upper}} \\ 
-      -\text{position\_scale} & \text{nếu } \alpha_t < \theta_{\text{lower}} \\ 
-      0.0 & \text{khác} 
-    \end{cases}$$
-  - Với cấu hình Short-side (`direction = -1.0`):
-    $$P_t = \begin{cases} 
-      -\text{position\_scale} & \text{nếu } \alpha_t > \theta_{\text{upper}} \\ 
-      \text{position\_scale} & \text{nếu } \alpha_t < \theta_{\text{lower}} \\ 
-      0.0 & \text{khác} 
-    \end{cases}$$
-  - *Đặc điểm:* Hỗ trợ trạng thái Flat/Cash ($P_t = 0$) khi giá trị chỉ báo nằm trong vùng trung tính ở giữa hai ngưỡng, giúp giảm thiểu tần suất giao dịch và tránh nhiễu khi thị trường đi ngang (sideway).
-
-### 9.3. Normalized Template (Z-Score chuẩn hóa động)
-- **Mô tả:** Thiết kế đặc biệt cho các chuỗi dữ liệu đầu ra không có giới hạn biên (unbounded domain) như Giá (Close, High, Low), Khối lượng (Volume), hoặc hiệu số tuyệt đối giữa các chỉ báo (ví dụ: MACD Histogram, Spread).
-- **Cơ chế vào lệnh:**
-  Trước khi so khớp, giá trị thô của biểu thức $\alpha_t$ sẽ được chuẩn hóa động qua cửa sổ trượt (rolling window) chu kỳ $W$ (do MCTS tối ưu hóa):
-  - Tính trung bình trượt động: $\mu_t = \text{rolling\_mean}(\alpha, W)_t$
-  - Tính độ lệch chuẩn trượt động: $\sigma_t = \text{rolling\_std}(\alpha, W)_t + 10^{-8}$
-  - Tính điểm số Z-score chuẩn hóa: $Z_t = \frac{\alpha_t - \mu_t}{\sigma_t}$
-  Vị thế được kích hoạt bằng cách so sánh trị tuyệt đối của $Z_t$ với ngưỡng độ nhạy $Z_{\text{threshold}}$ (do MCTS tối ưu hóa trong khoảng $[0.5 - 2.5]$):
-  - Với cấu hình Long-side (`direction = 1.0`):
-    $$P_t = \begin{cases} 
-      \text{position\_scale} & \text{nếu } Z_t > Z_{\text{threshold}} \\ 
-      -\text{position\_scale} & \text{nếu } Z_t < -Z_{\text{threshold}} \\ 
-      0.0 & \text{khác} 
-    \end{cases}$$
-  - Với cấu hình Short-side (`direction = -1.0`):
-    $$P_t = \begin{cases} 
-      -\text{position\_scale} & \text{nếu } Z_t > Z_{\text{threshold}} \\ 
-      \text{position\_scale} & \text{nếu } Z_t < -Z_{\text{threshold}} \\ 
-      0.0 & \text{khác} 
-    \end{cases}$$
-  - *Đặc điểm:* Giúp san phẳng xu hướng dài hạn và triệt tiêu tính bất định về mặt thứ nguyên của các dữ liệu thô. Vị thế chỉ được kích hoạt (Long/Short) khi xảy ra sự đột biến vượt trội so với phân phối lịch sử gần nhất trong cửa sổ trượt $W$. Khi giá trị dao động bình thường quanh trung bình trượt ($|Z_t| \le Z_{\text{threshold}}$), hệ thống duy trì vị thế Flat ($0.0$) để bảo toàn vốn.
-
-
+### 7.3. Normalized Template (Z-Score chuẩn hóa động)
+- Áp dụng cho các chỉ báo không có giới hạn miền (Unbounded) như Giá hoặc `ts_mean`.
+- Trực tiếp gọi hàm `ts_zscore` (được tối ưu hóa bằng Vector) để chuẩn hóa tín hiệu, tính điểm Z-score trước khi kích hoạt lệnh Long/Short nếu bứt phá qua ngưỡng Z-Threshold. Hỗ trợ trạng thái Flat/Cash khi thị trường Sideway.

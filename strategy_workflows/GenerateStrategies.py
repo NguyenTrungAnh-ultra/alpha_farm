@@ -8,7 +8,7 @@ if PROJECT_ROOT not in sys.path:
 
 from utilities.AppConfig import PROJECT_ROOT
 """
-Strategy Idea Generation Pipeline (XNO Engine)
+Strategy Idea Generation Pipeline
 =============================================
 Generates Quant logic/formulas via LLM based on Experience Log.
 Output: JSON files in agent/results/ideas/

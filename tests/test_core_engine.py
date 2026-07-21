@@ -1,9 +1,17 @@
 import pytest
 import numpy as np
 import pandas as pd
-from core_engine.BacktestEngine import XNOBacktestEngine, BacktestResult
+from core_engine.BacktestEngine import AlphaBacktestEngine, BacktestResult
+from core_engine.AlphaEngine import (
+    AlphaEngine,
+    AlphaStrategy,
+    AlphaDataProxy,
+    SimpleAlgorithm,
+    DataProxy,
+)
 from core_engine.GenerateReport import compute_metrics
 from utilities.AppConfig import INITIAL_CAPITAL
+
 
 class DummyStrategy:
     def __init__(self, positions):
@@ -12,8 +20,68 @@ class DummyStrategy:
     def run_algorithm(self, df):
         return pd.Series(self.positions, index=df.index)
 
+
+class SampleAlphaStrategy(AlphaStrategy):
+    def __algorithm__(self):
+        long_mask = self.data.close > self.data.open_
+        self.set_positions(long_mask, 0.2)
+
+
+def test_alpha_data_proxy(dummy_ohlcv_data):
+    proxy = AlphaDataProxy(dummy_ohlcv_data)
+    assert proxy.pv_open is dummy_ohlcv_data['Open']
+    assert proxy.pv_high is dummy_ohlcv_data['High']
+    assert proxy.pv_low is dummy_ohlcv_data['Low']
+    assert proxy.pv_close is dummy_ohlcv_data['Close']
+    assert len(proxy.pv_volume) == len(dummy_ohlcv_data)
+    
+    assert proxy.open_ is proxy.pv_open
+    assert proxy.high is proxy.pv_high
+    assert proxy.low is proxy.pv_low
+    assert proxy.close is proxy.pv_close
+    assert proxy.volume is proxy.pv_volume
+    assert (proxy.index == dummy_ohlcv_data.index).all()
+    
+    # Test backward compatibility alias
+    assert DataProxy is AlphaDataProxy
+
+
+def test_alpha_strategy(dummy_ohlcv_data):
+    strategy = SampleAlphaStrategy(param1=10, param2="test")
+    assert strategy.params == {"param1": 10, "param2": "test"}
+    assert strategy.param1 == 10
+    assert strategy.param2 == "test"
+    
+    positions = strategy.run_algorithm(dummy_ohlcv_data)
+    assert isinstance(positions, pd.Series)
+    assert len(positions) == len(dummy_ohlcv_data)
+    
+    expected_mask = dummy_ohlcv_data['Close'] > dummy_ohlcv_data['Open']
+    assert (positions[expected_mask] == 0.2).all()
+    assert (positions[~expected_mask] == 0.0).all()
+    
+    # Test backward compatibility alias
+    assert SimpleAlgorithm is AlphaStrategy
+
+
+def test_alpha_engine_run_and_evaluate(dummy_ohlcv_data):
+    engine = AlphaEngine(initial_capital=1e9)
+    strategy = SampleAlphaStrategy()
+    
+    result = engine.run(strategy, dummy_ohlcv_data)
+    assert isinstance(result, BacktestResult)
+    assert len(result.equity_curve) == len(dummy_ohlcv_data)
+    assert result.initial_capital == 1e9
+    
+    metrics = engine.evaluate(strategy, dummy_ohlcv_data)
+    assert isinstance(metrics, dict)
+    assert 'cagr_pct' in metrics
+    assert 'max_drawdown_pct' in metrics
+    assert 'sharpe_ratio' in metrics
+
+
 def test_pnl_cagr_drawdown(dummy_ohlcv_data):
-    engine = XNOBacktestEngine()
+    engine = AlphaBacktestEngine()
     
     # Simple strategy: go long at bar 10, short at bar 500, flat at 900
     positions = np.zeros(len(dummy_ohlcv_data))
@@ -27,7 +95,7 @@ def test_pnl_cagr_drawdown(dummy_ohlcv_data):
     assert len(result.equity_curve) == len(dummy_ohlcv_data)
     assert result.initial_capital == INITIAL_CAPITAL
     
-    # test compute_metrics
+    # test compute_metrics (from GenerateReport)
     metrics = compute_metrics(result)
     assert 'cagr' in metrics
     assert 'max_drawdown_pct' in metrics
@@ -37,8 +105,9 @@ def test_pnl_cagr_drawdown(dummy_ohlcv_data):
     assert isinstance(metrics['cagr'], float)
     assert isinstance(metrics['max_drawdown_pct'], float)
 
+
 def test_vectorized_margin_call():
-    engine = XNOBacktestEngine()
+    engine = AlphaBacktestEngine()
     
     # Create extreme dummy data where market drops huge, triggering margin call on a long position
     dates = pd.date_range(start='2020-01-01', periods=10, freq='15min')

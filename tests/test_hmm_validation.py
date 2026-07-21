@@ -1,5 +1,6 @@
 import os
 import pytest
+pytest.importorskip('hmmlearn')
 import numpy as np
 import pandas as pd
 from unittest.mock import patch

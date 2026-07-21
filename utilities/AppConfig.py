@@ -73,7 +73,7 @@ MARGIN_RATE = 0.285                # Tỷ lệ ký quỹ (28.5%)
 MAINTENANCE_MARGIN_RATE = 0.20     # Tỷ lệ ký quỹ duy trì (Maintenance Margin)
 
 # === Vốn mặc định ===
-INITIAL_CAPITAL = 1_000_000_000    # 1 tỷ VND (chuẩn XNOQuant)
+INITIAL_CAPITAL = 1_000_000_000    # 1 tỷ VND
 
 # === Khoảng backtest ===
 BACKTEST_START = '2020-01-01'

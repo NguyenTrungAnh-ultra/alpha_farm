@@ -19,8 +19,7 @@ from utilities.AppConfig import (
     BENCHMARK_BASELINE_PATH
 )
 import json
-from core_engine.BacktestEngine import load_data
-from core_engine.PlatformEmulator import XNOPlatformEmulator
+from core_engine.BacktestEngine import load_data, AlphaBacktestEngine
 
 def fit_hmm_model(df: pd.DataFrame, n_components: int, random_state: int = 42):
     """Fits Gaussian HMM to returns, rolling volatility, and relative volume features."""
@@ -282,7 +281,7 @@ def validate_strategy_with_hmm(strategy, normal_paths: list, stressed_paths: lis
         reason: str
         details: dict
     """
-    emulator = XNOPlatformEmulator()
+    engine = AlphaBacktestEngine()
     
     # -------------------------------------------------------------
     # 1. Thu thập dữ liệu từ Normal Paths
@@ -294,7 +293,7 @@ def validate_strategy_with_hmm(strategy, normal_paths: list, stressed_paths: lis
     
     for sim_df in normal_paths:
         try:
-            res = emulator.engine.run(strategy, sim_df)
+            res = engine.run(strategy, sim_df)
             sh, ca, dd = calculate_metrics_for_result(res)
             norm_sharpes.append(sh)
             norm_cagrs.append(ca)
@@ -393,7 +392,7 @@ def validate_strategy_with_hmm(strategy, normal_paths: list, stressed_paths: lis
     stressed_sharpes = []
     for sim_df in stressed_paths:
         try:
-            res = emulator.engine.run(strategy, sim_df)
+            res = engine.run(strategy, sim_df)
             sh, ca, dd = calculate_metrics_for_result(res)
             stressed_sharpes.append(sh)
         except Exception:

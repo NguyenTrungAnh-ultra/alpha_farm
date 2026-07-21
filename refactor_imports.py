@@ -29,21 +29,17 @@ replacements = [
     (r'import backtest\.reporting', r'import core_engine.GenerateReport'),
     (r'backtest\.reporting', r'core_engine.GenerateReport'),
     
-    (r'from backtest\.strategy import', r'from core_engine.XnoEngine import'),
-    (r'import backtest\.strategy', r'import core_engine.XnoEngine'),
-    (r'backtest\.strategy', r'core_engine.XnoEngine'),
+    (r'from backtest\.strategy import', r'from core_engine.AlphaEngine import'),
+    (r'import backtest\.strategy', r'import core_engine.AlphaEngine'),
+    (r'backtest\.strategy', r'core_engine.AlphaEngine'),
     
-    (r'from xno_sdk\.engine import', r'from core_engine.XnoEngine import'),
-    (r'import xno_sdk\.engine', r'import core_engine.XnoEngine'),
-    (r'xno_sdk\.engine', r'core_engine.XnoEngine'),
+    (r'from xno_sdk\.engine import', r'from core_engine.AlphaEngine import'),
+    (r'import xno_sdk\.engine', r'import core_engine.AlphaEngine'),
+    (r'xno_sdk\.engine', r'core_engine.AlphaEngine'),
     
-    (r'from xno_sdk\.emulator import', r'from core_engine.PlatformEmulator import'),
-    (r'import xno_sdk\.emulator', r'import core_engine.PlatformEmulator'),
-    (r'xno_sdk\.emulator', r'core_engine.PlatformEmulator'),
-    
-    (r'from xno_sdk\.series import', r'from core_engine.RestrictedSeries import'),
-    (r'import xno_sdk\.series', r'import core_engine.RestrictedSeries'),
-    (r'xno_sdk\.series', r'core_engine.RestrictedSeries'),
+    (r'from core_engine\.XnoEngine import', r'from core_engine.AlphaEngine import'),
+    (r'import core_engine\.XnoEngine', r'import core_engine.AlphaEngine'),
+    (r'core_engine\.XnoEngine', r'core_engine.AlphaEngine'),
     
     (r'from agent\.gemini_client import', r'from llm_clients.GeminiClient import'),
     (r'import agent\.gemini_client', r'import llm_clients.GeminiClient'),
@@ -60,10 +56,6 @@ replacements = [
     (r'from agent\.pipeline import', r'from strategy_workflows.GenerateStrategies import'),
     (r'import agent\.pipeline', r'import strategy_workflows.GenerateStrategies'),
     (r'agent\.pipeline', r'strategy_workflows.GenerateStrategies'),
-    
-    (r'from agent\.auto_submit import', r'from strategy_workflows.SubmitStrategies import'),
-    (r'import agent\.auto_submit', r'import strategy_workflows.SubmitStrategies'),
-    (r'agent\.auto_submit', r'strategy_workflows.SubmitStrategies'),
     
     (r'from agent\.mcts_pipeline import', r'from strategy_workflows.RunMCTS import'),
     (r'import agent\.mcts_pipeline', r'import strategy_workflows.RunMCTS'),
@@ -96,10 +88,6 @@ replacements = [
     (r'from agent\.mcts_dimensions import', r'from strategy_workflows.MCTSDimensions import'),
     (r'import agent\.mcts_dimensions', r'import strategy_workflows.MCTSDimensions'),
     (r'agent\.mcts_dimensions', r'strategy_workflows.MCTSDimensions'),
-    
-    (r'from agent\.sandbox_prefixer import', r'from utilities.SandboxPrefixer import'),
-    (r'import agent\.sandbox_prefixer', r'import utilities.SandboxPrefixer'),
-    (r'agent\.sandbox_prefixer', r'utilities.SandboxPrefixer'),
     
     (r'agent\.util\.deepseek4free', r'utilities.deps.deepseek4free')
 ]
