@@ -34,7 +34,7 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
 
 - ⏸️ Gộp alpha: trung bình vị thế top-5 trọng số đều (đang ghi trong proposal) hay thêm tổ hợp tuyến tính kiểu RiskMiner làm cấu hình phụ. Suy đoán của Claude: trọng số đều an toàn hơn vì ít dữ liệu; chưa ai chốt.
 - ⏸️ Cách tạo placebo chính: hoán vị lợi suất (theo Masters/Aronson) hay đổi dấu theo ngày. Proposal ghi hoán vị là chính.
-- ⏸️ Tệp nháp chưa commit ngoài `docs/` có giữ không: `docs/log.txt` (log console một lượt chạy LLM tháng 6), `PROJECT.md` và `ORIGINAL_REQUEST.md` ở gốc (đề bài của đợt refactor tháng 7), thư mục `.agents/` (sản phẩm phụ của các agent đợt đó). Chưa commit nên xoá là mất hẳn.
+- ✅ Tệp nháp (`docs/log.txt`, `PROJECT.md`, `ORIGINAL_REQUEST.md`, `.agents/`): người dùng chọn chuyển vào `docs/archive/` (2026-10-13).
 - ⏸️ Độ dài cửa sổ walk-forward (2 năm tìm / 6 tháng đánh giá) và số seed (5), K = 19 lần placebo: do Claude đề xuất, người dùng chưa xác nhận.
 
 ## 4. Nợ
@@ -42,4 +42,5 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
 - ⛔ `token.txt` (token DeepSeek) nằm trong lịch sử git đã đẩy lên GitHub; link repo có trong proposal. Cần thu hồi token.
 - `results/pushed/` (chiến lược thế hệ đầu) bị xoá ở commit `3bdc8fd`; khôi phục bằng `git checkout eec5f06 -- results/pushed` nếu cần so sánh RQ2.
 - `GenerateStrategies.load_experience_log` đọc `utilities/experience_log.md` — tệp không tồn tại nên prompt LLM nhận phần "kinh nghiệm" rỗng. Xử lý cùng lúc sửa prompt (việc 1).
-- `docs/proposal/`, `CLAUDE.md`, `docs/ROADMAP.md` và đợt dọn tài liệu chưa commit; `results/mcts_stats.json` đang sửa dở.
+- `results/mcts_stats.json` có thay đổi chưa commit (do lượt chạy MCTS cũ ghi thêm).
+- Ảnh chữ ký và PDF đã ký trong `docs/proposal/` chỉ nằm trên máy (`.gitignore`), không có trong git; mất máy là mất.
