@@ -1,0 +1,63 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.2, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\TPAA\AppData\Local\Python\pythoncore-3.14-64\python.exe
+cachedir: .pytest_cache
+rootdir: f:\Projects\alpha_farm
+configfile: pytest.ini
+plugins: anyio-4.12.0, langsmith-0.8.3, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 13 items
+
+tests/test_core_engine.py::test_alpha_data_proxy PASSED
+tests/test_core_engine.py::test_alpha_strategy PASSED
+tests/test_core_engine.py::test_alpha_engine_run_and_evaluate PASSED
+tests/test_core_engine.py::test_pnl_cagr_drawdown PASSED
+tests/test_core_engine.py::test_vectorized_margin_call PASSED
+.agents/challenger_m3_2/test_challenger_m3_2_verification.py::test_engine_integration PASSED
+.agents/challenger_m3_2/test_challenger_m3_2_verification.py::test_margin_requirements_and_long_margin_call PASSED
+.agents/challenger_m3_2/test_challenger_m3_2_verification.py::test_short_margin_call PASSED
+.agents/challenger_m3_2/test_challenger_m3_2_verification.py::test_fee_calculations_and_netting PASSED
+.agents/challenger_m3_2/test_challenger_m3_2_verification.py::test_pnl_metrics_consistency PASSED
+.agents/challenger_m3_2/test_challenger_m3_2_verification.py::test_unrealized_pnl_with_open_position_at_end PASSED
+.agents/challenger_m3_2/test_challenger_m3_2_verification.py::test_rollover_penalty_full_month_vs_sliced_month FAILED
+.agents/challenger_m3_2/test_challenger_m3_2_verification.py::test_daily_vs_bar_drawdown_discrepancy Intra-day Bar-level Max Drawdown: -29.82%
+Daily Resampled Max Drawdown:    0.00%
+PASSED
+
+================================== FAILURES ===================================
+______________ test_rollover_penalty_full_month_vs_sliced_month _______________
+
+    def test_rollover_penalty_full_month_vs_sliced_month():
+        """
+        Empirical Test: Rollover penalty detection logic flaw on full month vs sliced dataset.
+        """
+        engine = XNOBacktestEngine(initial_capital=1_000_000_000.0, fee_per_contract=6000.0)
+    
+        # 1. Full month dataset (Jan 2025 has Thursdays on Jan 2, Jan 9, Jan 16, Jan 23, Jan 30)
+        dates_full = pd.date_range('2025-01-01 09:00', '2025-01-31 14:45', freq='15min')
+        prices_full = np.ones(len(dates_full)) * 1000.0
+        df_full = pd.DataFrame({
+            'Open': prices_full, 'High': prices_full+1, 'Low': prices_full-1, 'Close': prices_full, 'Volume': 1000.0
+        }, index=dates_full)
+    
+        positions_full = np.ones(len(dates_full))
+        class AlwaysLong:
+            def run_algorithm(self, df):
+                return pd.Series(np.ones(len(df)), index=df.index)
+    
+        result_full = engine.run(AlwaysLong(), df_full)
+    
+        # On full month data, Jan 16 is correctly identified as 3rd Thursday!
+        # Expected fee = open fee (210k) + rollover fee (35 * (50k + 12k) = 2,170k) = 2,380k
+>       assert result_full.total_fees == 2_380_000.0, f"Full month fees expected 2,380,000 but got {result_full.total_fees}"
+E       AssertionError: Full month fees expected 2,380,000 but got 7630000.0
+E       assert 7630000.0 == 2380000.0
+E        +  where 7630000.0 = BacktestResult(equity_curve=2025-01-01 09:00:00    1.000000e+09\n2025-01-01 09:15:00    9.997900e+08\n2025-01-01 09:30:00    9.997900e+08\n2025-01-01 09:45:00    9.997900e+08\n2025-01-01 10:00:00    9.997900e+08\n                           ...     \n2025-01-31 13:45:00    9.923700e+08\n2025-01-31 14:00:00    9.923700e+08\n2025-01-31 14:15:00    9.923700e+08\n2025-01-31 14:30:00    9.923700e+08\n2025-01-31 14:45:00    9.923700e+08\nFreq: 15min, Name: equity, Length: 2904, dtype: float64, positions=2025-01-01 09:00:00    0.0\n2025-01-01 09:15:00    1.0\n2025-01-01 09:30:00    1.0\n2025-01-01 09:45:00    1.0\n2025-01-01 10:00:00    1.0\n                      ... \n2025-01-31 13:45:00    1.0\n2025-01-31 14:00:00    1.0\n2025-01-31 14:15:00    1.0\n2025-01-31 14:30:00    1.0\n2025-01-31 14:45:00    1.0\nFreq: 15min, Length: 2904, dtype: float64, trades=[], initial_capital=1000000000.0, final_equity=np.float64(992370000.0), total_fees=7630000.0, total_trades=np.int64(1), first_trade_open_fee=210000.0).total_fees
+
+.agents\challenger_m3_2\test_challenger_m3_2_verification.py:297: AssertionError
+=========================== short test summary info ===========================
+FAILED .agents/challenger_m3_2/test_challenger_m3_2_verification.py::test_rollover_penalty_full_month_vs_sliced_month - AssertionError: Full month fees expected 2,380,000 but got 7630000.0
+assert 7630000.0 == 2380000.0
+ +  where 7630000.0 = BacktestResult(equity_curve=2025-01-01 09:00:00    1.000000e+09\n2025-01-01 09:15:00    9.997900e+08\n2025-01-01 09:30:00    9.997900e+08\n2025-01-01 09:45:00    9.997900e+08\n2025-01-01 10:00:00    9.997900e+08\n                           ...     \n2025-01-31 13:45:00    9.923700e+08\n2025-01-31 14:00:00    9.923700e+08\n2025-01-31 14:15:00    9.923700e+08\n2025-01-31 14:30:00    9.923700e+08\n2025-01-31 14:45:00    9.923700e+08\nFreq: 15min, Name: equity, Length: 2904, dtype: float64, positions=2025-01-01 09:00:00    0.0\n2025-01-01 09:15:00    1.0\n2025-01-01 09:30:00    1.0\n2025-01-01 09:45:00    1.0\n2025-01-01 10:00:00    1.0\n                      ... \n2025-01-31 13:45:00    1.0\n2025-01-31 14:00:00    1.0\n2025-01-31 14:15:00    1.0\n2025-01-31 14:30:00    1.0\n2025-01-31 14:45:00    1.0\nFreq: 15min, Length: 2904, dtype: float64, trades=[], initial_capital=1000000000.0, final_equity=np.float64(992370000.0), total_fees=7630000.0, total_trades=np.int64(1), first_trade_open_fee=210000.0).total_fees
+======================== 1 failed, 12 passed in 0.26s =========================
+
+Pytest Exit Code: 1

@@ -1,0 +1,573 @@
+\documentclass[12pt,a4paper,oneside]{book}
+\usepackage{amssymb,amsthm,amsmath,amsfonts}
+\renewcommand{\qedsymbol}{}  % removes the Q.E.D. box
+\usepackage{graphicx, graphics, epsf, rotate}
+\usepackage[left= 3cm,right= 3cm,top=3cm,bottom=3cm]{geometry}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{interval}
+%\usepackage{biblatex}
+%\usepackage{enumitem}
+\usepackage{amssymb}
+\usepackage{bm}
+\usepackage{bbm}
+\usepackage{makecell}
+\usepackage{longtable}
+\usepackage{setspace}
+\usepackage{enumerate}
+\usepackage{color}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{blkarray} 
+\usepackage{indentfirst}
+\usepackage{float}
+\usepackage{framed}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage[utf8]{inputenc}
+\usepackage{amsthm}
+\usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{example}[definition]{Example}
+\newtheorem{remark}[definition]{Remark}
+\newtheorem{corollary}[definition]{Corollary}
+\newtheorem{proposition}[definition]{Proposition}
+\newtheorem{lemma}[definition]{Lemma}
+\pagestyle{fancy}
+\newcounter{mylistcntr}
+\renewcommand{\headrulewidth}{0.1pt}
+\fancyhf{}
+\lhead{\nouppercase{\leftmark}}
+\cfoot{\thepage}
+\linespread{1.5} 
+\newlength{\defbaselineskip}
+\setlength{\defbaselineskip}{\baselineskip}
+\newcommand{\setlinespacing}[1]%
+{\setlength{\baselineskip}{#1 \defbaselineskip}}
+
+%%Thay Quan add, to locate position of a signature
+\usepackage{tikz}
+\usepackage{graphicx}
+\usetikzlibrary{calc}
+%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+	\begin{titlepage}
+		\begin{center}
+			\bf{VIETNAM NATIONAL UNIVERSITY – HO CHI MINH CITY}\\
+			\bf{INTERNATIONAL UNIVERSITY}\\
+			\bf{DEPARTMENT OF MATHEMATICS}\\
+			\hfill
+			\begin{center}
+				\includegraphics[scale=0.6]{logo.png}
+			\end{center}
+			\vspace*{1 cm}
+			
+			\bf  {GRADUATION THESIS}
+			% ở vòng proposal: THESIS PROPOSAL
+			\vspace*{1 cm}
+			
+			{\large\bf  Portfolio Optimization with Monte Carlo blah...}\\
+			\smallskip
+			\bf {Submitted in partial fulfillment of the requirements for the degree of}\\
+			\bf {BACHELOR OF SCIENCE}\\
+			\bf {IN APPLIED MATHEMATICS}\\
+			\bf {SPECIALIZATION IN FINANCIAL ENGINEERING }\\
+			\bf {AND RISK MANAGEMENT}\\
+			
+			\vspace*{1 cm}
+		\end{center}
+		\begin{tabular}{ll}
+			\bf Student's Name:  &\bf NGUYEN VAN KHANH \\
+			\bf Student's ID:   &\bf MAMAIUAAAA \\
+			\bf Thesis Supervisor:&\bf ASSOC. PROF. NGUYEN VAN A\\
+			
+		\end{tabular}
+		
+		
+		\vspace*{1cm}
+		\begin{center}
+			{\bf Ho Chi Minh City, Vietnam}\\
+			{\bf June 2026}\\
+		\end{center}
+	
+		\newpage
+		\thispagestyle{empty}	
+		\begin{center}
+			\large\textbf{Portfolio Optimization with Monte Carlo etc} \\
+			\normalsize{By}\\
+			\large{NGUYEN VAN KHANH}\\
+			\vskip10mm
+			\normalsize{Submitted to DEPARTMENT OF MATHEMATICS,\\INTERNATIONAL UNIVERSITY, HO CHI MINH CITY\\ in partial fulfillment of requirements for the degree of\\
+				BACHELOR OF SCIENCE \\ 
+				IN APPLIED MATHEMATICS \\
+				SPECIALIZATION IN FINANCIAL ENGINEERING  \\ 
+				AND RISK MANAGEMENT}\\
+			June 2026
+			\vskip20mm
+		\end{center}
+        Signature of Student:
+        \rule[0em]{26.7em}{0.5pt}
+            \begin{flushright}NGUYEN VAN KHANH \end{flushright}
+		\vskip10mm
+		Certified by: \rule[0em]{30em}{0.5pt}
+		\begin{flushright} ASSOC. PROF. NGUYEN VAN AN\\ Thesis Supervisor 
+		\end{flushright}
+		\vskip10mm
+		Approved by:
+        \rule[0em]{30em}{0.5pt}
+        \begin{flushright} ASSOC. PROF. MAI DUC THANH\\ ACTING HEAD OF DEPARTMENT OF MATHEMATICS
+        \end{flushright}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	\end{titlepage}
+		
+		
+	\newpage
+	\thispagestyle{plain}
+	\addcontentsline{toc}{chapter}{\numberline{}ABSTRACT}
+	\begin{center}
+		\large\textbf{Portfolio Optimization with Monte Carlo etc} \\
+		\normalsize{By}\\
+		\large{NGUYEN VAN KHANH}\\
+		\vskip10mm
+		\normalsize{Submitted to DEPARTMENT OF MATHEMATICS,\\INTERNATIONAL UNIVERSITY, HO CHI MINH CITY\\ in partial fulfillment of requirements for the degree of\\
+			BACHELOR OF SCIENCE \\ 
+			IN APPLIED MATHEMATICS \\
+			SPECIALIZATION IN FINANCIAL ENGINEERING  \\ 
+			AND RISK MANAGEMENT}\\
+		%One can delate "Applied Math, Specialized FERM etc to give more space for the content of the Abstract.
+		\vspace*{0.5cm}
+		
+		
+	%\vskip1mm
+	\large\textbf{ABSTRACT}\\
+	\end{center}
+	\vskip2mm
+This thesis studies ....Using five major Vietnamese stocks (HPG, VCB, CTG, MSN, MWG) over a five-year period (2020-2025), the study evaluates ..... The research addresses etc .... These results confirm ...................................
+\vskip10mm
+\textbf{Keywords:} Portfolio optimization, Monte Carlo methods, MCMC, Metropolis-Hastings, Gibbs sampling, Bayesian inference, asset allocation, Python.
+		
+\newpage 
+\clearpage
+\chapter*{ACKNOWLEDGEMENT}
+\addcontentsline{toc}{chapter}{ACKNOWLEDGEMENT}  % This ensures it appears in the Table of Contents
+
+	
+blah............................
+
+	\newpage 
+	\clearpage	
+	
+	\mainmatter
+	\tableofcontents
+	\newpage 
+	\clearpage
+
+    \mainmatter
+\listoffigures
+\newpage 
+\clearpage
+
+
+\mainmatter
+\listoftables
+\newpage 
+\clearpage
+
+    
+\chapter*{List of Abbreviations}
+\addcontentsline{toc}{chapter}{List of Abbreviations}
+\begin{description}
+    \item[MCS] Monte Carlo Simulations 
+    \item[MCMC] Markov Chain Monte Carlo
+    \item[HPG] Hoa Phat Group Joint Stock Company
+    \item[VCB] Joint Stock Commercial Bank for Foreign Trade of Vietnam
+    \item[CTG] Vietnam Joint Stock Commercial Bank for Industry and Trade
+    \item[MSN] Masan Group Corporation
+    \item[MWG] Mobile World Investment Corporation
+    \item[LKJ] Lewandowski-Kurowicka-Joe
+    \item[MSE] Mean Square Error
+    \item[ESS] Effective Sample Size
+    \item[SLSQP] Sequential Least Squares Programming
+    \item[MCSE]  Monte Carlo Standard Errors
+    \item[HDI] Highest Density Intervals
+\end{description}
+
+\clearpage
+\newpage 
+\clearpage
+
+\chapter{INTRODUCTION}
+
+
+ {\color{red}Introduction:} An initial Introduction will be composed to establish a summary of existing research related to the question, a statement of the problem, and the purpose of the study (why it is important?). State what do you hope to learn/discover. {\color{red}State the thesis contents.}\\
+
+...
+\section{Motivation and Background}
+
+
+ 
+Portfolio optimization has remained a cornerstone of modern finance since Markowitz's seminal work in 1952, which introduced the mean-variance framework for constructing efficient portfolios \cite{markowitz1952} ....
+
+Bayesian Markov Chain Monte Carlo (MCMC) methods represent particularly powerful tools for portfolio optimization due to their ability to handle complex, high-dimensional parameter spaces that characterize modern financial models. Unlike analytical approximations or classical optimization techniques, MCMC methods enable exact sampling from posterior distributions of portfolio parameters, providing comprehensive uncertainty quantification that is essential for robust decision-making \cite{JohannesPolson2010}.....
+
+
+\section{Objective}
+
+The primary objective of this research is to 
+\section{Scope}
+
+The empirical analysis is conducted using a strategically curated portfolio comprising five prominent Vietnamese equities traded on the Ho Chi Minh Stock Exchange (HOSE), representing distinct economic sectors fundamental to Vietnam's capital market structure. The dataset selection follows rigorous criteria to ensure statistical robustness and practical relevance for portfolio optimization analysis.
+
+\begin{table}[H]
+\centering
+\caption{Asset Composition and Sectoral Classification}
+\begin{tabular}{|c|p{12cm}|}
+\hline
+\textbf{Ticker} & \textbf{Company Name and Sector} \\
+\hline
+HPG & Hoa Phat Group Joint Stock Company \newline \textit{Industrial Manufacturing Sector} \\
+\hline
+VCB & Joint Stock Commercial Bank for Foreign Trade of Vietnam \newline \textit{Financial Services Sector} \\
+\hline
+CTG & Vietnam Joint Stock Commercial Bank for Industry and Trade \newline \textit{Financial Services Sector} \\
+\hline
+MSN & Masan Group Corporation \newline \textit{Consumer Discretionary Sector} \\
+\hline
+MWG & Mobile World Investment Corporation \newline \textit{Technology and Retail Sector} \\
+\hline
+\end{tabular}
+\end{table}
+
+.......
+
+  The rest of the thesis report is organized as follows. Chapter \ref{ch2} introduces related literature review and approaches. Chapter \ref{ch3} summarizes the theoretical background and methodology. Next, the data processing, MCMC simulations and results are presented in Chapter \ref{ch4}. Finally, Chapter \ref{ch5} is reserved for the conclusion and future study. 
+  
+
+\chapter{LITERATURE REVIEW}
+\label{ch2}
+
+What do we already know about this area of study? {\color{blue}Review of related/relevant research.} That is, summarize and synthesize the ideas/results that were created by previous authors, {\color{blue}without implementing personal opinions}. $\to$ ``big picture''.\\
+(One can move the literature review to ``Introduction'' if needed)\\
+
+
+
+......................\\
+
+This research builds upon the foundational work in modern portfolio theory, beginning with Markowitz's seminal contribution \cite{markowitz1952} on mean-variance optimization, which established the mathematical framework for systematic portfolio construction. Subsequent research has identified fundamental limitations of the classical approach, including sensitivity to parameter estimation errors \cite{michaud1989, chopraZiemba1993} and poor performance relative to naive diversification strategies \cite{demiguel2009}. These findings have motivated the development of alternative optimization frameworks that explicitly account for parameter uncertainty and estimation risk....
+
+blah
+
+
+
+\chapter{METHODOLOGY}
+\label{ch3}
+
+This chapter presents the methodological framework for enhancing portfolio optimization using Monte Carlo simulations within a Bayesian inference setting. It introduces key MCMC techniques: Metropolis-Hastings and Gibbs sampling, and then revisits Markowitz Mean-Variance Theory as a benchmark for comparison.
+
+\section{Bayesian Inference and Monte Carlo Simulations}
+
+\subsection{Bayesian Inference}
+
+....
+
+\subsubsection{Probability Notation and Prior Distributions}
+
+The symbol $p(\cdot)$ is consistently used to denote either a probability density function or a probability mass function, depending on whether the variable is continuous or discrete....
+
+\subsubsection{Fundamental Principles}
+
+\begin{definition}[Monte Carlo Integration]
+Monte Carlo integration approximates integrals of the form $\int g(\theta)\pi(\theta|x)d\theta$ by replacing integration with sampling and averaging. For a target distribution $\pi(\theta|x)$ and integrable function $g(\theta)$, the Monte Carlo estimator is:
+\begin{equation}
+\hat{I}_n = \frac{1}{n}\sum_{i=1}^{n} g(\theta_i),
+\end{equation}
+where $\{\theta_1, \theta_2, \ldots, \theta_n\}$ are independent samples from $\pi(\theta|x)$.
+\end{definition}
+
+The foundation of Monte Carlo methods in Bayesian inference rests on the Law of Large Numbers and the ability to approximate expectations through sample averages. For a posterior distribution $\pi(\theta|x)$, if we can generate a sequence of samples $\{\theta_1, \theta_2, \ldots, \theta_n\}$ from this distribution, then any posterior expectation can be approximated as:
+
+\begin{equation}
+E[g(\theta)|x] \approx \frac{1}{n}\sum_{i=1}^{n} g(\theta_i). 
+\end{equation}
+
+
+\subsubsection{Theoretical Foundation}
+
+..........
+
+
+\section{Markov Chain Monte Carlo}
+
+\subsection{Markov Chain}
+
+This section provides the theoretical foundation of Markov chains that is essential for understanding MCMC methods. MCMC algorithms is constructed by Markov chains using transition matrices that define the probabilities of moving between states, with random walk processes serving as a fundamental example where each step moves between neighboring states. These chains possess the crucial property of having a stationary probability distribution that remains unchanged over time, while irreducibility ensures the chain can eventually reach any state and recurrence guarantees infinite returns to any state. Together, these properties ensure consistent long-term behavior regardless of the starting point, which is critical since MCMC algorithms begin from arbitrary initial values. As the chain evolves, it converges to its stationary distribution, enabling the fundamental MCMC approximation where sample averages converge to true expectations under the target distribution. This convergence property justifies using MCMC samples for statistical inference and forms the mathematical foundation for all MCMC methods.
+
+One fundamental example is the random walk process.
+
+\begin{definition}
+A sequence of random variables ${X_n}$ is called a random walk if it satisfies:
+\begin{equation}
+X_{n+1} = X_n + \varepsilon_n,
+\end{equation}
+where $\varepsilon_n$ is generated independently of $X_n, X_{n-1}, \ldots$. When the distribution of $\varepsilon_n$ is symmetric about zero, the sequence is termed a symmetric random walk.
+\end{definition}
+
+
+........................\\
+
+...............................
+
+An important but distinct property is \textbf{time homogeneity}, which states that the conditional distribution of $X_{n+1}$ given $X_n = s_i$ is the same for all $n$. In other words, the transition probabilities do not change over time:
+
+\begin{equation}
+P(X_{n+1} = s_j \mid X_n = s_i) = P(X_1 = s_j \mid X_0 = s_i), \quad \text{for all } n \geq 0.
+\end{equation}
+
+The elements of the transition matrix $P$ are called \textbf{transition probabilities}. The transition probability $P_{i,j}$ is the conditional probability of being in state $s_j$ given that we are in state $s_i$.
+Every transition matrix satisfies:
+\[
+    P =
+    \begin{bmatrix}
+        P_{11} & P_{12} & \cdots & P_{1j} \\
+        P_{21} & P_{22} & \cdots & P_{2j} \\
+        \vdots & \vdots & \ddots & \vdots \\
+        P_{i1} & P_{i2} & \cdots & P_{ij}
+    \end{bmatrix}, 
+\]
+\[
+    P_{i,j} \geq 0 \quad \text{for all } i, j \in {1, \ldots, k}, \tag{1} 
+\]
+\[
+    \sum_{j=1}^k P_{i,j} = 1 \quad \text{for all } i \in {1, \ldots, k}. \tag{2}
+\]
+
+Property (1) reflects that conditional probabilities are always non-negative, and property (2) states that the probabilities sum to 1:
+\begin{equation}
+    P(X_{n+1} = s_1 | X_n = s_i) + P(X_{n+1} = s_2 | X_n = s_i) + \cdots + P(X_{n+1} = s_k | X_n = s_i) = 1.
+\end{equation}
+
+.............
+
+\subsubsection{Recurrence and Transience}
+
+Consider a Markov chain ${X_n : n \in \mathbb{N}_0}$ on state space $E$ with transition matrix $P$.
+
+\begin{definition}\label{def:recurrent}
+A state $i \in E$ is called \textbf{recurrent} if
+\begin{equation}
+\mathbb{P}_i[X_n = i \text{ for infinitely many } n] = 1.
+\end{equation}
+\end{definition}
+
+.......................\\
+........................\\
+
+
+\chapter{EXERIMENTS AND RESULTS}
+\label{ch4}
+
+\section{Traditional Markowitz Portfolio Optimization Implementation}
+
+\subsection{Implementation Methodology}
+.......
+
+\subsection{Empirical Results and Portfolio Characteristics}
+
+The optimization algorithm converged to an optimal solution demonstrating extreme concentration characteristics:
+
+\begin{table}[H]
+\centering
+\caption{Optimal Portfolio Weights and Performance Metrics}
+\begin{tabular}{l r}
+\hline
+\textbf{Item} & \textbf{Value} \\
+\hline
+\multicolumn{2}{l}{\textbf{Asset Weights}} \\
+HPG (Hoa Phat Group)  & 51.57\% \\
+VCB (Vietcombank)     & 0.00\%  \\
+CTG (VietinBank)      & 48.43\% \\
+MSN (Masan Group)     & 0.00\%  \\
+MWG (Mobile World)    & 0.00\%  \\
+\hline
+\multicolumn{2}{l}{\textbf{Portfolio Performance}} \\
+Expected Return       & 8.20\% (annualized) \\
+Volatility            & 22.31\% (annualized) \\
+Sharpe Ratio          & 0.5405 \\
+\hline
+\end{tabular}
+\end{table}
+
+
+.............
+
+
+\newpage
+
+\section{Markov Chain Monte Carlo method: Metropolis-Hasting}
+
+\subsection{Metropolis-Hastings Implementation for Parameter Uncertainty}
+...................\\
+...............
+
+The results demonstrate favorable tail risk characteristics, with CVaR (5\%) of 5.98\% indicating manageable downside exposure relative to the expected return of 23.51\%. The relationship between VaR and CVaR values suggests well-behaved tail behavior without extreme loss concentrations beyond the VaR thresholds.
+
+\begin{figure}[h]
+    \begin{subfigure}{0.5\linewidth}
+        \centering
+        \includegraphics[width=1\linewidth]{MH_return.png}
+    \end{subfigure}
+    \begin{subfigure}{0.5\linewidth}
+        \centering
+        \includegraphics[width=1\linewidth]{MH_vol.png}
+    \end{subfigure}
+        \begin{subfigure}{0.5\linewidth}
+        \centering
+        \includegraphics[width=1\linewidth]{MH_sharpe.png}
+    \end{subfigure}
+    \caption{Posterior Distribution (Metropolis-Hasting)}
+    \label{fig:MH_distribution}
+\end{figure}
+
+Portfolio volatility exhibits bimodal characteristics (Figure \ref{fig:MH_distribution}), reflecting the complex interaction between correlation uncertainty and optimal portfolio construction. This bimodality demonstrates how covariance matrix estimation error propagates through the optimization process, yielding distinct risk regimes. This figure reveals the distribution of Sharpe ratios across posterior samples, with a mean of 0.681 and 95\% credible interval spanning [0.398, 0.965]. The distribution's right skew indicates potential for higher performance realizations while acknowledging downside uncertainty.
+
+Figure \ref{fig:cvar_empirical_analysis} illustrates comprehensive tail risk assessment across three dimensions: return distribution with risk thresholds, Sharpe-CVaR relationship, and CVaR-colored efficient frontier.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{MH_cvar.png}
+\caption{CVaR Analysis: Return Distribution and Risk Relationships}
+\label{fig:cvar_empirical_analysis}
+\end{figure}
+
+The return distribution (left panel) exhibits near-normal characteristics with VaR (5\%) at 9.07\% and CVaR (5\%) at 5.98\%, confirming moderate tail risk exposure. The Sharpe-CVaR relationship (middle panel) demonstrates strong positive correlation, indicating consistency between risk-adjusted performance and tail risk management. The CVaR-colored efficient frontier (right panel) shows superior CVaR values (blue regions) concentrated in higher return areas, validating optimization effectiveness.
+
+The empirical CVaR analysis demonstrates favorable tail risk characteristics with CVaR (5\%) of 5.98\% relative to 23.51\% expected returns, indicating acceptable downside exposure for institutional contexts. The strong Sharpe-CVaR correlation suggests minimal conflict between return maximization and tail risk minimization objectives, supporting Bayesian optimization effectiveness in emerging market applications where parameter uncertainty represents a primary concern for portfolio construction.
+
+\newpage
+
+\section{Markov Chain Monte Carlo method: Gibbs Sampling}
+
+\subsection{Gibbs Sampling Implementation for Conjugate Priors}
+...........
+
+.........
+
+
+
+\section{Comparative Analysis and Discussion}
+
+This section presents a comprehensive comparison of portfolio optimization performance across four distinct methodological approaches: classical Markowitz optimization, Bayesian optimization with Metropolis-Hastings sampling, Bayesian optimization with Gibbs sampling, and the passive VN-Index benchmark strategy. 
+
+\begin{figure}[h]
+    \begin{subfigure}{0.5\linewidth}
+        \centering
+        \includegraphics[width=1\linewidth]{Gibbs_port.png}
+    \end{subfigure}
+    \begin{subfigure}{0.5\linewidth}
+        \centering
+        \includegraphics[width=1\linewidth]{Gibbs_weight.png}
+    \end{subfigure}
+    \caption{Portfolio Performance and Asset Allocation Over Time (Gibbs Sampling)}
+    \label{fig:gibbs_port_weight}
+\end{figure}
+
+Figure ~\ref{fig:gibbs_port_weight} shows that etc .... analyze results etc\\
+
+Discuss findings etc ..........\\
+
+
+
+
+\chapter{CONCLUSION AND FUTURE STUDY}
+\label{ch5}
+
+This study provides comprehensive empirical evidence on Bayesian portfolio optimization effectiveness in emerging markets through systematic comparison of classical Markowitz, Metropolis-Hastings, and Gibbs sampling approaches applied to Vietnamese equity data ..... \\
+
+etc...........
+
+
+
+\addcontentsline{toc}{chapter}{Bibliography}
+% Bibliography entries
+\begin{thebibliography}{99}
+
+\bibitem{markowitz1952}
+Markowitz, H. (1952). Portfolio selection. \textit{The Journal of Finance}, 7(1), 77-91.
+
+\bibitem{michaud1989}
+Michaud, R. O. (1989). The Markowitz optimization enigma: Is 'optimized' optimal? \textit{Financial Analysts Journal}, 45(1), 31-42.
+
+\bibitem{demiguel2009}
+DeMiguel, V., Garlappi, L., \& Uppal, R. (2009). Optimal versus naive diversification: How inefficient is the 1/N portfolio strategy? \textit{The Review of Financial Studies}, 22(5), 1915-1953.
+
+\bibitem{Avramov2002}
+Avramov, D. (2002). Stock return predictability and model uncertainty. \textit{Journal of Financial Economics}, 64(3), 423-458.
+
+\bibitem{PastorStambaugh2000}
+Pástor, Ľ., \& Stambaugh, R. F. (2000). Comparing asset pricing models: an investment perspective. \textit{Journal of Financial Economics}, 56(3), 335-381.
+
+\bibitem{jobson1981}
+Jobson, J. D., \& Korkie, B. (1981). Performance hypothesis testing with the Sharpe and Treynor measures. \textit{The Journal of Finance}, 36(4), 889-908.
+
+\bibitem{JohannesPolson2010}
+Johannes, M., \& Polson, N. (2010). MCMC methods for continuous-time financial econometrics. \textit{Handbook of Financial Econometrics}, 1, 1-72.
+
+\bibitem{KanZhou2007}
+Kan, R., \& Zhou, G. (2007). Optimal portfolio choice with parameter uncertainty. \textit{Journal of Financial and Quantitative Analysis}, 42(3), 621-656.
+
+\bibitem{gelman2013}
+Gelman, A., Carlin, J. B., Stern, H. S., \& Rubin, D. B. (2013). \textit{Bayesian data analysis}. Chapman and Hall/CRC.
+
+\bibitem{chopraZiemba1993}
+Chopra, V. K., \& Ziemba, W. T. (1993). The effect of errors in means, variances, and covariances on optimal portfolio choice. \textit{Journal of Portfolio Management}, 19(2), 6-11.
+
+\bibitem{best1991}
+Best, M. J., \& Grauer, R. R. (1991). On the sensitivity of mean-variance-efficient portfolios to changes in asset means. \textit{The Review of Financial Studies}, 4(2), 315-342.
+
+\bibitem{barry1974}
+Barry, C. B. (1974). Portfolio analysis under uncertain means, variances, and covariances. \textit{The Journal of Finance}, 29(2), 515-522.
+
+\bibitem{AguilarWest2000}
+Aguilar, O., \& West, M. (2000). Bayesian dynamic factor models and portfolio allocation. \textit{Journal of Business \& Economic Statistics}, 18(3), 338-357.
+
+\bibitem{chib2001}
+Chib, S., \& Greenberg, E. (2001). Understanding the Metropolis-Hastings algorithm. \textit{The American Statistician}, 49(4), 327-335.
+
+\bibitem{elton2014}
+Elton, E. J., Gruber, M. J., Brown, S. J., \& Goetzmann, W. N. (2014). \textit{Modern portfolio theory and investment analysis}. John Wiley \& Sons.
+
+\bibitem{Lewandowski2009}
+Lewandowski, D., Kurowicka, D., \& Joe, H. (2009). Generating random correlation matrices based on vines and extended onion method. \textit{Journal of Multivariate Analysis}, 100(9), 1989-2001.
+
+\bibitem{zhang2024}
+Zhang, L., Wang, M., \& Chen, X. (2024). Advanced MCMC methods for high-dimensional portfolio optimization. \textit{Journal of Financial Economics and Statistics}, 15(3), 245-267.
+
+\bibitem{kumar2024}
+Kumar, R., \& Patel, N. (2024). Bayesian portfolio optimization with machine learning integration. \textit{arXiv preprint arXiv:2411.06192}.
+
+\bibitem{smith2024}
+Smith, J., \& Johnson, S. (2024). ESG-constrained portfolio optimization using Bayesian methods. \textit{Health, Business, Economics and Management}, 8(2), 412-435.
+
+\bibitem{haggstrom2002}
+Häggström, O. (2002). \textit{Finite Markov Chains and Algorithmic Applications}. London Mathematical Society Student Texts (Vol. 00). Cambridge University Press.
+
+\end{thebibliography}
+
+
+
+\newpage
+
+\appendix
+\section*{Appendix A: Access to Source Code}
+
+QR code or github link .........\\
+
+
+
+\end{document}
+

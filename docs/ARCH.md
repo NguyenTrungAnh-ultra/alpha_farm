@@ -1,77 +1,96 @@
-# Alpha Farm Architecture
+# Kiến trúc Alpha Farm (theo code hiện tại)
 
-> **Security Note:** Credentials have been moved to `.env` file. See `.env.example`.
+Mô tả hệ thống **đúng như code đang chạy**. Phần nào đang hỏng thì ghi rõ ⛔. Việc sẽ làm và câu chờ quyết nằm ở `docs/ROADMAP.md`; phương pháp nghiên cứu nằm ở `docs/proposal/thesis_proposal/Thesis_Proposal.pdf`.
+Mọi thông số (ngưỡng, phí, ký quỹ, khoảng ngày) lấy từ `utilities/AppConfig.py`; số ghi dưới đây là giá trị lúc soát code.
 
-## 1. Cấu trúc Thư mục Hệ thống (Clean Architecture)
+## 1. Mục tiêu
 
-- `core_engine/`: Động cơ lõi, chứa AlphaBacktestEngine nội bộ, module AlphaPrimitives và AlphaEngine điều phối.
-- `llm_clients/`: Các module giao tiếp với API của AI (Gemini, DeepSeek, Ollama).
-- `strategy_workflows/`: Quy trình tạo và xử lý chiến lược (Generate, MCTS, Portfolio, HMM Validate).
-- `utilities/`: Các tiện ích cấu hình tập trung (`AppConfig.py`), template và logger.
-- `data/`: Thư mục chứa dữ liệu tĩnh và các bộ nhớ đệm giả lập như Monte Carlo Cache (`MCdata/`).
-- `results/`: Thư mục lưu trữ các chiến lược sinh ra và danh mục tổng hợp (Portfolio).
-- `docs/`: Chứa các tài liệu kỹ thuật chi tiết như ARCH.md.
-- `tests/`: Thư mục chứa bộ kiểm thử đơn vị tự động bao trùm toàn bộ hệ thống (Pytest).
+Tự tìm tín hiệu có hướng (Long / Short / Flat) cho hợp đồng tương lai VN30F1M: LLM đề xuất cấu trúc chiến lược, MCTS hoàn thiện công thức, backtest chấm điểm, bộ kiểm định HMM lọc ứng viên.
 
-## 2. Hệ Thống Luật & Giới Hạn Thi Hành (Execution Rules)
+## 2. Thư mục
 
-Dưới đây là các giới hạn và quy định chung để chiến lược có thể chạy mượt mà trên `AlphaBacktestEngine`:
+| Thư mục | Nội dung |
+|---|---|
+| `core_engine/` | `AlphaPrimitives.py` (9 toán tử `ts_*`), `BacktestEngine.py` (`AlphaBacktestEngine`, `load_data`), `AlphaEngine.py` (`AlphaDataProxy`, `AlphaStrategy`, lớp bọc `AlphaEngine`), `CalculateMetrics.py` (chỉ số), `GenerateReport.py` (bọc lại `compute_metrics`, đổi tên khoá) |
+| `strategy_workflows/` | `GenerateStrategies.py`, `SemanticCompiler.py`, `MCTSDimensions.py`, `MCTSEngine.py`, `RunMCTS.py`, `HMMValidation.py`, `PortfolioManager.py` |
+| `llm_clients/` | `DeepseekClient.py` (token web, `token.txt`), `GeminiClient.py` (cookie, `cookies.txt`), `OllamaClient.py` (qwen3.5 chạy máy) |
+| `utilities/` | `AppConfig.py` (cấu hình tập trung), `Prompts.py` (prompt LLM), `deps/deepseek4free` |
+| `data/` | `DNSE_VN30F_{1m,3m,5m,10m,15m,30m,1H}.csv` (13/08/2018 → 31/12/2025); `MCdata/synthetic_data.pkl` (cache đường giá HMM, ~13 GB) |
+| `results/` | `ideas/` (blueprint chờ chạy), `ideas/processed/` (đã chạy), `portfolio_summary.json`, `leaderboard.csv`, `mcts_stats.json` |
+| `tests/` | pytest; chạy bằng `.venv` (Python 3.12) |
 
-- **Khung thời gian (Universe):** Áp dụng cho hợp đồng tương lai VN30 (VN30F1M) ở các khung intraday.
-- **Biến trạng thái vị thế:** Mục tiêu vị thế nằm trong dải `[-1, 1]`. Trong đó `1` = Full Long, `-1` = Full Short, `0` = Flat.
-- **Nguồn dữ liệu hợp lệ:** Chỉ được phép gọi `self.data.pv_close`, `self.data.pv_volume`, và `self.data.pv_vn30_close`, v.v... qua `AlphaDataProxy`.
-- **Luật Cấu trúc (AST Rules):**
-  - Lớp chiến lược phải kế thừa `class AlphaStrategy`.
-  - Hàm thuật toán bắt buộc là `def __algorithm__(self):`. Không sử dụng hàm `__init__`.
-  - Cấm sử dụng vòng lặp duyệt từng dòng (row-by-row). Code bắt buộc phải ở dạng Vectorized thông qua `AlphaPrimitives` (như `ts_mean`, `ts_corr`).
-  - Hệ thống tự động nắn lại các phép toán Logic và phương thức gọi bằng `SemanticCompiler`.
-- **Quy trình tính điểm nội bộ:**
-  - Mục tiêu bắt buộc (Target Metrics): Sharpe $\ge$ 1.3, CAGR $\ge$ 15%, Max Drawdown $\ge$ -35%, Profit factor ≥ 1.3, Calmar ≥ 1.1
+Tệp một dòng "DELETED" còn sót từ đợt bỏ XNOQuant: `core_engine/PlatformEmulator.py`, `core_engine/RestrictedSeries.py`, `strategy_workflows/SubmitStrategies.py`, `utilities/SandboxPrefixer.py`.
 
-## 3. Kiến Trúc Luồng Chạy & Các Phân Hệ
+## 3. Luồng chạy
 
-### MCTS Alpha Discovery Engine (`strategy_workflows/`)
+`main.py` điều phối: `generate` (tầng 1) → `mcts` (tầng 2 và kiểm định) → `full` (chạy cả hai).
 
-- `MCTSDimensions.py`: Nơi đăng ký mọi Toán tử và quy tắc chữ ký hàm (Arity). Hệ thống áp dụng 9 Primitives cốt lõi thay vì hàng loạt chỉ báo kỹ thuật rời rạc. 
-- `SemanticCompiler.py`: Bộ biên dịch AST thông minh. Không chỉ kiểm tra cú pháp, bộ biên dịch còn thực thi nghiêm ngặt luật chống **Dimensional Bleeding** (Rò rỉ thứ nguyên). Có bộ từ điển `HALLUCINATION_MAP` để ép các hàm bịa ra từ LLM (`sma`, `boll`) về chuẩn Primitives (`ts_mean`).
-- `MCTSEngine.py`: Động cơ lõi sử dụng thuật toán Monte Carlo Tree Search. Tích hợp Máy chém Calmar (Hard Filter) và tính toán phần thưởng Đa mục tiêu. Hệ thống tích hợp **Scale-Mismatch Logic** để các chu kỳ luôn nội suy chuẩn xác khi chuyển đổi Timeframe.
-- `RunMCTS.py`: Tiến trình Worker (Chạy đa luồng). Ngay khi khởi động, nó nạp Ma trận Vị thế lịch sử (Ký ức toàn cục) từ `portfolio_summary.json` và truyền vào MCTS để chống đạo nhái (Correlation Penalty). `RunMCTS.py` thực hiện Nghiệm thu một chạm (One-pass Commit): lấy đúng 1 chiến lược Top 1 và lưu.
-- `HMMValidation.py`: (Tích hợp sâu vào MCTS) 3-Tier Realistic Validation, lọc chiến lược qua các kịch bản nhiễu loạn Monte Carlo của Hidden Markov Model, Kelly Fraction và Benchmark thực tế.
+### 3.1 Tầng 1 — LLM sinh blueprint (`GenerateStrategies.py`)
 
-### Pipeline LLM Sinh Tự Động (`strategy_workflows/` & `llm_clients/`)
+1. Prompt lấy từ `utilities/Prompts.py`; mô hình chọn bằng `--model` (`deepseek-thinking`, `ollama-local`, `ollama-9b`, `flash`, `pro`, `thinking`).
+2. LLM trả JSON (kiểm bằng Pydantic) có `macro_blueprint`: biểu thức có chỗ trống `?`.
+3. `SemanticCompiler` đọc bằng `ast.parse`, đổi tên hàm bịa qua `HALLUCINATION_MAP`, kiểm thứ nguyên. Lỗi ⇒ gửi lại LLM sửa **1 lần**; gọi API thử lại tối đa 5 lần.
+4. Hợp lệ ⇒ lưu `results/ideas/<tên>_<khung>.json`.
+5. Code có đọc "kinh nghiệm" từ `utilities/experience_log.md`; tệp này **không tồn tại** nên phần đó rỗng.
 
-- `GenerateStrategies.py`: Trình điều khiển chính của nhóm LLM (Gemini, DeepSeek, Ollama). Nhiệm vụ sinh ra **Macro-Blueprint** chứa cấu trúc chiến lược dạng khung (chứa các dấu `?`). Đặc biệt, tiến trình này nhúng sẵn bộ `SemanticCompiler` để chặn lỗi cú pháp và lỗi ảo giác, ép LLM vào vòng lặp Self-Correction trước khi lưu file JSON.
-- `llm_clients/`: Giao diện gọi API (`GeminiClient.py`, `DeepseekClient.py`, `OllamaClient.py`).
-- `PortfolioManager.py`: Sổ cái lưu trữ và quản lý danh mục (Portfolio Ledger). Ở kiến trúc mới (One-pass), các bài kiểm tra rủi ro đã được đẩy vào `MCTSEngine`. MCTS lưu chiến lược thông qua cờ `force_add=True`.
+⛔ Prompt vẫn liệt kê toán tử TA-Lib (`ema`, `macd_line`, `zscore`…) mà trình biên dịch mới từ chối; cả ví dụ mẫu trong prompt cũng bị từ chối.
 
-### Động Cơ Lõi Siêu Tốc (Vectorized `core_engine/`)
+### 3.2 Tầng 2 — MCTS (`RunMCTS.py`, `MCTSEngine.py`, `MCTSDimensions.py`)
 
-- `AlphaPrimitives.py`: Trái tim toán học của hệ thống. Chứa các hàm (như `ts_mean`, `ts_zscore`, `ts_rank`) được viết bằng `np.lib.stride_tricks.sliding_window_view`, đạt tốc độ xử lý nhanh hơn từ 15x đến hàng trăm lần so với các hàm `pandas.rolling()`.
-- `AlphaBacktestEngine.py`: Động cơ mô phỏng giao dịch bar-by-bar siêu tốc (**Vectorized Numpy**). Tích hợp cơ chế **VN30F Netting Fee**, thuật toán khóa rò rỉ dữ liệu (Lookahead Bias) bằng lệnh `shift(1)` vị thế, và hệ thống **Vectorized Margin Call** ngăn chặn cháy tài khoản âm. Mới đây nhất, động cơ được bổ sung **Vectorized Rollover Penalty** tại các phiên ATC ngày đáo hạn, ép MCTS tính toán đúng chi phí trượt giá.
-- `CalculateMetrics.py`: Cung cấp bộ tính toán chỉ số hiệu năng (Sharpe, Sortino, VaR, CAGR, Max Drawdown).
-- `AlphaEngine.py`: Lớp Wrapper cấp cao (Facade) gom `AlphaBacktestEngine`, `CalculateMetrics` và `AlphaDataProxy` để thực thi chiến lược.
+1. Nạp (hoặc dựng) cache đường giá HMM cho 7 khung.
+2. Mỗi khung chạy một tiến trình. Tiến trình nạp vị thế các chiến lược đã có trong `portfolio_summary.json` (dùng để phạt tương quan), rồi lần lượt biên dịch từng blueprint của khung đó và chạy `run_search_from_blueprint`. Blueprint chạy xong — kể cả khi lỗi — bị chuyển sang `ideas/processed/`.
+3. **Ngữ pháp**: mỗi toán tử khai báo thứ nguyên vào/ra (CURRENCY, VOLUME, RATIO, BOOLEAN, ANY); chỉ điền vào chỗ trống những nút hợp thứ nguyên. Toán tử: 9 `ts_*`, logic (`crossed_above`, `greater_than`, `and_`…), số học (`add`, `sub`, `mult`, `div`).
+4. **Khuôn vị thế** theo thứ nguyên gốc: NORMALIZED (z-score trượt, ngưỡng θ), RATIO (ngưỡng trên/dưới), BOOLEAN (±w). Tỷ trọng khi chấm điểm `w = 0.2`. Mỗi công thức thử cả hai chiều, giữ chiều tốt hơn.
+5. **Cửa sổ** khai báo ở khung 10m (`BASE_PERIODS`, `BASE_WINDOW_SEARCH`) rồi co giãn theo khung.
+6. **Điểm thưởng**: `R = (0.6·S_calmar + 0.4·S_IC) · (1 − tương quan vị thế lớn nhất)`; `R = −10` nếu Calmar < 1.1 hoặc < 15 lệnh. IC là tương quan Spearman với lợi suất bar kế tiếp.
+7. **Chọn nút**: UCT với giá trị **lớn nhất** (không phải trung bình), `c = 1.414`. Công thức có R > 1 bị ghi vào bộ nhớ chống trùng (FSA); gặp lại ⇒ −100.
+8. **Dừng sớm**: entropy chuẩn hoá của lượt thăm ở gốc < 0.15, hoặc 5 000 vòng không cải thiện (`patience`); trần mặc định 50 000 vòng.
+9. Lấy **đúng 1** ứng viên tốt nhất có R > 0 mỗi khung → backtest lại → kiểm định HMM (mục 3.3) → `PortfolioManager.evaluate_and_add(force_add=True)`, nên tiêu chí danh mục và loại theo tương quan **không được áp**.
 
-### Testing & Environment (`tests/` & `uv`)
-- Môi trường dự án được khóa chặt ở **Python 3.12** sử dụng **`uv`** để tối ưu hóa tốc độ build các thư viện gốc C++.
-- Khung kiểm thử sử dụng **`pytest`** bao phủ các module lõi (`core_engine`, `strategy_workflows`, `hardware_concurrency`) đạt điểm Pass 100%.
+⛔ Ba chỗ hỏng làm tầng này không ra được ứng viên nào:
+- `get_terminals_for_dimension` gọi `OperatorGroup.CANDLESTICK` đã xoá ⇒ lỗi khi mở rộng chỗ trống BOOLEAN / ANY.
+- `evaluate_expression` truyền `np.ndarray` vào backtest; backtest gọi `.shift` ⇒ lỗi bị nuốt, mọi ứng viên nhận −10.
+- `generate_strategy_code` sinh code dùng `self.feat` / `self.op` và không import `ts_*` ⇒ tệp chiến lược xuất ra không chạy được.
 
-## 4. Liên Kết Hệ Thống (Master Pipeline 2 Tầng)
+⛔ `ast_to_code` chọn độ dài cửa sổ bằng `random.choice` mỗi lần dựng code ⇒ một nút MCTS ứng với nhiều công thức khác nhau. MCTS không đặt seed ⇒ chạy lại cho kết quả khác.
 
-Quy trình tự động hóa được điều khiển thông qua CLI Master Controller **`main.py`** với thư viện `argparse`:
+### 3.3 Kiểm định 3 tầng (`HMMValidation.py`)
 
-1. **Phase 1 (LLM Blueprint Generation)**: LLM viết kịch bản dạng khung Macro-Blueprint. `SemanticCompiler` sẽ xác thực AST và ép LLM tự sửa các lỗi cú pháp ngay tại vòng lặp (`python main.py generate`).
-2. **Phase 2 (MCTS Brute-force & Compile)**: Động cơ MCTS nạp các Blueprint, nhét các tham số hợp lệ vào các điểm `?`, biên dịch thành mã Python chứa `AlphaPrimitives` và chạy giả lập trên `AlphaBacktestEngine` để đánh giá mảng đa mục tiêu (`python main.py mcts`). Lọc top và lưu thẳng vào Portfolio.
+- HMM Gauss 3 trạng thái trên (log-lợi suất, độ lệch chuẩn 20 bar, tỷ lệ khối lượng). Đường giả lập: chạy chuỗi Markov, mỗi trạng thái chép một khối 20 bar lịch sử bắt đầu ở trạng thái đó. Biến thể "căng thẳng": xác suất chuyển vào trạng thái biến động cao × 1.5. 500 đường mỗi khung.
+- Tầng 1 sống sót: < 5 % số đường có sụt giảm ≤ −23 %.
+- Tầng 2: Kelly > 0 và lãi trung bình mỗi lệnh ≥ 3 × phí trung bình.
+- Tầng 3: CAGR trung bình > 6 %/năm và Sharpe trung bình > mua-và-giữ trên cùng đường.
 
----
+Đã đo: bộ giả lập giữ độ dài chế độ 0.72–0.92 lần thực tế, sụt giảm mua-và-giữ tương đương hoặc nhẹ hơn thực tế.
+⛔ Quy đổi theo năm sai: `calculate_metrics_for_result` suy số năm từ số bar bằng hằng 4800 / 1200 (đúng phải theo lịch). CAGR mua-và-giữ 2020–2024 ra 0.76 % ở 1m, 20.0 % ở 30m; đúng là 8.9 %.
 
-## 5. Hệ Thống Phân Loại & Sửa Lỗi (Inline Self-Correction)
+## 4. Backtest (`core_engine/BacktestEngine.py`)
 
-Thay vì sửa lỗi bằng kịch bản rời rạc, mọi thứ được ép thẳng vào đường ống:
+- Tín hiệu bar t khớp ở bar t+1 (`shift(1)`); đã kiểm: không nhìn trước tương lai.
+- Đầu vào `strategy.run_algorithm(df)` phải trả **`pd.Series`** vị thế mục tiêu trong [−1, 1].
+- Số hợp đồng cố định theo vốn ban đầu (1 tỷ VND) và giá bar đầu: `N = round(|w|·E0 / (P0 · 100 000 · 0.285))`.
+- Phí 6 000 VND / hợp đồng / chiều, tính trên phần chênh số hợp đồng.
+- Gọi ký quỹ: xét giá xấu nhất trong bar (Low khi Long, High khi Short) so với ký quỹ duy trì 20 %; chạm ⇒ đóng hết, đóng băng vốn.
+- Đáo hạn: bar cuối của ngày Thứ Năm thứ ba trong tháng (theo ngày có trong dữ liệu) bị phạt 2 điểm + 2 lần phí mỗi hợp đồng đang giữ.
+- Không có trượt giá.
+- `load_data(tf)` đọc CSV và lọc `BACKTEST_START → BACKTEST_END` (2020-01-01 → 2025-01-01); `'60m'` đọc tệp `1H`. Dữ liệu 2018–2019 và 2025 hiện không dùng.
 
-### 5.1. Vòng Lặp Self-Correction Trong Quá Trình Sinh Ý Tưởng
-Khi `GenerateStrategies.py` yêu cầu LLM tạo Macro-Blueprint, mã JSON sinh ra sẽ bị kiểm tra ngay:
-- **Macro-Blueprint Semantic Error**: Lỗi được bắt bởi `SemanticCompiler.py`. Dữ liệu lỗi được gửi lại vào LLM để tự sửa (Max retry = 3). 
-- **Mapping (Ảo giác LLM)**: Các Indicator truyền thống như `sma` hoặc `bollinger_band_upper` sẽ bị `HALLUCINATION_MAP` bẻ lái sang `ts_mean` để ép tương thích.
+## 5. Chỉ số
 
-### 5.2. MCTS Sandboxing
-- Các công thức sinh ra lỗi toán học (ZeroDivision, NaN/Inf) hoặc đạt Sharpe < 1.3, Calmar < 1.1 sẽ bị hệ thống **MCTS Máy chém** chém ngay lập tức (Reward = -10.0), ép cây tìm kiếm đi nhánh khác. Thao tác này tiết kiệm thời gian hơn nhiều so với việc bắt LLM sửa lại một công thức vô dụng.
+- `CalculateMetrics.compute_metrics`: gom về ngày, nhân √252 — đúng.
+- `HMMValidation.calculate_metrics_for_result`: cách riêng, sai (mục 3.3).
+
+## 6. Toán tử `AlphaPrimitives`
+
+`ts_mean, ts_sum, ts_max, ts_min, ts_rank, ts_zscore, ts_argmax, ts_argmin, ts_corr`, viết bằng `sliding_window_view`. Đã kiểm: kết quả trên chuỗi đầy đủ và chuỗi cắt bớt trùng nhau tuyệt đối (không nhìn trước). `benchmark_primitives.py` so khớp pandas trong sai số 1e-5; `ts_argmax` / `ts_argmin` nhanh hơn pandas khoảng 13–15 lần.
+Chưa có toán tử trễ / sai phân (`ts_delay`, `ts_delta`).
+
+## 7. Nguồn gốc ý tưởng thiết kế
+
+| Ý | Nguồn |
+|---|---|
+| Kiểm thứ nguyên trước khi ghép nhánh | Alpha² (`docs/references/2406.16505v1.pdf`) |
+| Chống cây con trùng lặp (FSA) | Alpha Jungle (`docs/references/2505.11122v3.pdf`) |
+| MCTS lan truyền giá trị lớn nhất (tìm trường hợp tốt nhất) | RiskMiner (`docs/references/3677052.3698613.pdf`) |
+| LLM chạy tách khỏi MCTS, chỉ sinh cấu trúc | Lựa chọn thiết kế của dự án (bài Chain-of-Alpha từng được dẫn đã bị rút khỏi arXiv) |
+| Phạt tương quan với danh mục, giữ z-score tĩnh để dễ diễn giải | Lựa chọn thiết kế của dự án |

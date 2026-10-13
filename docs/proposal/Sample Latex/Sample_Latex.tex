@@ -1,0 +1,392 @@
+\documentclass[12pt,a4paper,oneside]{book}
+\usepackage{amssymb,amsthm,amsmath,amsfonts}
+\usepackage{graphicx,graphics,epsf,rotate}
+\usepackage[left= 3cm,right= 3cm,top=3cm,bottom=3cm]{geometry}
+\usepackage{graphicx}
+\usepackage{interval}
+\usepackage{biblatex}
+\usepackage{enumitem}
+\usepackage{amssymb}
+\usepackage{bm}
+\usepackage{bbm}
+\usepackage{makecell}
+\usepackage{longtable}
+\usepackage{setspace}
+\usepackage{enumerate}
+\usepackage{color}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{blkarray} 
+\usepackage{indentfirst}
+\usepackage{float}
+\usepackage{framed}
+\usepackage{fancyhdr}
+\usepackage[utf8]{inputenc}
+\usepackage{amsthm}
+\newtheorem{definition}{Definition}
+\newtheorem{example}{Example}
+\pagestyle{fancy}
+\renewcommand{\headrulewidth}{0.1pt}
+\fancyhf{}
+\lhead{\nouppercase{\leftmark}}
+\cfoot{\thepage}
+\linespread{1.5} 
+\newlength{\defbaselineskip}
+\setlength{\defbaselineskip}{\baselineskip}
+\newcommand{\setlinespacing}[1]%
+{\setlength{\baselineskip}{#1 \defbaselineskip}}
+
+\begin{document}
+	\begin{titlepage}
+		\begin{center}
+			\bf{VIETNAM NATIONAL UNIVERSITY – HO CHI MINH CITY}\\
+			\bf{INTERNATIONAL UNIVERSITY}\\
+			\bf{DEPARTMENT OF MATHEMATICS}\\
+			\hfill
+			\begin{center}
+				\includegraphics[scale=0.6]{logo.png}
+			\end{center}
+			\vspace*{1 cm}
+			
+			\bf  {GRADUATION THESIS}
+			
+			\vspace*{1 cm}
+			
+			{\large\bf  STOCHASTIC CALCULUS ON OPTION VALUATION, OPTION GREEKS AND APPLICATION IN HEDGING STRATEGIES}\\
+			\smallskip
+			\bf {Submitted in partial fulfillment of the requirements for the degree of}\\
+			\bf {BACHELOR OF SCIENCE}\\
+			\bf {IN APPLIED MATHEMATICS}\\
+			\bf {SPECIALIZATION IN FINANCIAL ENGINEERING }\\
+			\bf {AND RISK MANAGEMENT}\\
+			
+			\vspace*{1 cm}
+		\end{center}
+		\begin{tabular}{ll}
+			\bf Student's Name:   &\bf NGUYEN NGOC PHUNG \\
+			\bf Student's ID:    &\bf MAMAIU18028 \\
+			\bf Thesis Supervisor:&\bf NGUYEN MINH QUAN, Ph.D\\
+			
+		\end{tabular}
+		
+		
+		\vspace*{1cm}
+		\begin{center}
+			{\bf Ho Chi Minh City, Vietnam}\\
+			{\bf July 2022}\\
+		\end{center}
+	
+		\newpage
+		\thispagestyle{empty}	
+		\begin{center}
+			\large\textbf{STOCHASTIC CALCULUS ON OPTION VALUATION, OPTION GREEKS AND APPLICATION IN HEDGING STRATEGIES} \\
+			\normalsize{By}\\
+			\large{NGUYEN NGOC PHUNG}\\
+			\vskip10mm
+			\normalsize{Submitted to DEPARTMENT OF MATHEMATICS,\\INTERNATIONAL UNIVERSITY, HO CHI MINH CITY\\ in partial fulfillment of requirements for the degree of\\
+				BACHELOR OF SCIENCE \\ 
+				IN APPLIED MATHEMATICS \\
+				SPECIALIZATION IN FINANCIAL ENGINEERING  \\ 
+				AND RISK MANAGEMENT}\\
+			July 2022
+			\vskip30mm
+		\end{center}
+		Signature of Student:
+		\rule[0em]{26.7em}{0.5pt}
+		\begin{flushright}NGUYEN NGOC PHUNG \end{flushright}
+		\vskip10mm
+		Certified by:
+		\rule[0em]{30em}{0.5pt}
+		\begin{flushright}NGUYEN MINH QUAN, PhD.\\ Thesis Supervisor 
+		\end{flushright}
+		\vskip10mm
+		Approved by:
+		\rule[0em]{30em}{0.5pt}
+        \begin{flushright}Prof. Pham Huu Anh Ngoc, PhD\\ Head of Department of Mathematics
+        \end{flushright}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	\end{titlepage}
+		
+		
+	\newpage
+	\thispagestyle{plain}
+	\addcontentsline{toc}{chapter}{\numberline{}Abstract}
+	\begin{center}
+		\large\textbf{STOCHASTIC CALCULUS ON OPTION VALUATION, OPTION GREEKS AND APPLICATION IN HEDGING STRATEGIES} \\
+		\normalsize{By}\\
+		\large{NGUYEN NGOC PHUNG}\\
+		\vskip10mm
+		\normalsize{Submitted to DEPARTMENT OF MATHEMATICS,\\INTERNATIONAL UNIVERSITY, HO CHI MINH CITY\\ in partial fulfillment of requirements for the degree of\\
+			BACHELOR OF SCIENCE \\ 
+			IN APPLIED MATHEMATICS \\
+			SPECIALIZATION IN FINANCIAL ENGINEERING  \\ 
+			AND RISK MANAGEMENT}\\
+		%One can delate "Applied Math, Specialized FERM etc to give more space for the content of the Abstract.
+		\vspace*{1cm}
+		
+		
+	\vskip10mm
+	\large\textbf{ABSTRACT}\\
+	\end{center}
+	\vskip10mm
+	\normalsize{This thesis studies ... 
+	}\\
+	\vskip10mm
+	\textbf{Keywords:}
+	\normalsize{Stochastic Calculus, Option Valuation, Greek Letters, Stochastic Volatility, Delta, Vega, Option Hedging Strategy}\\
+	
+	
+	
+
+	\newpage 
+	\clearpage
+	
+	\chapter*{ACKNOWLEDGEMENT}
+	
+	Thank you etc here...\\
+
+	\newpage 
+	\clearpage	
+	
+	\mainmatter
+	\tableofcontents
+	\newpage 
+	\clearpage
+	
+	\chapter*{INTRODUCTION AND LITERATURE REVIEW}
+	The theory of Stochastic Process has been long eminent as the foundation for generating systems/ models in time or space in accordance with probability laws. Roughly speaking, the concept is supposedly defined as a phenomenon that evolves over time in a random manner. Jiggled movement of single particle in liquid (Robert Brown-1827), Internet traffic, Price of Stock, Interest rate in financial market are all prime examples of Stochastic Application \cite{1}. \\
+	
+	blah blah etc .......\\
+	 
+	The structure of the rest of the thesis is organized as follows. In Chapter 1, we introduce the fundamentals of Stochastic Calculus. Chapter 2 is devoted for introduction of European options and Construction of Asset price movement model, while rationale behind construction of Black-Scholes Merton model is unveiled in chapter 3. Chapter 4 is dedicated to studying option's sensitivity with respect to fluctuations of underlying stochastic variables, we use Greek letters as measures of the sensitivity. The final chapter, chapter 5 introduces advanced hedging method using two Greek letters (Delta and Vega) and develops extended hedging model. The effectiveness of these hedging is compared with the benchmark of Black-Scholes Delta (or Delta-Gamma) hedging approaches.  
+	
+	\newpage 
+	\clearpage
+	
+	
+	\chapter{INTRODUCTION TO STOCHASTIC CALCULUS}
+	%% Literature Review can be also presented in Chap 1
+	This chapter is dedicated for foundation theories of Stochastic calculus, divided into 4 main sections. All the essential theories or inferences are proven mathematically in details. 
+	
+	The first section of Stochastic Process, we introduce again the concept of Natural filtration, Adapted-ness an Martingale process. Furthermore, all the proofs in thesis validate the convergence of stochastic process in mean-square sense, hence its concept is also introduced in this part. 
+	
+	Basics of Brownian motion and its variation are inspected in second section. As these ``special'' process explain most of randomness in movement of asset price in real financial world, this part acts as foundational knowledge of following chapter on Asset price movement model. 
+	
+	The section of Stochastic calculus heavily focus on Stochastic Integration. We categorize and study 3 main types of integration, the core ideas on how to construct these stochastic integration are elaborately inspected, as well as their properties and simulations. In addition, the concepts of variation and co-variation functions, Riemann Sum of stochastic integration are considered in this part. 
+	
+	Lastly, the final section studies the basics of It\^o Process, numerical approximation using Euler-Maruyama approach and most importantly, theory of It\^o Lemma. 
+	
+	The motivation of this chapter is not only to provide foundation knowledge for the following 2 chapters (on construction of Price model and Black-Scholes Merton model), but also acts as stepping stone for further studies. 
+	
+	\section{STOCHASTIC PROCESS}
+	
+	Before going to the definition of stochastic process, first we clarify the notable difference between the deterministic and stochastic models. Undeniably, the measure and probability theory have paved a way for study of uncertainty and stochastic process is a typical example. While the value of deterministic model is fixed and mostly determined by its input, the stochastic system, on the other hand, is ``random'' and its uncertainty is described by the random variables and probability distributions. 
+	
+	\subsection{Basics of stochastic process}
+	\textbf{a) Definition-Stochastic Process} 
+	
+	Stochastic process is a collection of random variables $\{X_t\}_{t\in \mathcal{I}}$ on the probability space $(\Omega,\mathcal{F},\mathcal{P})$. The value of random variable $X_t$ is defined on the state space $\mathcal{S}$
+	\begin{equation}
+	    X:\;  \mathcal{I}\; \text{x} \; \Omega \rightarrow \mathcal{S},
+	\end{equation}
+	where
+\begin{itemize}[label=$\bullet$]
+	\item $\mathcal{I}$ is the index set of the process. For a discrete-time stochastic process, $\mathcal{I}$ is countable set, for example, $\mathcal{I}= \{1,2,...\}$. For a continuous-time stochastic process, $\mathcal{I}$ is uncountable set, for example, $\mathcal{I}= [0,\infty)$.
+	\item $\mathcal{S}$ is the state set of the process. For a discrete-state stochastic process, $\mathcal{S}$ is countable set. For a continuous-state stochastic process, $\mathcal{S}$ is uncountable set.
+\end{itemize}
+
+\begin{itemize}[label=$\bullet$]
+	\item For a fixed time point $t$, the value $X_t$ is a random variable with some distribution.
+	\item For fixed $w \in \Omega$, we have $\{X_t\}_{t\in \mathcal{I}}$ is a deterministic function of t (also called sample path or trajectory)
+\end{itemize}
+
+	\textbf{b) Definition- Natural Filtration}
+	
+	The the non-decreasing sequence of $\sigma$-algebra $\{\mathcal{F}_t\}$ is called the natural filtration of $\{X_t\}_{t\geq 0}$ defined in probability space $(\Omega, \mathcal{F}, \mathcal{P})$ if: 
+	\begin{itemize}[label=$\bullet$]
+		\item $\mathcal{F}_t \subset \mathcal{F}\; , \forall t\geq 0$,
+		\item $\mathcal{F}_s \subset \mathcal{F}_t \; ,\forall 0\leq s\leq t$,
+		\item $\mathcal{F}_t= \sigma(X_s, 0\leq s\leq t)$ ($\sigma$-algebra generated by collection of random variables $\{X_s\}_{0\leq s\leq t}$).
+	\end{itemize} 
+
+	$\mathcal{F}_t$ is also interpreted as the filter of information flow in order to control the information propagation. Note that $\mathcal{F}_t$ is sometimes called the ``information set'' and the 2nd condition above guarantees that the information evolve as time progress. \\
+
+	\textbf{c) Definition- Adaptedness}
+	
+	A random process $\{X_t\}$ defined on filtered probability space $\Omega, \mathcal{F}, \{\mathcal{F}_t\}, \mathcal{P}$ is called adapted to the filtration $\{\mathcal{F}_t\}$ (or $\mathcal{F}_t$-adapted) if for all $t\in \mathcal{I}$, we have the random variable $X_t$ is $\mathcal{F}_t-\text{measurable}$. 
+	
+	Let's say $X_t: \Omega \mapsto \mathbb{R}^n$ and $\mathcal{B}(\mathbb{R}^n)$ be the Borel $\sigma$-algebra on $\mathbb{R}^n$, then we have:
+	\[X^{-1}(B)=\{\omega \in \Omega| X(\omega)\in B, B\in \mathcal{B}\} \in \mathcal{F}_t \; (\forall B\in \mathcal{B}).\]
+	
+	\textbf{d) Definition- Martingale}
+	
+	A random process $\{X_t\}$ on filtered probability space $(\Omega,\mathcal{F},\{\mathcal{F}_t\},\mathcal{P})$ is called martingale if it enjoys the following properties:
+	
+	\begin{itemize}[label=$\bullet$]
+		\item $\{X_t\}$ is adapted to $\{\mathcal{F}_t\}$ (In other words, $\forall t, X_t \;\text{is} \;\mathcal{F}_t-\text{measurable}$)
+		\item For all $t$, $\mathbb{E}[|X_t|]< \infty$ ($X_t$ is integrable for all t).
+	\end{itemize} 
+	
+	Recall that $\mathcal{F}_t= \sigma(X_s|0\leq s\leq t)$
+	\begin{itemize}[label=$\bullet$]
+		\item $\{X_t\}$ is continuous-time: $\mathbb{E}[X_t|\mathcal{F}_s]= X_s \; ,\forall 0\leq s\le t$.
+		\item $\{X_t\}$ is discrete-time: $\mathbb{E}[X_{t+1}|\mathcal{F}_t]= X_t	$.
+	    \end{itemize}
+
+	\subsection{Mean-Square Convergence and Continuity}
+	
+	\textbf{a) Mean-Square Convergence}
+	
+	For a sequence of random variable $\{X_t\}$, the fact that the sequence converge to a random variable $X$ is largely depend on its 'metric' (way we measure the distance of 2 random variables). In this research, we mainly place focus on convergence in mean-square sense. 
+	
+	Let's $\{X_t\}$ be sequence of square-integrable random variables defined on $\Omega$, we say that $\{X_t\}$ converges to $X$ which is also square-integrable if the following holds:
+	
+	\begin{equation} \label{eqn: convergence}
+	    \lim_{n \to \infty}\mathbb{E}[X_n-X]=0, \; \text{denoted as} \; X_n \xrightarrow{\mathcal{L}^2} X.
+	\end{equation}
+	
+	Note: $\mathcal{L}^2$ or $\mathcal{L}^2(\Omega)$ is space of all random variables (functions) X defined on $(\Omega, \mathcal{F}, \mathcal{P})$ such that $\mathbb{E}[|X|^2]<\infty$.\\
+	
+	\textbf{b) Mean-Square Continuity}
+	
+	The notion of mean-square convergence enable us to formalize the idea of continuity. For a random process $\{X_t\}_{t\in \mathcal{I}}$ is mean-square continuous at $t=t_0$ if: 
+	\begin{equation} \label{eqn: continuity}
+	    \lim_{t \to t_0}\mathbb{E}[(X_t-X_{t_0})^2]= 0.
+	\end{equation}
+
+	
+	\section{BROWNIAN MOTION}
+	\subsection{Basics of Brownian motion}
+	
+	\textbf{a) Definition- Standard Brownian motion} 
+	
+	A Continuous-time stochastic process $\{B_t\}_{t\geq 0}$ is standard Brownian motion if the process satisfy the following:
+	\begin{itemize}[label=$\bullet$]
+		\item $B_0=0$
+		\item (Normal Distribution)  For all $t\geq 0$, $B_t \sim \mathcal{N}(0,\text{t})$
+		\item (Stationary Increments) For all $s,t \geq 0$, we have that $(B_{t+s}-B_s) \overset{\text{D}}{\sim} B_t \sim \mathcal{N}(0,\text{t})$
+		\item (Independent Increments) For all $n\in \mathbb{N}$, we let 
+		$0\leq t_1 \le t_2 \le ... \le t_n$, then:
+		\[B_{t_1}, (B_{t_2}-B_{t_1}), ..., (B_{t_n}-B_{t_{n-1}}) \; \text{are independent}\]
+		\item (Continuous paths)   $\mathcal{P}(\text{function} \; f:t \mapsto B_t \text{is continuous})= 1$
+	\end{itemize} 
+
+	It is obvious to prove that $Cov[B_s, B_t]= \min\{s,t\}$.
+	
+	For $s< t:$	
+	\begin{equation*} 
+		\begin{split}
+	Cov[B_s, B_t] &= \mathbb{E}[B_sB_t]- \mathbb{E}[B_s]\mathbb{E}[B_t]= \mathbb{E}[B_s[(B_t-B_s)+ B_s]]\\
+	&= \mathbb{E}[B_s(B_t-B_s)]+ \mathbb{E}[B_s^2] \; \text{(Linearity)}\\
+	&= \mathbb{E}[B_s]\mathbb{E}[B_t-B_s] + s \text{(Independent increment, $B_s \sim N(0,s)$)}\\
+	&= s
+	\end{split}
+	\end{equation*}
+	By symmetry, we also have $Cov[B_s, B_t]=t$ for $t<s$, hence we get $Cov[B_s, B_t]= \min (s,t)$.
+	
+	It is worthy to note that there is an umbrella term for both Brownian motion and its variations which is Gaussian process. In short, it means that $\forall \alpha_i\in \mathbb{R},\; \forall n\in \mathbb{N}, t_1,...,t_n\in [0,\infty)$, the linear combination $\sum_{i=1}^{n}\alpha_iB_{t_i}$ is univariate normal random variable. 
+	
+	Note that, as Brownian motion is just one type of Gaussian process, we can define  $\{B_t\}$ differently as a Gaussian process with constant mean function $\mathbb{E}[B_t]= c$ (constant) and with covariance function $Cov[B_t, B_s]= \min (s,t)$.\\
+
+	\textbf{b) Transformation of Brownian motion}
+	
+	Let $\{B_t\}_{t\geq 0}$ be standard Brownian motion, then each of the following continuous-time stochastic process is also standard Brownian motion: 
+	
+		\begin{itemize}[label=$\bullet$]
+		\item (Reflection) $\{-B_t\}_{t\geq 0}$
+		\item (Translation) $\{B_{t+s}-B_s\}_{t\geq 0}\; \forall s\geq 0$
+ 		\item (Rescaling) $\{\frac{B_{at}}{\sqrt{a}}\}_{t\geq 0}  \; \forall a\geq 0$
+		\item (Inversion) $\{tB_{1/t}\}_{t>0}$ and at $t=0$ the process get value 0.	
+		\end{itemize} 
+
+	\textbf{c) Filtration of Brownian motion}
+	
+	Since Brownian motion is an essential theoretical device for the construction of asset-pricing model in later chapter, we should firmly grasp the idea about 'information set' ($\{\mathcal{F}_t\}$) 	and how it evolve over time, does it consistent with real-world asset price's movement ? 
+	
+	$\{B_t\}_{t\geq 0}$ is adapted process on filtered probability space $(\Omega, \mathcal{F}, \{\mathcal{F}_t\},\mathcal{P})$ where $\{\mathcal{F}_t\}_{t\geq 0}$ is natural filtration  for $\{B_t\}_{t\geq 0}$ where $\mathcal{F}_t= \sigma(B_s, 0\leq s\leq t)$  satisfying:
+	
+	\begin{itemize}[label=$\bullet$]
+	\item (Accumulated Information) $\mathcal{F}_s \subset \mathcal{F}_s\; \forall  0\leq s\leq t $
+	\item (Adaptivity) $B_t$ is $\mathcal{F}_t$-measurable for all $t\geq 0$
+	\item (Independent of future increments) $(B_t-B_s)$ is independent of $\mathcal{F}_s \; \forall t>s$
+\end{itemize} 
+
+	\textbf{Remark}
+	
+	The natural filtration of standard Brownian motion $\{\mathcal{F}_t\}_{t\geq 0}$ is a base to construct 'progressively measurable' process $\{X_t\}$ which is an important piece to develop It\^{o} integral in later section.\\
+	
+	\textbf{d) Martingales of Brownian motion}
+	Let $\{B_t\}_{t\geq 0}$ be a Brownian motion, then the following are martingales: 
+	\begin{itemize}[label=$\bullet$]
+		\item $\{B_t\}_{t\geq 0}$
+		\item $\{B_t^2-t\}_{t\geq 0}$
+		\item $\{e^{\sigma B_t- \frac{\sigma^2}{2}t}\}_{t\geq 0}$
+	\end{itemize} 
+	
+	\textbf{e) Construction of Brownian motion}
+	
+	Interestingly, the continuous-time Brownian motion can be constructed by discrete-time process. Normally we will construct $\{B_t\}_{t\geq 0}$ by the scaled symmetric random walk. However, based on Donsker's Invariance Principle, we can be flexible in our construction as following:
+	\[X_1, X_2,... \overset{\text{i.i,d}}{\sim} \mathcal{D}\; \text{such that}\; \mathbb{E}[X_i]=0, Var[X_i]=1.\]
+
+	Let $S_n= \sum_{i=1}^{n}X_i$, then $\{\lim_{n \to +\infty} \frac{S_{nt}}{\sqrt{n}}\}$ gives Brownian motion, In other words, regardless of the distribition of each $X_i$, the scaled process of $S_n$ always gives Brownian motion limit.
+	
+	For example, we let $Z_1,...,Z_n \overset{\text{i.i,d}}{\sim} N(0,1)$ and $S_n= \sum_{i=1}^{n}Z_i$, then we have the process $\{S_n\}$ (n=1,...,100) and the scaled-process $\{\frac{S_{nt}}{\sqrt{n}}\}_{t\in [0,1]}$ is simulated as below:
+	
+	\subsection{It\^{o} Integral }
+	\begin{equation} \label{eqn: ito integral}
+	    \mathcal{I}_t= \int_{0}^t X_s dB_s
+	\end{equation}
+	
+	In order to validly define It\^{o} integral $\mathcal{I}_t$, it requires the stochastic process $\{X_t\}$ to satisfy some essential properties. \\
+	
+
+    \section{EMPIRICAL ASSET PRICE AND RETURN}
+
+	Before digging deeper into modeling process, it is essential to first whet readers' appetite by examining some key features of asset price and return.
+	
+	Underlying asset: Stock price- Hoa Phat Dung Quat Steel, Joint stock company (Ticker: HPG)
+	
+	We will first consider the movement and distribution of HPG's stock price, then come into its daily log-return. \\
+		
+
+\section{NEGATIVE RELATIONSHIP BETWEEN ASSET PRICE AND VOLATILITY}
+
+The flaw of ``constant'' volatility value can be reflected from negative relationship between equity price and its return volatility. The evidence is for this relation is shown by Black (1976) and Christine (1982). There are several explanations for this phenomenon, but two most prominent ones are owning to leverage effect and volatility feedback effect....
+
+\chapter{CONSTRUCTION OF ASSET PRICE MOVEMENT MODELS}	
+sample only....\\
+\newpage
+
+\chapter{SAMPLE CHAPTER ONLY...}	
+sample only....\\
+\newpage
+
+\chapter{CONCLUSION AND FURTHER STUDY}	
+ 
+ In conclusion, the main objective of this thesis is two-fold. 
+ 
+ First and foremost, based on the option theory and Black-Scholes Merton option pricing model, we take a step further to study options' sensitivity as a result of changes in other financial variables (including underlying asset price, volatility, time to maturity and interest rate) with the objective to find portfolio strategies to `` hedge '' these volatility in reality. Our thesis also developed an extended hedging model inspired from the one developed from Hull's research. The effectiveness of these hedging models is superior compared to conventional methods that investors have applied for years. Especially, they overcomes the drawbacks of other hedging methods in modern, volatile financial world... \\
+ etc....
+ 
+	\newpage 
+	\clearpage	
+
+
+\begin{thebibliography}{20}
+	\bibitem{1} {Evans, Lawrence C. An introduction to stochastic differential equations. Vol. 82. American Mathematical Soc., 2012.}
+	\bibitem{2}{Higham, Desmond J. An introduction to financial option valuation: mathematics, stochastics and computation., 2004.}
+	\bibitem{3}{Hull, John, and Alan White. Optimal delta hedging for options. Journal of Banking \& Finance 82 (2017): 180-190.}	
+	\bibitem{4}{Kumar, Arya. ``A Study on Risk Hedging Strategy: Efficacy Of Option Greeks.'' Abhinav National Monthly Refereed Journal of Research in Commerce \& Management 7.4 (2018): 77-85.}	
+	\bibitem{5}{Dyshaev, Mikhail M., and Vladimir E. Fedorov. ``Comparing of some sensitivities (Greeks) for nonlinear models of option pricing with market illiquidity.'' Mathematical notes of NEFU 26.2 (2019): 94-108.}	
+	\bibitem{6}{Dobrow, R. (2016). Introduction to Stochastic Processes with R (1st ed.). Wiley. Retrieved from https://www.perlego.com/book/999284/introduction-to-stochastic-processes-with-r-pdf (Original work published 2016)}	
+	\bibitem{7}{Hull, John, 1946-. Options, Futures, and Other Derivatives. Boston :Prentice Hall, 2012.}	
+	\bibitem{8}{Anand, Ujjwal, and K. S. Manu. "Role of Options Greeks in Risk Management." (2021).	}	
+    \bibitem{9}{Alexander, C., Kaeck, A., Nogueira, L.M., 2009. Model risk adjusted hedge ratios. J.
+Futures Markets 29 (11), 1021–1049.}\\
+...etc...
+   
+
+\end{thebibliography}
+
+\end{document}
+

@@ -1,0 +1,404 @@
+% Đề cương luận văn — biên dịch bằng: tectonic proposal.tex
+\documentclass[12pt,a4paper]{article}
+
+% ── Ngôn ngữ và phông chữ (XeLaTeX) ──────────────────────────────────────────
+\usepackage{fontspec}
+\setmainfont{texgyretermes}[
+  Extension      = .otf,
+  UprightFont    = *-regular,
+  BoldFont       = *-bold,
+  ItalicFont     = *-italic,
+  BoldItalicFont = *-bolditalic]
+\setmonofont{texgyrecursor}[
+  Extension   = .otf,
+  UprightFont = *-regular,
+  BoldFont    = *-bold,
+  Scale       = 0.95]
+\usepackage[vietnamese]{babel}
+
+% ── Bố cục ────────────────────────────────────────────────────────────────────
+\usepackage[top=2.5cm,bottom=2.5cm,left=3cm,right=2cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{parskip}
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.6em}{}
+
+% ── Toán, bảng, hình ─────────────────────────────────────────────────────────
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,tabularx,multirow}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,calc}
+\usepackage{enumitem}
+\setlist{nosep,leftmargin=1.5em}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{caption}
+\usepackage{float}
+\captionsetup{font=small,labelfont=bf}
+
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcommand{\TODO}[1]{\textcolor{red}{[#1]}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\begin{document}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{titlepage}
+\centering
+{\large \TODO{TÊN TRƯỜNG}\par}
+{\large \TODO{KHOA / VIỆN}\par}
+\vspace{3cm}
+{\Large\bfseries ĐỀ CƯƠNG LUẬN VĂN\par}
+\vspace{1.2cm}
+{\LARGE\bfseries Khai phá alpha dạng công thức cho hợp đồng tương lai VN30F bằng tìm kiếm cây Monte Carlo có ràng buộc thứ nguyên, dẫn hướng bởi mô hình ngôn ngữ lớn\par}
+\vspace{0.8cm}
+{\large\itshape LLM-Guided, Dimension-Constrained Monte Carlo Tree Search for Formulaic Alpha Discovery in VN30F Futures\par}
+\vfill
+\begin{tabular}{rl}
+Học viên: & \TODO{Họ và tên} \\
+Mã học viên: & \TODO{MSHV} \\
+Giảng viên hướng dẫn: & \TODO{Học hàm, học vị, họ tên} \\
+Chuyên ngành: & \TODO{Chuyên ngành} \\
+\end{tabular}
+\vspace{2cm}
+
+{\TODO{Thành phố}, tháng \TODO{MM} năm \TODO{YYYY}\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Đặt vấn đề}
+
+Tín hiệu giao dịch định lượng (\emph{alpha}) thường được biểu diễn dưới dạng công thức toán học trên chuỗi giá và khối lượng, ví dụ tập 101 alpha công bố bởi \citet{kakushadze2016alphas}. Dạng công thức có ưu điểm dễ diễn giải và dễ kiểm soát rủi ro so với mô hình hộp đen, nhưng không gian công thức khả dĩ là tổ hợp và rất lớn. Việc tìm kiếm thủ công tốn kém, còn các phương pháp tự động như lập trình di truyền \citep{koza1992gp} hay học tăng cường \citep{yu2023alphagen} thường kém hiệu quả khi tìm kiếm hoặc sinh ra công thức khó hiểu.
+
+Gần đây, mô hình ngôn ngữ lớn (LLM) được dùng để đề xuất ý tưởng alpha \citep{wang2023alphagpt,tang2025alphaagent}, và kết hợp với tìm kiếm cây Monte Carlo (MCTS) để tinh chỉnh công thức dựa trên phản hồi từ backtest \citep{shi2026alphajungle}. Tuy nhiên, các nghiên cứu này tập trung vào \emph{alpha cắt ngang} trên thị trường cổ phiếu, tức xếp hạng tương đối giữa nhiều mã. Bài toán \emph{tín hiệu có hướng trên một công cụ duy nhất} (Long/Short/Flat), tương tự chiến lược CTA/Managed Futures \citep{moskowitz2012tsmom}, trên hợp đồng tương lai chỉ số VN30 (VN30F) ở tần suất trong ngày chưa được nghiên cứu một cách có hệ thống.
+
+Một vấn đề xuyên suốt khác là \emph{quá khớp backtest}. Khi hàng chục nghìn công thức được thử trên cùng một chuỗi lịch sử, công thức tốt nhất gần như chắc chắn đẹp một phần nhờ may mắn \citep{white2000reality,harvey2016cross,bailey2017pbo}. Một hệ thống khai phá alpha tự động vì vậy phải được đánh giá không chỉ bằng hiệu suất trong mẫu mà bằng khả năng sống sót qua kiểm định ngoài mẫu và kiểm định độ bền.
+
+Luận văn đề xuất và đánh giá một hệ thống khai phá alpha hai tầng cho VN30F: LLM sinh \emph{bản thiết kế cấu trúc} của chiến lược, MCTS điền chi tiết công thức trong một ngữ pháp có ràng buộc thứ nguyên, và mọi ứng viên được lọc qua một bộ backtest mô phỏng sát thị trường phái sinh Việt Nam cùng kiểm định độ bền nhiều tầng.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Mục tiêu và câu hỏi nghiên cứu}
+
+\subsection{Mục tiêu tổng quát}
+Xây dựng và đánh giá một khung khai phá tự động tín hiệu giao dịch có hướng cho hợp đồng tương lai VN30F, kết hợp LLM và MCTS, với quy trình kiểm định đủ chặt để phân biệt tín hiệu có thật với kết quả của việc thử quá nhiều công thức.
+
+\subsection{Câu hỏi nghiên cứu}
+\begin{enumerate}[label=\textbf{RQ\arabic*.}, leftmargin=3em]
+  \item \textbf{Vai trò của LLM:} Với cùng ngân sách tính toán, việc LLM đề xuất bản thiết kế cấu trúc có giúp MCTS tìm được công thức tốt hơn (trong và ngoài mẫu) so với MCTS khởi đầu từ cây rỗng, hoặc tìm kiếm ngẫu nhiên, hay không?
+  \item \textbf{Không gian tìm kiếm:} Công thức dựng từ toán tử chuỗi thời gian cơ bản (\code{ts\_rank}, \code{ts\_corr}, \ldots) có vượt trội công thức dựng từ chỉ báo kỹ thuật do con người thiết kế (RSI, MACD, Bollinger, \ldots) hay không?
+  \item \textbf{Độ bền:} Hiệu suất của alpha được khai phá suy giảm bao nhiêu khi chuyển từ trong mẫu sang ngoài mẫu (năm 2025) và sang các đường giá giả lập theo chế độ thị trường? Sau khi hiệu chỉnh cho số lượng công thức đã thử, còn lại bao nhiêu alpha có ý nghĩa thống kê?
+\end{enumerate}
+
+\subsection{Phạm vi}
+\begin{itemize}
+  \item Công cụ: hợp đồng tương lai VN30F1M (hợp đồng tháng gần nhất, nối liên tục).
+  \item Tần suất: 7 khung thời gian từ 1 phút đến 60 phút.
+  \item Loại tín hiệu: có hướng (Long/Short/Flat) trên một công cụ; không xét danh mục cắt ngang cổ phiếu.
+  \item Không triển khai giao dịch thật; đánh giá hoàn toàn bằng mô phỏng.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Tổng quan nghiên cứu liên quan}
+
+\paragraph{Alpha dạng công thức và khai phá tự động.}
+\citet{kakushadze2016alphas} công bố 101 alpha thực tế dưới dạng công thức, xác lập bộ toán tử chuẩn như \code{rank}, \code{delay}, \code{delta}, \code{correlation}, \code{ts\_argmax}. Hướng tự động hoá sớm dùng lập trình di truyền \citep{koza1992gp}: biểu diễn công thức dạng cây và tiến hoá qua lai ghép, đột biến. AlphaGen \citep{yu2023alphagen} dùng học tăng cường để sinh \emph{tập} alpha bổ trợ nhau, lấy hiệu suất của mô hình kết hợp làm phần thưởng.
+
+\paragraph{LLM cho khai phá alpha.}
+Alpha-GPT \citep{wang2023alphagpt} dùng LLM để chuyển ý tưởng của nhà nghiên cứu thành alpha qua tương tác người–máy. AlphaAgent \citep{tang2025alphaagent} dùng tác tử LLM kèm cơ chế điều chuẩn khám phá để chống suy giảm alpha. Gần nhất với luận văn, \citet{shi2026alphajungle} đặt LLM bên trong vòng lặp MCTS: mỗi nút là một công thức, LLM sinh và tinh chỉnh công thức dựa trên phản hồi định lượng từ backtest. Cơ chế tự sửa lỗi của LLM dựa trên phản hồi tương tự Self-Refine \citep{madaan2023selfrefine}.
+
+\paragraph{Tìm kiếm cây Monte Carlo.}
+MCTS với chiến lược chọn UCT \citep{kocsis2006uct} cân bằng khai thác và khám phá bằng cận tin cậy trên của bài toán máy đánh bạc nhiều tay. \citet{browne2012mcts} tổng hợp các biến thể, trong đó có biến thể dùng giá trị lớn nhất thay cho trung bình, phù hợp khi mục tiêu là tìm \emph{một} lời giải tốt nhất thay vì chính sách tốt trung bình.
+
+\paragraph{Quá khớp backtest và kiểm định bội.}
+\citet{white2000reality} đề xuất Reality Check để kiểm định mô hình tốt nhất trong một quá trình tìm kiếm có thực sự vượt benchmark. \citet{harvey2016cross} chỉ ra ngưỡng $t > 2$ không còn phù hợp khi hàng trăm nhân tố đã được thử. \citet{bailey2014dsr} đề xuất Deflated Sharpe Ratio (DSR), hiệu chỉnh Sharpe cho số lần thử và phân phối phi chuẩn; \citet{bailey2017pbo} đề xuất ước lượng xác suất quá khớp (PBO) bằng kiểm định chéo tổ hợp đối xứng. \citet{lopezdeprado2018afml} tổng hợp các thực hành này.
+
+\paragraph{Mô phỏng theo chế độ thị trường.}
+Mô hình chuyển chế độ Markov \citep{hamilton1989regime} và mô hình Markov ẩn \citep{rabiner1989hmm} mô tả thị trường luân phiên giữa các trạng thái biến động. Bootstrap theo khối \citep{kunsch1989block} giữ cấu trúc phụ thuộc ngắn hạn khi lấy mẫu lại chuỗi thời gian. Kết hợp hai kỹ thuật cho phép sinh đường giá giả lập giữ được cả đặc tính chế độ lẫn cấu trúc vi mô của dữ liệu thật.
+
+\paragraph{Khoảng trống nghiên cứu.}
+\begin{enumerate}
+  \item Các khung LLM+MCTS hiện có nhắm vào alpha cắt ngang cổ phiếu; chưa có đánh giá cho tín hiệu có hướng trên hợp đồng tương lai đơn lẻ, tần suất trong ngày, ở thị trường cận biên như Việt Nam.
+  \item Các nghiên cứu khai phá alpha thường báo cáo IC hoặc lợi nhuận trong mẫu với giả định chi phí đơn giản; ít nghiên cứu mô phỏng ký quỹ, gọi ký quỹ và đáo hạn hợp đồng.
+  \item Ít nghiên cứu áp dụng đồng thời DSR/PBO và kiểm định độ bền theo chế độ cho alpha do máy sinh ra.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Dữ liệu}
+
+Dữ liệu OHLCV của VN30F1M lấy từ DNSE, từ 13/08/2018 đến 31/12/2025, ở 7 khung thời gian (Bảng~\ref{tab:data}). Phiên giao dịch gồm 9:00–11:30 và 13:00–14:45 nên số bar mỗi năm thấp hơn nhiều so với thị trường giao dịch liên tục. Giai đoạn này bao gồm các chế độ thị trường khác nhau: tăng mạnh 2020–2021, sụp đổ 2022 (VN30F giảm khoảng 35\%) và phục hồi 2023–2025.
+
+\begin{table}[H]
+\centering
+\caption{Dữ liệu VN30F1M theo khung thời gian (số bar trong giai đoạn 2020–2024).}
+\label{tab:data}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Khung & 1m & 3m & 5m & 10m & 15m & 30m & 60m \\
+\midrule
+Số bar (2020–2024) & 272\,137 & $\sim$93\,000 & $\sim$57\,000 & 30\,250 & $\sim$21\,300 & 11\,204 & 6\,229 \\
+Bar / năm & 54\,427 & & & 6\,050 & & 2\,241 & 1\,246 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Phân chia theo thời gian.} Để trả lời RQ3, dữ liệu được chia tuần tự, không xáo trộn:
+\begin{itemize}
+  \item \textbf{Tìm kiếm (trong mẫu):} 01/2020 – 12/2023. MCTS chỉ nhìn thấy giai đoạn này.
+  \item \textbf{Kiểm định (validation):} 2024, dùng cho chọn ngưỡng và kiểm định độ bền.
+  \item \textbf{Kiểm tra (ngoài mẫu):} 2025, chỉ dùng \emph{một lần} ở cuối để báo cáo kết quả.
+  \item Dữ liệu 2018–2019 dùng làm giai đoạn khởi động cho các toán tử cửa sổ trượt.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Phương pháp}
+
+\subsection{Kiến trúc tổng quan}
+
+Hệ thống gồm ba tầng (Hình~\ref{fig:arch}). Tầng 1 dùng LLM sinh bản thiết kế cấu trúc; tầng 2 dùng MCTS hoàn thiện công thức và đánh giá bằng backtest; tầng 3 kiểm định độ bền và kiểm tra ngoài mẫu.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=1.8cm and 1.9cm,
+  box/.style={draw, rounded corners=2pt, align=center, font=\small, minimum height=1.3cm, text width=3.1cm, fill=#1},
+  box/.default={white},
+  arr/.style={-{Stealth[length=2.2mm]}, thick},
+  lbl/.style={font=\scriptsize, align=center, fill=white, inner sep=1pt}]
+  % Hàng trên: tầng 1 và tầng 2
+  \node[box=blue!8] (llm) {LLM\\sinh bản thiết kế};
+  \node[box=blue!8, right=of llm] (comp) {Trình biên dịch\\ngữ nghĩa};
+  \node[box=violet!8, right=of comp] (mcts) {MCTS\\hoàn thiện công thức};
+  % Hàng dưới: backtest và tầng 3
+  \node[box=violet!8, below=of mcts] (bt) {Backtest VN30F\\phí, ký quỹ, đáo hạn};
+  \node[box=orange!10, below=of comp] (val) {Kiểm định độ bền\\3 tầng (HMM)};
+  \node[box=green!10, below=of llm] (oos) {Kiểm tra ngoài mẫu\\2025, DSR, PBO};
+  % Luồng chính
+  \draw[arr] (llm) -- node[above, lbl, yshift=2pt]{bản thiết kế} (comp);
+  \draw[arr] (comp) -- node[above, lbl, yshift=2pt]{cây AST} (mcts);
+  \draw[arr] (bt) -- node[above, lbl, yshift=2pt]{ứng viên} (val);
+  \draw[arr] (val) -- node[above, lbl, yshift=2pt]{qua 3 tầng} (oos);
+  % Vòng tự sửa lỗi của LLM
+  \draw[arr] (comp.north) -- ++(0,0.6) -| node[pos=0.25, above, lbl]{lỗi cú pháp / thứ nguyên: LLM tự sửa} (llm.north);
+  % Vòng lặp MCTS <-> backtest
+  \draw[arr] ([xshift=-6mm]mcts.south) -- node[left, lbl, xshift=-2pt]{công thức} ([xshift=-6mm]bt.north);
+  \draw[arr] ([xshift=6mm]bt.north) -- node[right, lbl, xshift=2pt]{phần thưởng} ([xshift=6mm]mcts.south);
+\end{tikzpicture}
+\caption{Kiến trúc hệ thống đề xuất.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Tầng 1: LLM sinh bản thiết kế cấu trúc}
+
+LLM nhận mô tả thị trường, khung thời gian và danh sách toán tử được phép, rồi sinh một \emph{bản thiết kế} dạng biểu thức có chỗ trống, ví dụ \code{ts\_zscore(sub(?, ts\_mean(?)))}. LLM chỉ quyết định \emph{cấu trúc} (ý tưởng kinh tế: hồi quy về trung bình, động lượng, bất thường biến động, \ldots); các chỗ trống \code{?} và tham số cửa sổ do MCTS điền. Trình biên dịch ngữ nghĩa phân tích biểu thức thành cây cú pháp (AST), ánh xạ tên hàm gần đúng về toán tử hợp lệ, và kiểm tra thứ nguyên. Nếu biên dịch thất bại, thông báo lỗi được gửi lại cho LLM để tự sửa \citep{madaan2023selfrefine}.
+
+\subsection{Tầng 2: MCTS trên ngữ pháp có ràng buộc thứ nguyên}
+
+\paragraph{Ngữ pháp.} Mỗi nút trong cây công thức mang một \emph{thứ nguyên}: \textsc{Currency} (giá), \textsc{Volume}, \textsc{Ratio} (không thứ nguyên: lợi suất, hệ số tương quan, z-score) hoặc \textsc{Boolean}. Mỗi toán tử khai báo thứ nguyên đầu vào và đầu ra (Bảng~\ref{tab:ops}); MCTS chỉ mở rộng một chỗ trống bằng toán tử hoặc lá có thứ nguyên tương thích. Ràng buộc này loại bỏ các biểu thức vô nghĩa như cộng giá với khối lượng, thu hẹp đáng kể không gian tìm kiếm.
+
+\begin{table}[H]
+\centering
+\caption{Bộ toán tử của không gian tìm kiếm.}
+\label{tab:ops}
+\begin{tabularx}{\textwidth}{lL}
+\toprule
+Nhóm & Toán tử \\
+\midrule
+Chuỗi thời gian & \code{ts\_mean}, \code{ts\_sum}, \code{ts\_max}, \code{ts\_min}, \code{ts\_rank}, \code{ts\_zscore}, \code{ts\_argmax}, \code{ts\_argmin}, \code{ts\_corr}; \emph{bổ sung dự kiến:} \code{ts\_delay}, \code{ts\_delta} \\
+Số học & \code{add}, \code{sub}, \code{mult}, \code{div} \\
+Logic & \code{greater\_than}, \code{less\_than}, \code{crossed\_above}, \code{crossed\_below}, \code{rising}, \code{falling}, \code{and\_}, \code{or\_}, \code{not\_} \\
+Lá & \code{open}, \code{high}, \code{low}, \code{close}, \code{volume}, hằng số \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{Chuyển công thức thành vị thế.} Tuỳ thứ nguyên của gốc, công thức $\alpha_t$ được gắn vào một trong ba khuôn mẫu, với tỷ trọng vị thế $w$:
+\begin{align*}
+\text{Chuẩn hoá:}\quad & z_t = \mathrm{ts\_zscore}(\alpha, W)_t,\quad
+  p_t = w\cdot\mathbf{1}[z_t > \theta] - w\cdot\mathbf{1}[z_t < -\theta] \\
+\text{Tỷ lệ:}\quad & p_t = w\cdot\mathbf{1}[\alpha_t > u] - w\cdot\mathbf{1}[\alpha_t < \ell] \\
+\text{Logic:}\quad & p_t = w\cdot(2\cdot\mathbf{1}[\alpha_t] - 1)
+\end{align*}
+Mỗi công thức được thử theo cả hai chiều ($\pm p_t$); chiều tốt hơn được giữ lại và số lần thử được đếm gấp đôi khi hiệu chỉnh kiểm định bội.
+
+\paragraph{Phần thưởng.} Với Calmar ratio $C$, hệ số tương quan hạng thông tin (Rank IC) giữa $\alpha_t$ và lợi suất bar kế tiếp, và tương quan vị thế lớn nhất $\rho_{\max}$ với các alpha đã có trong danh mục:
+\[
+R = \begin{cases}
+-10 & \text{nếu } C < 1{,}1 \text{ hoặc số lệnh} < 15,\\[2pt]
+\left(0{,}6\, S_C + 0{,}4\, S_{IC}\right)\left(1 - \rho_{\max}\right) & \text{ngược lại},
+\end{cases}
+\]
+trong đó $S_C = \min\!\big(1, \tfrac{C-1{,}1}{3{,}0-1{,}1}\big)$ và $S_{IC} = \min\!\big(1, \tfrac{|IC|}{0{,}15}\big)$. Hệ số $(1-\rho_{\max})$ khuyến khích tìm alpha mới thay vì biến thể của alpha đã có.
+
+\paragraph{Chọn nút.} MCTS dùng UCT \citep{kocsis2006uct} nhưng thay giá trị trung bình bằng giá trị \emph{lớn nhất} quan sát được ở nút con:
+\[
+a^* = \arg\max_{a}\; \Big( \max R_a + c\sqrt{\tfrac{\ln N}{n_a}} \Big),\quad c = \sqrt{2},
+\]
+vì mục tiêu là tìm một công thức tốt nhất chứ không phải chính sách tốt trung bình. Luận văn sẽ phân tích tác động của lựa chọn này lên thiên lệch chọn lọc (mục~\ref{sec:stats}).
+
+\subsection{Mô phỏng giao dịch VN30F}
+
+Bộ backtest mô phỏng các đặc điểm sau của thị trường phái sinh Việt Nam:
+\begin{itemize}
+  \item \textbf{Thời điểm khớp lệnh:} tín hiệu tại giá đóng cửa bar $t$ được khớp tại giá đóng cửa bar $t+1$, không dùng thông tin tương lai.
+  \item \textbf{Số hợp đồng:} $N = \mathrm{round}\big(|w|\,E_0 / (P_0 \cdot M \cdot m)\big)$ với hệ số nhân $M = 100\,000$ VND/điểm và tỷ lệ ký quỹ ban đầu $m = 28{,}5\%$.
+  \item \textbf{Phí:} 6\,000 VND/hợp đồng/chiều, tính trên phần chênh lệch số hợp đồng (netting).
+  \item \textbf{Gọi ký quỹ:} dùng giá bất lợi nhất trong bar (thấp nhất khi Long, cao nhất khi Short); khi vốn giảm dưới mức ký quỹ duy trì 20\%, toàn bộ vị thế bị đóng.
+  \item \textbf{Đáo hạn:} phạt 2 điểm cho mỗi lần giữ vị thế qua ngày đáo hạn hợp đồng tháng.
+  \item \textbf{Bổ sung dự kiến:} trượt giá 1 bước giá (0,1 điểm) mỗi chiều.
+\end{itemize}
+
+\subsection{Tầng 3: Kiểm định độ bền theo chế độ thị trường}
+
+Một mô hình Markov ẩn Gauss 3 trạng thái được học trên ba đặc trưng: log-lợi suất, độ lệch chuẩn trượt 20 bar và tỷ lệ khối lượng. Đường giá giả lập được sinh bằng cách chạy chuỗi trạng thái theo ma trận chuyển đã học, và với mỗi trạng thái lấy ngẫu nhiên một khối 20 bar liên tiếp từ lịch sử thuộc trạng thái đó \citep{kunsch1989block}. Một biến thể ``căng thẳng'' tăng xác suất chuyển vào trạng thái biến động cao lên 1,5 lần. Mỗi ứng viên chạy trên 500 đường giá và phải qua cả ba tầng:
+\begin{enumerate}
+  \item \textbf{Sống sót:} tỷ lệ đường giá có sụt giảm vốn vượt 23\% (ngưỡng gọi ký quỹ) phải dưới 5\%.
+  \item \textbf{Kỳ vọng dương sau phí:} tỷ lệ Kelly \citep{kelly1956} $f^* = p - (1-p)/b > 0$, và lợi nhuận trung bình mỗi lệnh ít nhất gấp 3 lần phí trung bình.
+  \item \textbf{Chi phí cơ hội:} CAGR trung bình trên đường giả lập vượt lãi suất tiết kiệm 6\%/năm, và Sharpe trung bình vượt chiến lược mua-và-giữ trên cùng các đường giá.
+\end{enumerate}
+
+\subsection{Hiệu chỉnh thống kê và kiểm tra ngoài mẫu}
+\label{sec:stats}
+
+Các alpha qua tầng 3 được đánh giá thêm bằng:
+\begin{itemize}
+  \item \textbf{Deflated Sharpe Ratio} \citep{bailey2014dsr}, với số lần thử bằng tổng số công thức MCTS đã đánh giá (tính cả hai chiều), qua mọi khung thời gian.
+  \item \textbf{Xác suất quá khớp (PBO)} \citep{bailey2017pbo} trên tập ứng viên hàng đầu.
+  \item \textbf{Kiểm tra ngoài mẫu năm 2025:} chạy đúng một lần trên các alpha đã chốt, báo cáo toàn bộ kết quả kể cả âm.
+\end{itemize}
+
+\subsection{Thiết kế thí nghiệm}
+
+\begin{table}[H]
+\centering
+\caption{Các cấu hình so sánh, cùng ngân sách số lần đánh giá backtest.}
+\label{tab:exp}
+\begin{tabularx}{\textwidth}{lLl}
+\toprule
+Cấu hình & Mô tả & RQ \\
+\midrule
+LLM + MCTS & Hệ thống đầy đủ & 1, 2, 3 \\
+MCTS thuần & MCTS bắt đầu từ cây rỗng, không có bản thiết kế LLM & 1 \\
+LLM thuần & LLM viết công thức hoàn chỉnh, tham số mặc định, không tìm kiếm & 1 \\
+Tìm kiếm ngẫu nhiên & Sinh cây ngẫu nhiên hợp lệ thứ nguyên & 1 \\
+Chỉ báo kỹ thuật & LLM + MCTS trên không gian chỉ báo TA-Lib (kiến trúc cũ) & 2 \\
+Mua-và-giữ & Luôn Long 1 đơn vị tỷ trọng & chuẩn \\
+Động lượng chuỗi thời gian & Theo \citet{moskowitz2012tsmom}, điều chỉnh cho tần suất trong ngày & chuẩn \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Tiêu chí so sánh: Sharpe và Calmar ngoài mẫu, DSR, tỷ lệ ứng viên qua 3 tầng, mức suy giảm Sharpe từ trong mẫu sang ngoài mẫu, và số lần backtest cần để đạt ứng viên hợp lệ đầu tiên.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Kết quả sơ bộ và tình trạng hiện tại}
+
+\subsection{Kết quả của kiến trúc chỉ báo kỹ thuật}
+
+Phiên bản đầu của hệ thống (không gian chỉ báo TA-Lib) đã sinh 171 chiến lược: 22 do LLM viết trực tiếp và 149 do MCTS tìm. Kết quả kiểm định 3 tầng ở Bảng~\ref{tab:prelim}.
+
+\begin{table}[H]
+\centering
+\caption{Kết quả kiểm định 3 tầng của 171 chiến lược thế hệ đầu.}
+\label{tab:prelim}
+\begin{tabular}{lrrr}
+\toprule
+ & LLM viết trực tiếp & MCTS & Tổng \\
+\midrule
+Loại ở tầng 1 (sống sót) & 22 & 140 & 162 (94,7\%) \\
+Loại ở tầng 2 (phí) & 0 & 4 & 4 \\
+Loại ở tầng 3 (chi phí cơ hội) & 0 & 4 & 4 \\
+\textbf{Qua cả 3 tầng} & \textbf{0} & \textbf{1} & \textbf{1} \\
+\midrule
+Trung vị Sharpe trong mẫu & 1,48 & 0,99 & \\
+Trung vị tỷ lệ phá sản trên đường giả lập & 93,5\% & 70,0\% & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Ba quan sát định hướng cho luận văn:
+\begin{enumerate}
+  \item Chiến lược do LLM viết trực tiếp có Sharpe trong mẫu cao hơn nhưng không chiến lược nào sống sót trên đường giá giả lập, gợi ý rằng hiệu suất trong mẫu cao không phản ánh độ bền.
+  \item Tương quan giữa Sharpe trong mẫu và Sharpe trung bình trên đường giả lập chỉ khoảng 0,19–0,24; với chiến lược MCTS, Sharpe lịch sử nằm ở trung vị phân vị 96–100\% so với các đường giả lập. Đây là dấu hiệu điển hình của quá khớp vào một đường giá lịch sử cụ thể.
+  \item Alpha duy nhất qua 3 tầng có Sharpe giảm từ 2,38 trong mẫu xuống khoảng 1,5--1,6 trên đường giả lập (giảm khoảng một phần ba), và kết quả nằm sát ngưỡng: một phiên bản bộ lọc trước đó loại nó khi dùng 100 đường giá nhưng chấp nhận khi dùng 300 đường.
+\end{enumerate}
+
+\subsection{Kiểm tra độ tin cậy của bộ giả lập}
+
+Để loại trừ khả năng tỷ lệ loại cao ở tầng 1 là do bộ giả lập quá khắc nghiệt, độ dài trung bình của chế độ biến động cao và mức sụt giảm của chiến lược mua-và-giữ được đo trên dữ liệu thật và trên 10 đường giả lập mỗi khung (Bảng~\ref{tab:regime}). Bộ giả lập tái tạo độ dài chế độ ở mức 0,72–0,92 lần thực tế và mức sụt giảm tương đương hoặc nhẹ hơn thực tế; tức là nó \emph{không} khắc nghiệt hơn thị trường thật. Điểm yếu còn lại là tự tương quan dài hạn của độ lớn lợi suất thấp hơn thực tế.
+
+\begin{table}[H]
+\centering
+\caption{So sánh dữ liệu thật và dữ liệu giả lập HMM.}
+\label{tab:regime}
+\begin{tabular}{lrrrr}
+\toprule
+Khung & \multicolumn{2}{c}{Độ dài chế độ biến động cao (bar)} & \multicolumn{2}{c}{Sụt giảm lớn nhất của mua-và-giữ} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+ & Thật & Giả lập & Thật & Giả lập (TB) \\
+\midrule
+60m & 61,9 & 44,8 & $-44{,}7\%$ & $-43{,}0\%$ \\
+15m & 40,2 & 34,5 & $-45{,}2\%$ & $-41{,}4\%$ \\
+5m  & 40,3 & 34,6 & $-45{,}3\%$ & $-36{,}4\%$ \\
+1m  & 10,3 & 9,4  & $-45{,}4\%$ & $-36{,}4\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Các vấn đề đã phát hiện, cần xử lý trong luận văn}
+
+Quá trình rà soát bằng thực nghiệm đã phát hiện các vấn đề sau. Chúng không làm mất giá trị của khung đề xuất nhưng phải được xử lý trước khi báo cáo kết quả chính thức:
+\begin{enumerate}
+  \item \textbf{Quy đổi theo năm trong kiểm định tầng 3:} số năm được ước lượng từ số bar với hệ số cố định thay vì từ thời gian thực. Trên chiến lược mua-và-giữ 2020–2024 (CAGR thật 8,9\%), CAGR tính ra là 0,76\% ở khung 1m và 20,0\% ở khung 30m. Cần tính lại theo lịch thực tế.
+  \item \textbf{Không có dữ liệu ngoài mẫu:} tìm kiếm, học HMM và đánh giá cùng dùng giai đoạn 2020–2024; cần áp dụng phân chia ở mục 4.
+  \item \textbf{Kiến trúc toán tử cơ bản chưa vận hành trọn vẹn:} sau khi chuyển từ chỉ báo TA-Lib sang toán tử \code{ts\_*}, bốn điểm nối giữa các thành phần chưa được cập nhật (prompt LLM, bước mở rộng nút MCTS, kiểu dữ liệu vị thế truyền vào backtest, và mã chiến lược xuất ra). Vì vậy chưa có kết quả cho RQ2.
+  \item \textbf{Tham số cửa sổ được chọn ngẫu nhiên} khi chuyển cây thành mã, làm thống kê phần thưởng tại một nút MCTS trộn lẫn nhiều công thức khác nhau; cần đưa cửa sổ thành một bước quyết định của MCTS.
+  \item \textbf{Thiếu toán tử độ trễ và sai phân} (\code{ts\_delay}, \code{ts\_delta}), vốn là nền tảng của alpha dạng công thức \citep{kakushadze2016alphas}.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Đóng góp dự kiến}
+\begin{enumerate}
+  \item Một khung LLM + MCTS có ràng buộc thứ nguyên cho tín hiệu có hướng trên hợp đồng tương lai, kèm bộ mô phỏng giao dịch VN30F có phí, ký quỹ và đáo hạn.
+  \item Bằng chứng thực nghiệm về vai trò của LLM (RQ1) và của không gian toán tử (RQ2) trong khai phá alpha, với nghiên cứu cắt bỏ (ablation) trên cùng ngân sách tính toán.
+  \item Đánh giá định lượng mức quá khớp của alpha do máy sinh ra trên thị trường phái sinh Việt Nam (RQ3), kết hợp kiểm định theo chế độ, DSR/PBO và kiểm tra ngoài mẫu; báo cáo cả kết quả âm.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Kế hoạch thực hiện}
+
+\begin{table}[H]
+\centering
+\caption{Tiến độ dự kiến.}
+\label{tab:plan}
+\begin{tabularx}{\textwidth}{lL}
+\toprule
+Thời gian & Công việc \\
+\midrule
+Tháng 1 & Sửa các điểm nối của kiến trúc toán tử cơ bản; bổ sung \code{ts\_delay}, \code{ts\_delta}; sửa phép quy đổi theo năm; thêm trượt giá; viết kiểm thử chạy trọn quy trình. \\
+Tháng 2 & Áp dụng phân chia dữ liệu theo thời gian; cài đặt DSR và PBO; cài đặt các cấu hình so sánh (Bảng~\ref{tab:exp}). \\
+Tháng 3 & Chạy thí nghiệm RQ1 và RQ2 trên 7 khung thời gian. \\
+Tháng 4 & Kiểm định độ bền, hiệu chỉnh thống kê; kiểm tra ngoài mẫu năm 2025 (một lần). \\
+Tháng 5 & Phân tích kết quả, viết luận văn. \\
+Tháng 6 & Hoàn thiện, chỉnh sửa theo góp ý, chuẩn bị bảo vệ. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{Rủi ro và phương án dự phòng.}
+\begin{itemize}
+  \item \emph{Không alpha nào qua kiểm tra ngoài mẫu:} đây vẫn là kết quả có giá trị; luận văn chuyển trọng tâm sang định lượng mức quá khớp và so sánh các cấu hình theo mức độ suy giảm.
+  \item \emph{Chi phí và tính ổn định của LLM:} dùng mô hình chạy cục bộ (Ollama) làm phương án thay thế, cố định phiên bản mô hình và lưu toàn bộ prompt/phản hồi để tái lập.
+  \item \emph{Thời gian tính toán:} backtest đã được vector hoá; giới hạn ngân sách đánh giá bằng nhau giữa các cấu hình.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

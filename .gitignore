@@ -30,3 +30,16 @@ ENV/
 htmlcov/
 .env
 
+
+# Signature images and signed PDFs stay local; the repository link is published in the proposal.
+docs/proposal/thesis_proposal/figures/chuky.jpeg
+docs/proposal/thesis_proposal/figures/signature_*.png
+docs/proposal/thesis_proposal/figures/NguyenTrungAnh_Proposal.pdf
+docs/proposal/thesis_proposal/Thesis_Proposal.pdf
+docs/proposal/Sample_Thesis_Tex_format_2026/thayQ.png
+docs/proposal/Sample_Thesis_Tex_format_2026/kzan.jpeg
+docs/proposal/Sample_Thesis_Tex_format_2026/desktop.ini
+# Images the proposal needs to compile (exceptions to the *.png rule above).
+!docs/proposal/thesis_proposal/logo.png
+!docs/proposal/thesis_proposal/figures/walk_forward.png
+docs/proposal/thesis_proposal/*.pdf
