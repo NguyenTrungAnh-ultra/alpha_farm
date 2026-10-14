@@ -14,7 +14,7 @@ Current plan, status and open decisions: `docs/ROADMAP.md` (Vietnamese). Update 
 - The `venv/` directory is empty.
 - System Python 3.14 has no `hmmlearn` wheel. On 3.14, `tests/test_hmm_validation.py` is silently skipped and `HMMValidation` cannot be imported.
 - LLM credentials are read from `token.txt` (DeepSeek) and `cookies.txt` (Gemini) in the repo root. Ollama models come from `Modelfile` (qwen3.5).
-- `token.txt` and `api.txt` are gitignored but still exist in old commits. Never stage them.
+- `token.txt` and `api.txt` hold credentials and are gitignored. Never stage them.
 
 ## Commands
 
@@ -75,7 +75,7 @@ As of 2026-10-01, the suite in `.venv` gives 37 passed and 1 failed. The failure
   - `CalculateMetrics.compute_metrics` resamples to daily and uses 252 (correct).
   - `HMMValidation.calculate_metrics_for_result` infers years from the bar count with constants 4800/1200. This is wrong for most timeframes: buy-and-hold CAGR comes out 0.76% on 1m vs 8.9% true.
 
-## Known state after the XNOQuant decoupling (commit `3bdc8fd`)
+## Known state after the XNOQuant decoupling (commit `c6b1f03`)
 
 The project was originally built for the XNOQuant competition sandbox (`XnoEngine` with TA-Lib `self.feat`/`self.op`, `RestrictedSeries`, Playwright submission). The refactor replaced indicators with `ts_*` primitives but left the pipeline broken end to end. The unit tests do not exercise these paths.
 
@@ -88,7 +88,7 @@ The project was originally built for the XNOQuant competition sandbox (`XnoEngin
 
 Other leftovers from the refactor:
 - `core_engine/PlatformEmulator.py`, `RestrictedSeries.py` and `strategy_workflows/SubmitStrategies.py` are one-line "DELETED" stubs.
-- First-generation (TA-Lib) strategy artifacts were removed from `results/pushed/` in that commit. Recover them with `git checkout eec5f06 -- results/pushed`.
+- First-generation (TA-Lib) strategy artifacts were removed from `results/pushed/` in that commit. Recover them with `git checkout cfeb770 -- results/pushed`.
 - `results/portfolio_summary.json` and `3tier_results.csv` contain only first-generation strategies.
 
 ## Thesis documents

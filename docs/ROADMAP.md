@@ -40,7 +40,7 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
 ## 4. Nợ
 
 - ⛔ `token.txt` (token DeepSeek) nằm trong lịch sử git đã đẩy lên GitHub; link repo có trong proposal. Cần thu hồi token.
-- `results/pushed/` (chiến lược thế hệ đầu) bị xoá ở commit `3bdc8fd`; khôi phục bằng `git checkout eec5f06 -- results/pushed` nếu cần so sánh RQ2.
+- `results/pushed/` (chiến lược thế hệ đầu) bị xoá ở commit `c6b1f03`; khôi phục bằng `git checkout cfeb770 -- results/pushed` nếu cần so sánh RQ2.
 - `GenerateStrategies.load_experience_log` đọc `utilities/experience_log.md` — tệp không tồn tại nên prompt LLM nhận phần "kinh nghiệm" rỗng. Xử lý cùng lúc sửa prompt (việc 1).
 - `results/mcts_stats.json` có thay đổi chưa commit (do lượt chạy MCTS cũ ghi thêm).
 - Ảnh chữ ký và PDF đã ký trong `docs/proposal/` chỉ nằm trên máy (`.gitignore`), không có trong git; mất máy là mất.
