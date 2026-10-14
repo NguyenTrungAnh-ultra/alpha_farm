@@ -14,7 +14,7 @@ Current plan, status and open decisions: `docs/ROADMAP.md` (Vietnamese). Update 
 - The `venv/` directory is empty.
 - System Python 3.14 has no `hmmlearn` wheel. On 3.14, `tests/test_hmm_validation.py` is silently skipped and `HMMValidation` cannot be imported.
 - LLM credentials are read from `token.txt` (DeepSeek) and `cookies.txt` (Gemini) in the repo root. Ollama models come from `Modelfile` (qwen3.5).
-- `token.txt` is **tracked in git** despite `.gitignore`. Never stage it.
+- `token.txt` and `api.txt` are gitignored but still exist in old commits. Never stage them.
 
 ## Commands
 
