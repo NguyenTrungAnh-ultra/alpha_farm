@@ -10,10 +10,12 @@ import ast
 from .MCTSDimensions import OPERATOR_REGISTRY, DATA_FIELD_DIMENSIONS, Dimension
 
 class ASTNode:
-    def __init__(self, name: str, children: list = None, value=None):
+    def __init__(self, name: str, children: list = None, value=None, window: int = None):
         self.name = name
         self.children = children or []
         self.value = value
+        # Rolling-window length of a TIME_SERIES node; None until the search fixes it.
+        self.window = window
 
     def __repr__(self):
         if self.value is not None:

@@ -24,7 +24,7 @@ import time
 import re
 import pandas as pd
 import concurrent.futures
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from strategy_workflows.MCTSEngine import MCTSEngine, Dimension, BooleanMCTSStrategy, RatioMCTSStrategy, NormalizedMCTSStrategy
 from strategy_workflows.SemanticCompiler import SemanticCompiler, ASTNode
@@ -61,98 +61,57 @@ def generate_descriptive_name(expr_str: str) -> str:
     return "_".join(unique_words)
 
 def generate_strategy_code(expr_str: str, direction: float, position_scale: float, template: str = "NORMALIZED", window: int = 20, z_score_threshold: float = 1.0, threshold_upper: float = 70.0, threshold_lower: float = 30.0) -> str:
-    """Generates a clean CustomStrategy Python source code string based on template type."""
+    """
+    Generates the Python source of a CustomStrategy for a discovered formula.
+
+    The file is self-contained apart from `core_engine`: it imports the `ts_*` primitives it
+    uses and builds the same positions as `MCTSEngine.compute_positions`, so
+    `AlphaBacktestEngine().run(CustomStrategy(), df)` reproduces the score MCTS gave it.
+    """
+    used = set(re.findall(r"\bts_[a-z]+", expr_str))
     if template == "NORMALIZED":
-        return f"""# [MCTS_DISCOVERY_ENGINE]
-from core_engine.AlphaEngine import AlphaStrategy, SimpleAlgorithm
+        used.add("ts_zscore")
+    ts_import = ("from core_engine.AlphaPrimitives import " + ", ".join(sorted(used)) + "\n") if used else ""
 
-class CustomStrategy(SimpleAlgorithm):
-    def __algorithm__(self):
-        open_ = self.data.pv_open
-        high = self.data.pv_high
-        low = self.data.pv_low
-        close = self.data.pv_close
-        volume = self.data.pv_volume
-        
-        alpha_val = {expr_str}
-        
-        window = {window}
-        r_mean = self.feat.rolling_mean(alpha_val, window)
-        r_std = self.feat.rolling_std(alpha_val, window) + 1e-8
-        
-        z_score = (alpha_val - r_mean) / r_std
-        z_score = z_score * {direction}
-
-        raw_pos = self.op.where(z_score > {z_score_threshold}, {position_scale}, self.op.where(z_score < -{z_score_threshold}, -{position_scale}, 0.0))
-        
-        flat_mask = raw_pos == 0.0
-        long_mask = raw_pos == {position_scale}
-        short_mask = raw_pos == -{position_scale}
-        
-        self.set_positions(flat_mask, position=0.0)
-        self.set_positions(long_mask, position={position_scale})
-        self.set_positions(short_mask, position=-{position_scale})
-"""
+    if template == "NORMALIZED":
+        signal = f"""        z_score = ts_zscore(alpha_val, {window}) * {direction}
+        long_cond = z_score > {z_score_threshold}
+        short_cond = z_score < -{z_score_threshold}"""
     elif template == "RATIO":
-        return f"""# [MCTS_DISCOVERY_ENGINE]
-from core_engine.AlphaEngine import AlphaStrategy, SimpleAlgorithm
+        above, below = f"alpha_val > {threshold_upper}", f"alpha_val < {threshold_lower}"
+        long_expr, short_expr = (above, below) if direction == 1.0 else (below, above)
+        signal = f"""        long_cond = {long_expr}
+        short_cond = {short_expr}"""
+    else:  # BOOLEAN
+        long_expr, short_expr = ("truth", "~truth") if direction == 1.0 else ("~truth", "truth")
+        signal = f"""        truth = alpha_val.astype(bool)
+        long_cond = {long_expr}
+        short_cond = {short_expr}"""
 
-class CustomStrategy(SimpleAlgorithm):
+    return f"""# [MCTS_DISCOVERY_ENGINE]
+import numpy as np
+import pandas as pd
+
+from core_engine.AlphaEngine import AlphaStrategy
+{ts_import}
+
+class CustomStrategy(AlphaStrategy):
     def __algorithm__(self):
         open_ = self.data.pv_open
         high = self.data.pv_high
         low = self.data.pv_low
         close = self.data.pv_close
         volume = self.data.pv_volume
-        
-        alpha_val = {expr_str}
-        
-        direction = {direction}
-        threshold_upper = {threshold_upper}
-        threshold_lower = {threshold_lower}
-        
-        long_cond = alpha_val > threshold_upper if direction == 1.0 else alpha_val < threshold_lower
-        short_cond = alpha_val < threshold_lower if direction == 1.0 else alpha_val > threshold_upper
-        
-        raw_pos = self.op.where(long_cond, {position_scale}, self.op.where(short_cond, -{position_scale}, 0.0))
-        
-        flat_mask = raw_pos == 0.0
-        long_mask = raw_pos == {position_scale}
-        short_mask = raw_pos == -{position_scale}
-        
-        self.set_positions(flat_mask, position=0.0)
-        self.set_positions(long_mask, position={position_scale})
-        self.set_positions(short_mask, position=-{position_scale})
-"""
-    else: # BOOLEAN
-        return f"""# [MCTS_DISCOVERY_ENGINE]
-from core_engine.AlphaEngine import AlphaStrategy, SimpleAlgorithm
 
-class CustomStrategy(SimpleAlgorithm):
-    def __algorithm__(self):
-        open_ = self.data.pv_open
-        high = self.data.pv_high
-        low = self.data.pv_low
-        close = self.data.pv_close
-        volume = self.data.pv_volume
-        
         alpha_val = {expr_str}
-        direction = {direction}
-        
-        raw_pos = self.op.where(alpha_val, {position_scale}, -{position_scale})
-        if direction < 0:
-            raw_pos = raw_pos * -1.0
-        
-        flat_mask = raw_pos == 0.0
-        long_mask = raw_pos == {position_scale}
-        short_mask = raw_pos == -{position_scale}
-        
-        self.set_positions(flat_mask, position=0.0)
-        self.set_positions(long_mask, position={position_scale})
-        self.set_positions(short_mask, position=-{position_scale})
+
+{signal}
+
+        raw_pos = np.where(long_cond, {position_scale}, np.where(short_cond, -{position_scale}, 0.0))
+        self._positions = pd.Series(raw_pos, index=alpha_val.index, dtype=np.float64)
 """
 
-def process_timeframe(tf: str, iterations: int, synthetic_data: dict):
+def process_timeframe(tf: str, iterations: int, synthetic_data: dict, seed: Optional[int] = None):
     """
     Worker function to process a single timeframe.
     
@@ -164,6 +123,8 @@ def process_timeframe(tf: str, iterations: int, synthetic_data: dict):
         The number of MCTS iterations to perform per dimension.
     synthetic_data: dict
         Precomputed synthetic data paths containing 'normal' and 'stressed' lists.
+    seed : int, optional
+        Seed of the MCTS engine's random generator; None means non-reproducible.
         
     Returns
     -------
@@ -210,7 +171,7 @@ def process_timeframe(tf: str, iterations: int, synthetic_data: dict):
         except Exception as pe:
             print(f"[Worker {tf}] Warning: Failed to load global position matrix: {pe}")
 
-    mcts = MCTSEngine(timeframe=tf, max_depth=4, global_position_matrix=global_position_matrix)
+    mcts = MCTSEngine(timeframe=tf, max_depth=4, global_position_matrix=global_position_matrix, seed=seed)
     
     # ==========================================
     # ĐỌC Ý TƯỞNG TỪ TẦNG 1 & BIÊN DỊCH BỞI TẦNG 2
@@ -378,7 +339,7 @@ def process_timeframe(tf: str, iterations: int, synthetic_data: dict):
     print(f"--- [Worker {tf}] Finished processing ---")
     return tf, total_generated, total_rejected, successful_candidates
 
-def run_mcts_pipeline(iterations: int = MCTS_ITERATIONS, retrain_hmm: bool = False):
+def run_mcts_pipeline(iterations: int = MCTS_ITERATIONS, retrain_hmm: bool = False, seed: Optional[int] = None):
     """
     Main entry point for running the parallel MCTS strategy discovery pipeline.
     
@@ -392,6 +353,8 @@ def run_mcts_pipeline(iterations: int = MCTS_ITERATIONS, retrain_hmm: bool = Fal
         Number of MCTS iterations per worker.
     retrain_hmm : bool, default False
         Whether to force retrain the HMM models.
+    seed : int, optional
+        Seed passed to every timeframe's MCTS engine; None means non-reproducible.
     """
     print("==============================================================")
     print("      STARTING MULTIPROCESSING MCTS ALPHA SEARCH PIPELINE     ")
@@ -409,7 +372,7 @@ def run_mcts_pipeline(iterations: int = MCTS_ITERATIONS, retrain_hmm: bool = Fal
     
     # Launch parallel workers
     with concurrent.futures.ProcessPoolExecutor(max_workers=len(TIMEFRAMES)) as executor:
-        futures = {executor.submit(process_timeframe, tf, iterations, synthetic_data_all.get(tf, {})): tf for tf in TIMEFRAMES}
+        futures = {executor.submit(process_timeframe, tf, iterations, synthetic_data_all.get(tf, {}), seed): tf for tf in TIMEFRAMES}
         
         for future in concurrent.futures.as_completed(futures):
             tf = futures[future]

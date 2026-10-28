@@ -92,6 +92,12 @@ OPERATOR_REGISTRY = {
     "div": {"group": OperatorGroup.STATISTICS, "input_dims": [Dimension.ANY, Dimension.ANY], "output_dim": Dimension.RATIO},
 }
 
+# Registered for type checking, but no code is generated for them yet: MCTS never proposes
+# them and the prompt never lists them.
+UNIMPLEMENTED_OPERATORS = frozenset({
+    "crossed", "crossed_above", "crossed_below", "rising", "falling", "between",
+})
+
 def get_operators_by_return_dim(target_dim: Dimension):
     """
     Perform backward chaining to find all operators returning a target dimension.

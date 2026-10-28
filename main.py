@@ -71,7 +71,8 @@ def cmd_mcts(args):
     
     iterations = getattr(args, 'iterations', 50000)
     retrain_hmm = getattr(args, 'retrain_hmm', False)
-    run_mcts_pipeline(iterations=iterations, retrain_hmm=retrain_hmm)
+    seed = getattr(args, 'seed', None)
+    run_mcts_pipeline(iterations=iterations, retrain_hmm=retrain_hmm, seed=seed)
 
 
 
@@ -289,6 +290,7 @@ def main():
     parser_mcts.add_argument("--iterations", type=int, default=50000, help="Number of MCTS iterations")
     parser_mcts.add_argument("--patience", type=int, default=5000, help="Early stopping patience limit")
     parser_mcts.add_argument("--retrain-hmm", action="store_true", help="Force retrain HMM models instead of using cache")
+    parser_mcts.add_argument("--seed", type=int, default=None, help="Seed for the MCTS random generator (default: not reproducible)")
     
     # Full
     parser_full = subparsers.add_parser("full", help="Run full pipeline (generate -> mcts)")
@@ -297,6 +299,7 @@ def main():
     parser_full.add_argument("--iterations", type=int, default=50000, help="Number of MCTS iterations")
     parser_full.add_argument("--patience", type=int, default=5000, help="Early stopping patience limit")
     parser_full.add_argument("--retrain-hmm", action="store_true", help="Force retrain HMM models instead of using cache")
+    parser_full.add_argument("--seed", type=int, default=None, help="Seed for the MCTS random generator (default: not reproducible)")
     parser_full.add_argument("--no_cookies", action="store_true")
     
     args = parser.parse_args()

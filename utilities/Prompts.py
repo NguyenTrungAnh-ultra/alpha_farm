@@ -3,29 +3,53 @@ Prompts
 =======
 Prompt templates and builders for the Alpha Farm strategy generation pipeline.
 
-Maintains dictionaries of timeframe hints, library of available indicators/operators, 
+Maintains dictionaries of timeframe hints, the library of available data fields/operators, 
 and helper functions to construct structured LLM prompts for generating strategy 
 blueprints and self-correction instructions.
 """
 
-# ─── Available talib & SDK indicators (curated for futures) ────────────────
-DIMENSIONAL_FUNCTIONS = """
-## Available Indicators (called via self.feat.xxx())
+from strategy_workflows.MCTSDimensions import (
+    OPERATOR_REGISTRY, OperatorGroup, UNIMPLEMENTED_OPERATORS, DATA_FIELD_DIMENSIONS,
+)
 
-**[CURRENCY_OUTPUT_FUNCTIONS]**: ema, vwap, macd_line, macd_signal, macd_hist, bbands_upper, bbands_middle, bbands_lower, stddev
-**[RATIO_OUTPUT_FUNCTIONS]**: rsi, adx, roc, pct_change, stoch_k, stoch_d, var, zscore
-**[CANDLESTICK_FUNCTIONS]**: doji, hammer, three_black_crows, morning_star
+# Data fields the OHLCV data provides (pv_vn30_close is declared but has no data behind it).
+DATA_FIELDS = ["pv_open", "pv_high", "pv_low", "pv_close", "pv_volume"]
+assert all(f in DATA_FIELD_DIMENSIONS for f in DATA_FIELDS)
+
+
+def _operator_names(group: OperatorGroup) -> str:
+    """Operators of a group that code generation supports, in registry order."""
+    return ", ".join(
+        op for op, meta in OPERATOR_REGISTRY.items()
+        if meta["group"] == group and op not in UNIMPLEMENTED_OPERATORS
+    )
+
+
+# ─── Operator library, generated from the registry the compiler checks against ───
+DIMENSIONAL_FUNCTIONS = f"""
+## Available Data Fields
+{', '.join(DATA_FIELDS)}  (or `?` to let the search choose the series)
 """
 
-# ─── Available operator functions ────────────────────────────────────────
-OPERATOR_FUNCTIONS = """
+OPERATOR_FUNCTIONS = f"""
 ## Available Operator Functions
 
-**Time-Series**: shift, diff, pct_change
-**[BOOLEAN_OUTPUT_FUNCTIONS]**: crossed, crossed_above, crossed_below, rising, falling, between, and_, or_, not_, greater_than, less_than, equal
-**Math**: add, sub, mult, div
-**Statistics**: stddev, var, zscore
+**Time-Series** (rolling window; the search picks the window length, never write it): {_operator_names(OperatorGroup.TIME_SERIES)}
+  - Each takes ONE series argument, except `ts_corr` which takes two. Example: `ts_mean(?)`, `ts_corr(?, ?)`.
+  - `ts_rank`, `ts_corr`, `ts_zscore` return a dimensionless RATIO. The others keep the dimension of their input.
+**Math** (two series arguments): {_operator_names(OperatorGroup.STATISTICS)}
+**[BOOLEAN_OUTPUT_FUNCTIONS]**: {_operator_names(OperatorGroup.LOGIC)}
+  - `and_`, `or_`, `not_` take BOOLEAN arguments; `greater_than`, `less_than`, `equal` take two series and return BOOLEAN.
 """
+
+# Every example must compile with SemanticCompiler (checked by tests).
+FEW_SHOT_EXAMPLES = [
+    ("statistical-mean-reversion", "sub(?, ts_mean(?))"),
+    ("time-series-kinematics", "sub(ts_mean(?), ts_mean(?))"),
+    ("volatility-regime", "sub(ts_max(?), ts_min(?))"),
+    ("cross-dimensional-arbitrage", "mult(ts_zscore(?), ts_corr(?, ?))"),
+    ("cross-dimensional-arbitrage, BOOLEAN root", "and_(greater_than(ts_mean(?), ts_mean(?)), less_than(ts_zscore(?), ts_corr(?, ?)))"),
+]
 
 # ─── Timeframe-specific guidance ────────────────────────────────────
 TIMEFRAME_HINTS = {
@@ -35,7 +59,7 @@ TIMEFRAME_HINTS = {
 - Trades: 10-30/day (high frequency)
 - Suitable for: Fast momentum, micro-breakouts
 - Stop loss: 1-3 points
-- Extremely noisy. Needs very strong noise filters (e.g. volume or ADX confirmation).
+- Extremely noisy. Needs very strong noise filters (e.g. a volume-based condition).
 """,
     "3m": """
 **3-Minute Timeframe** — Fast Scalping/Intraday:
@@ -88,10 +112,10 @@ TIMEFRAME_HINTS = {
 
 # ─── Strategy families for diversity (Orthogonal & Quant-focused) ───
 STRATEGY_FAMILIES = [
-    "statistical-mean-reversion", # Z-score of spread between VWAP and price/EMA
-    "time-series-kinematics",     # 2nd derivative/acceleration (diff, rate of change)
-    "volatility-regime",          # Variance, standard deviation breakouts, Z-Score of variance
-    "cross-dimensional-arbitrage" # Combining momentum ratios with volatility/variance metrics
+    "statistical-mean-reversion", # Z-score of price deviation from a rolling mean
+    "time-series-kinematics",     # Differences of rolling means (momentum, acceleration)
+    "volatility-regime",          # Rolling range and dispersion breakouts
+    "cross-dimensional-arbitrage" # Combining price, volume and correlation series
 ]
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -161,12 +185,20 @@ def build_idea_prompt(
     suggested = f"Suggested unused families: **{', '.join(unused_families[:3])}**" if unused_families else "All families used. Create a unique variation."
 
     tf_hint = TIMEFRAME_HINTS.get(timeframe, "")
-    exp_section = f"## COMBAT EXPERIENCE (MANDATORY TO FOLLOW)\n{experience}\n" if experience else ""
+    if experience:
+        exp_section = f"## COMBAT EXPERIENCE (MANDATORY TO FOLLOW)\n{experience}\n"
+    else:
+        exp_section = "## COMBAT EXPERIENCE\n(No experience log is available.)\n"
     
     fsa_section = ""
     if fsa_forbidden_patterns:
         fsa_list = ", ".join(fsa_forbidden_patterns)
         fsa_section = f"\nCRITICAL CONSTRAINT: Do not generate blueprints that share the exact structural topology as the following root patterns: {fsa_list}\n"
+
+    few_shot = "\n".join(
+        f"- Example {i} ({family}): `{blueprint}`"
+        for i, (family, blueprint) in enumerate(FEW_SHOT_EXAMPLES, start=1)
+    )
 
     static_prefix = f"""You are an expert **Quant Researcher** designing trading strategies for the **VN30 Index Futures contract**.
 
@@ -183,20 +215,21 @@ You MUST return EXACTLY the following JSON structure.
     "timeframe": "10m",
     "family": "statistical-mean-reversion|time-series-kinematics|volatility-regime|cross-dimensional-arbitrage",
     "description": "Financial intuition behind the strategy.",
-    "macro_blueprint": "div(diff(macd_line(?)), stddev(?))"
+    "macro_blueprint": "sub(ts_mean(?), ts_mean(?))"
 }}
 ```
 
 **Few-Shot Examples for macro_blueprint:**
-- Example 1 (Statistical Mean-Reversion): `zscore(div(sub(ema(?), vwap()), stddev(?)))`
-- Example 2 (Time-Series Kinematics): `div(diff(macd_line(?)), stddev(?))`
-- Example 3 (Volatility Regime Anomalies): `zscore(var(pct_change(?)))`
+{few_shot}
 
 ## CRITICAL RULES (MUST FOLLOW STRICTLY)
-1. **CONTINUOUS SIGNAL ROOT**: The root (outermost function) of your macro_blueprint MUST evaluate to a RATIO or CURRENCY (e.g., div, zscore, rsi, pct_change). DO NOT use functions that output Dimension.ANY (such as add, sub, mult, ema, stddev) or BOOLEAN functions (like crossed_above, and_) as the final root. *(Note: The engine automatically applies a dynamic rolling Z-Score filter to your output signal to generate trade positions).*
-2. **Valid Functions ONLY**: RESTRICT YOURSELF EXCLUSIVELY to the exact names listed in the REFERENCE LIBRARY.
-3. **No Hardcoded Numbers**: REPLACE ALL numerical parameters with `?` (e.g., `ema(?)`). Keep NO hardcoded numbers.
-4. **Syntax & Depth Limit**: DO NOT nest functions deeper than 3 levels. Ensure all parentheses are closed. Only use `?` for the main data series arguments, DO NOT pass `?` for constant parameters like timeperiod. For example, `ema(?)` is correct, `ema(?, ?)` is wrong.
+1. **ROOT TYPE**: The root (outermost function) decides how positions are built.
+   - Prefer a root whose output keeps its input dimension: `sub`, `add`, `mult`, `ts_mean`, `ts_sum`, `ts_max`, `ts_min`, `ts_argmax`, `ts_argmin`. The engine applies a rolling Z-Score to it and trades when |Z| exceeds a searched threshold.
+   - A BOOLEAN root (`greater_than`, `less_than`, `equal`, `and_`, `or_`, `not_`) is also fine: long where true, short where false.
+   - AVOID a RATIO root (`div`, `ts_rank`, `ts_corr`, `ts_zscore`): it is read as a 0-100 oscillator (long above 60-80, short below 20-40), which does not fit these outputs.
+2. **Valid Functions ONLY**: RESTRICT YOURSELF EXCLUSIVELY to the exact names listed in the REFERENCE LIBRARY. Do not invent indicators (no `ema`, `rsi`, `macd`, `zscore`, `diff`, `shift`).
+3. **No Hardcoded Numbers**: Window lengths and thresholds are searched by the engine. Keep NO numbers in the blueprint.
+4. **Syntax & Depth Limit**: DO NOT nest functions deeper than 3 levels. Ensure all parentheses are closed. Use `?` (or a data field name) for each series argument and never for a window: `ts_mean(?)` is correct, `ts_mean(?, ?)` is wrong, `ts_mean(?, 20)` is wrong.
 5. **JSON Only**: OUTPUT ONLY a valid JSON block.
 """
 
@@ -252,7 +285,7 @@ Here is the error traceback from the sandbox:
 
 CRITICAL RULES FOR CORRECTION:
 1. Identify the source of the error in your formulas or parameter space.
-   - For example: syntax errors, incorrect TA-Lib function parameter names (e.g. `period` instead of `timeperiod`), missing required parameters, dividing by zero/volume without offset, or using unallowed functions.
+   - For example: syntax errors, unknown function names, wrong number of series arguments (`ts_mean(?)` takes one, `ts_corr(?, ?)` takes two), numbers written into the blueprint, mixing price and volume in one `add`/`sub`/comparison, or a BOOLEAN function fed with a non-BOOLEAN argument.
 2. Fix the errors while preserving the core trading concept.
 3. Return ONLY a valid JSON block containing the corrected fields. Do not return the entire original JSON. Do not include any explanations or commentary.
 """

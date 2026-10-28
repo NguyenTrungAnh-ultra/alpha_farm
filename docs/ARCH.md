@@ -27,32 +27,40 @@ Tệp một dòng "DELETED" còn sót từ đợt bỏ XNOQuant: `core_engine/Pl
 
 ### 3.1 Tầng 1 — LLM sinh blueprint (`GenerateStrategies.py`)
 
-1. Prompt lấy từ `utilities/Prompts.py`; mô hình chọn bằng `--model` (`deepseek-thinking`, `ollama-local`, `ollama-9b`, `flash`, `pro`, `thinking`).
+1. Prompt lấy từ `utilities/Prompts.py`; danh sách trường dữ liệu và toán tử trong prompt sinh từ `OPERATOR_REGISTRY` (bỏ các toán tử trong `UNIMPLEMENTED_OPERATORS`), ví dụ mẫu nằm ở `FEW_SHOT_EXAMPLES` và có test biên dịch từng cái. Mô hình chọn bằng `--model` (`deepseek-thinking`, `ollama-local`, `ollama-9b`, `flash`, `pro`, `thinking`).
 2. LLM trả JSON (kiểm bằng Pydantic) có `macro_blueprint`: biểu thức có chỗ trống `?`.
 3. `SemanticCompiler` đọc bằng `ast.parse`, đổi tên hàm bịa qua `HALLUCINATION_MAP`, kiểm thứ nguyên. Lỗi ⇒ gửi lại LLM sửa **1 lần**; gọi API thử lại tối đa 5 lần.
 4. Hợp lệ ⇒ lưu `results/ideas/<tên>_<khung>.json`.
-5. Code có đọc "kinh nghiệm" từ `utilities/experience_log.md`; tệp này **không tồn tại** nên phần đó rỗng.
+5. Code đọc "kinh nghiệm" từ `utilities/experience_log.md`. Tệp này **không tồn tại**: `load_experience_log` in một dòng thông báo, trả chuỗi rỗng, và prompt hiện mục kinh nghiệm với chữ "No experience log is available." (không bịa nội dung).
 
-⛔ Prompt vẫn liệt kê toán tử TA-Lib (`ema`, `macd_line`, `zscore`…) mà trình biên dịch mới từ chối; cả ví dụ mẫu trong prompt cũng bị từ chối.
+Prompt dặn LLM chọn gốc công thức thuộc nhóm giữ thứ nguyên (`sub`, `ts_mean`…) hoặc BOOLEAN, tránh gốc RATIO (`ts_zscore`, `ts_rank`, `div`…) vì khuôn RATIO đọc nó như dao động 0–100 (ngưỡng 60–80 / 20–40).
 
 ### 3.2 Tầng 2 — MCTS (`RunMCTS.py`, `MCTSEngine.py`, `MCTSDimensions.py`)
 
 1. Nạp (hoặc dựng) cache đường giá HMM cho 7 khung.
 2. Mỗi khung chạy một tiến trình. Tiến trình nạp vị thế các chiến lược đã có trong `portfolio_summary.json` (dùng để phạt tương quan), rồi lần lượt biên dịch từng blueprint của khung đó và chạy `run_search_from_blueprint`. Blueprint chạy xong — kể cả khi lỗi — bị chuyển sang `ideas/processed/`.
-3. **Ngữ pháp**: mỗi toán tử khai báo thứ nguyên vào/ra (CURRENCY, VOLUME, RATIO, BOOLEAN, ANY); chỉ điền vào chỗ trống những nút hợp thứ nguyên. Toán tử: 9 `ts_*`, logic (`crossed_above`, `greater_than`, `and_`…), số học (`add`, `sub`, `mult`, `div`).
+3. **Ngữ pháp**: mỗi toán tử khai báo thứ nguyên vào/ra (CURRENCY, VOLUME, RATIO, BOOLEAN, ANY); chỉ điền vào chỗ trống những nút hợp thứ nguyên. Toán tử có code sinh: 9 `ts_*`, logic (`greater_than`, `less_than`, `equal`, `and_`, `or_`, `not_`), số học (`add`, `sub`, `mult`, `div`). `crossed`, `crossed_above`, `crossed_below`, `rising`, `falling`, `between` có trong `OPERATOR_REGISTRY` (biên dịch được) nhưng **chưa có code sinh** (`UNIMPLEMENTED_OPERATORS`): MCTS không đề xuất chúng, và blueprint chứa chúng bị `run_search_from_blueprint` từ chối ngay.
+   Chỗ trống `?` lấy thứ nguyên từ chữ ký của toán tử cha (hoặc từ thứ nguyên gắn sẵn khi MCTS mở rộng); chỗ BOOLEAN chỉ nhận toán tử trả BOOLEAN. Chỗ vào của `ts_*` không nhận hằng số.
 4. **Khuôn vị thế** theo thứ nguyên gốc: NORMALIZED (z-score trượt, ngưỡng θ), RATIO (ngưỡng trên/dưới), BOOLEAN (±w). Tỷ trọng khi chấm điểm `w = 0.2`. Mỗi công thức thử cả hai chiều, giữ chiều tốt hơn.
-5. **Cửa sổ** khai báo ở khung 10m (`BASE_PERIODS`, `BASE_WINDOW_SEARCH`) rồi co giãn theo khung.
+5. **Cửa sổ** khai báo ở khung 10m (`BASE_PERIODS`, `BASE_WINDOW_SEARCH`) rồi co giãn theo khung. Độ dài cửa sổ của mỗi nút `ts_*` là **một thuộc tính của nút** (`ASTNode.window`), do MCTS chọn trong `scaled_periods` khi mở rộng (một nước đi riêng, như cửa sổ z-score của khuôn NORMALIZED). `ast_to_code` chỉ đọc thuộc tính này; nút `ts_*` chưa có cửa sổ thì chưa là nút kết thúc, và dựng code sẽ báo lỗi. Một nút MCTS ứng với đúng một công thức.
 6. **Điểm thưởng**: `R = (0.6·S_calmar + 0.4·S_IC) · (1 − tương quan vị thế lớn nhất)`; `R = −10` nếu Calmar < 1.1 hoặc < 15 lệnh. IC là tương quan Spearman với lợi suất bar kế tiếp.
 7. **Chọn nút**: UCT với giá trị **lớn nhất** (không phải trung bình), `c = 1.414`. Công thức có R > 1 bị ghi vào bộ nhớ chống trùng (FSA); gặp lại ⇒ −100.
 8. **Dừng sớm**: entropy chuẩn hoá của lượt thăm ở gốc < 0.15, hoặc 5 000 vòng không cải thiện (`patience`); trần mặc định 50 000 vòng.
 9. Lấy **đúng 1** ứng viên tốt nhất có R > 0 mỗi khung → backtest lại → kiểm định HMM (mục 3.3) → `PortfolioManager.evaluate_and_add(force_add=True)`, nên tiêu chí danh mục và loại theo tương quan **không được áp**.
 
-⛔ Ba chỗ hỏng làm tầng này không ra được ứng viên nào:
-- `get_terminals_for_dimension` gọi `OperatorGroup.CANDLESTICK` đã xoá ⇒ lỗi khi mở rộng chỗ trống BOOLEAN / ANY.
-- `evaluate_expression` truyền `np.ndarray` vào backtest; backtest gọi `.shift` ⇒ lỗi bị nuốt, mọi ứng viên nhận −10.
-- `generate_strategy_code` sinh code dùng `self.feat` / `self.op` và không import `ts_*` ⇒ tệp chiến lược xuất ra không chạy được.
+**Chấm điểm và nối với backtest** (`evaluate_expression`):
+- Công thức được `eval` (không có builtins) với `open_/high/low/close/volume` là `pd.Series` và 9 hàm `ts_*`; kết quả bắt buộc là `pd.Series`. `compute_positions` (một hàm duy nhất) biến alpha thành `pd.Series` vị thế cùng chỉ mục dữ liệu rồi đưa vào `AlphaBacktestEngine.run`.
+- Ngoại lệ khi dựng code / `eval` / backtest vẫn cho −10 nhưng **không bị nuốt**: đếm theo "Loại: thông điệp" (`error_counts`), log cảnh báo ở lần đầu, và cuối `run_search_from_blueprint` in số lần chấm, số lần lỗi và các lỗi hay gặp (`error_summary()`). Cả lượt chấm đều lỗi ⇒ log mức ERROR.
+- Mỗi ứng viên trong bảng xếp hạng mang `template`, `window`, `z_score`, `threshold_upper`, `threshold_lower` để chạy lại đúng.
 
-⛔ `ast_to_code` chọn độ dài cửa sổ bằng `random.choice` mỗi lần dựng code ⇒ một nút MCTS ứng với nhiều công thức khác nhau. MCTS không đặt seed ⇒ chạy lại cho kết quả khác.
+**Seed**: `MCTSEngine(seed=...)` tạo một `random.Random(seed)` riêng; mọi ngẫu nhiên của tìm kiếm (chọn nước chưa thử, rollout, hoà điểm UCT) đi qua nó. Cùng seed + cùng dữ liệu + cùng blueprint ⇒ cùng bảng xếp hạng (có test). Đưa ra ngoài bằng `main.py mcts --seed N` (`run_mcts_pipeline(seed=)`, `process_timeframe(seed=)`); không đặt ⇒ không tái lập được. Mọi khung dùng cùng seed nhưng mỗi khung có engine riêng.
+
+**Mã xuất ra** (`RunMCTS.generate_strategy_code`): tệp `CustomStrategy(AlphaStrategy)` import đúng các `ts_*` nó dùng từ `core_engine.AlphaPrimitives`, tự dựng vị thế như `compute_positions`, chạy được qua `AlphaBacktestEngine.run`. Test dựng lại điểm Calmar, số lệnh và chuỗi vị thế của ứng viên tốt nhất từ tệp này.
+
+⛔ Còn hở:
+- Chỗ BOOLEAN ở độ sâu tối đa vượt giới hạn tối đa một tầng (so sánh `greater_than` / `less_than` / `equal` với hai lá), vì không có lá BOOLEAN.
+- Đã đo 17 / 141 lượt chấm lỗi (khung 60m, seed 1, 300 vòng, blueprint `sub(ts_mean(?), ts_mean(?))`) vì `ts_*` nhận biểu thức toàn hằng số, ví dụ `ts_mean((0.2 + 0.5), 10)`; chúng nay được đếm và ghi log thay vì bị nuốt.
+- Gốc RATIO vẫn dùng ngưỡng 60–80 / 20–40 (chưa sửa; ngoài phạm vi nối lại pipeline).
 
 ### 3.3 Kiểm định 3 tầng (`HMMValidation.py`)
 

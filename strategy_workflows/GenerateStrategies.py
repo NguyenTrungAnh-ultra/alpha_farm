@@ -108,7 +108,9 @@ def load_experience_log(filepath: str = None) -> str:
     Load the quantitative experience log from experience_log.md.
     
     This log contains insights from prior strategy failures and successes 
-    and is injected into the LLM prompt to guide generation.
+    and is injected into the LLM prompt to guide generation. The file is optional: when it
+    is missing the log is empty, a notice is printed, and the prompt shows an empty
+    experience section.
     
     Parameters
     ----------
@@ -123,10 +125,11 @@ def load_experience_log(filepath: str = None) -> str:
     """
     if filepath is None:
         filepath = os.path.join(PROJECT_ROOT, "utilities", "experience_log.md")
-    if os.path.exists(filepath):
-        with open(filepath, 'r', encoding='utf-8') as f:
-            return f.read()
-    return ""
+    if not os.path.exists(filepath):
+        print(f"[Pipeline] No experience log at {filepath}; the prompt gets an empty experience section.")
+        return ""
+    with open(filepath, 'r', encoding='utf-8') as f:
+        return f.read()
 
 def load_existing_ideas(ideas_dir: str) -> list[dict]:
     """

@@ -8,6 +8,8 @@ Alpha Farm discovers **directional trading signals** (long/short/flat) for the V
 
 Current plan, status and open decisions: `docs/ROADMAP.md` (Vietnamese). Update it when a task finishes or the user decides something.
 
+Code changes go to the `coder` agent (`.claude/agents/coder.md`, Sonnet, medium effort). The main session writes the brief, then reviews the diff and re-runs the tests before reporting done.
+
 ## Environment
 
 - Use the **`.venv`** interpreter (Python 3.12, managed with `uv`). It has `hmmlearn`.
@@ -32,7 +34,7 @@ Current plan, status and open decisions: `docs/ROADMAP.md` (Vietnamese). Update 
 
 `--model` accepts: `deepseek-thinking`, `ollama-local`, `ollama-9b`, `flash`, `pro`, `thinking`.
 
-As of 2026-10-01, the suite in `.venv` gives 37 passed and 1 failed. The failure is `test_core_engine.py::test_alpha_data_proxy`, an identity check (`is`) on a copied Series.
+As of 2026-10-28, the suite in `.venv` gives 49 passed and 1 failed. The failure is `test_core_engine.py::test_alpha_data_proxy`, an identity check (`is`) on a copied Series.
 
 ## Pipeline gotchas
 
@@ -59,14 +61,11 @@ Stages (generate → MCTS → scoring → HMM validation → portfolio) are desc
 
 ## Known state after the XNOQuant decoupling (commit `c6b1f03`)
 
-The project was originally built for the XNOQuant competition sandbox (`XnoEngine` with TA-Lib `self.feat`/`self.op`, `RestrictedSeries`, Playwright submission). The refactor replaced indicators with `ts_*` primitives but left the pipeline broken end to end. The unit tests do not exercise these paths.
+The project was originally built for the XNOQuant competition sandbox (`XnoEngine` with TA-Lib `self.feat`/`self.op`, `RestrictedSeries`, Playwright submission). The pipeline now runs end to end on `ts_*` blueprints (`tests/test_mcts_pipeline.py`). Still open:
 
-1. **LLM prompt:** `utilities/Prompts.py` still lists TA-Lib operators (`ema`, `macd_line`, `zscore`, …). The compiler rejects all of the prompt's own few-shot examples.
-2. **MCTS expansion:** `get_terminals_for_dimension` references the removed `OperatorGroup.CANDLESTICK`, so expansion raises `AttributeError` for BOOLEAN/ANY slots.
-3. **Scoring:** `evaluate_expression` passes `np.where(...)` arrays (not Series) to the backtest. The `.shift` error is swallowed, so every candidate gets reward −10.
-4. **Exported code:** `RunMCTS.generate_strategy_code` emits code using `self.feat`/`self.op` and does not import `ts_*`, so it cannot run.
-5. **Random windows:** `ast_to_code` picks window lengths with `random.choice` on every render, so one MCTS node maps to many different formulas.
-6. **Missing operators:** there are no lag/delta operators (`ts_delay`, `ts_delta`).
+- No lag/delta operators (`ts_delay`, `ts_delta`). Operators in `UNIMPLEMENTED_OPERATORS` (`crossed*`, `rising`, `falling`, `between`) are never proposed, and a blueprint using one is rejected.
+- Evaluation errors still score −10. Check `MCTSEngine.error_summary()` after a run instead of trusting the leaderboard.
+- `main.py mcts` / `process_timeframe` (which need the HMM cache) have not been run since the rewire.
 
 Other leftovers from the refactor:
 - First-generation (TA-Lib) strategy artifacts were removed from `results/pushed/` in that commit. Recover them with `git checkout cfeb770 -- results/pushed`.
