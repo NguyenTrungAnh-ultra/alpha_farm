@@ -28,6 +28,24 @@ Nếu dữ liệu thật sự chứa một công thức mà ngữ pháp biểu d
 - ⛔ **Bộ sinh lần 1 (2026-10-28, `results/planted/blueprints.json`, 20/20 qua biên dịch) không dùng được:** 19/20 blueprint không có ô `?` nào (LLM viết công thức trọn vẹn), nên MCTS chỉ còn chọn cửa sổ và ngưỡng. Không blueprint nào biểu diễn được công thức cài theo phép khớp cấu trúc; riêng `sub(ts_mean(pv_close), pv_close)` là −A (cùng nghĩa vì backtest thử cả hai chiều) nhưng không có ô nào. Người dùng chốt (2026-10-28): sửa prompt + loại blueprint không có `?` (áp cho cả `main.py generate`), thử 5 blueprint với 4B trước; chỉ khi hết cách mới thử `ollama-9b`; không dùng bộ viết tay.
 - ✅ Thử 5 blueprint với prompt mới (2026-10-28, 4B): 5/5 có ô `?` (1–2 ô mỗi blueprint), mất ~8 vòng hỏi. Không blueprint nào biểu diễn được `sub(close, ts_mean(close, 10))` — công thức mặc định chỉ là ứng viên, đúng như mục này đã nói.
 - **Luật chọn công thức cài (chốt trước khi xem bộ 20, Claude quyết 2026-10-28, theo đúng nguyên tắc ở trên):** đi theo thứ tự trong `blueprints.json`, lấy blueprint đầu tiên có ≥ 2 ô `?` và gốc thuộc template NORMALIZED. Công thức cài = blueprint đó với mọi `?` điền `pv_close` và mọi cửa sổ = 10 (cửa sổ z-score 10). Nếu kết quả trùng nguyên văn một blueprint thì lấy blueprint kế tiếp. Không blueprint nào thoả ⇒ báo người dùng, không tự nới luật.
+- ✅ **Bộ chính thức (2026-10-28, 4B, prompt mới):** 20/20 có ô `?` (1–4 ô), không bị loại lần nào. Luật chọn ra blueprint đầu tiên `sub(ts_max(?), ts_mean(?))` ⇒ công thức cài `ts_zscore(ts_max(close, 10) − ts_mean(close, 10), 10)`, NORMALIZED; 1/20 blueprint biểu diễn được. Lưu ý cho RQ1: blueprint này và `sub(ts_mean(?), ts_mean(?))` trùng nguyên văn ví dụ mẫu trong prompt — mô hình 4B có chép ví dụ.
+- **Chấm đáp án trên công thức này (`oracle.csv`, 27 s):** soft trung bình 0.305 / 0.317 / 0.416 / 0.474 ở IC 0 / 0.01 / 0.02 / 0.05; gated qua cổng 2 / 2 / 3 / 4 trên 5. Tăng theo IC nhưng yếu: điểm phụ thuộc hoán vị nhiều hơn tín hiệu (seed 2 và 4 được 0.62–0.78 ở mọi độ mạnh, kể cả IC 0, Calmar ≈ 4). Suy đoán của Claude (chưa đo): Calmar trên đoạn 2 năm rất nhiễu, và công thức này nhặt được xu hướng mà hoán vị vẫn giữ (lợi suất trung bình của đoạn). Bảng tìm lại mới là thước đo chính.
+
+## 8. Kết quả lần chạy 1 (2026-10-28, soft, 5.000 vòng × 20 blueprint, 20 lượt, mỗi lượt 1.300–1.570 s trên 10 tiến trình)
+
+| IC | IC đo đoạn tìm | tìm lại đúng | tìm lại gần | Sharpe ngoài mẫu |
+|---|---|---|---|---|
+| 0 | 0.000 | 0/5 | 0/5 | −2.30 ± 0.41 |
+| 0.01 | 0.015 | 0/5 | 0/5 | −0.96 ± 1.03 |
+| 0.02 | 0.026 | 0/5 | 0/5 | 0.25 ± 1.46 |
+| 0.05 | 0.058 | 0/5 | 1/5 | −0.13 ± 0.44 |
+
+- ⛔ **Tiêu chí IC 0.05 trượt** (cần ≥ 3/5, được 1/5). Tiêu chí IC 0 đạt (0/5).
+- Reward tốt nhất MCTS tìm được là 0.73–0.86 ở **mọi** độ mạnh, kể cả IC 0, cao hơn điểm của chính công thức cài (trung bình 0.47 ở IC 0.05). Tức là trong ~60.000 công thức chấm trên ~2.300 bar, công thức nhiễu tốt nhất luôn thắng tín hiệu thật ở IC 0.05: reward trong mẫu bị chọn-quá-khớp (đa kiểm định), không phải MCTS tìm kém.
+- Sharpe ngoài mẫu ở IC 0 là −2.3: alpha nhiễu giao dịch nhiều và thua phí.
+- ⛔ Lỗi phát hiện: top-5 có công thức trùng nhau (cùng biểu thức, khác tham số template), nên "gộp top-5" thực chất gộp 1–3 công thức.
+- ~4–5% lượt chấm lỗi vì biểu thức hằng (`ts_mean(volume*0.05)`… và lỗi shape) — nợ đã ghi.
+- ⏸️ Bước tiếp theo chờ người dùng chọn (xem ROADMAP mục 3).
 
 ## 4. Chạy
 
