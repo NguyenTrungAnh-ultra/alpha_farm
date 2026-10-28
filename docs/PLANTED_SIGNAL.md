@@ -51,6 +51,23 @@ Nếu dữ liệu thật sự chứa một công thức mà ngữ pháp biểu d
   - **(c)** thêm độ mạnh IC 0.1 và 0.2 (chỉ báo cáo, không đặt ngưỡng) ⇒ 6 độ mạnh × 5 seed = 30 lượt.
   - Tiêu chí đạt giữ nguyên (IC 0.05: gần ≥ 3/5; IC 0: gần ≤ 1/5).
 
+## 9. Kết quả lần chạy 2 (2026-10-28, soft, 5.000 vòng × 20 blueprint, học 2018-08→2019-12, chọn trên 2020-01→06; 30 lượt, mỗi lượt 1.580–1.710 s, tổng ≈ 85 phút trên 10 tiến trình)
+
+| IC mục tiêu | IC đo đoạn tìm | tìm lại đúng | tìm lại gần | Sharpe ngoài mẫu |
+|---|---|---|---|---|
+| 0 | 0.000 | 0/5 | 0/5 | −2.17 ± 2.09 |
+| 0.01 | 0.015 | 0/5 | 0/5 | −0.31 ± 2.04 |
+| 0.02 | 0.026 | 0/5 | 0/5 | 0.12 ± 1.67 |
+| 0.05 | 0.058 | 0/5 | 1/5 | −0.65 ± 1.52 |
+| 0.1 | 0.109 | 0/5 | 3/5 | 0.74 ± 1.33 |
+| 0.2 | 0.206 | 1/5 | 5/5 | 1.79 ± 1.43 |
+
+- ⛔ **Tiêu chí IC 0.05 vẫn trượt** (1/5). Tiêu chí IC 0 đạt (0/5).
+- **Ngưỡng phát hiện đo được ≈ IC 0.1** (3/5 gần), IC 0.2 tìm lại 5/5. Sharpe ngoài mẫu tăng theo IC (−2.2 ở placebo → +1.8 ở IC 0.2): quy trình có cảm được tín hiệu, nhưng chỉ khi tín hiệu mạnh gấp đôi mức thiết kế.
+- Ở IC 0.05, công thức gần đáp án (|Spearman| ≥ 0.7) **có** nằm trong ≤ 100 ứng viên ở 2/5 seed (seed 3: hạng học 75 → hạng kiểm định 10; seed 4: 46 → 1). Đoạn kiểm định có kéo nó lên, nhưng 6 tháng (~600 bar) vẫn quá nhiễu để đưa lên top-5 đều đặn.
+- So lần 1 (không có đoạn kiểm định, cùng IC 0.05): vẫn 1/5 ⇒ riêng đoạn kiểm định không đủ để đạt tiêu chí.
+- ⏸️ Người dùng cho tạm dừng sau lần chạy này (2026-10-28); hướng tiếp theo chưa chọn.
+
 ## 4. Chạy
 
 - MCTS trên đoạn tìm, rồi gộp top-5 trọng số đều, giao dịch trên đoạn đánh giá. Đây là đúng đơn vị đánh giá của proposal.
