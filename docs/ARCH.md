@@ -15,7 +15,7 @@ Tự tìm tín hiệu có hướng (Long / Short / Flat) cho hợp đồng tươ
 | `strategy_workflows/` | `GenerateStrategies.py`, `SemanticCompiler.py`, `MCTSDimensions.py`, `MCTSEngine.py`, `RunMCTS.py`, `HMMValidation.py`, `PortfolioManager.py` |
 | `llm_clients/` | `OllamaClient.py` (qwen3.5 chạy máy, cùng hàm `extract_json`); dự án chỉ dùng LLM local |
 | `utilities/` | `AppConfig.py` (cấu hình tập trung), `Prompts.py` (prompt LLM) |
-| `data/` | `DNSE_VN30F_{1m,3m,5m,10m,15m,30m,1H}.csv` (13/08/2018 → 31/12/2025); `MCdata/synthetic_data.pkl` (cache đường giá HMM, ~13 GB) |
+| `data/` | `DNSE_VN30F_{1m,3m,5m,10m,15m,30m,1H}.csv` (13/08/2018 → 31/12/2025); `MCdata/synthetic/{tf}_{khoá}.pkl` (cache đường giá HMM, mỗi tệp một khung + một bộ dữ liệu); `MCdata/synthetic_data.pkl` (cache cũ ~13 GB, không có siêu dữ liệu nên không còn được nạp) |
 | `results/` | `ideas/` (blueprint chờ chạy), `ideas/processed/` (đã chạy), `portfolio_summary.json`, `leaderboard.csv`, `mcts_stats.json` |
 | `tests/` | pytest; chạy bằng `.venv` (Python 3.12) |
 
@@ -37,7 +37,7 @@ Prompt dặn LLM chọn gốc công thức thuộc nhóm giữ thứ nguyên (`s
 
 ### 3.2 Tầng 2 — MCTS (`RunMCTS.py`, `MCTSEngine.py`, `MCTSDimensions.py`)
 
-1. Nạp (hoặc dựng) cache đường giá HMM cho 7 khung.
+1. `run_mcts_pipeline` nạp dữ liệu **một lần** cho mỗi khung (`load_data`, điền Volume thiếu = 0), rồi đưa đúng DataFrame đó cho bước HMM (nạp hoặc dựng cache đường giá), cho `MCTSEngine(data=...)` và cho lượt backtest lại ở `process_timeframe`; ba nơi không thể lệch dữ liệu. `MCTSEngine` không truyền `data` thì tự `load_data(timeframe)` như trước.
 2. Mỗi khung chạy một tiến trình. Tiến trình nạp vị thế các chiến lược đã có trong `portfolio_summary.json` (dùng để phạt tương quan), rồi lần lượt biên dịch từng blueprint của khung đó và chạy `run_search_from_blueprint`. Blueprint chạy xong — kể cả khi lỗi — bị chuyển sang `ideas/processed/`.
 3. **Ngữ pháp**: mỗi toán tử khai báo thứ nguyên vào/ra (CURRENCY, VOLUME, RATIO, BOOLEAN, ANY); chỉ điền vào chỗ trống những nút hợp thứ nguyên. Toán tử có code sinh: 9 `ts_*`, logic (`greater_than`, `less_than`, `equal`, `and_`, `or_`, `not_`), số học (`add`, `sub`, `mult`, `div`). `crossed`, `crossed_above`, `crossed_below`, `rising`, `falling`, `between` có trong `OPERATOR_REGISTRY` (biên dịch được) nhưng **chưa có code sinh** (`UNIMPLEMENTED_OPERATORS`): MCTS không đề xuất chúng, và blueprint chứa chúng bị `run_search_from_blueprint` từ chối ngay.
    Chỗ trống `?` lấy thứ nguyên từ chữ ký của toán tử cha (hoặc từ thứ nguyên gắn sẵn khi MCTS mở rộng); chỗ BOOLEAN chỉ nhận toán tử trả BOOLEAN. Chỗ vào của `ts_*` không nhận hằng số.
@@ -64,13 +64,14 @@ Prompt dặn LLM chọn gốc công thức thuộc nhóm giữ thứ nguyên (`s
 
 ### 3.3 Kiểm định 3 tầng (`HMMValidation.py`)
 
-- HMM Gauss 3 trạng thái trên (log-lợi suất, độ lệch chuẩn 20 bar, tỷ lệ khối lượng). Đường giả lập: chạy chuỗi Markov, mỗi trạng thái chép một khối 20 bar lịch sử bắt đầu ở trạng thái đó. Biến thể "căng thẳng": xác suất chuyển vào trạng thái biến động cao × 1.5. 500 đường mỗi khung.
+- `precompute_hmm_synthetic_data(data_by_timeframe, force_retrain, n_paths)` nhận DataFrame lịch sử, không tự nạp. Mỗi mục cache là một tệp `data/MCdata/synthetic/{tf}_{khoá}.pkl`; khoá là băm của tên khung + dấu vân tay dữ liệu (số dòng, mốc đầu/cuối, SHA-256 của chỉ số và OHLCV) + tham số sinh (số đường, số trạng thái, hệ số căng thẳng, cỡ khối). Tệp lưu kèm siêu dữ liệu và được so khớp khi nạp, nên đường sinh từ dữ liệu khác không bao giờ được dùng lại. Tệp cũ `synthetic_data.pkl` không có siêu dữ liệu: không nạp, không xoá; khi còn tệp đó mà thiếu mục khớp thì khung bị bỏ qua kèm thông báo, chạy `--retrain-hmm` để dựng (bộ lọc HMM của khung đó bị bỏ qua cho tới lúc đó).
+- HMM Gauss 3 trạng thái trên (log-lợi suất, độ lệch chuẩn 20 bar, tỷ lệ khối lượng). Đường giả lập: chạy chuỗi Markov, mỗi trạng thái chép một khối 20 bar lịch sử bắt đầu ở trạng thái đó. Biến thể "căng thẳng": xác suất chuyển vào trạng thái biến động cao × 1.5. 500 đường mỗi khung. Chỉ số thời gian của đường giả lập lấy từ lịch giao dịch của chính dữ liệu nguồn (cùng số bar mỗi ngày), để gom theo ngày ra đúng số phiên.
 - Tầng 1 sống sót: < 5 % số đường có sụt giảm ≤ −23 %.
 - Tầng 2: Kelly > 0 và lãi trung bình mỗi lệnh ≥ 3 × phí trung bình.
-- Tầng 3: CAGR trung bình > 6 %/năm và Sharpe trung bình > mua-và-giữ trên cùng đường.
+- Tầng 3: CAGR trung bình > 6 %/năm và Sharpe trung bình > mua-và-giữ trên cùng các đường chuẩn (`calculate_buy_hold_metrics`, tính tại chỗ bằng cùng hàm quy đổi; không còn đọc `results/benchmark_hmm_baseline.json`, tệp đó là số đo cũ và không gắn với dữ liệu nào).
 
 Đã đo: bộ giả lập giữ độ dài chế độ 0.72–0.92 lần thực tế, sụt giảm mua-và-giữ tương đương hoặc nhẹ hơn thực tế.
-⛔ Quy đổi theo năm sai: `calculate_metrics_for_result` suy số năm từ số bar bằng hằng 4800 / 1200 (đúng phải theo lịch). CAGR mua-và-giữ 2020–2024 ra 0.76 % ở 1m, 20.0 % ở 30m; đúng là 8.9 %.
+Quy đổi theo năm: `calculate_metrics_for_result` gọi `compute_metrics` (Sharpe theo lợi suất ngày × √252; CAGR theo thời gian lịch trôi qua `(mốc cuối − mốc đầu)/365.25 ngày`) cho Sharpe và CAGR; sụt giảm vẫn tính theo bar. CAGR mua-và-giữ 2020–2024 đo lại ≈ 8.9 % ở cả 1m, 30m, 60m. Tệp 1m/5m/15m/30m thiếu 126 phiên (1 121 ngày so với 1 247 ở 1H, rải rác 2023-03-22 → 2024-03-14); CAGR đếm số phiên / 252 từng làm lệch 10.1 % so với 9.0 %, nay đã đổi sang thời gian lịch.
 
 ## 4. Backtest (`core_engine/BacktestEngine.py`)
 
@@ -85,8 +86,8 @@ Prompt dặn LLM chọn gốc công thức thuộc nhóm giữ thứ nguyên (`s
 
 ## 5. Chỉ số
 
-- `CalculateMetrics.compute_metrics`: gom về ngày, nhân √252 — đúng.
-- `HMMValidation.calculate_metrics_for_result`: cách riêng, sai (mục 3.3).
+- `CalculateMetrics.compute_metrics`: Sharpe / Sortino / biến động trên lợi suất ngày × √252; CAGR (và Calmar, vào điểm thưởng MCTS) theo thời gian lịch `(mốc cuối − mốc đầu)/365.25 ngày`, tối thiểu 1 ngày, nên phiên thiếu trong dữ liệu không làm lệch.
+- `HMMValidation.calculate_metrics_for_result`: dùng lại `compute_metrics` (mục 3.3).
 
 ## 6. Toán tử `AlphaPrimitives`
 

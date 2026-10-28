@@ -24,6 +24,10 @@ def test_multiprocessing_pipeline():
     }):
         from strategy_workflows.RunMCTS import run_mcts_pipeline
 
+        import pandas as pd
+        tiny = pd.DataFrame({'Open': [1.0], 'High': [1.0], 'Low': [1.0], 'Close': [1.0], 'Volume': [1.0]},
+                            index=pd.date_range('2024-01-01', periods=1))
+
         mock_executor_instance = MagicMock()
 
         f10m = Future()
@@ -36,7 +40,7 @@ def test_multiprocessing_pipeline():
 
         with patch('strategy_workflows.RunMCTS.concurrent.futures.ProcessPoolExecutor') as mock_executor_class:
             mock_executor_class.return_value.__enter__.return_value = mock_executor_instance
-            with patch('strategy_workflows.RunMCTS.TIMEFRAMES', ['10m', '60m']):
+            with patch('strategy_workflows.RunMCTS.TIMEFRAMES', ['10m', '60m']), patch('strategy_workflows.RunMCTS.load_data', return_value=tiny):
                 run_mcts_pipeline(iterations=10, retrain_hmm=False)
 
                 mock_precompute.assert_called_once()

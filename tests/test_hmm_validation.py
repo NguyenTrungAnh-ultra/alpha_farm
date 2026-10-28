@@ -3,7 +3,7 @@ import pytest
 pytest.importorskip('hmmlearn')
 import numpy as np
 import pandas as pd
-from unittest.mock import patch
+import strategy_workflows.HMMValidation as hmm_module
 from strategy_workflows.HMMValidation import (
     fit_hmm_model,
     stress_transition_matrix,
@@ -80,38 +80,30 @@ def test_generate_synthetic_ohlcv(dummy_ohlcv_data):
     assert isinstance(sim_df.index, pd.DatetimeIndex)
 
 @pytest.mark.hardware
-@patch('strategy_workflows.HMMValidation.load_data')
-def test_precompute_hmm_synthetic_data_caching(mock_load_data, dummy_ohlcv_data, temp_hmm_cache, monkeypatch):
+def test_precompute_hmm_synthetic_data_caching(dummy_ohlcv_data, temp_hmm_cache, monkeypatch):
     """Test cơ chế ghi/đọc cache từ Disk, giảm tải CPU khi dữ liệu đã có sẵn."""
-    # Mock load_data trả về dữ liệu ảo
-    mock_load_data.return_value = dummy_ohlcv_data
-    
-    # Ép thư mục cache về thư mục giả lập bằng cách ghi đè MC_CACHE_DIR
     monkeypatch.setattr('strategy_workflows.HMMValidation.MC_CACHE_DIR', temp_hmm_cache)
-    
+    fit_calls = []
+    real_fit = hmm_module.fit_hmm_model
+    monkeypatch.setattr(hmm_module, 'fit_hmm_model', lambda *a, **k: fit_calls.append(1) or real_fit(*a, **k))
+
     # 1. Chạy lần đầu tiên: Chưa có file cache -> Bắt buộc phải train và sinh file
-    timeframes = ['10m', '15m']
-    
-    result_first_run = precompute_hmm_synthetic_data(timeframes, force_retrain=False)
-    
+    data = {'10m': dummy_ohlcv_data, '15m': dummy_ohlcv_data.iloc[:800]}
+    result_first_run = precompute_hmm_synthetic_data(data, force_retrain=False, n_paths=2)
+
     assert '10m' in result_first_run
     assert '15m' in result_first_run
-    
-    # Đảm bảo file .pkl đã được sinh ra trên Disk
-    cache_file = os.path.join(temp_hmm_cache, "synthetic_data.pkl")
-    assert os.path.exists(cache_file)
-    
-    # 2. Chạy lần thứ 2: Đã có file cache -> Phải load thẳng từ Disk
-    # Ta sẽ xóa mock_load_data. Nếu precompute gọi load_data, nó sẽ crash hoặc báo mock call.
-    mock_load_data.reset_mock()
-    
-    result_second_run = precompute_hmm_synthetic_data(timeframes, force_retrain=False)
-    
-    # Nếu nó load từ cache, hàm load_data sẽ KHÔNG bị gọi
-    mock_load_data.assert_not_called()
+    assert len(fit_calls) == 2
+
+    # Đảm bảo mỗi (timeframe, dữ liệu) có một file .pkl riêng trên Disk
+    cache_dir = os.path.join(temp_hmm_cache, hmm_module.KEYED_CACHE_SUBDIR)
+    assert len(os.listdir(cache_dir)) == 2
+
+    # 2. Chạy lần thứ 2: Đã có file cache -> Phải load thẳng từ Disk, không fit lại
+    result_second_run = precompute_hmm_synthetic_data(data, force_retrain=False, n_paths=2)
+    assert len(fit_calls) == 2
     assert '10m' in result_second_run
-    
-    # 3. Chạy ép retrain: --retrain-hmm
-    result_third_run = precompute_hmm_synthetic_data(timeframes, force_retrain=True)
-    # Bị ép retrain nên load_data sẽ bị gọi 2 lần (cho 2 timeframe)
-    assert mock_load_data.call_count == 2
+
+    # 3. Chạy ép retrain: --retrain-hmm -> fit lại cho cả 2 timeframe
+    precompute_hmm_synthetic_data(data, force_retrain=True, n_paths=2)
+    assert len(fit_calls) == 4

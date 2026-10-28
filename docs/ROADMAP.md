@@ -12,17 +12,17 @@ Khung nghiên cứu: `docs/proposal/thesis_proposal/Thesis_Proposal.pdf` (chươ
   - Bộ giả lập HMM sát thực tế (độ dài chế độ 0.72–0.92 lần, MDD tương đương).
 - ✅ Pipeline `ts_*` chạy hết từ blueprint tới code chiến lược xuất ra (2026-10-28, việc 1 ở mục 2).
 - ⛔ Chưa có thành phần nào của quy trình đánh giá mới (walk-forward, gộp top-k, seed, baseline, placebo, cài tín hiệu, SPA/DSR).
-- ⛔ Lỗi quy đổi theo năm trong `HMMValidation.calculate_metrics_for_result` (đã đo: CAGR mua-và-giữ 0.76% ở 1m, 20.0% ở 30m, đúng là 8.9%).
-- ⛔ Test: `.venv` cho 49 pass, 1 fail (`test_core_engine.py::test_alpha_data_proxy`, có từ trước).
+- ✅ Quy đổi theo năm thống nhất, CAGR theo lịch (2026-10-28, việc 4).
+- ⛔ Test: `.venv` cho 59 pass, 1 fail (`test_core_engine.py::test_alpha_data_proxy`, có từ trước).
 
 - ✅ Dọn tài liệu (2026-10-13): `docs/ARCH.md` và `README.md` viết lại theo code; bài báo vào `docs/references/`; tài liệu thời XNOQuant vào `docs/archive/` (lý do từng tệp ở `docs/archive/README.md`).
 
 ## 2. Việc theo thứ tự (Tháng 1 của proposal)
 
 1. ✅ **Nối lại pipeline** (2026-10-28): sửa 4 chỗ nối ở mục 1, đặt seed cho MCTS, cửa sổ cố định trên từng nút. Đo thật: 60m, `sub(ts_mean(?), ts_mean(?))`, seed 1, 300 vòng → 4 ứng viên reward ≠ −10, tốt nhất 0.26; cùng seed cho cùng kết quả kể cả khác tiến trình. Test: `tests/test_mcts_pipeline.py` (12 ca). `main.py mcts` thật (cần cache HMM) chưa chạy.
-2. ⏸️ **Tách dữ liệu khỏi engine**: `MCTSEngine` và `HMMValidation` nhận DataFrame từ ngoài thay vì tự gọi `load_data`. Xong khi: chạy được MCTS trên một DataFrame tuỳ ý (cửa sổ con, dữ liệu tổng hợp).
+2. ✅ **Tách dữ liệu khỏi engine** (2026-10-28): `MCTSEngine`, HMM và `process_timeframe` nhận DataFrame từ ngoài; cache HMM khoá theo khung + dấu vân tay dữ liệu. Test: `tests/test_data_injection.py` với `load_data` bị chặn. Cache cũ 13 GB không còn được đọc: chạy `--retrain-hmm` một lần trước lượt `mcts` thật.
 3. ⏸️ **Bài cài tín hiệu (kiểm soát dương), một khung thời gian**: cài một công thức biết trước vào lợi suất placebo với IC 0.01 / 0.02 / 0.05, xem MCTS có tìm lại được không. Xong khi: có bảng tỷ lệ tìm lại theo cường độ.
-4. ⏸️ Sửa quy đổi theo năm trong `HMMValidation`.
+4. ✅ Sửa quy đổi theo năm (2026-10-28): mọi chỉ số đi qua `compute_metrics`; CAGR theo thời gian lịch. Đo thật CAGR mua-và-giữ 2020–2024: 8.94% (1m), 8.93% (15m), 8.90% (60m) — trước đây 0.76% / 20.0% trong HMM và 10.1% trong `compute_metrics` khung phút (do thiếu ngày). Kết quả cũ trong `results/` (`portfolio_summary.json`…) vẫn tính theo công thức cũ.
 
 Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + placebo + baseline → chạy RQ1/RQ2 → RQ3, SPA, DSR.
 
@@ -39,6 +39,8 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
 
 - ⛔ Token DeepSeek từng bị đẩy lên GitHub (lịch sử git đã viết lại, tệp đã xoá khỏi máy 2026-10-28) nhưng token và cookie Gemini có thể vẫn còn hiệu lực: người dùng tự đăng xuất mọi phiên ở chat.deepseek.com và Google.
 - Rò rỉ qua trọng số LLM (nêu 2026-10-28, người dùng cho vào nợ): `qwen3.5:4b` được huấn luyện trên văn bản có thể đã nói về 2020–2025, nên lợi ích của LLM ở RQ1 có thể lẫn "biết trước". Prompt ghi tên "VN30 Index Futures" nhưng không ghi ngày. Cách kiểm Claude đề xuất: (1) ẩn tên thị trường trong prompt; (2) so blueprint có tên và ẩn danh cùng ngân sách; (3) tra ngày cắt dữ liệu huấn luyện của qwen3.5, tách cửa sổ đánh giá sau ngày đó; (4) nêu trong mục hạn chế. Chưa đo.
+- ⛔ Dữ liệu thiếu ngày (đo 2026-10-28): giai đoạn 2020–2024, tệp 1m/5m/15m/30m có 1.121 ngày giao dịch, tệp 1H có 1.247; 126 ngày chỉ có ở 1H, rải từ 2023-03-22 tới 2024-03-14. Backtest khung phút nhảy qua các ngày đó như một bar. Cần kiểm tệp CSV gốc / tải lại trước khi chạy RQ trên khung phút.
+- Test `test_hardware_concurrency.py` gọi `run_mcts_pipeline` thật nên mỗi lần chạy test ghi thêm vào `results/mcts_stats.json`.
 - `results/pushed/` (chiến lược thế hệ đầu) bị xoá ở commit `c6b1f03`; khôi phục bằng `git checkout cfeb770 -- results/pushed` nếu cần so sánh RQ2.
 - ~~`GenerateStrategies.load_experience_log` đọc tệp không tồn tại~~ → ✅ báo rõ khi thiếu, prompt ghi "(No experience log is available.)" (2026-10-28).
 - Không gian tìm phí: 12% lượt chấm lỗi vì biểu thức toàn hằng (`ts_mean((0.2 + 0.5), 10)`); MCTS còn sinh `(0.1 + low)` — cộng hằng vào giá không đổi z-score. Cần lọc hằng theo nút cha.
@@ -46,5 +48,5 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
 - `generate_strategy_code` mới được test với template NORMALIZED; RATIO / BOOLEAN dựa vào việc dùng chung `compute_positions`.
 - ✅ Môi trường (2026-10-28): thêm `requirements.in` / `requirements.txt`, `.venv` sync theo đó (66 → 35 gói, 537 → 321 MB; bỏ playwright, google-generativeai, openai, ta-lib, psutil, pytest-mock; thêm matplotlib 3.11.2). Test vẫn 49 pass / 1 fail; `make_figures.py` chạy được bằng `.venv`. Hình `walk_forward.png` vẽ lại khác byte với bản trong PDF nên giữ bản cũ.
 - `generate_descriptive_name` còn tìm `self.feat.*` nên tên chiến lược luôn rơi về tên trường.
-- `results/mcts_stats.json` có thay đổi chưa commit (do lượt chạy MCTS cũ ghi thêm).
+- `results/mcts_stats.json` có thay đổi chưa commit (do lượt chạy MCTS cũ và các lượt chạy test ghi thêm).
 - Ảnh chữ ký và PDF đã ký trong `docs/proposal/` chỉ nằm trên máy (`.gitignore`), không có trong git; mất máy là mất.

@@ -111,7 +111,7 @@ class CustomStrategy(AlphaStrategy):
         self._positions = pd.Series(raw_pos, index=alpha_val.index, dtype=np.float64)
 """
 
-def process_timeframe(tf: str, iterations: int, synthetic_data: dict, seed: Optional[int] = None):
+def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_data: dict, seed: Optional[int] = None):
     """
     Worker function to process a single timeframe.
     
@@ -119,6 +119,9 @@ def process_timeframe(tf: str, iterations: int, synthetic_data: dict, seed: Opti
     ----------
     tf : str
         The timeframe to process (e.g. '10m', '1h').
+    data : pd.DataFrame
+        OHLCV history for this timeframe. The search, the replay backtest and (through
+        `synthetic_data`) the HMM step all use this one frame.
     iterations : int
         The number of MCTS iterations to perform per dimension.
     synthetic_data: dict
@@ -171,7 +174,7 @@ def process_timeframe(tf: str, iterations: int, synthetic_data: dict, seed: Opti
         except Exception as pe:
             print(f"[Worker {tf}] Warning: Failed to load global position matrix: {pe}")
 
-    mcts = MCTSEngine(timeframe=tf, max_depth=4, global_position_matrix=global_position_matrix, seed=seed)
+    mcts = MCTSEngine(timeframe=tf, max_depth=4, global_position_matrix=global_position_matrix, seed=seed, data=data)
     
     # ==========================================
     # ĐỌC Ý TƯỞNG TỪ TẦNG 1 & BIÊN DỊCH BỞI TẦNG 2
@@ -279,7 +282,7 @@ def process_timeframe(tf: str, iterations: int, synthetic_data: dict, seed: Opti
     best_scale = 0.2  # MCTS mặc định tính ở mức 0.2
     
     # Chạy lại 1 lần duy nhất để lấy equity_curve và positions
-    df_full = load_data(tf)
+    df_full = data.copy()
     df_full['Volume'] = df_full['Volume'].fillna(0.0)
     
     if template == "NORMALIZED":
@@ -368,11 +371,16 @@ def run_mcts_pipeline(iterations: int = MCTS_ITERATIONS, retrain_hmm: bool = Fal
     
     # Precompute HMM Synthetic Data once for all timeframes
     from strategy_workflows.HMMValidation import precompute_hmm_synthetic_data
-    synthetic_data_all = precompute_hmm_synthetic_data(TIMEFRAMES, force_retrain=retrain_hmm)
+    data_all = {}
+    for tf in TIMEFRAMES:
+        df = load_data(tf)
+        df['Volume'] = df['Volume'].fillna(0.0)
+        data_all[tf] = df
+    synthetic_data_all = precompute_hmm_synthetic_data(data_all, force_retrain=retrain_hmm)
     
     # Launch parallel workers
     with concurrent.futures.ProcessPoolExecutor(max_workers=len(TIMEFRAMES)) as executor:
-        futures = {executor.submit(process_timeframe, tf, iterations, synthetic_data_all.get(tf, {}), seed): tf for tf in TIMEFRAMES}
+        futures = {executor.submit(process_timeframe, tf, data_all[tf], iterations, synthetic_data_all.get(tf, {}), seed): tf for tf in TIMEFRAMES}
         
         for future in concurrent.futures.as_completed(futures):
             tf = futures[future]

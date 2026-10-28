@@ -33,7 +33,7 @@ Code changes go to the `coder` agent (`.claude/agents/coder.md`, Sonnet, medium 
 
 `--model` accepts: `ollama-local`, `ollama-9b`.
 
-As of 2026-10-28, the suite in `.venv` gives 49 passed and 1 failed. The failure is `test_core_engine.py::test_alpha_data_proxy`, an identity check (`is`) on a copied Series.
+As of 2026-10-28, the suite in `.venv` gives 59 passed and 1 failed. The failure is `test_core_engine.py::test_alpha_data_proxy`, an identity check (`is`) on a copied Series.
 
 ## Pipeline gotchas
 
@@ -42,7 +42,7 @@ Stages (generate → MCTS → scoring → HMM validation → portfolio) are desc
 - `RunMCTS` moves idea files to `results/ideas/processed/` even on error, so failures are easy to miss.
 - MCTS selection is UCT on **max** reward, not mean.
 - `RunMCTS` passes `force_add=True`, and correlation rejection is commented out, so portfolio criteria are not enforced.
-- HMM synthetic paths are cached in `data/MCdata/synthetic_data.pkl` (~13 GB); `--retrain-hmm` rebuilds it.
+- HMM synthetic paths are cached per (timeframe, data fingerprint) in `data/MCdata/synthetic/`. The legacy `data/MCdata/synthetic_data.pkl` (~13 GB) is never read; until `--retrain-hmm` builds keyed files, `main.py mcts` skips the HMM step with a message.
 
 ## Core engine conventions
 
@@ -54,9 +54,8 @@ Stages (generate → MCTS → scoring → HMM validation → portfolio) are desc
   - A signal at bar t executes at bar t+1.
   - Contract count is fixed from initial capital and the first price.
   - A margin call flattens all positions and freezes equity.
-- **Two different annualisations:**
-  - `CalculateMetrics.compute_metrics` resamples to daily and uses 252 (correct).
-  - `HMMValidation.calculate_metrics_for_result` infers years from the bar count with constants 4800/1200. This is wrong for most timeframes: buy-and-hold CAGR comes out 0.76% on 1m vs 8.9% true.
+- **Annualisation:** everything goes through `CalculateMetrics.compute_metrics`. CAGR uses elapsed calendar time (/365.25 days); Sharpe/Sortino/vol use daily returns with sqrt(252). Never count trading days for years: the 1m–30m files miss 126 sessions in 2023–2024 that the 1H file has.
+- **Data injection:** `MCTSEngine(data=...)`, `precompute_hmm_synthetic_data({tf: df})` and `process_timeframe(tf, data, ...)` use only the frame they are given; only `run_mcts_pipeline` / no-`data` defaults call `load_data`.
 
 ## Known state after the XNOQuant decoupling (commit `c6b1f03`)
 

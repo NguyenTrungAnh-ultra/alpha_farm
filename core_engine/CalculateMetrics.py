@@ -100,9 +100,10 @@ def compute_metrics(result: BacktestResult) -> dict:
     # === PERFORMANCE METRICS ===
     cumulative_return = total_profit_pct
 
-    # CAGR (calculated using trading days / 252 as years, with initial capital as base)
+    # CAGR over elapsed calendar time (missing sessions must not shorten the period),
+    # floored at one day to keep the exponent finite on tiny spans.
     if len(daily_equity) > 0:
-        years = len(daily_equity) / 252.0
+        years = max((equity.index[-1] - equity.index[0]).total_seconds() / (365.25 * 86400.0), 1.0 / 365.25)
         if years > 0 and net_equity > 0:
             cagr = (net_equity / result.initial_capital) ** (1 / years) - 1
         else:

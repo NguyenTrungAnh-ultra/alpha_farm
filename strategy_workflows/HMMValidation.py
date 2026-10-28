@@ -1,5 +1,7 @@
 import os
 import sys
+import json
+import hashlib
 import numpy as np
 import pandas as pd
 import joblib
@@ -16,10 +18,14 @@ from utilities.AppConfig import (
     RUIN_RATE_THRESHOLD,
     COST_COVERAGE_MULTIPLIER,
     SAVINGS_RATE_ANNUAL,
-    BENCHMARK_BASELINE_PATH
 )
-import json
-from core_engine.BacktestEngine import load_data, AlphaBacktestEngine
+from core_engine.BacktestEngine import AlphaBacktestEngine, BacktestResult
+from core_engine.CalculateMetrics import compute_metrics
+
+# Per-(timeframe, data fingerprint) path caches live in this subdirectory of MC_CACHE_DIR.
+# The legacy single-file cache carries no metadata, so it is never loaded.
+KEYED_CACHE_SUBDIR = "synthetic"
+LEGACY_CACHE_FILENAME = "synthetic_data.pkl"
 
 def fit_hmm_model(df: pd.DataFrame, n_components: int, random_state: int = 42):
     """Fits Gaussian HMM to returns, rolling volatility, and relative volume features."""
@@ -83,6 +89,24 @@ def stress_transition_matrix(trans_matrix: np.ndarray, bad_state: int, stress_fa
                 stressed_trans[i, idx] = remaining_prob / len(other_indices)
                 
     return stressed_trans
+
+def _trading_calendar_index(source_index: pd.DatetimeIndex, n_bars: int) -> pd.DatetimeIndex:
+    """
+    Returns n_bars timestamps taken from the source's own trading calendar.
+
+    Daily resampling of a synthetic path must see the same bars-per-day structure as the
+    real data, otherwise calendar-based annualisation counts the wrong number of trading
+    days. Past the end of the source, the calendar is repeated shifted by whole spans.
+    """
+    n_src = len(source_index)
+    if n_bars <= n_src:
+        return source_index[:n_bars]
+    step = source_index[1:] - source_index[:-1]
+    span = (source_index[-1] - source_index[0]) + (step.median() if len(step) else pd.Timedelta(0))
+    reps = -(-n_bars // n_src)
+    chunks = [source_index + span * k for k in range(reps)]
+    return chunks[0].append(chunks[1:])[:n_bars]
+
 
 def generate_synthetic_ohlcv(
     df_clean: pd.DataFrame, 
@@ -151,8 +175,7 @@ def generate_synthetic_ohlcv(
         sim_low[i] = current_close * sim_low_ratio[i]
         current_close = sim_close[i]
         
-    # Create arbitrary dates to appease the backtester
-    dates = pd.date_range(start='2020-01-01', periods=n_sim_bars, freq='15min') 
+    dates = _trading_calendar_index(df_clean.index, n_sim_bars)
     
     sim_df = pd.DataFrame({
         'Open': sim_open,
@@ -165,86 +188,140 @@ def generate_synthetic_ohlcv(
     
     return sim_df
 
-def precompute_hmm_synthetic_data(timeframes: list, force_retrain: bool = False) -> dict:
+def fingerprint_data(df: pd.DataFrame, timeframe: str, n_paths: int) -> dict:
     """
-    Fits HMM for all timeframes, generates synthetic paths, and caches them.
-    Returns: dict mapping tf to {'normal': [paths], 'stressed': [paths]}
+    Identifies a cache entry: the timeframe, everything about the input data that the
+    paths depend on (row count, first/last timestamp, hash of the index and OHLCV values)
+    and the generation parameters.
+    """
+    h = hashlib.sha256()
+    h.update(df.index.asi8.tobytes())
+    for col in ('Open', 'High', 'Low', 'Close', 'Volume'):
+        h.update(np.ascontiguousarray(df[col].to_numpy(dtype='float64')).tobytes())
+    return {
+        'timeframe': timeframe,
+        'n_rows': int(len(df)),
+        'first': str(df.index[0]),
+        'last': str(df.index[-1]),
+        'data_sha256': h.hexdigest(),
+        'n_paths': int(n_paths),
+        'hmm_components': int(HMM_COMPONENTS),
+        'stress_factor': float(HMM_STRESS_FACTOR),
+        'block_size': int(HMM_BLOCK_SIZE),
+    }
+
+
+def _cache_file(cache_dir: str, meta: dict) -> str:
+    key = hashlib.sha256(json.dumps(meta, sort_keys=True).encode()).hexdigest()[:16]
+    return os.path.join(cache_dir, KEYED_CACHE_SUBDIR, f"{meta['timeframe']}_{key}.pkl")
+
+
+def _build_paths(hist_df: pd.DataFrame, n_paths: int) -> dict:
+    hmm, df_clean, bad_state = fit_hmm_model(hist_df, n_components=HMM_COMPONENTS)
+    trans_matrix = hmm.transmat_
+    stressed_trans = stress_transition_matrix(trans_matrix, bad_state=bad_state, stress_factor=HMM_STRESS_FACTOR)
+    n_bars = len(df_clean)
+    normal_paths, stressed_paths = [], []
+    for i in range(n_paths):
+        normal_paths.append(generate_synthetic_ohlcv(df_clean, trans_matrix, n_bars, HMM_BLOCK_SIZE, random_seed=1000 + i))
+        stressed_paths.append(generate_synthetic_ohlcv(df_clean, stressed_trans, n_bars, HMM_BLOCK_SIZE, random_seed=2000 + i))
+    return {'normal': normal_paths, 'stressed': stressed_paths}
+
+
+def precompute_hmm_synthetic_data(data_by_timeframe: dict, force_retrain: bool = False, n_paths: int = HMM_PATHS_PER_TF) -> dict:
+    """
+    Fits an HMM on each given historical DataFrame, generates synthetic paths and caches them.
+
+    data_by_timeframe maps a timeframe name to the history to fit on; nothing is loaded here.
+    Each entry is cached in its own file keyed by timeframe + a fingerprint of that data, so
+    paths are never reused for different data. The legacy single-file cache has no metadata
+    and is never loaded or modified: while it exists, a missing entry is not built unless
+    force_retrain is set (a full rebuild is slow and the user should choose it).
+
+    Returns: dict mapping tf to {'normal': [paths], 'stressed': [paths]}; a timeframe that
+    could not be served is absent.
     """
     cache_dir = MC_CACHE_DIR
-    os.makedirs(cache_dir, exist_ok=True)
-    cache_path = os.path.join(cache_dir, "synthetic_data.pkl")
-    
-    if not force_retrain and os.path.exists(cache_path):
-        print("[HMM Validation] Loading precomputed synthetic data from cache...")
-        return joblib.load(cache_path)
-        
-    print(f"[HMM Validation] Precomputing synthetic paths for {len(timeframes)} timeframes. This may take 1-2 phút...")
-    
+    os.makedirs(os.path.join(cache_dir, KEYED_CACHE_SUBDIR), exist_ok=True)
+    legacy_path = os.path.join(cache_dir, LEGACY_CACHE_FILENAME)
+
     synthetic_data = {}
-    
-    for tf in timeframes:
+    for tf, hist_df in data_by_timeframe.items():
         try:
-            print(f"  -> Fitting HMM for {tf}...")
-            hist_df = load_data(tf)
             if len(hist_df) < HMM_BLOCK_SIZE:
+                print(f"[HMM Validation] {tf}: only {len(hist_df)} bars, skipped.")
                 continue
-                
-            hmm, df_clean, bad_state = fit_hmm_model(hist_df, n_components=HMM_COMPONENTS)
-            trans_matrix = hmm.transmat_
-            stressed_trans = stress_transition_matrix(trans_matrix, bad_state=bad_state, stress_factor=HMM_STRESS_FACTOR)
-            
-            n_bars = len(df_clean)
-            normal_paths = []
-            stressed_paths = []
-            
-            print(f"  -> Generating {HMM_PATHS_PER_TF} Normal and {HMM_PATHS_PER_TF} Stressed paths for {tf}...")
-            for i in range(HMM_PATHS_PER_TF):
-                normal_paths.append(generate_synthetic_ohlcv(df_clean, trans_matrix, n_bars, HMM_BLOCK_SIZE, random_seed=1000 + i))
-                stressed_paths.append(generate_synthetic_ohlcv(df_clean, stressed_trans, n_bars, HMM_BLOCK_SIZE, random_seed=2000 + i))
-                
-            synthetic_data[tf] = {
-                'normal': normal_paths,
-                'stressed': stressed_paths
-            }
+            meta = fingerprint_data(hist_df, tf, n_paths)
+            path = _cache_file(cache_dir, meta)
+
+            if not force_retrain and os.path.exists(path):
+                entry = joblib.load(path)
+                if entry.get('meta') == meta:
+                    print(f"[HMM Validation] {tf}: loaded cached paths ({os.path.basename(path)}).")
+                    synthetic_data[tf] = entry['paths']
+                    continue
+                print(f"[HMM Validation] {tf}: cache file metadata does not match the data, rebuilding.")
+
+            if not force_retrain and os.path.exists(legacy_path):
+                print(f"[HMM Validation] {tf}: no cache entry for this data, and the old "
+                      f"{LEGACY_CACHE_FILENAME} has no metadata so it cannot be reused. "
+                      f"Skipping HMM paths; re-run with --retrain-hmm to build them "
+                      f"(the old file is left untouched).")
+                continue
+
+            print(f"  -> Fitting HMM for {tf} and generating {n_paths} Normal and {n_paths} Stressed paths...")
+            paths = _build_paths(hist_df, n_paths)
+            tmp_path = path + ".tmp"
+            joblib.dump({'meta': meta, 'paths': paths}, tmp_path)
+            os.replace(tmp_path, path)
+            synthetic_data[tf] = paths
         except Exception as e:
             print(f"[HMM Validation] Failed to precompute paths for {tf}: {e}")
             import traceback
             traceback.print_exc()
-            
-    print(f"[HMM Validation] Saving synthetic paths to cache: {cache_path}")
-    joblib.dump(synthetic_data, cache_path)
+
     return synthetic_data
 
 def calculate_metrics_for_result(result):
-    """Calculates Sharpe Ratio, CAGR and Max Drawdown from BacktestResult."""
+    """
+    Returns (Sharpe, CAGR as a fraction, max drawdown in %) of a BacktestResult.
+
+    Sharpe and CAGR come from compute_metrics (daily resampling, 252 trading days a year), so
+    they need result.equity_curve to have a real trading-calendar DatetimeIndex.
+    Drawdown stays bar-level because it is compared with the margin-call threshold.
+    """
     equity = result.equity_curve
     if len(equity) < 2:
         return 0.0, 0.0, 0.0
-        
-    total_bars = len(equity)
-    # Estimate years from bar count fallback
-    years = total_bars / 4800.0 if total_bars > 10000 else total_bars / 1200.0
-        
-    final_val = equity.iloc[-1]
-    initial_val = equity.iloc[0]
-    
-    if final_val > 0 and initial_val > 0:
-        cagr = (final_val / initial_val) ** (1.0 / max(years, 0.1)) - 1.0
-    else:
-        cagr = -1.0
-        
-    returns = equity.pct_change().dropna()
-    if returns.std() > 0:
-        annual_bars = 4800 if total_bars > 10000 else 1200
-        sharpe = (returns.mean() / returns.std()) * np.sqrt(annual_bars)
-    else:
-        sharpe = 0.0
-        
+
+    metrics = compute_metrics(result)
+    sharpe = float(metrics['sharpe_ratio'])
+    cagr = float(metrics['cagr_pct']) / 100.0 if equity.iloc[-1] > 0 else -1.0
+
     cum_max = equity.cummax()
     drawdown = (equity - cum_max) / cum_max * 100
     max_dd = drawdown.min()
-    
+
     return sharpe, cagr, max_dd
+
+
+def calculate_buy_hold_metrics(df: pd.DataFrame):
+    """
+    Buy-and-hold one unit of the series, scored by calculate_metrics_for_result so benchmark
+    and strategy share the same annualisation. Returns (Sharpe, CAGR, max drawdown %).
+    """
+    capital = 1.0
+    equity = (capital * df['Close'] / df['Close'].iloc[0]).astype('float64')
+    result = BacktestResult(
+        equity_curve=equity,
+        positions=pd.Series(1.0, index=df.index),
+        trades=[],
+        initial_capital=capital,
+        final_equity=float(equity.iloc[-1]),
+        total_fees=0.0,
+        total_trades=0,
+    )
+    return calculate_metrics_for_result(result)
 
 def extract_trade_stats_from_result(result) -> dict:
     """Trích xuất thống kê lệnh từ BacktestResult để phục vụ Tầng 2 (Kelly, Cost Coverage)."""
@@ -370,18 +447,14 @@ def validate_strategy_with_hmm(strategy, normal_paths: list, stressed_paths: lis
         reason = f"Failed Tier 3: MC CAGR {mc_cagr_mean*100:.1f}% < Savings Rate {SAVINGS_RATE_ANNUAL*100:.1f}%"
         return False, 3, reason, {'mc_cagr_mean': float(mc_cagr_mean)}
         
-    # 2. So với Dummy Buy & Hold (nếu có cache)
+    # 2. Buy & Hold on the same normal paths, same annualisation as the strategy
     benchmark_sharpe = -999.0
     benchmark_cagr = -999.0
-    if os.path.exists(BENCHMARK_BASELINE_PATH):
-        try:
-            with open(BENCHMARK_BASELINE_PATH, 'r') as f:
-                bmark = json.load(f)
-                benchmark_sharpe = bmark.get('sharpe_mean', -999.0)
-                benchmark_cagr = bmark.get('cagr_mean', -999.0)
-        except Exception:
-            pass
-            
+    bh = [calculate_buy_hold_metrics(p) for p in normal_paths if len(p) >= 2]
+    if bh:
+        benchmark_sharpe = float(np.mean([m[0] for m in bh]))
+        benchmark_cagr = float(np.mean([m[1] for m in bh]))
+
     if benchmark_sharpe != -999.0 and mc_sharpe_mean < benchmark_sharpe:
         reason = f"Failed Tier 3: MC Sharpe {mc_sharpe_mean:.2f} < Buy&Hold {benchmark_sharpe:.2f}"
         return False, 3, reason, {'mc_sharpe_mean': float(mc_sharpe_mean), 'benchmark_sharpe': float(benchmark_sharpe)}

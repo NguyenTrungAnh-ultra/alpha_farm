@@ -451,14 +451,14 @@ class MCTSEngine:
         the engine overrides the state's default `max_depth` of 3 with its own 
         configured depth (typically 4).
     """
-    def __init__(self, timeframe: str = '10m', max_depth: int = 4, exploration_c: float = 1.414, global_position_matrix: pd.DataFrame = None, seed: Optional[int] = None):
+    def __init__(self, timeframe: str = '10m', max_depth: int = 4, exploration_c: float = 1.414, global_position_matrix: pd.DataFrame = None, seed: Optional[int] = None, data: Optional[pd.DataFrame] = None):
         """
         Initialize the MCTSEngine.
         
         Parameters
         ----------
         timeframe : str, default '10m'
-            The data timeframe to load and run backtests on.
+            The data timeframe; selects window scaling and, when `data` is None, the file to load.
         max_depth : int, default 4
             The maximum formula tree depth. Overrides MCTSState's default of 3.
         exploration_c : float, default 1.414
@@ -469,6 +469,9 @@ class MCTSEngine:
             Seed of the engine's private random generator. All search randomness (expansion,
             rollout, tie-breaks) goes through it; the same seed on the same data and blueprint
             reproduces the same search. None seeds from the OS.
+        data : Optional[pd.DataFrame], default None
+            OHLCV frame to search on (datetime index). The engine reads nothing beyond it, so a
+            sub-window or synthetic frame can be injected. None loads `load_data(timeframe)`.
         """
         self.seed = seed
         self.rng = random.Random(seed)
@@ -492,8 +495,11 @@ class MCTSEngine:
         print(f"[MCTS] Scaled Window Search: {self.scaled_window_search}")
         print(f"[MCTS] Seed: {seed}")
         
-        print(f"[MCTS] Loading data for {timeframe}...")
-        self.df = load_data(timeframe)
+        if data is None:
+            print(f"[MCTS] Loading data for {timeframe}...")
+            data = load_data(timeframe)
+        # Copy so filling Volume never mutates the caller's frame.
+        self.df = data.copy()
         self.df['Volume'] = self.df['Volume'].fillna(0.0)
         # Use full historical data for MCTS due to vectorized engine speedup
         self.df_search = self.df
