@@ -45,7 +45,11 @@ Nếu dữ liệu thật sự chứa một công thức mà ngữ pháp biểu d
 - Sharpe ngoài mẫu ở IC 0 là −2.3: alpha nhiễu giao dịch nhiều và thua phí.
 - ⛔ Lỗi phát hiện: top-5 có công thức trùng nhau (cùng biểu thức, khác tham số template), nên "gộp top-5" thực chất gộp 1–3 công thức.
 - ~4–5% lượt chấm lỗi vì biểu thức hằng (`ts_mean(volume*0.05)`… và lỗi shape) — nợ đã ghi.
-- ⏸️ Bước tiếp theo chờ người dùng chọn (xem ROADMAP mục 3).
+- ✅ Người dùng chốt làm cả ba (2026-10-28), áp cho lần chạy 2:
+  - **(a)** top-5 là 5 **biểu thức khác nhau**; mỗi biểu thức giữ bộ tham số template tốt nhất.
+  - **(b)** đoạn tìm tách hai: MCTS chạy trên **2018-08-13 → 2019-12-31** (đoạn học), top-5 chọn theo reward soft trên **2020-01-01 → 2020-06-30** (đoạn kiểm định), xếp hạng trong ≤ 100 ứng viên khác biểu thức của leaderboard. Alpha tính trên chuỗi liền nên cửa sổ không bị cắt. β vẫn hiệu chỉnh trên cả đoạn tìm; "tìm lại gần" vẫn đo trên cả đoạn tìm. Đây là thay đổi phương pháp, luận văn phải ghi; walk-forward sẽ dùng cùng cách tách (6 tháng cuối của 2 năm tìm).
+  - **(c)** thêm độ mạnh IC 0.1 và 0.2 (chỉ báo cáo, không đặt ngưỡng) ⇒ 6 độ mạnh × 5 seed = 30 lượt.
+  - Tiêu chí đạt giữ nguyên (IC 0.05: gần ≥ 3/5; IC 0: gần ≤ 1/5).
 
 ## 4. Chạy
 

@@ -40,7 +40,7 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
   - HMM: chỉ ghi kết quả, không loại chiến lược (khớp proposal).
   - Tiêu chí danh mục (`meets_criteria`, `force_add`, loại theo tương quan) và phạt −100 FSA: xoá, vì là code chết (FSA chỉ kích khi reward > 1.0, mà reward tối đa là 1.0).
   - Lọc `reward > 0` trước khi chọn: giữ tới khi làm gộp top-5.
-- ⏸️ Bài cài tín hiệu lần 1 trượt ở IC 0.05 (`docs/PLANTED_SIGNAL.md` mục 8): công thức nhiễu tốt nhất luôn thắng tín hiệu thật trong mẫu. Hướng Claude đề xuất (2026-10-28), chưa ai chốt: (a) sửa lỗi top-5 trùng công thức; (b) chọn top-5 trên một đoạn kiểm định tách riêng trong đoạn tìm (ví dụ 6 tháng cuối) thay vì reward trong mẫu; (c) thêm độ mạnh IC 0.1 / 0.2 để tìm ngưỡng phát hiện.
+- ✅ Bài cài tín hiệu lần 1 trượt ở IC 0.05 (`docs/PLANTED_SIGNAL.md` mục 8): công thức nhiễu tốt nhất luôn thắng tín hiệu thật trong mẫu. Người dùng chốt làm cả ba (2026-10-28): (a) sửa lỗi top-5 trùng công thức; (b) chọn top-5 trên một đoạn kiểm định tách riêng trong đoạn tìm (ví dụ 6 tháng cuối) thay vì reward trong mẫu; (c) thêm độ mạnh IC 0.1 / 0.2 để tìm ngưỡng phát hiện.
 - ⏸️ Độ dài cửa sổ walk-forward (2 năm tìm / 6 tháng đánh giá) và số seed (5), K = 19 lần placebo: do Claude đề xuất, người dùng chưa xác nhận.
 
 ## 4. Nợ

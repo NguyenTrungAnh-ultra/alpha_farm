@@ -1,17 +1,19 @@
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
 
-from strategy_workflows.MCTSEngine import MCTSEngine
+from strategy_workflows.MCTSEngine import MCTSEngine, describe_candidate
 from strategy_workflows.PlantedSignal import (
     PlantedFormula, assert_in_search_space, build_ohlcv_from_returns,
     build_planted_data, calibrate_beta, can_express, search_ic_for_seed, combine_positions, formula_from_dict,
     formula_to_dict, is_exact_recovery, is_near_recovery, is_verbatim, mean_reversion_formula, parse_expression,
     permute_returns, plant_signal, realized_ic, select_planted_formula, shape_fields, spearman_abs, split_bars,
-    top_candidates,
+    distinct_expressions, rank_by_validation, top_candidates,
 )
 from strategy_workflows.RunPlantedSignal import (
-    DEFAULT_STRENGTHS, annotate_blueprints, calibration_key, summarize_runs, criteria_report,
+    DEFAULT_STRENGTHS, annotate_blueprints, calibration_key, criteria_report, rank_leaderboard, summarize_runs,
 )
 from strategy_workflows.SemanticCompiler import ASTNode, SemanticCompiler
 
@@ -354,7 +356,7 @@ def test_summary_keeps_last_rerun_and_criteria():
     lines = criteria_report(summary)
     assert any('IC 0.05' in l and 'PASS' in l for l in lines)
     assert any('IC 0.0' in l and 'PASS' in l for l in lines)
-    assert DEFAULT_STRENGTHS == [0.0, 0.01, 0.02, 0.05]
+    assert DEFAULT_STRENGTHS == [0.0, 0.01, 0.02, 0.05, 0.1, 0.2]
 
 
 # ─── Generic formulas and selection ──────────────────────────────────────
@@ -510,3 +512,148 @@ def test_selected_formula_drives_recovery_checks(engine_60m):
     assert not is_exact_recovery(candidate("(ts_max(high, 10) - ts_mean(close, 10))"), formula, PERIODS, WINDOWS)
     assert can_express(compile_("sub(ts_max(?), ?)"), formula.expr_ast())
     assert not can_express(compile_("sub(ts_min(?), ?)"), formula.expr_ast())
+
+
+# ─── Distinct top-k, train/validation split ──────────────────────────────
+
+def test_top_candidates_has_k_distinct_expressions_and_keeps_best_params():
+    def cand(expr, reward, window, z=1.0):
+        return {'expr': expr, 'reward': reward, 'template': 'NORMALIZED', 'window': window,
+                'z_score': z, 'direction': 1.0}
+    board = [cand('a', 0.4, 5, 0.5), cand('a', 0.9, 10, 1.0), cand('a', 0.8, 3, 2.0), cand('b', 0.7, 5),
+             cand('c', -10.0, 5), cand('c', 0.6, 7), cand('d', 0.5, 5)]
+    top = top_candidates(board, k=3)
+    assert [c['expr'] for c in top] == ['a', 'b', 'c']
+    assert (top[0]['window'], top[0]['z_score'], top[0]['reward']) == (10, 1.0, 0.9)
+    assert [c['expr'] for c in distinct_expressions(board)] == ['a', 'b', 'c', 'd']
+
+
+def test_rank_by_validation_orders_by_validation_reward_and_ignores_train_order():
+    candidates = [{'expr': e} for e in 'abcd']
+    assert rank_by_validation(candidates, [0.1, 0.9, 0.5, 0.9]) == [1, 3, 2, 0]
+    with pytest.raises(ValueError):
+        rank_by_validation(candidates, [0.1])
+
+
+def span_candidate(engine, tree):
+    desc = describe_candidate(tree)
+    _, direction, _ = engine.evaluate_expression(tree)
+    return {'expr': desc['expr'], 'template': desc['template'], 'window': desc['window'],
+            'z_score': desc['z_score_threshold'], 'threshold_upper': desc['threshold_upper'],
+            'threshold_lower': desc['threshold_lower'], 'direction': direction}
+
+
+def normalized_tree_for_test(z=0.5):
+    return ASTNode(name='normalized_template', children=[
+        FORMULA.expr_ast(), ASTNode(name='window', value=10), ASTNode(name='z_score', value=z)])
+
+
+PRICE_COLUMNS = ['Open', 'High', 'Low', 'Close']
+
+
+def test_score_on_span_over_whole_frame_equals_evaluate_expression(dummy_ohlcv_data):
+    engine = MCTSEngine(timeframe='60m', data=dummy_ohlcv_data, seed=1, reward_mode='soft')
+    tree = normalized_tree_for_test()
+    reward, _, _ = engine.evaluate_expression(tree)
+    candidate = span_candidate(engine, tree)
+    index = dummy_ohlcv_data.index
+    assert engine.score_on_span(candidate, dummy_ohlcv_data, str(index[0]), str(index[-1])) == pytest.approx(reward)
+
+
+def test_score_on_span_uses_only_span_bars_but_keeps_warmup(dummy_ohlcv_data):
+    engine = MCTSEngine(timeframe='60m', data=dummy_ohlcv_data, seed=1, reward_mode='soft')
+    candidate = span_candidate(engine, normalized_tree_for_test())
+    frame, index = dummy_ohlcv_data, dummy_ohlcv_data.index
+    start, end = str(index[500]), str(index[899])
+    base = engine.score_on_span(candidate, frame, start, end)
+    cols = frame.columns.get_indexer(PRICE_COLUMNS)
+
+    far = frame.copy()                      # huge values only on early train bars, well before the warm-up
+    far.iloc[:300, cols] *= 1000.0
+    assert engine.score_on_span(candidate, far, start, end) == pytest.approx(base)
+
+    warm = frame.copy()                     # a change inside the warm-up (ts_mean 10 + z-score window 10)
+    warm.iloc[495:500, cols] *= 1.5
+    assert engine.score_on_span(candidate, warm, start, end) != pytest.approx(base)
+
+    late = frame.copy()                     # bars after the span end do not matter either
+    late.iloc[900:, cols] *= 7.0
+    assert engine.score_on_span(candidate, late, start, end) == pytest.approx(base)
+
+
+def test_score_on_span_scores_exactly_the_span_bars(dummy_ohlcv_data, monkeypatch):
+    engine = MCTSEngine(timeframe='60m', data=dummy_ohlcv_data, seed=1, reward_mode='soft')
+    candidate = span_candidate(engine, normalized_tree_for_test())
+    index = dummy_ohlcv_data.index
+    recorded = []
+    original = engine._reward_over_directions
+
+    def spy(alpha_val, rank_ic, df, desc, info, bars=None, directions=(1.0, -1.0)):
+        recorded.append((bars, directions, len(df)))
+        return original(alpha_val, rank_ic, df, desc, info, bars, directions)
+
+    monkeypatch.setattr(engine, '_reward_over_directions', spy)
+    engine.score_on_span(candidate, dummy_ohlcv_data, str(index[500]), str(index[899]))
+    bars, directions, frame_len = recorded[0]
+    assert bars[0] == index[500] and bars[-1] == index[899] and len(bars) == 400
+    assert directions == (candidate['direction'],) and frame_len == len(index)
+
+
+def test_rank_leaderboard_picks_by_validation_not_train():
+    from types import SimpleNamespace
+    board = [{'expr': e, 'reward': r} for e, r in (('a', 0.9), ('a', 0.8), ('b', 0.7), ('c', 0.6), ('d', 0.5))]
+    val = {'a': 0.1, 'b': 0.5, 'c': 0.9, 'd': 0.3}
+    engine = SimpleNamespace(get_best_candidates=lambda: board,
+                             score_on_span=lambda c, frame, start, end: val[c['expr']])
+    picked = rank_leaderboard(engine, None, k=2)
+    assert [c['expr'] for c in picked['ranked']] == ['a', 'b', 'c', 'd']
+    assert [picked['ranked'][i]['expr'] for i in picked['chosen']] == ['c', 'b']
+
+
+def planted_base():
+    index = pd.date_range('2018-08-13', '2020-12-31', freq='4h')
+    rng = np.random.default_rng(11)
+    close = 1000.0 * np.cumprod(1.0 + np.clip(rng.standard_t(3, len(index)) * 0.002, -0.05, 0.05))
+    return pd.DataFrame({'Open': close * 0.999, 'High': close * 1.002, 'Low': close * 0.998,
+                         'Close': close, 'Volume': rng.uniform(1000, 5000, len(index))}, index=index)
+
+
+def test_run_single_search_never_sees_bars_after_train_end(monkeypatch):
+    import strategy_workflows.RunPlantedSignal as run
+    base = planted_base()
+    monkeypatch.setattr(run, 'load_base', lambda: base)
+    seen = []
+
+    class SpyEngine(MCTSEngine):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            seen.append(self.df.index.copy())
+
+    monkeypatch.setattr(run, 'MCTSEngine', SpyEngine)
+    task = {'reward_mode': 'soft', 'strength': 0.0, 'seed': 1, 'beta': 0.0, 'iterations': 15,
+            'blueprints': [{'name': 'bp', 'macro_blueprint': 'sub(?, ts_mean(?))'}], 'formula': FORMULA}
+    row = run.run_single(task)
+    assert len(seen) == 1
+    assert seen[0].equals(base.index[base.index < pd.Timestamp('2020-01-01')])
+    assert seen[0].max() <= pd.Timestamp('2019-12-31 23:59:59')
+    assert row['n_ranked'] >= 1 and row['n_top'] == len(json.loads(row['top_exprs']))
+    assert len(set(json.loads(row['top_exprs']))) == row['n_top']       # distinct expressions
+    assert len(json.loads(row['top_val_rewards'])) == row['n_top']
+    assert 1 <= row['closest_val_rank'] <= row['n_ranked'] and 1 <= row['closest_train_rank'] <= row['n_ranked']
+    assert list(row) == run.RUN_FIELDS
+
+
+def test_split_constants_are_adjacent_days():
+    import strategy_workflows.RunPlantedSignal as run
+    assert pd.Timestamp(run.VALIDATION_START) - pd.Timestamp(run.TRAIN_END) == pd.Timedelta(days=1)
+    assert pd.Timestamp(run.SEARCH_END) > pd.Timestamp(run.VALIDATION_START)
+
+
+def test_calibration_brackets_strength_point_two():
+    base = heavy_tailed_base()
+    search_end = str(base.index[50 * 24 - 1].date())
+    result = calibrate_beta(base, search_end, 0.2, FORMULA, seeds=CAL_SEEDS, tolerance=0.01)
+    assert result.beta > 0.0
+    assert abs(result.mean_ic - 0.2) <= 0.01
+    lower = calibrate_beta(base, search_end, 0.1, FORMULA, seeds=CAL_SEEDS, tolerance=0.01)
+    assert 0.0 < lower.beta < result.beta

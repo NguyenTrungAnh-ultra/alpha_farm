@@ -715,22 +715,34 @@ def is_near_recovery(correlation: float, threshold: float = NEAR_CORRELATION) ->
 # --------------------------------------------------------------------------- top-k portfolio
 
 
-def top_candidates(leaderboard: List[dict], k: int = TOP_K) -> List[dict]:
-    """Best `k` distinct candidates that passed scoring (reward above the -10 failure value)."""
+def distinct_expressions(leaderboard: List[dict]) -> List[dict]:
+    """
+    One entry per rendered expression, best reward first: the highest-ranked entry of each
+    expression keeps its template parameters. Entries at the -10 failure value are dropped.
+    """
     seen = set()
     picked = []
     for item in sorted(leaderboard, key=lambda x: x['reward'], reverse=True):
-        if item['reward'] <= -10.0:
+        if item['reward'] <= -10.0 or item['expr'] in seen:
             continue
-        key = (item['expr'], item.get('template'), item.get('window'), item.get('z_score'),
-               item.get('threshold_upper'), item.get('threshold_lower'), item.get('direction'))
-        if key in seen:
-            continue
-        seen.add(key)
+        seen.add(item['expr'])
         picked.append(item)
-        if len(picked) == k:
-            break
     return picked
+
+
+def top_candidates(leaderboard: List[dict], k: int = TOP_K) -> List[dict]:
+    """Best `k` candidates with k different expressions that passed scoring."""
+    return distinct_expressions(leaderboard)[:k]
+
+
+def rank_by_validation(candidates: List[dict], validation_rewards: Sequence[float]) -> List[int]:
+    """
+    Indices of `candidates` ordered by validation reward, best first. Ties keep the incoming
+    (train) order; the train reward itself plays no part in the ranking.
+    """
+    if len(candidates) != len(validation_rewards):
+        raise ValueError("One validation reward per candidate is required")
+    return sorted(range(len(candidates)), key=lambda i: -validation_rewards[i])
 
 
 def combine_positions(positions: List[pd.Series]) -> pd.Series:

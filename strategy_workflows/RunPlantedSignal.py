@@ -37,19 +37,24 @@ from core_engine.AlphaEngine import AlphaDataProxy
 from core_engine.BacktestEngine import AlphaBacktestEngine, load_data
 from core_engine.CalculateMetrics import compute_metrics
 from strategy_workflows.MCTSEngine import (
-    MCTSEngine, _FixedPositions, _TemplateStrategy, compute_positions, evaluate_alpha,
+    MCTSEngine, _FixedPositions, _TemplateStrategy, compute_positions, describe_candidate, evaluate_alpha,
     find_unimplemented_operator,
 )
 from strategy_workflows.PlantedSignal import (
     EVAL_END, SEARCH_END, SEARCH_START, TOP_K, Calibration, PlantedData, PlantedFormula,
     assert_in_search_space, build_planted_data, calibrate_beta, can_express, combine_positions,
     formula_from_dict, formula_to_dict, is_exact_recovery, is_near_recovery, is_verbatim,
-    select_planted_formula, spearman_abs, top_candidates,
+    distinct_expressions, rank_by_validation, select_planted_formula, spearman_abs,
 )
 from strategy_workflows.SemanticCompiler import ASTNode, SemanticCompiler
 
 TIMEFRAME = '60m'
-DEFAULT_STRENGTHS = [0.0, 0.01, 0.02, 0.05]
+# The search segment is split: MCTS sees only bars up to TRAIN_END; the leaderboard is then ranked by
+# reward on VALIDATION_START..SEARCH_END. Dates are day-granular; a slice end includes the whole day.
+TRAIN_END = '2019-12-31'
+VALIDATION_START = '2020-01-01'
+MAX_RANKED = 100
+DEFAULT_STRENGTHS = [0.0, 0.01, 0.02, 0.05, 0.1, 0.2]
 DEFAULT_SEEDS = [1, 2, 3, 4, 5]
 DEFAULT_ITERATIONS = 5000
 DEFAULT_BLUEPRINT_COUNT = 20
@@ -58,12 +63,14 @@ Z_THRESHOLDS = [0.5, 1.0, 1.5, 2.0, 2.5]
 RUN_KEY = ['reward_mode', 'strength', 'seed', 'iterations']
 RUN_FIELDS = RUN_KEY + [
     'n_blueprints', 'blueprint_errors', 'beta', 'ic_search', 'ic_eval', 'evaluations', 'failed', 'gated',
-    'gate_rate', 'stop_reasons', 'n_top', 'best_reward', 'best_expr', 'top_exprs', 'exact',
-    'near', 'best_corr', 'oos_sharpe', 'oos_trades', 'elapsed_s',
+    'gate_rate', 'stop_reasons', 'n_ranked', 'n_top', 'train_best_reward', 'best_expr', 'top_exprs',
+    'top_val_rewards', 'top_train_ranks', 'closest_expr', 'closest_corr', 'closest_train_rank',
+    'closest_val_rank', 'closest_val_reward', 'exact', 'near', 'best_corr', 'oos_sharpe', 'oos_trades',
+    'elapsed_s',
 ]
 ORACLE_FIELDS = [
     'strength', 'seed', 'beta', 'ic_search', 'ic_eval', 'reward_gated', 'reward_soft', 'z_gated', 'z_soft',
-    'calmar', 'trades', 'rank_ic',
+    'calmar', 'trades', 'rank_ic', 'reward_soft_train', 'reward_soft_val',
 ]
 
 
@@ -285,7 +292,22 @@ def score_planted_formula(engine: MCTSEngine, formula: PlantedFormula) -> Dict:
         reward, _, metrics = engine.evaluate_expression(tree)
         if reward > best[0]:
             best = (reward, z, tree, metrics)
-    return {'reward': best[0], 'z': best[1], 'metrics': best[3]}
+    return {'reward': best[0], 'z': best[1], 'metrics': best[3], 'tree': best[2]}
+
+
+def planted_split_rewards(train_engine: MCTSEngine, formula: PlantedFormula, search: pd.DataFrame) -> Dict:
+    """
+    Reward of the planted formula on the train part and on the validation part. The z-score threshold
+    and direction are the ones that score best on train; validation then scores that fixed strategy.
+    """
+    best = score_planted_formula(train_engine, formula)
+    desc = describe_candidate(best['tree'])
+    _, direction, _ = train_engine.evaluate_expression(best['tree'])
+    candidate = {'expr': desc['expr'], 'template': desc['template'], 'window': desc['window'],
+                 'z_score': desc['z_score_threshold'], 'threshold_upper': desc['threshold_upper'],
+                 'threshold_lower': desc['threshold_lower'], 'direction': direction}
+    return {'train': best['reward'],
+            'validation': train_engine.score_on_span(candidate, search, VALIDATION_START, SEARCH_END)}
 
 
 def step_oracle(args) -> None:
@@ -305,6 +327,10 @@ def step_oracle(args) -> None:
                                         reward_mode=mode, global_position_matrix=None)
                 assert_in_search_space(engine, formula)
                 scored[mode] = score_planted_formula(engine, formula)
+            with quiet():
+                train_engine = MCTSEngine(timeframe=TIMEFRAME, data=data.search.loc[:TRAIN_END], seed=seed,
+                                          reward_mode='soft', global_position_matrix=None)
+                split = planted_split_rewards(train_engine, formula, data.search)
             soft_metrics = scored['soft']['metrics']
             rows.append({
                 'strength': strength, 'seed': seed, 'beta': data.beta, 'ic_search': data.ic_search, 'ic_eval': data.ic_eval,
@@ -312,6 +338,7 @@ def step_oracle(args) -> None:
                 'z_gated': scored['gated']['z'], 'z_soft': scored['soft']['z'],
                 'calmar': soft_metrics.get('calmar_ratio'), 'trades': soft_metrics.get('total_trades'),
                 'rank_ic': soft_metrics.get('rank_ic'),
+                'reward_soft_train': split['train'], 'reward_soft_val': split['validation'],
             })
     frame = pd.DataFrame(rows, columns=ORACLE_FIELDS)
     path = os.path.join(args.out_dir, 'oracle.csv')
@@ -331,6 +358,17 @@ def candidate_positions(candidate: dict, full: pd.DataFrame) -> pd.Series:
         candidate['template'], alpha, candidate['direction'], _TemplateStrategy.position_scale,
         candidate['window'], candidate['z_score'], candidate['threshold_upper'], candidate['threshold_lower'],
     )
+
+
+def rank_leaderboard(engine: MCTSEngine, search: pd.DataFrame, k: int = TOP_K) -> Dict:
+    """
+    Distinct expressions of the train leaderboard (at most MAX_RANKED, train-reward order), scored on the
+    validation part of `search` (the continuous frame up to SEARCH_END), and the best `k` by that score.
+    Returns the train-ordered list, validation rewards aligned with it, and the chosen indices.
+    """
+    ranked = distinct_expressions(engine.get_best_candidates())[:MAX_RANKED]
+    rewards = [engine.score_on_span(c, search, VALIDATION_START, SEARCH_END) for c in ranked]
+    return {'ranked': ranked, 'val_rewards': rewards, 'chosen': rank_by_validation(ranked, rewards)[:k]}
 
 
 def out_of_sample_sharpe(candidates: List[dict], data: PlantedData) -> Dict:
@@ -356,7 +394,7 @@ def run_single(task: Dict) -> Dict:
     with quiet():
         data = build_planted_data(load_base(), SEARCH_END, strength, seed, task['beta'], formula)
         engine = MCTSEngine(timeframe=TIMEFRAME, max_depth=4, global_position_matrix=None, seed=seed,
-                            data=data.search, reward_mode=mode)
+                            data=data.search.loc[:TRAIN_END], reward_mode=mode)
         assert_in_search_space(engine, formula)
         compiler = SemanticCompiler()
         stop_reasons: Counter = Counter()
@@ -370,10 +408,17 @@ def run_single(task: Dict) -> Dict:
                 print(f"blueprint {bp['name']} failed: {exc}")
 
         summary = engine.error_summary()
-        top = top_candidates(engine.get_best_candidates(), TOP_K)
+        picked = rank_leaderboard(engine, data.search, TOP_K)
+        ranked, val_rewards, chosen = picked['ranked'], picked['val_rewards'], picked['chosen']
+        top = [ranked[i] for i in chosen]
 
+        # Recovery is judged on the whole search segment (train + validation), alphas on the continuous frame.
+        search_proxy = AlphaDataProxy(data.search)
         planted_alpha = formula.alpha_series(data.search)
-        correlations = [spearman_abs(evaluate_alpha(c['expr'], engine.data), planted_alpha) for c in top]
+        all_corr = [spearman_abs(evaluate_alpha(c['expr'], search_proxy), planted_alpha) for c in ranked]
+        correlations = [all_corr[i] for i in chosen]
+        closest = int(np.argmax(all_corr)) if ranked else None
+        val_order = rank_by_validation(ranked, val_rewards)
         exact = any(is_exact_recovery(c, formula, engine.scaled_periods, engine.scaled_window_search)
                     for c in top)
         near = any(is_near_recovery(r) for r in correlations)
@@ -387,9 +432,17 @@ def run_single(task: Dict) -> Dict:
         'evaluations': evaluations, 'failed': summary['failed_evaluations'], 'gated': summary['gated_evaluations'],
         'gate_rate': summary['gated_evaluations'] / evaluations if evaluations else float('nan'),
         'stop_reasons': json.dumps(dict(stop_reasons)),
-        'n_top': len(top), 'best_reward': top[0]['reward'] if top else float('nan'),
+        'n_ranked': len(ranked), 'n_top': len(top),
+        'train_best_reward': ranked[0]['reward'] if ranked else float('nan'),
         'best_expr': top[0]['expr'] if top else '',
         'top_exprs': json.dumps([c['expr'] for c in top]),
+        'top_val_rewards': json.dumps([val_rewards[i] for i in chosen]),
+        'top_train_ranks': json.dumps([i + 1 for i in chosen]),
+        'closest_expr': ranked[closest]['expr'] if ranked else '',
+        'closest_corr': all_corr[closest] if ranked else float('nan'),
+        'closest_train_rank': closest + 1 if ranked else float('nan'),
+        'closest_val_rank': val_order.index(closest) + 1 if ranked else float('nan'),
+        'closest_val_reward': val_rewards[closest] if ranked else float('nan'),
         'exact': bool(exact), 'near': bool(near), 'best_corr': max(correlations) if correlations else float('nan'),
         'oos_sharpe': oos['sharpe'], 'oos_trades': oos['trades'],
         'elapsed_s': time.time() - started,

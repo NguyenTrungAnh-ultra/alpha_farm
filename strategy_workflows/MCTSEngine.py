@@ -553,6 +553,106 @@ class MCTSEngine:
             'top_errors': self.error_counts.most_common(5),
         }
 
+    def _reward_over_directions(self, alpha_val: pd.Series, rank_ic: float, df: pd.DataFrame,
+                                desc: Dict[str, Any], info: Dict[str, Any], bars: Optional[pd.Index] = None,
+                                directions: tuple = (1.0, -1.0)) -> tuple:
+        """
+        Best reward over both directions for one alpha (the reward formula of `evaluate_expression`).
+
+        `alpha_val` is aligned with `df`. Positions are computed on the whole of `alpha_val` (so rolling
+        windows keep their warm-up); when `bars` is given only those bars are traded and scored.
+        `directions` lists the trade directions tried; the best one counts. Returns (reward, direction, metrics, failed, passed_gate, gate_too_few_trades).
+        """
+        best_reward = -10.0
+        best_direction = 1.0
+        best_metrics = dict(info)
+        failed = False
+        passed_gate = False
+        gate_too_few_trades = []  # per direction: True when the hard gate failed on trade count
+        pos_scale = NormalizedMCTSStrategy.position_scale
+        template_type, window, z_score_thresh = desc['template'], desc['window'], desc['z_score_threshold']
+        scored_df = df if bars is None else df.loc[bars]
+        for direction in directions:
+            try:
+                pos_series = compute_positions(
+                    template_type, alpha_val, direction, pos_scale, window, z_score_thresh,
+                    desc['threshold_upper'], desc['threshold_lower'],
+                )
+                if bars is not None:
+                    pos_series = pos_series.loc[bars]
+                result = self.backtest_engine.run(_FixedPositions(pos_series), scored_df)
+                metrics = compute_metrics(result)
+
+                calmar = metrics.get('calmar_ratio', 0.0)
+                if calmar is None or np.isnan(calmar):
+                    calmar = 0.0
+
+                total_trades = metrics.get('total_trades', 0)
+                calmar_threshold = MCTS_QUALITY_THRESHOLDS['calmar_ratio']
+                too_few_trades = total_trades < MIN_TRADES
+                if self.reward_mode == "gated" and (too_few_trades or calmar < calmar_threshold):
+                    reward = -10.0
+                    gate_too_few_trades.append(too_few_trades)
+                else:
+                    passed_gate = True
+                    max_corr = 0.0
+                    if self.global_position_matrix is not None and not self.global_position_matrix.empty:
+                        common_idx = pos_series.index.intersection(self.global_position_matrix.index)
+                        if len(common_idx) > 20:
+                            # Align and forward fill inside corrwith if needed, but indices should match
+                            corrs = self.global_position_matrix.loc[common_idx].corrwith(pos_series.loc[common_idx])
+                            max_corr = corrs.abs().max()
+                            if np.isnan(max_corr):
+                                max_corr = 0.0
+
+                    if too_few_trades:
+                        s_calmar = 0.0  # only reachable in "soft" mode
+                    else:
+                        s_calmar = min(1.0, max(0.0, (calmar - calmar_threshold) / (REWARD_WEIGHTS['max_calmar'] - calmar_threshold)))
+                    s_ic = min(1.0, abs(rank_ic) / REWARD_WEIGHTS['max_ic'])
+                    s_corr = max(0.0, 1.0 - max_corr)
+
+                    reward = (REWARD_WEIGHTS['calmar_weight'] * s_calmar + REWARD_WEIGHTS['ic_weight'] * s_ic) * s_corr
+
+                if reward > best_reward:
+                    best_reward = reward
+                    best_direction = direction
+                    best_metrics = dict(metrics)
+                    best_metrics.update(info)
+                    best_metrics['rank_ic'] = rank_ic
+            except Exception as exc:
+                failed = True
+                self._record_error("backtest", exc)
+        return best_reward, best_direction, best_metrics, failed, passed_gate, gate_too_few_trades
+
+    def score_on_span(self, candidate: Dict[str, Any], frame: pd.DataFrame, start: str, end: str) -> float:
+        """
+        Reward of a leaderboard candidate on the bars of `frame` from `start` to `end` (inclusive),
+        by the same formula as `evaluate_expression` (this engine's reward mode and correlation matrix).
+
+        The alpha and the positions are computed on the whole of `frame`, so rolling windows have
+        their warm-up before `start`; only the bars in the span are traded and scored (rank IC
+        included). Bars after `end` never enter the span, but pass a frame that stops there anyway.
+        Only the candidate's own direction is traded (the one fixed on the search data), so the
+        score judges that strategy, not the better of two. Returns -10.0 when the expression fails.
+        """
+        desc = {
+            'expr': candidate['expr'], 'template': candidate['template'], 'window': candidate['window'],
+            'z_score_threshold': candidate['z_score'], 'threshold_upper': candidate['threshold_upper'],
+            'threshold_lower': candidate['threshold_lower'],
+        }
+        frame = frame.copy()
+        frame['Volume'] = frame['Volume'].fillna(0.0)
+        bars = frame.loc[start:end].index
+        try:
+            alpha_val = evaluate_alpha(desc['expr'], AlphaDataProxy(frame))
+            rank_ic = self.compute_rank_ic(alpha_val.loc[bars].astype(np.float64), frame.loc[bars, 'Close'])
+        except Exception as exc:
+            self._record_error("expression", exc)
+            return -10.0
+        return self._reward_over_directions(alpha_val, rank_ic, frame, desc, dict(desc), bars,
+                                            directions=(candidate['direction'],))[0]
+
     def evaluate_expression(self, ast_tree: ASTNode) -> tuple:
         """
         Evaluate the trading performance of an AST tree by running a backtest.
@@ -602,73 +702,18 @@ class MCTSEngine:
             'threshold_upper': desc['threshold_upper'],
             'threshold_lower': desc['threshold_lower'],
         }
-        best_reward = -10.0
-        best_direction = 1.0
-        best_metrics = dict(info)
-        failed = False
-        pos_scale = NormalizedMCTSStrategy.position_scale
-        passed_gate = False
-        gate_too_few_trades = []  # per direction: True when the hard gate failed on trade count
-
         try:
             alpha_val = evaluate_alpha(desc['expr'], self.data)
             rank_ic = self.compute_rank_ic(alpha_val.astype(np.float64), self.df_search['Close'])
         except Exception as exc:
             self._record_error("expression", exc)
             self.failed_evaluation_count += 1
-            self.cache[cache_key] = (best_reward, best_direction, best_metrics)
-            return best_reward, best_direction, best_metrics
+            best_metrics = dict(info)
+            self.cache[cache_key] = (-10.0, 1.0, best_metrics)
+            return -10.0, 1.0, best_metrics
 
-        # Both directions share one alpha evaluation.
-        for direction in (1.0, -1.0):
-            try:
-                pos_series = compute_positions(
-                    template_type, alpha_val, direction, pos_scale, window, z_score_thresh,
-                    desc['threshold_upper'], desc['threshold_lower'],
-                )
-                result = self.backtest_engine.run(_FixedPositions(pos_series), self.df_search)
-                metrics = compute_metrics(result)
-
-                calmar = metrics.get('calmar_ratio', 0.0)
-                if calmar is None or np.isnan(calmar):
-                    calmar = 0.0
-
-                total_trades = metrics.get('total_trades', 0)
-                calmar_threshold = MCTS_QUALITY_THRESHOLDS['calmar_ratio']
-                too_few_trades = total_trades < MIN_TRADES
-                if self.reward_mode == "gated" and (too_few_trades or calmar < calmar_threshold):
-                    reward = -10.0
-                    gate_too_few_trades.append(too_few_trades)
-                else:
-                    passed_gate = True
-                    max_corr = 0.0
-                    if self.global_position_matrix is not None and not self.global_position_matrix.empty:
-                        common_idx = pos_series.index.intersection(self.global_position_matrix.index)
-                        if len(common_idx) > 20:
-                            # Align and forward fill inside corrwith if needed, but indices should match
-                            corrs = self.global_position_matrix.loc[common_idx].corrwith(pos_series.loc[common_idx])
-                            max_corr = corrs.abs().max()
-                            if np.isnan(max_corr):
-                                max_corr = 0.0
-
-                    if too_few_trades:
-                        s_calmar = 0.0  # only reachable in "soft" mode
-                    else:
-                        s_calmar = min(1.0, max(0.0, (calmar - calmar_threshold) / (REWARD_WEIGHTS['max_calmar'] - calmar_threshold)))
-                    s_ic = min(1.0, abs(rank_ic) / REWARD_WEIGHTS['max_ic'])
-                    s_corr = max(0.0, 1.0 - max_corr)
-
-                    reward = (REWARD_WEIGHTS['calmar_weight'] * s_calmar + REWARD_WEIGHTS['ic_weight'] * s_ic) * s_corr
-
-                if reward > best_reward:
-                    best_reward = reward
-                    best_direction = direction
-                    best_metrics = dict(metrics)
-                    best_metrics.update(info)
-                    best_metrics['rank_ic'] = rank_ic
-            except Exception as exc:
-                failed = True
-                self._record_error("backtest", exc)
+        best_reward, best_direction, best_metrics, failed, passed_gate, gate_too_few_trades = \
+            self._reward_over_directions(alpha_val, rank_ic, self.df_search, desc, info)
 
         if failed:
             self.failed_evaluation_count += 1
