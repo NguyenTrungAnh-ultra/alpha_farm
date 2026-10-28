@@ -21,8 +21,10 @@ Khung nghiên cứu: `docs/proposal/thesis_proposal/Thesis_Proposal.pdf` (chươ
 
 1. ✅ **Nối lại pipeline** (2026-10-28): sửa 4 chỗ nối ở mục 1, đặt seed cho MCTS, cửa sổ cố định trên từng nút. Đo thật: 60m, `sub(ts_mean(?), ts_mean(?))`, seed 1, 300 vòng → 4 ứng viên reward ≠ −10, tốt nhất 0.26; cùng seed cho cùng kết quả kể cả khác tiến trình. Test: `tests/test_mcts_pipeline.py` (12 ca). `main.py mcts` thật (cần cache HMM) chưa chạy.
 2. ✅ **Tách dữ liệu khỏi engine** (2026-10-28): `MCTSEngine`, HMM và `process_timeframe` nhận DataFrame từ ngoài; cache HMM khoá theo khung + dấu vân tay dữ liệu. Test: `tests/test_data_injection.py` với `load_data` bị chặn. Cache cũ 13 GB không còn được đọc: chạy `--retrain-hmm` một lần trước lượt `mcts` thật.
-3. ⏸️ **Bài cài tín hiệu (kiểm soát dương), một khung thời gian**: cài một công thức biết trước vào lợi suất placebo với IC 0.01 / 0.02 / 0.05, xem MCTS có tìm lại được không. Xong khi: có bảng tỷ lệ tìm lại theo cường độ.
+3. ⏸️ **Bài cài tín hiệu (kiểm soát dương), một khung thời gian** — thiết kế: `docs/PLANTED_SIGNAL.md`, chờ duyệt: cài một công thức biết trước vào lợi suất placebo với IC 0.01 / 0.02 / 0.05, xem MCTS có tìm lại được không. Xong khi: có bảng tỷ lệ tìm lại theo cường độ.
 4. ✅ Sửa quy đổi theo năm (2026-10-28): mọi chỉ số đi qua `compute_metrics`; CAGR theo thời gian lịch. Đo thật CAGR mua-và-giữ 2020–2024: 8.94% (1m), 8.93% (15m), 8.90% (60m) — trước đây 0.76% / 20.0% trong HMM và 10.1% trong `compute_metrics` khung phút (do thiếu ngày). Kết quả cũ trong `results/` (`portfolio_summary.json`…) vẫn tính theo công thức cũ.
+
+5. 🔧 **Web điều khiển và theo dõi** (người dùng yêu cầu 2026-10-28; ngoài lịch proposal; mở từ xa qua Tailscale, người dùng chốt 2026-10-28) — kế hoạch: `docs/WEB_DASHBOARD.md`. W1 (móc tiến độ / dừng / danh sách blueprint vào lõi) làm cùng việc 3; W2–W6 sau khi việc 3 có kết quả.
 
 Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + placebo + baseline → chạy RQ1/RQ2 → RQ3, SPA, DSR.
 
