@@ -3,7 +3,7 @@
 Bản hiện hành. Đổi ý thì sửa đúng chỗ, kèm một dòng lý do + ngày.
 Nguồn: proposal mục "Planted-Signal Test"; ROADMAP mục 2 việc 3.
 
-Trạng thái: ⏸️ chờ người dùng duyệt các lựa chọn đánh dấu **[đề xuất]** (Claude đề xuất 2026-10-28).
+Trạng thái: 🔧 đang code. Người dùng duyệt toàn bộ các lựa chọn **[đề xuất]** ngày 2026-10-28.
 
 ## 1. Câu hỏi bài test trả lời
 
@@ -16,13 +16,14 @@ Nếu dữ liệu thật sự chứa một công thức mà ngữ pháp biểu d
 - **Cài tín hiệu [đề xuất]:** sinh tuần tự từng bar, vì công thức phụ thuộc giá mà giá lại phụ thuộc lợi suất đã cài:
   - `s_t = ts_zscore(A, W)` tính trên giá đã dựng tới bar t, với `A` là công thức cài;
   - `r_{t+1} = ε_{t+1} + β · σ_ε · s_t`, trong đó `ε` là lợi suất placebo đã hoán vị.
-- **Hiệu chỉnh độ mạnh:** `β = IC / sqrt(1 − IC²)` cho tương quan Pearson mục tiêu. Đo lại IC Spearman thực tế (cùng định nghĩa `MCTSEngine.compute_rank_ic`) và báo cáo con số đo, không báo con số mục tiêu.
+- **Hiệu chỉnh độ mạnh:** tìm `β ≥ 0` bằng chia đôi sao cho **IC Spearman trung bình trên 20 hoán vị hiệu chỉnh** (seed 1001–1020, khác seed của lượt chạy) trên đoạn tìm bằng IC mục tiêu. Một `β` cho mỗi độ mạnh, dùng chung cho mọi seed và cả đoạn đánh giá. IC đo được của từng seed = mục tiêu + nhiễu mẫu; báo cáo IC đo được ở cả hai đoạn. (Sửa lần 2, 2026-10-28, Claude quyết: hiệu chỉnh theo từng seed buộc `β` âm để triệt tiêu IC ngẫu nhiên của chính placebo (±0.02), tức là "tín hiệu" khi đó là nhiễu trùng hợp chứ không phải công thức cài.)
+- **Ngưỡng nhiễu:** đoạn tìm ≈ 3.000 bar ⇒ sai số chuẩn của IC ≈ 1/√3000 ≈ 0.018; đoạn đánh giá ≈ 600 bar ⇒ ≈ 0.04. IC 0.01 / 0.02 nằm dưới ngưỡng nhiễu của đoạn tìm, nên tìm lại được ở hai mức này là may; chỉ IC 0.05 (≈ 2.8 sai số chuẩn) có tiêu chí. (Sửa 2026-10-28, Claude quyết: công thức `β = IC / sqrt(1 − IC²)` nhắm tương quan Pearson; lợi suất 60m đuôi dày (kurtosis ≈ 28) nên IC Spearman đo được gấp ≈ 2 lần mục tiêu — nhãn "IC 0.05" thực ra là 0.10–0.14, bài test dễ hơn thiết kế.)
 - **Độ mạnh:** IC = 0 (placebo thuần, đo tỷ lệ "tìm nhầm"), 0.01, 0.02, 0.05.
 
 ## 3. Công thức cài và blueprint
 
 - **[đề xuất]** Sinh bộ blueprint một lần bằng `ollama-local` (20 ý tưởng, khung 60m) và đóng băng vào `results/planted/blueprints.json`. Bộ này dùng lại cho walk-forward.
-- Chọn công thức cài sao cho **ít nhất một** blueprint trong bộ biểu diễn được nó, nhưng không trùng nguyên văn blueprint nào. Ứng viên mặc định: `sub(close, ts_mean(close, 20))` dưới template NORMALIZED. Ghi rõ blueprint nào chạm được công thức đó.
+- Chọn công thức cài sao cho **ít nhất một** blueprint trong bộ biểu diễn được nó, nhưng không trùng nguyên văn blueprint nào. Ứng viên mặc định: `sub(close, ts_mean(close, 10))` dưới template NORMALIZED, cửa sổ z-score 10. (Sửa 2026-10-28: ở 60m các chu kỳ quy đổi từ 10m chỉ còn {2, 3, 5, 10}, nên 20 không nằm trong không gian tìm.) Ghi rõ blueprint nào chạm được công thức đó.
 - Lý do: nếu không blueprint nào biểu diễn được công thức cài thì "không tìm lại" là do bộ blueprint chứ không do MCTS, bài test vô nghĩa.
 
 ## 4. Chạy
@@ -36,6 +37,8 @@ Nếu dữ liệu thật sự chứa một công thức mà ngữ pháp biểu d
 **Kiểm tra "đáp án" trước khi chạy MCTS [đề xuất, thêm 2026-10-28 sau câu hỏi của người dùng về reward]:** chấm thẳng công thức cài bằng `MCTSEngine.evaluate_expression` trên đoạn tìm, ở từng độ mạnh. Lý do: reward có cổng cứng (−10 nếu Calmar < 1.1 hoặc < 15 lệnh). Nếu chính đáp án cũng nhận −10 thì reward không "cảm" được tín hiệu, và MCTS chỉ đang mò trong một mặt phẳng toàn −10. Khi đó lỗi nằm ở reward, không ở bước tìm. Ghi thêm tỷ lệ ứng viên nhận −10 trong mỗi lượt chạy.
 
 **So hai bản reward (người dùng chốt 2026-10-28):** chấm đáp án bằng cả bản "gated" và bản "soft" (định nghĩa ở ROADMAP mục 3), ở IC 0 / 0.01 / 0.02 / 0.05. Chọn bản mà điểm đáp án tăng theo IC và tách khỏi điểm ở IC 0; nếu cả hai đều được thì chọn "soft" vì mặt reward mượt hơn cho MCTS. Lượt MCTS của bài này chạy với bản đã chọn; bản đó đóng băng cho walk-forward.
+
+✅ **Kết quả chấm đáp án (2026-10-28, `results/planted/oracle.csv`, β hiệu chỉnh theo trung bình 20 hoán vị):** cả hai bản đều tăng theo IC. Soft: trung bình 0.075 / 0.143 / 0.215 / 0.31 ở IC 0 / 0.01 / 0.02 / 0.05. Gated: số seed qua cổng 1 / 2 / 3 / 4 trên 5. Hai nhóm chồng lấn (IC 0 seed 3 được 0.226 ở cả hai bản, là nhiễu placebo). Theo luật chốt trước ("cả hai được thì chọn soft") ⇒ **chọn "soft"**.
 
 Mỗi (độ mạnh, seed) ghi:
 - IC thực tế của tín hiệu cài trên đoạn tìm và đoạn đánh giá.

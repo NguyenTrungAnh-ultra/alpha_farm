@@ -65,6 +65,13 @@ def cmd_mcts(args):
 
 
 
+def cmd_planted(args):
+    """Run one step of the planted-signal test (`main.py planted <step>`)."""
+    from strategy_workflows.RunPlantedSignal import run_planted
+
+    run_planted(args)
+
+
 def cmd_full(args):
     """
     Execute the full end-to-end pipeline.
@@ -281,6 +288,9 @@ def main():
     parser_full.add_argument("--retrain-hmm", action="store_true", help="Force retrain HMM models instead of using cache")
     parser_full.add_argument("--seed", type=int, default=None, help="Seed for the MCTS random generator (default: not reproducible)")
     
+    from strategy_workflows.RunPlantedSignal import add_planted_parser
+    add_planted_parser(subparsers)
+
     args = parser.parse_args()
     
     if len(sys.argv) == 1:
@@ -304,6 +314,8 @@ def main():
         cmd_mcts(args)
     elif args.command == "full":
         cmd_full(args)
+    elif args.command == "planted":
+        cmd_planted(args)
 
 if __name__ == "__main__":
     main()
