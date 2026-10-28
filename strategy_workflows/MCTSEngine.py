@@ -15,7 +15,7 @@ import logging
 from collections import Counter
 import pandas as pd
 import numpy as np
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 
 from core_engine.AlphaEngine import AlphaStrategy, AlphaDataProxy
 from core_engine.AlphaPrimitives import ts_mean, ts_sum, ts_max, ts_min, ts_rank, ts_corr, ts_zscore, ts_argmax, ts_argmin
@@ -516,6 +516,9 @@ class MCTSEngine:
         self.error_counts: Counter = Counter()
         self.evaluation_count = 0
         self.failed_evaluation_count = 0
+        # Evaluations that ran without error but where no direction passed the hard gate (reward -10).
+        self.gated_evaluation_count = 0
+        self.gate_reasons: Counter = Counter()
         
         # Frequent Subtree Avoidance (FSA) Rolling Cache
         # Stores SHA256 hashes of AST string representations of top alphas
@@ -574,6 +577,8 @@ class MCTSEngine:
         return {
             'evaluations': self.evaluation_count,
             'failed_evaluations': self.failed_evaluation_count,
+            'gated_evaluations': self.gated_evaluation_count,
+            'gate_reasons': dict(self.gate_reasons),
             'top_errors': self.error_counts.most_common(5),
         }
 
@@ -637,6 +642,8 @@ class MCTSEngine:
         best_metrics = dict(info)
         failed = False
         pos_scale = NormalizedMCTSStrategy.position_scale
+        passed_gate = False
+        gate_too_few_trades = []  # per direction: True when the hard gate failed on trade count
 
         try:
             alpha_val = evaluate_alpha(desc['expr'], self.data)
@@ -665,7 +672,9 @@ class MCTSEngine:
                 calmar_threshold = MCTS_QUALITY_THRESHOLDS['calmar_ratio']
                 if total_trades < 15 or calmar < calmar_threshold:
                     reward = -10.0
+                    gate_too_few_trades.append(total_trades < 15)
                 else:
+                    passed_gate = True
                     max_corr = 0.0
                     if self.global_position_matrix is not None and not self.global_position_matrix.empty:
                         common_idx = pos_series.index.intersection(self.global_position_matrix.index)
@@ -694,6 +703,9 @@ class MCTSEngine:
 
         if failed:
             self.failed_evaluation_count += 1
+        elif not passed_gate:
+            self.gated_evaluation_count += 1
+            self.gate_reasons["too_few_trades" if all(gate_too_few_trades) else "low_calmar"] += 1
 
         if len(self.cache) > self.max_cache_size:
             # Evict the oldest 50% of cache entries (FIFO based on insertion order)
@@ -706,9 +718,23 @@ class MCTSEngine:
         self.cache[cache_key] = (best_reward, best_direction, best_metrics)
         return best_reward, best_direction, best_metrics
 
-    def run_search_from_blueprint(self, root_ast: ASTNode, n_iterations: int = 100):
+    def run_search_from_blueprint(
+        self,
+        root_ast: ASTNode,
+        n_iterations: int = 100,
+        on_progress: Optional[Callable[[dict], None]] = None,
+        should_stop: Optional[Callable[[], bool]] = None,
+        progress_interval_s: float = 2.0,
+    ) -> str:
         """
         Run MCTS to expand an AST tree blueprint into trading strategies.
+
+        Every `progress_interval_s` seconds (every iteration when 0) `on_progress(snapshot)` is
+        called, then `should_stop()`; a True result ends the search. The callbacks never touch
+        `self.rng`, so the search order is the same with or without them. After the loop
+        `on_progress` is called once more with the final snapshot plus `stop_reason`.
+
+        Returns the stop reason: "budget", "patience", "entropy" or "stopped".
         """
         unimplemented = find_unimplemented_operator(root_ast)
         if unimplemented is not None:
@@ -721,6 +747,21 @@ class MCTSEngine:
         start_time = time.time()
         current_best_reward = -float('inf')
         no_improvement_count = 0
+        stop_reason = "budget"
+        completed = 0
+        last_report = time.monotonic()
+
+        def snapshot() -> dict:
+            return {
+                'iteration': completed,
+                'n_iterations': n_iterations,
+                'best_reward': max(x['reward'] for x in self.leaderboard) if self.leaderboard else None,
+                'evaluations': self.evaluation_count,
+                'failed_evaluations': self.failed_evaluation_count,
+                'gated_evaluations': self.gated_evaluation_count,
+                'elapsed_s': time.time() - start_time,
+            }
+
         for i in range(1, n_iterations + 1):
             if i % 500 == 0:
                 import gc
@@ -745,6 +786,7 @@ class MCTSEngine:
                     if normalized_entropy < REWARD_WEIGHTS['entropy_threshold']:
                         print(f"\n[MCTS] Hội tụ Toán học tại vòng {i}!")
                         print(f"[MCTS] Normalized Entropy: {normalized_entropy:.4f} < {REWARD_WEIGHTS['entropy_threshold']}")
+                        stop_reason = "entropy"
                         break
                         
             node = root_node
@@ -782,6 +824,7 @@ class MCTSEngine:
                 p_node.visit_count += 1
                 if reward > p_node.max_reward:
                     p_node.max_reward = reward
+            completed = i
                     
             # Early Stopping (Patience Check)
             if self.leaderboard:
@@ -794,15 +837,31 @@ class MCTSEngine:
                     
                 if no_improvement_count >= REWARD_WEIGHTS.get('patience', 5000):
                     print(f"\n[MCTS] Early Stopping triggered after {no_improvement_count} iterations without improvement!")
+                    stop_reason = "patience"
                     break
+
+            if on_progress is not None or should_stop is not None:
+                now = time.monotonic()
+                if now - last_report >= progress_interval_s:
+                    last_report = now
+                    if on_progress is not None:
+                        on_progress(snapshot())
+                    if should_stop is not None and should_stop():
+                        stop_reason = "stopped"
+                        break
 
         print(f"[MCTS] Search completed in {time.time() - start_time:.1f}s.")
         summary = self.error_summary()
-        print(f"[MCTS] Evaluations: {summary['evaluations']} | Failed with an exception: {summary['failed_evaluations']}")
+        print(f"[MCTS] Evaluations: {summary['evaluations']} | Failed with an exception: {summary['failed_evaluations']} | Gated (-10): {summary['gated_evaluations']} {summary['gate_reasons']}")
         for message, count in summary['top_errors']:
             print(f"[MCTS]   {count} x {message}")
         if summary['evaluations'] > 0 and summary['failed_evaluations'] == summary['evaluations']:
             logger.error("[MCTS] Every evaluation raised an exception; the search found nothing.")
+        if on_progress is not None:
+            final = snapshot()
+            final['stop_reason'] = stop_reason
+            on_progress(final)
+        return stop_reason
 
     def select_best_child(self, node: MCTSNode) -> MCTSNode:
         """

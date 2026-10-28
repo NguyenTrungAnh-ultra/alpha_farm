@@ -24,7 +24,7 @@ import time
 import re
 import pandas as pd
 import concurrent.futures
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 
 from strategy_workflows.MCTSEngine import MCTSEngine, Dimension, BooleanMCTSStrategy, RatioMCTSStrategy, NormalizedMCTSStrategy
 from strategy_workflows.SemanticCompiler import SemanticCompiler, ASTNode
@@ -111,10 +111,40 @@ class CustomStrategy(AlphaStrategy):
         self._positions = pd.Series(raw_pos, index=alpha_val.index, dtype=np.float64)
 """
 
-def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_data: dict, seed: Optional[int] = None):
+def _ideas_folder() -> str:
+    return os.path.join(PROJECT_ROOT, "results", "ideas")
+
+
+def _list_idea_files(tf: str) -> List[str]:
+    import glob
+    return glob.glob(os.path.join(_ideas_folder(), f"*_{tf}.json"))
+
+
+def load_ideas(tf: str) -> List[Dict[str, Any]]:
+    """
+    Read the idea dicts waiting for timeframe `tf` in results/ideas/.
+
+    Read-only: files are neither moved nor deleted, and unreadable files are skipped.
+    """
+    import json
+    ideas = []
+    for idea_file in _list_idea_files(tf):
+        try:
+            with open(idea_file, 'r', encoding='utf-8') as f:
+                ideas.append(json.load(f))
+        except Exception as e:
+            print(f"[Ideas {tf}] Error reading {os.path.basename(idea_file)}: {e}")
+    return ideas
+
+
+def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_data: dict, seed: Optional[int] = None,
+                      ideas: Optional[List[Dict[str, Any]]] = None,
+                      on_progress: Optional[Callable[[dict], None]] = None,
+                      should_stop: Optional[Callable[[], bool]] = None,
+                      progress_interval_s: float = 2.0):
     """
     Worker function to process a single timeframe.
-    
+
     Parameters
     ----------
     tf : str
@@ -128,7 +158,14 @@ def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_da
         Precomputed synthetic data paths containing 'normal' and 'stressed' lists.
     seed : int, optional
         Seed of the MCTS engine's random generator; None means non-reproducible.
-        
+    ideas : list of dict, optional
+        Ideas (each with "name" and "macro_blueprint") to search. When given, results/ideas/ is
+        neither read nor modified. When None, the idea files for `tf` are read from that folder
+        and each is moved to results/ideas/processed/ once handled, also on error.
+    on_progress, should_stop, progress_interval_s
+        Forwarded to `MCTSEngine.run_search_from_blueprint`; each snapshot gets the extra keys
+        `timeframe` and `idea_name`. Must be plain (picklable) callables.
+
     Returns
     -------
     tuple
@@ -138,19 +175,19 @@ def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_da
     import warnings
     warnings.filterwarnings('ignore')
     logging.getLogger("core_engine.AlphaEngine").setLevel(logging.CRITICAL)
-    
+
     print(f"\n--- [Worker {tf}] Starting processing ---")
-    
+
     portfolio_manager = PortfolioManager() # Read-only use to check criteria
     full_backtest_engine = AlphaBacktestEngine()
-    
+
     # ==========================================
     # GIAI ĐOẠN 1: KHỞI TẠO KÝ ỨC TOÀN CỤC
     # ==========================================
     existing_portfolio_names = set()
     global_position_matrix = pd.DataFrame()
     pos_series_list = []
-    
+
     portfolio_file = os.path.join(PROJECT_ROOT, "results", "portfolio_summary.json")
     if os.path.exists(portfolio_file):
         try:
@@ -175,81 +212,95 @@ def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_da
             print(f"[Worker {tf}] Warning: Failed to load global position matrix: {pe}")
 
     mcts = MCTSEngine(timeframe=tf, max_depth=4, global_position_matrix=global_position_matrix, seed=seed, data=data)
-    
+
     # ==========================================
     # ĐỌC Ý TƯỞNG TỪ TẦNG 1 & BIÊN DỊCH BỞI TẦNG 2
     # ==========================================
-    ideas_folder = os.path.join(PROJECT_ROOT, "results", "ideas")
-    if not os.path.exists(ideas_folder):
-        print(f"[Worker {tf}] No ideas folder found.")
-        return tf, 0, 0, []
-        
     import json
-    import glob
     import shutil
-    idea_files = glob.glob(os.path.join(ideas_folder, f"*_{tf}.json"))
-    
-    processed_folder = os.path.join(ideas_folder, "processed")
-    os.makedirs(processed_folder, exist_ok=True)
+    folder_mode = ideas is None
+    if folder_mode:
+        ideas_folder = _ideas_folder()
+        if not os.path.exists(ideas_folder):
+            print(f"[Worker {tf}] No ideas folder found.")
+            return tf, 0, 0, []
+        processed_folder = os.path.join(ideas_folder, "processed")
+        os.makedirs(processed_folder, exist_ok=True)
+        entries = [(f, None) for f in _list_idea_files(tf)]
+    else:
+        entries = [(None, idea) for idea in ideas]
 
     compiler = SemanticCompiler()
-    
-    for idea_file in idea_files:
-        filename = os.path.basename(idea_file)
-        dest_path = os.path.join(processed_folder, filename)
-        
-        idea_data = None
+
+    def search_idea(idea_data: Dict[str, Any]) -> Optional[str]:
+        name = idea_data.get("name")
+        blueprint = idea_data.get("macro_blueprint")
+        if not blueprint:
+            return None
+
+        # Folder mode skips a strategy that is already in the portfolio or in the failed lists;
+        # with injected ideas the caller decides what to run.
+        failed_py_path = os.path.join(PROJECT_ROOT, "results", "failed", f"{name}_{tf}.py")
+        failed_conv_path = os.path.join(PROJECT_ROOT, "results", "failed_conversions", f"{name}_{tf}.py")
+        failed_base_path = os.path.join(PROJECT_ROOT, "results", "failed", f"{name}.py")
+        is_duplicate = (name in existing_portfolio_names) or \
+                       os.path.exists(failed_py_path) or \
+                       os.path.exists(failed_conv_path) or \
+                       os.path.exists(failed_base_path)
+        if is_duplicate and folder_mode:
+            print(f"[Worker {tf}] ⏩ Skipping MCTS for '{name}' (Already processed as success or failed).")
+            return None
+
+        print(f"[Worker {tf}] Compiling Blueprint: {blueprint}")
+        ast_root = compiler.compile_blueprint(blueprint)
+
+        progress = None
+        if on_progress is not None:
+            def progress(snapshot: dict) -> None:
+                snapshot['timeframe'] = tf
+                snapshot['idea_name'] = name
+                on_progress(snapshot)
+
+        # ==========================================
+        # TẦNG 3: MCTS BRUTE-FORCE TÌM KIẾM CHIẾN LƯỢC
+        # ==========================================
+        return mcts.run_search_from_blueprint(ast_root, n_iterations=iterations, on_progress=progress,
+                                       should_stop=should_stop, progress_interval_s=progress_interval_s)
+
+    stopped = False
+    for idea_file, idea_data in entries:
+        if folder_mode:
+            filename = os.path.basename(idea_file)
+            dest_path = os.path.join(processed_folder, filename)
+            try:
+                with open(idea_file, 'r', encoding='utf-8') as f:
+                    idea_data = json.load(f)
+            except Exception as e:
+                print(f"[Worker {tf}] Error reading {filename}: {e}")
+                try:
+                    shutil.move(idea_file, dest_path)
+                except Exception:
+                    pass
+                continue
         try:
-            with open(idea_file, 'r', encoding='utf-8') as f:
-                idea_data = json.load(f)
+            stopped = search_idea(idea_data) == "stopped"
         except Exception as e:
-            print(f"[Worker {tf}] Error reading {filename}: {e}")
+            print(f"[Worker {tf}] Error processing {filename if folder_mode else idea_data.get('name')}: {e}")
+        # Move the file even on failure so it cannot block the next run
+        if folder_mode:
             try:
                 shutil.move(idea_file, dest_path)
             except Exception:
                 pass
-            continue
-            
-        try:
-            name = idea_data.get("name")
-            blueprint = idea_data.get("macro_blueprint")
-            if not blueprint:
-                shutil.move(idea_file, dest_path)
-                continue
-            
-            # Check if this strategy is already in portfolio or failed lists
-            failed_py_path = os.path.join(PROJECT_ROOT, "results", "failed", f"{name}_{tf}.py")
-            failed_conv_path = os.path.join(PROJECT_ROOT, "results", "failed_conversions", f"{name}_{tf}.py")
-            
-            # If we have a general/unassigned failed strategy name as well
-            failed_base_path = os.path.join(PROJECT_ROOT, "results", "failed", f"{name}.py")
-            
-            is_duplicate = (name in existing_portfolio_names) or \
-                           os.path.exists(failed_py_path) or \
-                           os.path.exists(failed_conv_path) or \
-                           os.path.exists(failed_base_path)
-                           
-            if is_duplicate:
-                print(f"[Worker {tf}] ⏩ Skipping MCTS for '{name}' (Already processed as success or failed).")
-                shutil.move(idea_file, dest_path)
-                continue
-                
-            print(f"[Worker {tf}] Compiling Blueprint: {blueprint}")
-            ast_root = compiler.compile_blueprint(blueprint)
-            
-            # ==========================================
-            # TẦNG 3: MCTS BRUTE-FORCE TÌM KIẾM CHIẾN LƯỢC
-            # ==========================================
-            mcts.run_search_from_blueprint(ast_root, n_iterations=iterations)
-            shutil.move(idea_file, dest_path)
-        except Exception as e:
-            print(f"[Worker {tf}] Error processing {filename}: {e}")
-            # Move the file even on compilation failure to avoid blocking the pipeline next time
-            try:
-                shutil.move(idea_file, dest_path)
-            except Exception:
-                pass
-    
+        if stopped:
+            break
+
+    if stopped:
+        # A stop request ends the whole timeframe: no replay, HMM or commit.
+        total_generated = len(mcts.get_best_candidates())
+        print(f"[Worker {tf}] Stopped on request.")
+        return tf, total_generated, 0, []
+
     candidates = mcts.get_best_candidates()
     
     total_generated = len(candidates)

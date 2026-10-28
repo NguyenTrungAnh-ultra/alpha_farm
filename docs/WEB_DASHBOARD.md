@@ -4,7 +4,7 @@ Bản hiện hành. Đổi ý thì sửa đúng chỗ, kèm một dòng lý do +
 Nguồn: yêu cầu người dùng 2026-10-28 ("web chạy local, SQLite làm DB; chọn bắt đầu từ bước nào, đang chạy bước nào, bước đó xong bao nhiêu alpha").
 Đổi 2026-10-28: bỏ Cloudflare, dùng Tailscale (người dùng: chỉ mình họ xem, đã có Tailscale; Cloudflare cần thuê tên miền).
 
-Trạng thái: 🔧 W1 đang làm (mục 9 đã chốt 2026-10-28); W2–W6 chờ việc 3 có kết quả.
+Trạng thái: ✅ W1 xong 2026-10-28 (test `tests/test_progress_hooks.py`, 12 ca); W2–W6 chờ việc 3 có kết quả.
 
 ## 1. Mục tiêu
 
@@ -124,7 +124,7 @@ Web có nút khởi chạy tính toán trên máy này, nên chỉ được mở
 | Giai đoạn | Việc | Xong khi |
 |---|---|---|
 | W0 | Chốt mục 9 | ROADMAP ghi quyết định |
-| W1 | Móc tiến độ / dừng / danh sách blueprint vào lõi (mục 4) | test mục 4 xanh, CLI ra cùng kết quả |
+| W1 | Móc tiến độ / dừng / danh sách blueprint / đếm −10 vào lõi (mục 4, điểm 1–4; điểm 5 làm ở W2 cùng bảng `run`) | test mục 4 xanh, CLI ra cùng kết quả |
 | W2 | Schema SQLite + bộ ghi + runner chạy được từ dòng lệnh | một lượt `mcts` thật ghi đủ bảng, đo được tốc độ chậm đi bao nhiêu |
 | W3 | Web chỉ xem: trang 1, 3, 5 | xem được lượt đang chạy trên `127.0.0.1` |
 | W4 | Khởi chạy / dừng / chạy tiếp: trang 2, 4 | khởi chạy từ bước 3 với bộ đã đóng băng, dừng giữa chừng, chạy tiếp |

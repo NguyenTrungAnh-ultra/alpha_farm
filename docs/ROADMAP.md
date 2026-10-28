@@ -13,7 +13,7 @@ Khung nghiên cứu: `docs/proposal/thesis_proposal/Thesis_Proposal.pdf` (chươ
 - ✅ Pipeline `ts_*` chạy hết từ blueprint tới code chiến lược xuất ra (2026-10-28, việc 1 ở mục 2).
 - ⛔ Chưa có thành phần nào của quy trình đánh giá mới (walk-forward, gộp top-k, seed, baseline, placebo, cài tín hiệu, SPA/DSR).
 - ✅ Quy đổi theo năm thống nhất, CAGR theo lịch (2026-10-28, việc 4).
-- ⛔ Test: `.venv` cho 59 pass, 1 fail (`test_core_engine.py::test_alpha_data_proxy`, có từ trước).
+- ⛔ Test: `.venv` cho 71 pass, 1 fail (`test_core_engine.py::test_alpha_data_proxy`, có từ trước).
 
 - ✅ Dọn tài liệu (2026-10-13): `docs/ARCH.md` và `README.md` viết lại theo code; bài báo vào `docs/references/`; tài liệu thời XNOQuant vào `docs/archive/` (lý do từng tệp ở `docs/archive/README.md`).
 
@@ -24,7 +24,7 @@ Khung nghiên cứu: `docs/proposal/thesis_proposal/Thesis_Proposal.pdf` (chươ
 3. ⏸️ **Bài cài tín hiệu (kiểm soát dương), một khung thời gian** — thiết kế: `docs/PLANTED_SIGNAL.md`, chờ duyệt: cài một công thức biết trước vào lợi suất placebo với IC 0.01 / 0.02 / 0.05, xem MCTS có tìm lại được không. Xong khi: có bảng tỷ lệ tìm lại theo cường độ.
 4. ✅ Sửa quy đổi theo năm (2026-10-28): mọi chỉ số đi qua `compute_metrics`; CAGR theo thời gian lịch. Đo thật CAGR mua-và-giữ 2020–2024: 8.94% (1m), 8.93% (15m), 8.90% (60m) — trước đây 0.76% / 20.0% trong HMM và 10.1% trong `compute_metrics` khung phút (do thiếu ngày). Kết quả cũ trong `results/` (`portfolio_summary.json`…) vẫn tính theo công thức cũ.
 
-5. 🔧 **Web điều khiển và theo dõi** (người dùng yêu cầu 2026-10-28; ngoài lịch proposal; mở từ xa qua Tailscale, người dùng chốt 2026-10-28) — kế hoạch: `docs/WEB_DASHBOARD.md`. W1 (móc tiến độ / dừng / danh sách blueprint vào lõi) làm cùng việc 3; W2–W6 sau khi việc 3 có kết quả.
+5. ⏸️ **Web điều khiển và theo dõi** (người dùng yêu cầu 2026-10-28; ngoài lịch proposal; mở từ xa qua Tailscale, người dùng chốt 2026-10-28) — kế hoạch: `docs/WEB_DASHBOARD.md`. ✅ W1 (móc tiến độ, dừng, danh sách blueprint, đếm −10 theo lý do) xong 2026-10-28; W2–W6 sau khi việc 3 có kết quả.
 
 Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + placebo + baseline → chạy RQ1/RQ2 → RQ3, SPA, DSR.
 

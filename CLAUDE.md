@@ -33,7 +33,7 @@ Code changes go to the `coder` agent (`.claude/agents/coder.md`, Sonnet, medium 
 
 `--model` accepts: `ollama-local`, `ollama-9b`.
 
-As of 2026-10-28, the suite in `.venv` gives 59 passed and 1 failed. The failure is `test_core_engine.py::test_alpha_data_proxy`, an identity check (`is`) on a copied Series.
+As of 2026-10-28, the suite in `.venv` gives 71 passed and 1 failed. The failure is `test_core_engine.py::test_alpha_data_proxy`, an identity check (`is`) on a copied Series.
 
 ## Pipeline gotchas
 
