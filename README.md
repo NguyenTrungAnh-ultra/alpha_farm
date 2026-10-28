@@ -22,8 +22,11 @@ Dự án là phần thực nghiệm của luận văn cử nhân. Câu hỏi ngh
 - Ollama (bắt buộc): mọi lời gọi LLM đều chạy mô hình local qwen3.5 qua Ollama, không dùng API đám mây.
 
 ```bash
-uv pip install python-dotenv hmmlearn
+uv venv --python 3.12 .venv
+uv pip sync requirements.txt --python .venv/Scripts/python.exe
 ```
+
+Thêm thư viện: sửa `requirements.in` (chỉ thư viện dùng trực tiếp), rồi `uv pip compile requirements.in -o requirements.txt --python .venv/Scripts/python.exe` và sync lại.
 
 ## Chạy
 

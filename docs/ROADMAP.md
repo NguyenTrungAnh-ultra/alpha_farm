@@ -42,6 +42,7 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
 - Không gian tìm phí: 12% lượt chấm lỗi vì biểu thức toàn hằng (`ts_mean((0.2 + 0.5), 10)`); MCTS còn sinh `(0.1 + low)` — cộng hằng vào giá không đổi z-score. Cần lọc hằng theo nút cha.
 - Template BOOLEAN luôn có vị thế: bar NaN lúc khởi động (và mọi bar False) thành vị thế short. Template RATIO với ngưỡng 60–80 / 20–40 làm gốc `ts_zscore` gần như luôn short; prompt đang bảo LLM tránh gốc RATIO.
 - `generate_strategy_code` mới được test với template NORMALIZED; RATIO / BOOLEAN dựa vào việc dùng chung `compute_positions`.
+- ✅ Môi trường (2026-10-28): thêm `requirements.in` / `requirements.txt`, `.venv` sync theo đó (66 → 35 gói, 537 → 321 MB; bỏ playwright, google-generativeai, openai, ta-lib, psutil, pytest-mock; thêm matplotlib 3.11.2). Test vẫn 49 pass / 1 fail; `make_figures.py` chạy được bằng `.venv`. Hình `walk_forward.png` vẽ lại khác byte với bản trong PDF nên giữ bản cũ.
 - `generate_descriptive_name` còn tìm `self.feat.*` nên tên chiến lược luôn rơi về tên trường.
 - `results/mcts_stats.json` có thay đổi chưa commit (do lượt chạy MCTS cũ ghi thêm).
 - Ảnh chữ ký và PDF đã ký trong `docs/proposal/` chỉ nằm trên máy (`.gitignore`), không có trong git; mất máy là mất.

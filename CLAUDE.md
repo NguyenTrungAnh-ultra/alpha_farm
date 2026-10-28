@@ -12,7 +12,7 @@ Code changes go to the `coder` agent (`.claude/agents/coder.md`, Sonnet, medium 
 
 ## Environment
 
-- Use the **`.venv`** interpreter (Python 3.12, managed with `uv`). It has `hmmlearn`.
+- Use the **`.venv`** interpreter (Python 3.12, managed with `uv`). It is synced to `requirements.txt`, compiled from `requirements.in`. Add a dependency to `requirements.in`, recompile, then `uv pip sync`; never `uv pip install` ad hoc, since the next sync removes it.
 - The `venv/` directory is empty.
 - System Python 3.14 has no `hmmlearn` wheel. On 3.14, `tests/test_hmm_validation.py` is silently skipped and `HMMValidation` cannot be imported.
 - The only LLM provider is local Ollama; models come from `Modelfile` (qwen3.5). Do not add cloud LLM clients or credential files.
