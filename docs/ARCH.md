@@ -13,8 +13,8 @@ Tự tìm tín hiệu có hướng (Long / Short / Flat) cho hợp đồng tươ
 |---|---|
 | `core_engine/` | `AlphaPrimitives.py` (9 toán tử `ts_*`), `BacktestEngine.py` (`AlphaBacktestEngine`, `load_data`), `AlphaEngine.py` (`AlphaDataProxy`, `AlphaStrategy`, lớp bọc `AlphaEngine`), `CalculateMetrics.py` (chỉ số), `GenerateReport.py` (bọc lại `compute_metrics`, đổi tên khoá) |
 | `strategy_workflows/` | `GenerateStrategies.py`, `SemanticCompiler.py`, `MCTSDimensions.py`, `MCTSEngine.py`, `RunMCTS.py`, `HMMValidation.py`, `PortfolioManager.py` |
-| `llm_clients/` | `DeepseekClient.py` (token web, `token.txt`), `GeminiClient.py` (cookie, `cookies.txt`), `OllamaClient.py` (qwen3.5 chạy máy) |
-| `utilities/` | `AppConfig.py` (cấu hình tập trung), `Prompts.py` (prompt LLM), `deps/deepseek4free` |
+| `llm_clients/` | `OllamaClient.py` (qwen3.5 chạy máy, cùng hàm `extract_json`); dự án chỉ dùng LLM local |
+| `utilities/` | `AppConfig.py` (cấu hình tập trung), `Prompts.py` (prompt LLM) |
 | `data/` | `DNSE_VN30F_{1m,3m,5m,10m,15m,30m,1H}.csv` (13/08/2018 → 31/12/2025); `MCdata/synthetic_data.pkl` (cache đường giá HMM, ~13 GB) |
 | `results/` | `ideas/` (blueprint chờ chạy), `ideas/processed/` (đã chạy), `portfolio_summary.json`, `leaderboard.csv`, `mcts_stats.json` |
 | `tests/` | pytest; chạy bằng `.venv` (Python 3.12) |
@@ -27,7 +27,7 @@ Tệp một dòng "DELETED" còn sót từ đợt bỏ XNOQuant: `core_engine/Pl
 
 ### 3.1 Tầng 1 — LLM sinh blueprint (`GenerateStrategies.py`)
 
-1. Prompt lấy từ `utilities/Prompts.py`; danh sách trường dữ liệu và toán tử trong prompt sinh từ `OPERATOR_REGISTRY` (bỏ các toán tử trong `UNIMPLEMENTED_OPERATORS`), ví dụ mẫu nằm ở `FEW_SHOT_EXAMPLES` và có test biên dịch từng cái. Mô hình chọn bằng `--model` (`deepseek-thinking`, `ollama-local`, `ollama-9b`, `flash`, `pro`, `thinking`).
+1. Prompt lấy từ `utilities/Prompts.py`; danh sách trường dữ liệu và toán tử trong prompt sinh từ `OPERATOR_REGISTRY` (bỏ các toán tử trong `UNIMPLEMENTED_OPERATORS`), ví dụ mẫu nằm ở `FEW_SHOT_EXAMPLES` và có test biên dịch từng cái. Mô hình chọn bằng `--model` (`ollama-local` mặc định, `ollama-9b`).
 2. LLM trả JSON (kiểm bằng Pydantic) có `macro_blueprint`: biểu thức có chỗ trống `?`.
 3. `SemanticCompiler` đọc bằng `ast.parse`, đổi tên hàm bịa qua `HALLUCINATION_MAP`, kiểm thứ nguyên. Lỗi ⇒ gửi lại LLM sửa **1 lần**; gọi API thử lại tối đa 5 lần.
 4. Hợp lệ ⇒ lưu `results/ideas/<tên>_<khung>.json`.

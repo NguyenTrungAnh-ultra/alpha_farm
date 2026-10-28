@@ -14,8 +14,8 @@ Generates Quant logic/formulas via LLM based on Experience Log.
 Output: JSON files in agent/results/ideas/
 
 Usage:
-    from strategy_workflows.GenerateStrategies import run_pipeline, load_cookies
-    run_pipeline(cookies=load_cookies(), n_strategies=50, model="thinking")
+    from strategy_workflows.GenerateStrategies import run_pipeline
+    run_pipeline(n_strategies=50, model="ollama-local")
 """
 
 import os
@@ -34,7 +34,7 @@ if sys.stdout.encoding != 'utf-8':
         pass
 
 # Add project root to path
-from llm_clients.GeminiClient import GeminiChat
+from llm_clients.OllamaClient import OllamaChatClient, extract_json
 from utilities.Prompts import build_idea_prompt
 from pydantic import BaseModel, Field
 
@@ -46,62 +46,6 @@ class StrategyBlueprint(BaseModel):
     macro_blueprint: str
 
 
-
-def load_cookies(filepath: str = None) -> str:
-    """
-    Read the Gemini cookie string from cookies.txt (the first non-comment line).
-    
-    Parameters
-    ----------
-    filepath : str, optional
-        Path to cookies file. Defaults to `cookies.txt` in the project root.
-        
-    Returns
-    -------
-    str
-        The cookie string.
-        
-    Raises
-    ------
-    ValueError
-        If no cookies are found in the specified file.
-    """
-    if filepath is None:
-        filepath = os.path.join(PROJECT_ROOT, "cookies.txt")
-    with open(filepath, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#'):
-                return line
-    raise ValueError(f"No cookies found in {filepath}")
-
-def load_deepseek_token(filepath: str = None) -> str:
-    """
-    Read the Deepseek authentication token from token.txt (the first non-comment line).
-    
-    Parameters
-    ----------
-    filepath : str, optional
-        Path to token file. Defaults to `token.txt` in the project root.
-        
-    Returns
-    -------
-    str
-        The authentication token.
-        
-    Raises
-    ------
-    ValueError
-        If no token is found in the specified file.
-    """
-    if filepath is None:
-        filepath = os.path.join(PROJECT_ROOT, "token.txt")
-    with open(filepath, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#'):
-                return line
-    raise ValueError(f"No token found in {filepath}")
 
 def load_experience_log(filepath: str = None) -> str:
     """
@@ -168,33 +112,26 @@ TIMEFRAME_ORDER = ["1m", "3m", "5m", "10m", "15m", "30m", "60m"]
 # ─── Main Pipeline ──────────────────────────────────────────────────
 
 def run_pipeline(
-    cookies,
     n_strategies: int = 50,
-    model: str = "thinking",
-    request_delay: float = 5.0,
+    model: str = "ollama-local",
     results_dir: str = "results/ideas",
 ):
     """
     Execute the main strategy generation pipeline.
     
-    Queries the LLM (Gemini, Deepseek, or Ollama depending on configuration) for
+    Queries the local Ollama model for
     new trading strategy blueprints. Each generated blueprint is validated against
     the StrategyBlueprint Pydantic model and verified for semantic correctness via the
     SemanticCompiler. If validation fails, it attempts self-correction using a local
-    or primary LLM chat client. Validated JSON files are saved to `results/ideas/`
+    or the same local chat client. Validated JSON files are saved to `results/ideas/`
     for the MCTS step.
     
     Parameters
     ----------
-    cookies : str
-        Gemini cookie string (if using Gemini model).
     n_strategies : int, default 50
         Number of ideas/strategies to attempt to generate.
-    model : str, default "thinking"
-        The model identifier to use (e.g. "thinking", "deepseek-thinking", 
-        "ollama-local", "ollama-9b").
-    request_delay : float, default 5.0
-        Delay in seconds between LLM requests (primarily for cloud APIs).
+    model : str, default "ollama-local"
+        The model identifier to use: "ollama-local" or "ollama-9b".
     results_dir : str, default "results/ideas"
         Directory where generated JSON blueprints will be saved.
         
@@ -213,35 +150,17 @@ def run_pipeline(
     
     os.makedirs(results_dir, exist_ok=True)
     
-    if model == "deepseek-thinking":
-        try:
-            from llm_clients.DeepseekClient import DeepseekChatClient
-            token = load_deepseek_token()
-            chat = DeepseekChatClient(auth_token=token, thinking_enabled=True, verbose=True)
-            print(f"[Pipeline] DeepseekChatClient ready")
-        except Exception as e:
-            print(f"[Pipeline] Failed to init Deepseek: {e}")
-            sys.exit(1)
-    elif model in ["ollama-local", "ollama-9b"]:
-        model_name = "qwen3.5:9b" if model == "ollama-9b" else "qwen3.5:4b"
-        try:
-            from llm_clients.OllamaClient import OllamaChatClient
-            chat = OllamaChatClient(model=model_name, verbose=True)
-            print(f"[Pipeline] OllamaChatClient ready ({model_name})")
-        except Exception as e:
-            print(f"[Pipeline] Failed to init Ollama ({model_name}): {e}")
-            sys.exit(1)
-    else:
-        chat = GeminiChat(
-            cookies=cookies,
-            model=model,
-            request_delay=request_delay,
-            max_retries=5,
-            timeout=180, # Increased timeout for thinking model
-            verbose=True,
-        )
-        print(f"[Pipeline] GeminiChat ready: {chat}")
-    
+    if model not in ("ollama-local", "ollama-9b"):
+        print(f"[Pipeline] Unknown model '{model}'; use ollama-local or ollama-9b.")
+        sys.exit(1)
+    model_name = "qwen3.5:9b" if model == "ollama-9b" else "qwen3.5:4b"
+    try:
+        chat = OllamaChatClient(model=model_name, verbose=True)
+        print(f"[Pipeline] OllamaChatClient ready ({model_name})")
+    except Exception as e:
+        print(f"[Pipeline] Failed to init Ollama ({model_name}): {e}")
+        sys.exit(1)
+
     experience = load_experience_log()
     print(f"[Pipeline] Loaded Experience Log: {len(experience)} chars")
     
@@ -250,18 +169,8 @@ def run_pipeline(
     
     tried_names = set([idea.get("name") for idea in existing_ideas if idea.get("name")])
     
-    # Initialize local model client for self-correction if main model is not local
-    local_chat = None
-    if model not in ["ollama-local", "ollama-9b"]:
-        try:
-            from llm_clients.OllamaClient import OllamaChatClient
-            local_chat = OllamaChatClient(model="qwen3.5:4b", verbose=False)
-            print("[Pipeline] Local Ollama client initialized for self-correction.")
-        except Exception as e:
-            print(f"[Pipeline] Warning: Failed to init local Ollama for self-correction: {e}")
-    else:
-        local_chat = chat
-        
+    local_chat = chat
+
     start_time = time.time()
     accepted = 0
     errors = 0
@@ -293,7 +202,6 @@ def run_pipeline(
                 fsa_forbidden_patterns=[],
             )
             
-            # Phân luồng Local / Cloud
             schema_arg = {}
             if model == "ollama-local":
                 schema_arg = {"schema": "json"}
@@ -304,7 +212,6 @@ def run_pipeline(
                 print(f"  ❌ Error during chat.send: {e}")
                 raw_text = ""
             
-            from llm_clients.GeminiClient import extract_json
             idea_json = extract_json(raw_text)
             
             if idea_json is None:
@@ -419,8 +326,6 @@ def run_pipeline(
 ║  Errors:           {errors:6d}                               ║
 ╚══════════════════════════════════════════════════════════════╝
     """)
-    if local_chat and local_chat is not chat and hasattr(local_chat, 'stop_keepalive'):
-        local_chat.stop_keepalive()
     if hasattr(chat, 'stop_keepalive'):
         chat.stop_keepalive()
     return existing_ideas
@@ -428,12 +333,11 @@ def run_pipeline(
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate trading strategies.")
-    parser.add_argument("--model", type=str, default="thinking", help="Model to use: thinking, deepseek, ollama-local, ollama-9b")
+    parser.add_argument("--model", type=str, default="ollama-local", help="Model to use: ollama-local, ollama-9b")
     parser.add_argument("--n", type=int, default=50, help="Number of strategies to generate")
     args = parser.parse_args()
 
     try:
-        cookies = load_cookies()
-        run_pipeline(cookies=cookies, n_strategies=args.n, model=args.model)
+        run_pipeline(n_strategies=args.n, model=args.model)
     except Exception as e:
         print(f"Failed to start pipeline: {e}")

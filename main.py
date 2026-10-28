@@ -23,8 +23,8 @@ def cmd_generate(args):
     """
     Execute the strategy generation stage.
     
-    Reads credentials and cookies, then triggers GenerateStrategies to query
-    LLM models for initial strategy ideas.
+    Triggers GenerateStrategies to query the local Ollama model for initial
+    strategy ideas.
 
     Parameters
     ----------
@@ -32,20 +32,9 @@ def cmd_generate(args):
         The parsed command-line or interactive menu arguments.
     """
     print("\n[Bước 1/4] Đang sinh ý tưởng (Ideas Generation)...")
-    from strategy_workflows.GenerateStrategies import run_pipeline, load_cookies
-    
-    # 1. Trợ lý Cookie
-    cookie_path = os.path.join(PROJECT_ROOT, "cookies.txt")
-    cookies = None
-    try:
-        cookies = load_cookies(cookie_path)
-    except Exception:
-        print("Lỗi: Không thể load cookies.txt.")
-        if not args.no_cookies:
-            sys.exit(1)
-            
+    from strategy_workflows.GenerateStrategies import run_pipeline
+
     run_pipeline(
-        cookies=cookies,
         n_strategies=args.n_strategies,
         model=args.model
     )
@@ -187,23 +176,15 @@ def select_ai_model() -> str:
     Returns
     -------
     str
-        The model identifier key matching MODELS or Ollama/DeepSeek specs.
+        The model identifier key matching an Ollama option.
     """
     options = [
-        "DeepSeek Web Thinking (Cloud - Yêu cầu token.txt)",
         "Ollama Qwen3.5 4B (Local - Cần chạy Ollama nền)",
         "Ollama Qwen3.5 9B (Local - Cần chạy Ollama nền)",
-        "Gemini Web Flash (Cloud - Yêu cầu cookies.txt)",
-        "Gemini Web Pro (Cloud - Yêu cầu cookies.txt)",
-        "Gemini Web Flash Thinking (Cloud - Yêu cầu cookies.txt)"
     ]
     keys = [
-        "deepseek-thinking",
         "ollama-local",
         "ollama-9b",
-        "flash",
-        "pro",
-        "thinking"
     ]
     selected_idx = display_interactive_menu(options, "Chọn AI Model:")
     return keys[selected_idx]
@@ -240,7 +221,7 @@ def run_interactive_cli() -> None:
         
     print(f"\n  \033[1;32m» Lệnh đã chọn: {selected_cmd}\033[0m")
     
-    args_dict = {"command": selected_cmd, "no_cookies": False}
+    args_dict = {"command": selected_cmd}
     
     if selected_cmd in ("generate", "full"):
         args_dict["n_strategies"] = retrieve_numerical_input("Số lượng chiến lược sinh ra", 20, int)
@@ -279,8 +260,7 @@ def main():
     # Generate
     parser_gen = subparsers.add_parser("generate", help="Run LLM strategy generation")
     parser_gen.add_argument("--n_strategies", type=int, default=20, help="Number of strategies to generate")
-    parser_gen.add_argument("--model", type=str, default="deepseek-thinking", help="LLM Model")
-    parser_gen.add_argument("--no_cookies", action="store_true", help="Skip cookie check")
+    parser_gen.add_argument("--model", type=str, default="ollama-local", choices=["ollama-local", "ollama-9b"], help="Local Ollama model")
     
     # Convert (DEPRECATED)
     # Convert phase has been removed in 3-Tier Architecture.
@@ -295,12 +275,11 @@ def main():
     # Full
     parser_full = subparsers.add_parser("full", help="Run full pipeline (generate -> mcts)")
     parser_full.add_argument("--n_strategies", type=int, default=20)
-    parser_full.add_argument("--model", type=str, default="deepseek-thinking")
+    parser_full.add_argument("--model", type=str, default="ollama-local", choices=["ollama-local", "ollama-9b"])
     parser_full.add_argument("--iterations", type=int, default=50000, help="Number of MCTS iterations")
     parser_full.add_argument("--patience", type=int, default=5000, help="Early stopping patience limit")
     parser_full.add_argument("--retrain-hmm", action="store_true", help="Force retrain HMM models instead of using cache")
     parser_full.add_argument("--seed", type=int, default=None, help="Seed for the MCTS random generator (default: not reproducible)")
-    parser_full.add_argument("--no_cookies", action="store_true")
     
     args = parser.parse_args()
     

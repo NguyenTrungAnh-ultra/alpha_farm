@@ -15,14 +15,13 @@ Code changes go to the `coder` agent (`.claude/agents/coder.md`, Sonnet, medium 
 - Use the **`.venv`** interpreter (Python 3.12, managed with `uv`). It has `hmmlearn`.
 - The `venv/` directory is empty.
 - System Python 3.14 has no `hmmlearn` wheel. On 3.14, `tests/test_hmm_validation.py` is silently skipped and `HMMValidation` cannot be imported.
-- LLM credentials are read from `token.txt` (DeepSeek) and `cookies.txt` (Gemini) in the repo root. Ollama models come from `Modelfile` (qwen3.5).
-- `token.txt` and `api.txt` hold credentials and are gitignored. Never stage them.
+- The only LLM provider is local Ollama; models come from `Modelfile` (qwen3.5). Do not add cloud LLM clients or credential files.
 
 ## Commands
 
 ```bash
 .venv/Scripts/python.exe main.py                       # interactive menu
-.venv/Scripts/python.exe main.py generate --n_strategies 20 --model deepseek-thinking   # LLM -> blueprints
+.venv/Scripts/python.exe main.py generate --n_strategies 20 --model ollama-local   # LLM -> blueprints
 .venv/Scripts/python.exe main.py mcts --iterations 50000 --patience 5000 [--retrain-hmm]
 .venv/Scripts/python.exe main.py full ...              # generate then mcts
 
@@ -32,7 +31,7 @@ Code changes go to the `coder` agent (`.claude/agents/coder.md`, Sonnet, medium 
 .venv/Scripts/python.exe benchmark_primitives.py       # AlphaPrimitives vs pandas: speed + equivalence
 ```
 
-`--model` accepts: `deepseek-thinking`, `ollama-local`, `ollama-9b`, `flash`, `pro`, `thinking`.
+`--model` accepts: `ollama-local`, `ollama-9b`.
 
 As of 2026-10-28, the suite in `.venv` gives 49 passed and 1 failed. The failure is `test_core_engine.py::test_alpha_data_proxy`, an identity check (`is`) on a copied Series.
 

@@ -19,29 +19,24 @@ Dự án là phần thực nghiệm của luận văn cử nhân. Câu hỏi ngh
 ## Cài đặt
 
 - Python 3.12 trong `.venv`, quản lý bằng `uv` (cần để build `hmmlearn`).
-- Ollama nếu dùng mô hình chạy máy.
+- Ollama (bắt buộc): mọi lời gọi LLM đều chạy mô hình local qwen3.5 qua Ollama, không dùng API đám mây.
 
 ```bash
-uv pip install -r utilities/deps/deepseek4free/requirements.txt
 uv pip install python-dotenv hmmlearn
 ```
-
-Thông tin đăng nhập LLM:
-- **DeepSeek:** đăng nhập chat.deepseek.com, F12 → Network, chép giá trị header `Authorization` vào `token.txt` ở thư mục gốc.
-- **Gemini:** dán cookie vào `cookies.txt`.
 
 ## Chạy
 
 ```bash
 .venv/Scripts/python.exe main.py                     # menu tương tác
-.venv/Scripts/python.exe main.py generate --n_strategies 20 --model deepseek-thinking
+.venv/Scripts/python.exe main.py generate --n_strategies 20 --model ollama-local
 .venv/Scripts/python.exe main.py mcts --iterations 50000 --patience 5000
-.venv/Scripts/python.exe main.py full --n_strategies 20 --model deepseek-thinking
+.venv/Scripts/python.exe main.py full --n_strategies 20 --model ollama-local
 ```
 
 - `generate`: LLM sinh blueprint vào `results/ideas/`.
 - `mcts`: chạy MCTS trên các blueprint đang có trong `results/ideas/` (không có blueprint thì không có gì để chạy), kiểm định HMM, lưu vào `results/portfolio_summary.json`.
-- `--model`: `deepseek-thinking`, `ollama-local`, `ollama-9b`, `flash`, `pro`, `thinking`.
+- `--model`: `ollama-local` (mặc định, qwen3.5:4b), `ollama-9b` (qwen3.5:9b).
 
 ## Kiểm thử
 

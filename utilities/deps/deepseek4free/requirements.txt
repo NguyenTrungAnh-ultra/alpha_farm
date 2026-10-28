@@ -1,5 +1,0 @@
-curl-cffi
-wasmtime
-numpy
-nodriver
-drissionpage
