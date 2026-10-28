@@ -32,11 +32,13 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
 - ⏸️ Cách tạo placebo chính: hoán vị lợi suất (theo Masters/Aronson) hay đổi dấu theo ngày. Proposal ghi hoán vị là chính.
 - ✅ Tệp nháp (`docs/log.txt`, `PROJECT.md`, `ORIGINAL_REQUEST.md`, `.agents/`): người dùng chọn chuyển vào `docs/archive/` (2026-10-13).
 - ✅ Chỉ dùng LLM chạy máy (Ollama); gỡ code DeepSeek / Gemini, bỏ `token.txt`, `cookies.txt`, `api.txt` (người dùng chốt 2026-10-28). Proposal không nêu tên nhà cung cấp LLM nên không phải sửa; luận văn phải ghi rõ mô hình local đã dùng.
+- ✅ Vai trò bộ lọc HMM: proposal mục "Statistical Tests" đã chốt — HMM không nằm trong vòng chọn, chỉ mô tả rủi ro của chiến lược đã qua các test khác (2026-10-28, đối chiếu proposal). Vì vậy bootstrap từ toàn giai đoạn không làm rò rỉ vào kết quả; lỗi khoá cache theo khung vẫn sửa trong việc 2.
 - ⏸️ Độ dài cửa sổ walk-forward (2 năm tìm / 6 tháng đánh giá) và số seed (5), K = 19 lần placebo: do Claude đề xuất, người dùng chưa xác nhận.
 
 ## 4. Nợ
 
 - ⛔ Token DeepSeek từng bị đẩy lên GitHub (lịch sử git đã viết lại, tệp đã xoá khỏi máy 2026-10-28) nhưng token và cookie Gemini có thể vẫn còn hiệu lực: người dùng tự đăng xuất mọi phiên ở chat.deepseek.com và Google.
+- Rò rỉ qua trọng số LLM (nêu 2026-10-28, người dùng cho vào nợ): `qwen3.5:4b` được huấn luyện trên văn bản có thể đã nói về 2020–2025, nên lợi ích của LLM ở RQ1 có thể lẫn "biết trước". Prompt ghi tên "VN30 Index Futures" nhưng không ghi ngày. Cách kiểm Claude đề xuất: (1) ẩn tên thị trường trong prompt; (2) so blueprint có tên và ẩn danh cùng ngân sách; (3) tra ngày cắt dữ liệu huấn luyện của qwen3.5, tách cửa sổ đánh giá sau ngày đó; (4) nêu trong mục hạn chế. Chưa đo.
 - `results/pushed/` (chiến lược thế hệ đầu) bị xoá ở commit `c6b1f03`; khôi phục bằng `git checkout cfeb770 -- results/pushed` nếu cần so sánh RQ2.
 - ~~`GenerateStrategies.load_experience_log` đọc tệp không tồn tại~~ → ✅ báo rõ khi thiếu, prompt ghi "(No experience log is available.)" (2026-10-28).
 - Không gian tìm phí: 12% lượt chấm lỗi vì biểu thức toàn hằng (`ts_mean((0.2 + 0.5), 10)`); MCTS còn sinh `(0.1 + low)` — cộng hằng vào giá không đổi z-score. Cần lọc hằng theo nút cha.
