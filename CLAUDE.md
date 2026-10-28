@@ -34,32 +34,14 @@ Current plan, status and open decisions: `docs/ROADMAP.md` (Vietnamese). Update 
 
 As of 2026-10-01, the suite in `.venv` gives 37 passed and 1 failed. The failure is `test_core_engine.py::test_alpha_data_proxy`, an identity check (`is`) on a copied Series.
 
-## Pipeline architecture
+## Pipeline gotchas
 
-1. **Generate** (`strategy_workflows/GenerateStrategies.py` + `utilities/Prompts.py`)
-   - The LLM returns JSON with a `macro_blueprint`, an expression with `?` slots, e.g. `ts_zscore(sub(?, ts_mean(?)))`.
-   - `SemanticCompiler` parses it with Python `ast`, maps hallucinated names through `HALLUCINATION_MAP`, and type-checks dimensions.
-   - On a compile error the LLM is asked to self-correct.
-   - Valid ideas are saved to `results/ideas/<name>_<tf>.json`.
-2. **MCTS** (`strategy_workflows/RunMCTS.py`)
-   - Runs one process per timeframe (`TIMEFRAMES`, 1m–60m).
-   - Each process compiles the idea files for its timeframe, then calls `MCTSEngine.run_search_from_blueprint`.
-   - Processed files are moved to `results/ideas/processed/`, including on error, so failures are easy to miss.
-3. **Search space** (`strategy_workflows/MCTSDimensions.py`)
-   - Every operator declares input and output `Dimension`s (CURRENCY, VOLUME, RATIO, BOOLEAN, ANY). MCTS only fills a slot with a dimension-compatible node.
-   - The dimension of the root picks the position template in `MCTSEngine` (NORMALIZED / RATIO / BOOLEAN).
-4. **Scoring** (`MCTSEngine.evaluate_expression`)
-   - `eval()`s the generated expression with the `ts_*` functions from `core_engine/AlphaPrimitives.py`.
-   - Backtests both directions and keeps the better one.
-   - Reward = `(0.6·S_calmar + 0.4·S_IC)·(1 − max position corr with portfolio)`, hard −10 if Calmar < 1.1 or fewer than 15 trades.
-   - Selection is UCT on **max** reward, not mean.
-5. **Validation** (`strategy_workflows/HMMValidation.py`)
-   - Fits a 3-state Gaussian HMM, then generates paths by Markov-chain block bootstrap (20-bar blocks).
-   - The 3 tiers: ruin rate, Kelly + cost coverage, and CAGR/Sharpe vs savings rate and buy-and-hold.
-   - Synthetic paths are cached in `data/MCdata/synthetic_data.pkl` (~13 GB). `--retrain-hmm` rebuilds it.
-6. **Portfolio** (`PortfolioManager`)
-   - Writes `results/portfolio_summary.json` plus per-strategy `.py`, equity and positions CSVs.
-   - `RunMCTS` passes `force_add=True`, and correlation rejection is commented out, so criteria are not enforced.
+Stages (generate → MCTS → scoring → HMM validation → portfolio) are described in `docs/ARCH.md`.
+
+- `RunMCTS` moves idea files to `results/ideas/processed/` even on error, so failures are easy to miss.
+- MCTS selection is UCT on **max** reward, not mean.
+- `RunMCTS` passes `force_add=True`, and correlation rejection is commented out, so portfolio criteria are not enforced.
+- HMM synthetic paths are cached in `data/MCdata/synthetic_data.pkl` (~13 GB); `--retrain-hmm` rebuilds it.
 
 ## Core engine conventions
 
@@ -87,14 +69,11 @@ The project was originally built for the XNOQuant competition sandbox (`XnoEngin
 6. **Missing operators:** there are no lag/delta operators (`ts_delay`, `ts_delta`).
 
 Other leftovers from the refactor:
-- `core_engine/PlatformEmulator.py`, `RestrictedSeries.py` and `strategy_workflows/SubmitStrategies.py` are one-line "DELETED" stubs.
 - First-generation (TA-Lib) strategy artifacts were removed from `results/pushed/` in that commit. Recover them with `git checkout cfeb770 -- results/pushed`.
 - `results/portfolio_summary.json` and `3tier_results.csv` contain only first-generation strategies.
 
 ## Thesis documents
 
-- `docs/proposal/thesis_proposal/Thesis_Proposal.tex` follows the department template in `docs/proposal/Sample_Thesis_Tex_format_2026/` (IU, Department of Mathematics).
-- Build: `~/.local/bin/tectonic.exe Thesis_Proposal.tex`. Use XeTeX-safe fonts; `\mathbbm` breaks xdvipdfmx.
-- Figures are regenerated from repo data with `python docs/proposal/thesis_proposal/make_figures.py`.
+- Build and template notes for the proposal: `docs/proposal/CLAUDE.md`.
 - Bibliography entries were verified against publisher or arXiv pages. Do not add unverified citations.
 - `docs/ARCH.md` describes the architecture as the code is today (Vietnamese); update it in the same change when code behaviour changes. `docs/archive/` is history (XNOQuant era): never treat it as current.
