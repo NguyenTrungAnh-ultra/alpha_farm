@@ -13,7 +13,7 @@ Khung nghiên cứu: `docs/proposal/thesis_proposal/Thesis_Proposal.pdf` (chươ
 - ✅ Pipeline `ts_*` chạy hết từ blueprint tới code chiến lược xuất ra (2026-10-28, việc 1 ở mục 2).
 - ⛔ Chưa có thành phần nào của quy trình đánh giá mới (walk-forward, gộp top-k, seed, baseline, placebo, cài tín hiệu, SPA/DSR).
 - ✅ Quy đổi theo năm thống nhất, CAGR theo lịch (2026-10-28, việc 4).
-- ⛔ Test: `.venv` cho 71 pass, 1 fail (`test_core_engine.py::test_alpha_data_proxy`, có từ trước).
+- ⛔ Test: `.venv` cho 82 pass, 1 fail (`test_core_engine.py::test_alpha_data_proxy`, có từ trước).
 
 - ✅ Dọn tài liệu (2026-10-13): `docs/ARCH.md` và `README.md` viết lại theo code; bài báo vào `docs/references/`; tài liệu thời XNOQuant vào `docs/archive/` (lý do từng tệp ở `docs/archive/README.md`).
 
@@ -35,6 +35,11 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
 - ✅ Tệp nháp (`docs/log.txt`, `PROJECT.md`, `ORIGINAL_REQUEST.md`, `.agents/`): người dùng chọn chuyển vào `docs/archive/` (2026-10-13).
 - ✅ Chỉ dùng LLM chạy máy (Ollama); gỡ code DeepSeek / Gemini, bỏ `token.txt`, `cookies.txt`, `api.txt` (người dùng chốt 2026-10-28). Proposal không nêu tên nhà cung cấp LLM nên không phải sửa; luận văn phải ghi rõ mô hình local đã dùng.
 - ✅ Vai trò bộ lọc HMM: proposal mục "Statistical Tests" đã chốt — HMM không nằm trong vòng chọn, chỉ mô tả rủi ro của chiến lược đã qua các test khác (2026-10-28, đối chiếu proposal). Vì vậy bootstrap từ toàn giai đoạn không làm rò rỉ vào kết quả; lỗi khoá cache theo khung vẫn sửa trong việc 2.
+- ✅ Các cổng cứng (người dùng chốt 2026-10-28 theo đề xuất của Claude):
+  - Cổng reward (−10 nếu < 15 lệnh hoặc Calmar < 1.1): có hai bản reward. Bản "gated" (như cũ) và bản "soft" (bỏ ngưỡng Calmar; dưới 15 lệnh thì phần Calmar bằng 0, phần IC vẫn giữ; chỉ lỗi mới −10). Chọn bản bằng bước chấm đáp án của việc 3 (`docs/PLANTED_SIGNAL.md` mục 5), rồi đóng băng trước walk-forward trên dữ liệu thật.
+  - HMM: chỉ ghi kết quả, không loại chiến lược (khớp proposal).
+  - Tiêu chí danh mục (`meets_criteria`, `force_add`, loại theo tương quan) và phạt −100 FSA: xoá, vì là code chết (FSA chỉ kích khi reward > 1.0, mà reward tối đa là 1.0).
+  - Lọc `reward > 0` trước khi chọn: giữ tới khi làm gộp top-5.
 - ⏸️ Độ dài cửa sổ walk-forward (2 năm tìm / 6 tháng đánh giá) và số seed (5), K = 19 lần placebo: do Claude đề xuất, người dùng chưa xác nhận.
 
 ## 4. Nợ

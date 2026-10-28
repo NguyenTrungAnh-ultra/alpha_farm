@@ -8,17 +8,12 @@ if PROJECT_ROOT not in sys.path:
 
 """
 Portfolio Manager
-==================
-Manages accepted strategies with competition criteria filtering.
+=================
+Stores accepted strategies (code, equity curve, positions) and writes portfolio_summary.json.
 
-Note: Although the CRITERIA dictionary defines Sharpe, CAGR, Max Drawdown, 
-Profit Factor, and Calmar, the actual checks in `meets_criteria` and 
-`cleanup_portfolio` are restricted solely to Sharpe Ratio (> 1.3) and 
-CAGR (> 15%). Other metrics are not enforced during strategy filtering.
-
-Additionally, correlation is evaluated for warning/logging purposes only. 
-Strategies exceeding the correlation threshold are NOT rejected or pruned from 
-the portfolio (correlation rejection logic is currently commented out).
+Nothing is rejected here: every strategy passed to `evaluate_and_add` is stored. Correlation to
+the existing strategies is measured and reported (warning above `MAX_CORRELATION`), never used
+to refuse a strategy. HMM validation outcomes passed in `metrics` are stored as information.
 """
 
 import json
@@ -43,17 +38,8 @@ class NpEncoder(json.JSONEncoder):
         return super(NpEncoder, self).default(obj)
 
 
-# ─── Competition Criteria ────────────────────────────────────────────
-CRITERIA = {
-    'sharpe_ratio':     {'min': 1.3,   'label': 'Sharpe'},
-    'cagr':             {'min': 0.15,  'label': 'CAGR'},      # 15%
-    'max_drawdown_pct': {'min': -35.0, 'label': 'MaxDD%'},     # ≥ -35%
-    'profit_factor':    {'min': 1.2,   'label': 'PF'},
-    'calmar_ratio':     {'min': 1.1,   'label': 'Calmar'},
-}
-
+# Correlation above this prints a warning only.
 MAX_CORRELATION = 0.5
-MIN_TRADES = 20  # Minimum trades for statistical significance
 
 
 class PortfolioManager:
@@ -111,76 +97,6 @@ class PortfolioManager:
                       f"{len([p for p in self._position_series if p is not None])} position curves")
             except Exception as e:
                 print(f"[Portfolio] Load error: {e}")
-    
-    def meets_criteria(self, metrics: dict) -> tuple[bool, list[str]]:
-        """
-        Check if metrics meet active competition criteria.
-        
-        Note: Currently, only Sharpe Ratio (> 1.3) and CAGR (> 15%) are 
-        enforced. Other metrics defined in the CRITERIA dictionary (such as 
-        Max Drawdown, Profit Factor, and Calmar Ratio) are not verified.
-        """
-        fail_reasons = []
-        
-        # Check Sharpe
-        sharpe = metrics.get('sharpe_ratio', 0)
-        if sharpe <= 1.3:
-            fail_reasons.append(f"Sharpe {sharpe:.2f} <= 1.3")
-            
-        # Check CAGR
-        cagr = metrics.get('cagr', 0)
-        if cagr <= 0.15:
-            fail_reasons.append(f"CAGR {cagr*100:.1f}% <= 15%")
-            
-        return len(fail_reasons) == 0, fail_reasons
-
-    def cleanup_portfolio(self) -> int:
-        """
-        Quét qua toàn bộ danh mục hiện tại và xóa bỏ các chiến lược 
-        không đạt tiêu chuẩn (chỉ kiểm tra Sharpe > 1.3 và CAGR > 15%).
-        Xóa file .py, _equity.csv, _positions.csv và cập nhật lại JSON.
-        
-        Note: Các tiêu chí khác trong CRITERIA như Max Drawdown, Profit Factor, 
-        và Calmar Ratio không được kiểm tra ở đây.
-        """
-        removed_count = 0
-        valid_strategies = []
-        valid_equity = []
-        valid_positions = []
-        
-        for idx, s in enumerate(self.strategies):
-            m = s.get('metrics', {})
-            sharpe = m.get('sharpe_ratio', 0)
-            cagr = m.get('cagr', 0)
-            
-            if sharpe > 1.3 and cagr > 0.15:
-                valid_strategies.append(s)
-                valid_equity.append(self._equity_curves[idx])
-                valid_positions.append(self._position_series[idx])
-            else:
-                # Xóa file liên quan
-                name = s['name']
-                tf = s['timeframe']
-                
-                for ext in ['.py', '_equity.csv', '_positions.csv']:
-                    fpath = self.results_dir / f"{name}_{tf}{ext}"
-                    if fpath.exists():
-                        try:
-                            fpath.unlink()
-                        except Exception as e:
-                            print(f"Error deleting {fpath}: {e}")
-                
-                removed_count += 1
-                print(f"Removed failed strategy from portfolio: {name}_{tf} (Sharpe={sharpe}, CAGR={cagr})")
-                
-        if removed_count > 0:
-            self.strategies = valid_strategies
-            self._equity_curves = valid_equity
-            self._position_series = valid_positions
-            self._save_summary()
-            print(f"Portfolio cleanup complete. Removed {removed_count} strategies.")
-            
-        return removed_count
     
     def compute_max_correlation(self, new_equity: pd.Series) -> float:
         """
@@ -252,41 +168,27 @@ class PortfolioManager:
         metrics: dict,
         equity_curve: pd.Series,
         positions: pd.Series = None,
-        force_add: bool = False
     ) -> tuple[bool, str]:
         """
-        Evaluate strategy and add to portfolio if it passes.
-        
-        Note:
-        - Only checks Sharpe (> 1.3) and CAGR (> 15%).
-        - Returns a warning/logs if returns or positions correlation exceeds
-          the max correlation threshold, but does NOT reject the strategy
-          because the rejection logic for correlation is commented out.
-        
+        Add a strategy to the portfolio and report its correlation to the existing ones.
+
+        Never rejects: a correlation above `max_correlation` only prints a warning. Optional
+        `metrics` keys `hmm_passed`, `hmm_tier_failed`, `hmm_reason` are stored with the entry.
+
         Returns
         -------
         (accepted, reason)
         """
-        # ── Check criteria ──
-        if not force_add:
-            passed, fail_reasons = self.meets_criteria(metrics)
-            if not passed:
-                return False, f"Failed criteria: {', '.join(fail_reasons)}"
-        else:
-            passed = True
-        
         # ── Check correlation ──
         max_corr_returns = self.compute_max_correlation(equity_curve)
         max_corr_positions = self.compute_max_position_correlation(positions)
         
         if max_corr_returns > self.max_correlation:
             reason = f"WARNING (return correlation): max_corr_returns={max_corr_returns:.2f} > {self.max_correlation}"
-            # return False, reason  # Bỏ tiêu chí corr
             print(f"  ⚠️ {reason}")
             
         if max_corr_positions > self.max_correlation:
             reason = f"WARNING (position correlation): max_corr_positions={max_corr_positions:.2f} > {self.max_correlation}"
-            # return False, reason  # Bỏ tiêu chí corr
             print(f"  ⚠️ {reason}")
         
         # ── Accept! ──
@@ -304,6 +206,11 @@ class PortfolioManager:
                 'calmar_ratio': round(metrics.get('calmar_ratio', 0), 3),
                 'total_trades': metrics.get('total_trades', 0),
                 'win_rate': round(metrics.get('win_rate', 0), 2),
+            },
+            'hmm': {
+                'passed': metrics.get('hmm_passed'),
+                'tier_failed': metrics.get('hmm_tier_failed'),
+                'reason': metrics.get('hmm_reason'),
             },
             'max_correlation_returns': round(max_corr_returns, 3),
             'max_correlation_positions': round(max_corr_positions, 3),

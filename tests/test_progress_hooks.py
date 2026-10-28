@@ -211,3 +211,107 @@ def test_gate_reason_too_few_trades_when_every_direction_is_short(window, monkey
         {'total_trades': 5, 'calmar_ratio': 5.0},
     ])
     assert reasons == {"too_few_trades": 1}
+
+
+# --- reward modes ------------------------------------------------------------------------------
+
+RANK_IC = 0.06
+S_IC = min(1.0, RANK_IC / 0.15)
+
+
+def _normalized_tree():
+    from strategy_workflows.SemanticCompiler import ASTNode
+    return ASTNode(name="normalized_template", children=[
+        ASTNode(name="ts_mean", children=[ASTNode(name="pv_close")], window=5),
+        ASTNode(name="window", value=5), ASTNode(name="z_score", value=1.0)])
+
+
+def _evaluate(window, monkeypatch, reward_mode, trades, calmar):
+    monkeypatch.setattr('strategy_workflows.MCTSEngine.compute_metrics',
+                        lambda result: {'total_trades': trades, 'calmar_ratio': calmar})
+    monkeypatch.setattr(MCTSEngine, 'compute_rank_ic', lambda self, alpha, close: RANK_IC)
+    engine = MCTSEngine(timeframe='60m', seed=SEED, data=window, reward_mode=reward_mode)
+    reward, _, _ = engine.evaluate_expression(_normalized_tree())
+    return reward, engine
+
+
+def test_gated_mode_scores_low_calmar_as_minus_ten(window, monkeypatch):
+    reward, engine = _evaluate(window, monkeypatch, "gated", trades=30, calmar=0.5)
+    assert reward == -10.0
+    assert engine.gated_evaluation_count == 1
+
+
+def test_default_reward_mode_is_gated(window):
+    assert MCTSEngine(timeframe='60m', data=window).reward_mode == "gated"
+
+
+def test_soft_mode_keeps_low_calmar_candidate(window, monkeypatch):
+    reward, engine = _evaluate(window, monkeypatch, "soft", trades=30, calmar=0.5)
+    assert reward == pytest.approx(0.4 * S_IC)  # calmar below 1.1 clips s_calmar to 0
+    assert engine.gated_evaluation_count == 0 and not engine.gate_reasons
+
+
+def test_soft_mode_zeroes_calmar_term_below_min_trades(window, monkeypatch):
+    reward, engine = _evaluate(window, monkeypatch, "soft", trades=5, calmar=5.0)
+    assert reward == pytest.approx(0.4 * S_IC)
+    assert engine.gated_evaluation_count == 0
+
+
+def test_soft_mode_formula_for_good_candidate(window, monkeypatch):
+    reward, _ = _evaluate(window, monkeypatch, "soft", trades=30, calmar=2.0)
+    assert reward == pytest.approx(0.6 * (2.0 - 1.1) / (3.0 - 1.1) + 0.4 * S_IC)
+
+
+@pytest.mark.parametrize("reward_mode", ["gated", "soft"])
+def test_exception_scores_minus_ten_in_both_modes(window, monkeypatch, reward_mode):
+    def boom(result):
+        raise RuntimeError("metrics failed")
+    monkeypatch.setattr('strategy_workflows.MCTSEngine.compute_metrics', boom)
+    engine = MCTSEngine(timeframe='60m', seed=SEED, data=window, reward_mode=reward_mode)
+    reward, _, _ = engine.evaluate_expression(_normalized_tree())
+    assert reward == -10.0
+    assert engine.failed_evaluation_count == 1 and engine.gated_evaluation_count == 0
+
+
+def test_invalid_reward_mode_raises(window):
+    with pytest.raises(ValueError):
+        MCTSEngine(timeframe='60m', data=window, reward_mode="hard")
+
+
+def test_process_timeframe_threads_reward_mode(window, tmp_path, monkeypatch):
+    _prepare_folder(tmp_path, monkeypatch)
+    seen = []
+    original = MCTSEngine.__init__
+
+    def spy(self, *args, **kwargs):
+        original(self, *args, **kwargs)
+        seen.append(self.reward_mode)
+
+    monkeypatch.setattr(MCTSEngine, '__init__', spy)
+    run_module.process_timeframe('60m', window, 5, {}, seed=SEED, ideas=[], reward_mode="soft")
+    assert seen == ["soft"]
+
+
+# --- HMM is descriptive ------------------------------------------------------------------------
+
+def _run_with_hmm(window, tmp_path, monkeypatch, synthetic_data, outcome):
+    _prepare_folder(tmp_path, monkeypatch)
+    monkeypatch.setattr('strategy_workflows.HMMValidation.validate_strategy_with_hmm',
+                        lambda strategy, normal, stressed, sharpe: outcome)
+    _, _, _, successful = run_module.process_timeframe(
+        '60m', window, ITERATIONS, synthetic_data, seed=SEED,
+        ideas=[{"name": "hmm", "macro_blueprint": BLUEPRINT}])
+    return successful
+
+
+def test_failed_hmm_does_not_reject_candidate(window, tmp_path, monkeypatch):
+    successful = _run_with_hmm(window, tmp_path, monkeypatch, {'normal': [1], 'stressed': [1]},
+                               (False, 2, "cost coverage too low", {"k": 1}))
+    assert len(successful) == 1
+    assert successful[0]['hmm'] == {"passed": False, "tier_failed": 2,
+                                    "reason": "cost coverage too low", "details": {"k": 1}}
+
+
+def test_missing_synthetic_data_gives_none_hmm(window, tmp_path, monkeypatch):
+    successful = _run_with_hmm(window, tmp_path, monkeypatch, {}, (False, 1, "unused", {}))
+    assert len(successful) == 1 and successful[0]['hmm'] is None

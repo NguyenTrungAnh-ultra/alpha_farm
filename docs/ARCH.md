@@ -5,7 +5,7 @@ Mọi thông số (ngưỡng, phí, ký quỹ, khoảng ngày) lấy từ `utili
 
 ## 1. Mục tiêu
 
-Tự tìm tín hiệu có hướng (Long / Short / Flat) cho hợp đồng tương lai VN30F1M: LLM đề xuất cấu trúc chiến lược, MCTS hoàn thiện công thức, backtest chấm điểm, bộ kiểm định HMM lọc ứng viên.
+Tự tìm tín hiệu có hướng (Long / Short / Flat) cho hợp đồng tương lai VN30F1M: LLM đề xuất cấu trúc chiến lược, MCTS hoàn thiện công thức, backtest chấm điểm, bộ kiểm định HMM đánh giá (không loại) ứng viên.
 
 ## 2. Thư mục
 
@@ -43,15 +43,15 @@ Prompt dặn LLM chọn gốc công thức thuộc nhóm giữ thứ nguyên (`s
    Chỗ trống `?` lấy thứ nguyên từ chữ ký của toán tử cha (hoặc từ thứ nguyên gắn sẵn khi MCTS mở rộng); chỗ BOOLEAN chỉ nhận toán tử trả BOOLEAN. Chỗ vào của `ts_*` không nhận hằng số.
 4. **Khuôn vị thế** theo thứ nguyên gốc: NORMALIZED (z-score trượt, ngưỡng θ), RATIO (ngưỡng trên/dưới), BOOLEAN (±w). Tỷ trọng khi chấm điểm `w = 0.2`. Mỗi công thức thử cả hai chiều, giữ chiều tốt hơn.
 5. **Cửa sổ** khai báo ở khung 10m (`BASE_PERIODS`, `BASE_WINDOW_SEARCH`) rồi co giãn theo khung. Độ dài cửa sổ của mỗi nút `ts_*` là **một thuộc tính của nút** (`ASTNode.window`), do MCTS chọn trong `scaled_periods` khi mở rộng (một nước đi riêng, như cửa sổ z-score của khuôn NORMALIZED). `ast_to_code` chỉ đọc thuộc tính này; nút `ts_*` chưa có cửa sổ thì chưa là nút kết thúc, và dựng code sẽ báo lỗi. Một nút MCTS ứng với đúng một công thức.
-6. **Điểm thưởng**: `R = (0.6·S_calmar + 0.4·S_IC) · (1 − tương quan vị thế lớn nhất)`; `R = −10` nếu Calmar < 1.1 hoặc < 15 lệnh. IC là tương quan Spearman với lợi suất bar kế tiếp.
-7. **Chọn nút**: UCT với giá trị **lớn nhất** (không phải trung bình), `c = 1.414`. Công thức có R > 1 bị ghi vào bộ nhớ chống trùng (FSA); gặp lại ⇒ −100.
+6. **Điểm thưởng**: `R = (0.6·S_calmar + 0.4·S_IC) · (1 − tương quan vị thế lớn nhất)`; IC là tương quan Spearman với lợi suất bar kế tiếp. Hai chế độ (`AppConfig.REWARD_MODE`, tham số `MCTSEngine(reward_mode=...)`, tham số cuối của `process_timeframe`; giá trị khác `gated`/`soft` ⇒ `ValueError`): **`gated`** (mặc định) cho `R = −10` nếu Calmar < 1.1 hoặc < `MIN_TRADES` (15) lệnh; **`soft`** không có cổng: `S_calmar = clip((Calmar − 1.1)/(3.0 − 1.1), 0, 1)` như cũ nhưng `S_calmar = 0` khi < 15 lệnh (phần IC giữ nguyên), nên ứng viên yếu có điểm thấp thay vì −10.
+7. **Chọn nút**: UCT với giá trị **lớn nhất** (không phải trung bình), `c = 1.414`. Không còn bộ nhớ chống trùng (FSA) vì R tối đa là 1.0; công thức đã chấm được tra lại từ `cache`.
 8. **Dừng sớm**: entropy chuẩn hoá của lượt thăm ở gốc < 0.15, hoặc 5 000 vòng không cải thiện (`patience`); trần mặc định 50 000 vòng.
-9. Lấy **đúng 1** ứng viên tốt nhất có R > 0 mỗi khung → backtest lại → kiểm định HMM (mục 3.3) → `PortfolioManager.evaluate_and_add(force_add=True)`, nên tiêu chí danh mục và loại theo tương quan **không được áp**.
+9. Lấy **đúng 1** ứng viên tốt nhất có R > 0 mỗi khung → backtest lại → kiểm định HMM (mục 3.3, chỉ mô tả: kết quả không loại ứng viên) → `PortfolioManager.evaluate_and_add`. `PortfolioManager` không còn tiêu chí nào: mọi ứng viên được lưu, tương quan chỉ để cảnh báo/báo cáo (`MAX_CORRELATION = 0.5` nằm trong `PortfolioManager.py`). Ứng viên thành công mang khoá `hmm = {passed, tier_failed, reason, details}` (`None` khi thiếu đường giả lập); `passed/tier_failed/reason` được ghi vào mục chiến lược trong `portfolio_summary.json` dưới `hmm`.
 
 **Chấm điểm và nối với backtest** (`evaluate_expression`):
 - Công thức được `eval` (không có builtins) với `open_/high/low/close/volume` là `pd.Series` và 9 hàm `ts_*`; kết quả bắt buộc là `pd.Series`. `compute_positions` (một hàm duy nhất) biến alpha thành `pd.Series` vị thế cùng chỉ mục dữ liệu rồi đưa vào `AlphaBacktestEngine.run`.
 - Ngoại lệ khi dựng code / `eval` / backtest vẫn cho −10 nhưng **không bị nuốt**: đếm theo "Loại: thông điệp" (`error_counts`), log cảnh báo ở lần đầu, và cuối `run_search_from_blueprint` in số lần chấm, số lần lỗi và các lỗi hay gặp (`error_summary()`). Cả lượt chấm đều lỗi ⇒ log mức ERROR.
-- **Cổng cứng được đếm**: một lượt chấm là "bị chặn" (`gated_evaluation_count`) khi không có ngoại lệ và không hướng nào qua cổng (`total_trades < 15` hoặc Calmar dưới ngưỡng). Lý do ghi trong `gate_reasons`: `too_few_trades` nếu cả hai hướng dưới 15 lệnh, ngược lại `low_calmar`. Cache hit và FSA hit không được đếm. `error_summary()` trả thêm `gated_evaluations`, `gate_reasons`; dòng tổng kết cuối tìm kiếm in cả hai. Số lượt qua cổng = `evaluations − failed_evaluations − gated_evaluations`.
+- **Cổng cứng được đếm**: một lượt chấm là "bị chặn" (`gated_evaluation_count`) khi không có ngoại lệ và không hướng nào qua cổng (`total_trades < 15` hoặc Calmar dưới ngưỡng). Lý do ghi trong `gate_reasons`: `too_few_trades` nếu cả hai hướng dưới 15 lệnh, ngược lại `low_calmar`. Cache hit không được đếm. Ở chế độ `soft` bộ đếm luôn 0 (không có kết quả −10 do cổng); ngoại lệ vẫn tính vào `failed_evaluations` và cho −10 ở cả hai chế độ. `error_summary()` trả thêm `gated_evaluations`, `gate_reasons`; dòng tổng kết cuối tìm kiếm in cả hai. Số lượt qua cổng = `evaluations − failed_evaluations − gated_evaluations`.
 - **Móc quan sát / dừng**: `run_search_from_blueprint(root, n_iterations, on_progress=None, should_stop=None, progress_interval_s=2.0)`. Cứ `progress_interval_s` giây (0 = mỗi vòng, đo bằng `time.monotonic`) gọi `on_progress(snapshot)` rồi `should_stop()`; True thì thoát vòng. `snapshot` có `iteration`, `n_iterations`, `best_reward` (None nếu bảng rỗng), `evaluations`, `failed_evaluations`, `gated_evaluations`, `elapsed_s`. Hàm trả lý do dừng: `budget`, `patience`, `entropy` hoặc `stopped`; nếu có `on_progress` thì gọi thêm một lần cuối với snapshot kèm `stop_reason`. Callback không đụng `self.rng` nên cùng seed vẫn cho cùng bảng xếp hạng (có test).
 - Mỗi ứng viên trong bảng xếp hạng mang `template`, `window`, `z_score`, `threshold_upper`, `threshold_lower` để chạy lại đúng.
 
@@ -101,7 +101,6 @@ Chưa có toán tử trễ / sai phân (`ts_delay`, `ts_delta`).
 | Ý | Nguồn |
 |---|---|
 | Kiểm thứ nguyên trước khi ghép nhánh | Alpha² (`docs/references/2406.16505v1.pdf`) |
-| Chống cây con trùng lặp (FSA) | Alpha Jungle (`docs/references/2505.11122v3.pdf`) |
 | MCTS lan truyền giá trị lớn nhất (tìm trường hợp tốt nhất) | RiskMiner (`docs/references/3677052.3698613.pdf`) |
 | LLM chạy tách khỏi MCTS, chỉ sinh cấu trúc | Lựa chọn thiết kế của dự án (bài Chain-of-Alpha từng được dẫn đã bị rút khỏi arXiv) |
 | Phạt tương quan với danh mục, giữ z-score tĩnh để dễ diễn giải | Lựa chọn thiết kế của dự án |

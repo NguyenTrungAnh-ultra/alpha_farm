@@ -141,7 +141,8 @@ def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_da
                       ideas: Optional[List[Dict[str, Any]]] = None,
                       on_progress: Optional[Callable[[dict], None]] = None,
                       should_stop: Optional[Callable[[], bool]] = None,
-                      progress_interval_s: float = 2.0):
+                      progress_interval_s: float = 2.0,
+                      reward_mode: Optional[str] = None):
     """
     Worker function to process a single timeframe.
 
@@ -165,6 +166,8 @@ def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_da
     on_progress, should_stop, progress_interval_s
         Forwarded to `MCTSEngine.run_search_from_blueprint`; each snapshot gets the extra keys
         `timeframe` and `idea_name`. Must be plain (picklable) callables.
+    reward_mode : str, optional
+        "gated" or "soft", passed to `MCTSEngine`; None uses AppConfig.REWARD_MODE.
 
     Returns
     -------
@@ -178,7 +181,7 @@ def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_da
 
     print(f"\n--- [Worker {tf}] Starting processing ---")
 
-    portfolio_manager = PortfolioManager() # Read-only use to check criteria
+    portfolio_manager = PortfolioManager()
     full_backtest_engine = AlphaBacktestEngine()
 
     # ==========================================
@@ -211,7 +214,7 @@ def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_da
         except Exception as pe:
             print(f"[Worker {tf}] Warning: Failed to load global position matrix: {pe}")
 
-    mcts = MCTSEngine(timeframe=tf, max_depth=4, global_position_matrix=global_position_matrix, seed=seed, data=data)
+    mcts = MCTSEngine(timeframe=tf, max_depth=4, global_position_matrix=global_position_matrix, seed=seed, data=data, reward_mode=reward_mode)
 
     # ==========================================
     # ĐỌC Ý TƯỞNG TỪ TẦNG 1 & BIÊN DỊCH BỞI TẦNG 2
@@ -355,21 +358,20 @@ def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_da
     # HMM Monte Carlo Validation Step
     # -------------------------------------------------------------
     from strategy_workflows.HMMValidation import validate_strategy_with_hmm
+    hmm_result = None  # descriptive only: a failed validation never rejects the candidate
     if synthetic_data and 'normal' in synthetic_data and 'stressed' in synthetic_data:
         normal_paths = synthetic_data['normal']
         stressed_paths = synthetic_data['stressed']
         
         print(f"[Worker {tf}] Running HMM 3-Tier Realistic Validation...")
         passed_hmm, tier_failed, hmm_reason, hmm_details = validate_strategy_with_hmm(strategy, normal_paths, stressed_paths, sharpe)
-        
-        if not passed_hmm:
-            print(f"[Worker {tf}] ❌ Rejected at Tier {tier_failed}: {hmm_reason}")
-            total_rejected = total_generated
-            return tf, total_generated, total_rejected, successful_candidates
+        hmm_result = {"passed": bool(passed_hmm), "tier_failed": tier_failed, "reason": hmm_reason, "details": hmm_details}
+        if passed_hmm:
+            print(f"[Worker {tf}] HMM: passed. {hmm_reason}")
         else:
-            print(f"[Worker {tf}] ✅ {hmm_reason}")
+            print(f"[Worker {tf}] HMM: failed at tier {tier_failed} (information only, candidate kept): {hmm_reason}")
     else:
-        print(f"[Worker {tf}] ⚠️ Missing synthetic data for HMM validation. Skipping filter.")
+        print(f"[Worker {tf}] Missing synthetic data for HMM validation; hmm result is None.")
     # -------------------------------------------------------------
     
     print(f"[Worker {tf}] 🎉 ONE-PASS COMMIT! Reward: {reward:.2f} | Calmar: {calmar:.2f} | Sharpe: {sharpe:.2f} | CAGR: {cagr*100:.1f}%")
@@ -385,7 +387,8 @@ def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_da
         "threshold_lower": threshold_lower,
         "metrics": metrics,
         "equity_curve": result.equity_curve,
-        "positions": result.positions
+        "positions": result.positions,
+        "hmm": hmm_result,
     })
     
     total_rejected = total_generated - 1
@@ -449,6 +452,11 @@ def run_mcts_pipeline(iterations: int = MCTS_ITERATIONS, retrain_hmm: bool = Fal
                     
                     code = generate_strategy_code(cand["expr"], cand["direction"], cand["best_scale"], cand["template"], cand["window"], cand["z_score"], cand.get("threshold_upper", 70.0), cand.get("threshold_lower", 30.0))
                     
+                    hmm = cand.get("hmm")
+                    portfolio_metrics = dict(cand["metrics"])
+                    if hmm is not None:
+                        portfolio_metrics.update(hmm_passed=hmm["passed"], hmm_tier_failed=hmm["tier_failed"],
+                                                 hmm_reason=hmm["reason"])
                     accepted, reason = portfolio_manager.evaluate_and_add(
                         name=unique_name,
                         timeframe=tf_res,
@@ -456,10 +464,9 @@ def run_mcts_pipeline(iterations: int = MCTS_ITERATIONS, retrain_hmm: bool = Fal
                         description=f"Alpha discovered via One-pass MCTS: {cand['expr']}",
                         code=code,
                         params={"direction": cand["direction"], "position_scale": cand["best_scale"], "template": cand["template"], "window": cand["window"], "z_score": cand["z_score"], "threshold_upper": cand.get("threshold_upper"), "threshold_lower": cand.get("threshold_lower")},
-                        metrics=cand["metrics"],
+                        metrics=portfolio_metrics,
                         equity_curve=cand["equity_curve"],
                         positions=cand["positions"],
-                        force_add=True
                     )
                     
                     print(f"[Main] Saving {tf_res} candidate {unique_name}: {reason}")

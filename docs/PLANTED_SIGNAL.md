@@ -35,6 +35,8 @@ Nếu dữ liệu thật sự chứa một công thức mà ngữ pháp biểu d
 
 **Kiểm tra "đáp án" trước khi chạy MCTS [đề xuất, thêm 2026-10-28 sau câu hỏi của người dùng về reward]:** chấm thẳng công thức cài bằng `MCTSEngine.evaluate_expression` trên đoạn tìm, ở từng độ mạnh. Lý do: reward có cổng cứng (−10 nếu Calmar < 1.1 hoặc < 15 lệnh). Nếu chính đáp án cũng nhận −10 thì reward không "cảm" được tín hiệu, và MCTS chỉ đang mò trong một mặt phẳng toàn −10. Khi đó lỗi nằm ở reward, không ở bước tìm. Ghi thêm tỷ lệ ứng viên nhận −10 trong mỗi lượt chạy.
 
+**So hai bản reward (người dùng chốt 2026-10-28):** chấm đáp án bằng cả bản "gated" và bản "soft" (định nghĩa ở ROADMAP mục 3), ở IC 0 / 0.01 / 0.02 / 0.05. Chọn bản mà điểm đáp án tăng theo IC và tách khỏi điểm ở IC 0; nếu cả hai đều được thì chọn "soft" vì mặt reward mượt hơn cho MCTS. Lượt MCTS của bài này chạy với bản đã chọn; bản đó đóng băng cho walk-forward.
+
 Mỗi (độ mạnh, seed) ghi:
 - IC thực tế của tín hiệu cài trên đoạn tìm và đoạn đánh giá.
 - **Tìm lại đúng:** có alpha trong top-5 có cùng cấu trúc và trường dữ liệu với công thức cài, cửa sổ lệch không quá một nấc trong `BASE_PERIODS` đã quy đổi.

@@ -10,7 +10,6 @@ if PROJECT_ROOT not in sys.path:
 import math
 import random
 import time
-import hashlib
 import logging
 from collections import Counter
 import pandas as pd
@@ -29,7 +28,8 @@ from strategy_workflows.PortfolioManager import PortfolioManager
 from strategy_workflows.SemanticCompiler import ASTNode
 from utilities.AppConfig import (
     REWARD_WEIGHTS, BASE_PERIODS, BASE_WINDOW_SEARCH,
-    BASELINE_TF_MINUTES, TIMEFRAME_MINUTES, MCTS_QUALITY_THRESHOLDS
+    BASELINE_TF_MINUTES, TIMEFRAME_MINUTES, MCTS_QUALITY_THRESHOLDS,
+    MIN_TRADES, REWARD_MODE, REWARD_MODES
 )
 
 logger = logging.getLogger(__name__)
@@ -451,7 +451,7 @@ class MCTSEngine:
         the engine overrides the state's default `max_depth` of 3 with its own 
         configured depth (typically 4).
     """
-    def __init__(self, timeframe: str = '10m', max_depth: int = 4, exploration_c: float = 1.414, global_position_matrix: pd.DataFrame = None, seed: Optional[int] = None, data: Optional[pd.DataFrame] = None):
+    def __init__(self, timeframe: str = '10m', max_depth: int = 4, exploration_c: float = 1.414, global_position_matrix: pd.DataFrame = None, seed: Optional[int] = None, data: Optional[pd.DataFrame] = None, reward_mode: Optional[str] = None):
         """
         Initialize the MCTSEngine.
         
@@ -472,7 +472,14 @@ class MCTSEngine:
         data : Optional[pd.DataFrame], default None
             OHLCV frame to search on (datetime index). The engine reads nothing beyond it, so a
             sub-window or synthetic frame can be injected. None loads `load_data(timeframe)`.
+        reward_mode : Optional[str], default None
+            "gated" or "soft" (see `evaluate_expression`); None takes AppConfig.REWARD_MODE.
         """
+        if reward_mode is None:
+            reward_mode = REWARD_MODE
+        if reward_mode not in REWARD_MODES:
+            raise ValueError(f"reward_mode must be one of {REWARD_MODES}, got {reward_mode!r}")
+        self.reward_mode = reward_mode
         self.seed = seed
         self.rng = random.Random(seed)
         self.timeframe = timeframe
@@ -519,42 +526,6 @@ class MCTSEngine:
         # Evaluations that ran without error but where no direction passed the hard gate (reward -10).
         self.gated_evaluation_count = 0
         self.gate_reasons: Counter = Counter()
-        
-        # Frequent Subtree Avoidance (FSA) Rolling Cache
-        # Stores SHA256 hashes of AST string representations of top alphas
-        self.fsa_cache: set = set()
-
-    def add_to_fsa_cache(self, ast_str: str):
-        """
-        Add the SHA256 hash of an AST string to the Frequent Subtree Avoidance (FSA) cache.
-        
-        This cache prevents genetic duplication by tracking structures that have
-        already yielded promising candidates, avoiding redundant search paths.
-        
-        Parameters
-        ----------
-        ast_str : str
-            The string representation of the AST node or expression.
-        """
-        h = hashlib.sha256(ast_str.encode()).hexdigest()
-        self.fsa_cache.add(h)
-        
-    def is_in_fsa_cache(self, ast_str: str) -> bool:
-        """
-        Check if the SHA256 hash of an AST string exists in the FSA cache.
-        
-        Parameters
-        ----------
-        ast_str : str
-            The string representation of the AST node or expression to check.
-            
-        Returns
-        -------
-        bool
-            True if the hash exists in the FSA cache, False otherwise.
-        """
-        h = hashlib.sha256(ast_str.encode()).hexdigest()
-        return h in self.fsa_cache
 
     def compute_rank_ic(self, alpha_series: pd.Series, close_series: pd.Series) -> float:
         fwd_returns = close_series.pct_change(1).shift(-1)
@@ -588,16 +559,14 @@ class MCTSEngine:
 
         Uses an evaluation cache (`self.cache`) to store previous backtest results
         based on the generated expression string, window, and z-score threshold.
-        Also checks the FSA cache to penalize duplicate subtrees with a large
-        negative reward.
 
         An exception while rendering, evaluating or backtesting scores -10 but is counted in
         `self.error_counts` and logged on first occurrence.
 
-        Applies One-pass Pipeline rules:
-        - Hard filter: Calmar Ratio < 1.1 -> reward = -10.0
-        - Position correlation penalty against global_position_matrix
-        - Multi-objective reward: (0.6 * S_calmar + 0.4 * S_ic) * S_corr
+        Reward = (0.6 * S_calmar + 0.4 * S_ic) * S_corr, S_corr from the position correlation
+        against global_position_matrix. `self.reward_mode` decides what happens to weak candidates:
+        - "gated": total_trades < MIN_TRADES or Calmar below the threshold -> reward -10.0.
+        - "soft": no gate; S_calmar is 0 when total_trades < MIN_TRADES, the IC term stays.
 
         Parameters
         ----------
@@ -624,10 +593,6 @@ class MCTSEngine:
         cache_key = desc['cache_key']
         if cache_key in self.cache:
             return self.cache[cache_key]
-
-        # FSA Check - Penalty for genetic duplication
-        if self.is_in_fsa_cache(cache_key):
-            return -100.0, 1.0, {} # Massive penalty for identical subtree
 
         self.evaluation_count += 1
         info = {
@@ -670,9 +635,10 @@ class MCTSEngine:
 
                 total_trades = metrics.get('total_trades', 0)
                 calmar_threshold = MCTS_QUALITY_THRESHOLDS['calmar_ratio']
-                if total_trades < 15 or calmar < calmar_threshold:
+                too_few_trades = total_trades < MIN_TRADES
+                if self.reward_mode == "gated" and (too_few_trades or calmar < calmar_threshold):
                     reward = -10.0
-                    gate_too_few_trades.append(total_trades < 15)
+                    gate_too_few_trades.append(too_few_trades)
                 else:
                     passed_gate = True
                     max_corr = 0.0
@@ -685,7 +651,10 @@ class MCTSEngine:
                             if np.isnan(max_corr):
                                 max_corr = 0.0
 
-                    s_calmar = min(1.0, max(0.0, (calmar - calmar_threshold) / (REWARD_WEIGHTS['max_calmar'] - calmar_threshold)))
+                    if too_few_trades:
+                        s_calmar = 0.0  # only reachable in "soft" mode
+                    else:
+                        s_calmar = min(1.0, max(0.0, (calmar - calmar_threshold) / (REWARD_WEIGHTS['max_calmar'] - calmar_threshold)))
                     s_ic = min(1.0, abs(rank_ic) / REWARD_WEIGHTS['max_ic'])
                     s_corr = max(0.0, 1.0 - max_corr)
 
@@ -814,10 +783,6 @@ class MCTSEngine:
                     desc = None  # already counted as a render error by evaluate_expression
                 if desc is not None:
                     self.update_leaderboard(desc['expr'], reward, direction, metrics)
-
-                    # Update FSA Rolling Window Cache if good reward
-                    if reward > 1.0:
-                        self.add_to_fsa_cache(desc['cache_key'])
                 
             # Risk-Seeking Backpropagation (Tail Quantile)
             for p_node in path:

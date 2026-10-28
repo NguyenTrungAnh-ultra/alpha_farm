@@ -17,17 +17,17 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Load environment variables
 load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
 
-# Centralized Quality Thresholds for MCTS (Search Gradient)
+# Calmar floor of the hard gate ("gated" reward mode) and the zero point of the Calmar score.
 MCTS_QUALITY_THRESHOLDS = {
-    'sharpe_ratio': 1.3,
-    'cagr': 0.15,
-    'max_drawdown_pct': -35.0,
-    'profit_factor': 1.3,
     'calmar_ratio': 1.1
 }
 
-# General App Config
-MAX_CORRELATION = 0.5
+# Fewer trades than this is statistically meaningless: reward -10 in "gated" mode, Calmar term zeroed in "soft".
+MIN_TRADES = 15
+
+# "gated": candidates below the Calmar / trade-count gate score -10. "soft": no gate, the score only shrinks.
+REWARD_MODES = ("gated", "soft")
+REWARD_MODE = "gated"
 
 # === MCTS One-pass Pipeline Config ===
 REWARD_WEIGHTS = {
