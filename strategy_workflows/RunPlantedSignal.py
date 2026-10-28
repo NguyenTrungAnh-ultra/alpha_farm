@@ -5,7 +5,8 @@ Planted-signal test: does the pipeline (frozen blueprints -> MCTS -> top-5 portf
 formula that is known to be in the data, and is it quiet when nothing is there?
 
 Steps (`main.py planted <step>`):
-    blueprints  generate and freeze the blueprint set; report which can express the planted formula
+    blueprints  generate and freeze the blueprint set
+    select      derive the planted formula from the frozen set and store it (planted_formula.json)
     oracle      score the planted formula itself on each planted frame (no search)
     search      run MCTS per (strength, seed), recover-check and trade the top-5 out of sample
     summary     aggregate runs.csv and print the pass/fail criteria
@@ -40,9 +41,10 @@ from strategy_workflows.MCTSEngine import (
     find_unimplemented_operator,
 )
 from strategy_workflows.PlantedSignal import (
-    EVAL_END, PLANTED_FORMULA, SEARCH_END, SEARCH_START, TOP_K, PlantedData,
-    Calibration, assert_in_search_space, build_planted_data, calibrate_beta, can_express, combine_positions,
-    is_exact_recovery, is_near_recovery, is_verbatim, spearman_abs, top_candidates,
+    EVAL_END, SEARCH_END, SEARCH_START, TOP_K, Calibration, PlantedData, PlantedFormula,
+    assert_in_search_space, build_planted_data, calibrate_beta, can_express, combine_positions,
+    formula_from_dict, formula_to_dict, is_exact_recovery, is_near_recovery, is_verbatim,
+    select_planted_formula, spearman_abs, top_candidates,
 )
 from strategy_workflows.SemanticCompiler import ASTNode, SemanticCompiler
 
@@ -83,14 +85,27 @@ def load_blueprints(path: str) -> List[Dict[str, str]]:
     return [{'name': i['name'], 'macro_blueprint': i['macro_blueprint']} for i in items]
 
 
-def calibration_key(base: pd.DataFrame, strength: float) -> str:
-    """Cache key: strength, formula and the data window (bounds, size, price checksum)."""
+def formula_path(out_dir: str) -> str:
+    return os.path.join(out_dir, 'planted_formula.json')
+
+
+def load_formula(out_dir: str) -> PlantedFormula:
+    """The formula stored by the `select` step; refuses to continue without it."""
+    path = formula_path(out_dir)
+    if not os.path.exists(path):
+        raise SystemExit(f"[planted] {path} not found; run the select step first.")
+    with open(path, 'r', encoding='utf-8') as f:
+        return formula_from_dict(json.load(f))
+
+
+def calibration_key(base: pd.DataFrame, strength: float, formula: PlantedFormula) -> str:
+    """Cache key: strength, formula (expression and z-score window) and the data window (bounds, size, price checksum)."""
     checksum = hashlib.md5(base['Close'].to_numpy().tobytes()).hexdigest()[:12]
-    return (f"strength={strength}|period={PLANTED_FORMULA.period}|window={PLANTED_FORMULA.window}"
+    return (f"strength={strength}|expr={formula.expr}|z_window={formula.z_window}"
             f"|data={base.index[0]}..{base.index[-1]}|n={len(base)}|search_end={SEARCH_END}|close={checksum}")
 
 
-def get_beta(base: pd.DataFrame, strength: float, out_dir: str, workers: int = 1) -> float:
+def get_beta(base: pd.DataFrame, strength: float, out_dir: str, formula: PlantedFormula, workers: int = 1) -> float:
     """Calibrated beta for `strength`, from calibration.json when cached, else computed and stored."""
     if strength == 0.0:
         return 0.0
@@ -99,10 +114,10 @@ def get_beta(base: pd.DataFrame, strength: float, out_dir: str, workers: int = 1
     if os.path.exists(path):
         with open(path, 'r', encoding='utf-8') as f:
             cache = json.load(f)
-    key = calibration_key(base, strength)
+    key = calibration_key(base, strength, formula)
     if key not in cache:
         started = time.time()
-        result = calibrate_beta(base, SEARCH_END, strength, PLANTED_FORMULA, workers=workers)
+        result = calibrate_beta(base, SEARCH_END, strength, formula, workers=workers)
         cache[key] = {
             'beta': result.beta, 'target_ic': strength, 'mean_ic': result.mean_ic, 'std_ic': result.std_ic,
             'perm_seeds': result.seeds, 'evaluations': result.iterations,
@@ -132,10 +147,10 @@ def normalized_tree(expr: ASTNode, window: int, z_score: float) -> ASTNode:
 # --------------------------------------------------------------------------- step: blueprints
 
 
-def annotate_blueprints(blueprints: List[Dict[str, str]]) -> List[Dict]:
+def annotate_blueprints(blueprints: List[Dict[str, str]], formula: PlantedFormula) -> List[Dict]:
     """Add `can_express` and `verbatim` flags (against the planted formula) to each blueprint."""
     compiler = SemanticCompiler()
-    target = PLANTED_FORMULA.expr_ast()
+    target = formula.expr_ast()
     out = []
     for bp in blueprints:
         root = compiler.compile_blueprint(bp['macro_blueprint'])
@@ -224,32 +239,49 @@ def step_blueprints(args) -> None:
         return
     os.makedirs(os.path.dirname(path), exist_ok=True)
     blueprints = generate_blueprints(args.n, args.model)
-    annotated = annotate_blueprints(blueprints)
     with open(path, 'w', encoding='utf-8') as f:
-        json.dump(annotated, f, indent=4, ensure_ascii=False)
+        json.dump(blueprints, f, indent=4, ensure_ascii=False)
+    print(f"[planted] Froze {len(blueprints)} blueprints to {path}; run the select step next")
+
+
+# --------------------------------------------------------------------------- step: select
+
+
+def step_select(args) -> None:
+    path = args.blueprints or os.path.join(args.out_dir, 'blueprints.json')
+    blueprints = load_blueprints(path)
+    base = load_base()
+    with quiet():
+        engine = MCTSEngine(timeframe=TIMEFRAME, data=base.loc[:SEARCH_END], global_position_matrix=None)
+    formula, info = select_planted_formula(blueprints, engine)
+    annotated = annotate_blueprints(blueprints, formula)
+    source = next(b for b in annotated if b['name'] == formula.source)
+    if not source['can_express']:
+        raise RuntimeError(f"Selected blueprint {formula.source} cannot express its own formula")
     expressing = [b['name'] for b in annotated if b['can_express']]
-    verbatim = [b['name'] for b in annotated if b['verbatim']]
-    print(f"[planted] Froze {len(annotated)} blueprints to {path}")
-    print(f"[planted] Planted formula: ts_zscore({PLANTED_FORMULA.expr}, {PLANTED_FORMULA.window}) under NORMALIZED")
-    if not expressing:
-        print("!" * 70)
-        print("!!! NO BLUEPRINT CAN EXPRESS THE PLANTED FORMULA: the test would measure the")
-        print("!!! blueprint set, not the search. Change the formula or the set before searching.")
-        print("!" * 70)
-    else:
-        print(f"[planted] {len(expressing)} blueprint(s) can express it: {expressing}")
-    if verbatim:
-        print(f"[planted] WARNING: spelled out verbatim (no '?' left): {verbatim}")
+    record = {**formula_to_dict(formula), 'window_choice': info, 'blueprints_file': os.path.basename(path),
+              'n_blueprints': len(blueprints), 'expressing_blueprints': expressing}
+    os.makedirs(args.out_dir, exist_ok=True)
+    with open(formula_path(args.out_dir), 'w', encoding='utf-8') as f:
+        json.dump(record, f, indent=2, ensure_ascii=False)
+    print(f"[planted] Planted formula: ts_zscore({formula.expr}, {formula.z_window}) under NORMALIZED")
+    print(f"[planted] From blueprint {formula.source}: {next(b['macro_blueprint'] for b in blueprints if b['name'] == formula.source)}")
+    print(f"[planted] Windows used: period {info['period']}, z-score {info['z_window']}"
+          f"{' (ADJUSTED from 10: not in the scaled ladders)' if info['adjusted'] else ''}")
+    if info['skipped_verbatim']:
+        print(f"[planted] Skipped (filled formula spelled out by a blueprint): {info['skipped_verbatim']}")
+    print(f"[planted] {len(expressing)} blueprint(s) can express it: {expressing}")
+    print(f"[planted] Wrote {formula_path(args.out_dir)}")
 
 
 # --------------------------------------------------------------------------- step: oracle
 
 
-def score_planted_formula(engine: MCTSEngine) -> Dict:
+def score_planted_formula(engine: MCTSEngine, formula: PlantedFormula) -> Dict:
     """Best (over the z-score thresholds the search offers) reward of the planted formula itself."""
     best = (-float('inf'), None, None, {})
     for z in Z_THRESHOLDS:
-        tree = normalized_tree(PLANTED_FORMULA.expr_ast(), PLANTED_FORMULA.window, z)
+        tree = normalized_tree(formula.expr_ast(), formula.z_window, z)
         reward, _, metrics = engine.evaluate_expression(tree)
         if reward > best[0]:
             best = (reward, z, tree, metrics)
@@ -257,22 +289,22 @@ def score_planted_formula(engine: MCTSEngine) -> Dict:
 
 
 def step_oracle(args) -> None:
-    os.makedirs(args.out_dir, exist_ok=True)
+    formula = load_formula(args.out_dir)
     started = time.time()
     base = load_base()
     workers = args.workers if args.workers else max(1, multiprocessing.cpu_count() - 2)
     rows = []
     for strength in args.strengths:
-        beta = get_beta(base, strength, args.out_dir, workers)
+        beta = get_beta(base, strength, args.out_dir, formula, workers)
         for seed in args.seeds:
-            data = build_planted_data(base, SEARCH_END, strength, seed, beta)
+            data = build_planted_data(base, SEARCH_END, strength, seed, beta, formula)
             scored = {}
             for mode in ('gated', 'soft'):
                 with quiet():
                     engine = MCTSEngine(timeframe=TIMEFRAME, data=data.search, seed=seed,
                                         reward_mode=mode, global_position_matrix=None)
-                assert_in_search_space(engine)
-                scored[mode] = score_planted_formula(engine)
+                assert_in_search_space(engine, formula)
+                scored[mode] = score_planted_formula(engine, formula)
             soft_metrics = scored['soft']['metrics']
             rows.append({
                 'strength': strength, 'seed': seed, 'beta': data.beta, 'ic_search': data.ic_search, 'ic_eval': data.ic_eval,
@@ -320,12 +352,12 @@ def run_single(task: Dict) -> Dict:
     warnings.filterwarnings('ignore')
     started = time.time()
     mode, strength, seed, iterations = task['reward_mode'], task['strength'], task['seed'], task['iterations']
-    blueprints = task['blueprints']
+    blueprints, formula = task['blueprints'], task['formula']
     with quiet():
-        data = build_planted_data(load_base(), SEARCH_END, strength, seed, task['beta'])
+        data = build_planted_data(load_base(), SEARCH_END, strength, seed, task['beta'], formula)
         engine = MCTSEngine(timeframe=TIMEFRAME, max_depth=4, global_position_matrix=None, seed=seed,
                             data=data.search, reward_mode=mode)
-        assert_in_search_space(engine)
+        assert_in_search_space(engine, formula)
         compiler = SemanticCompiler()
         stop_reasons: Counter = Counter()
         blueprint_errors = 0
@@ -340,9 +372,9 @@ def run_single(task: Dict) -> Dict:
         summary = engine.error_summary()
         top = top_candidates(engine.get_best_candidates(), TOP_K)
 
-        planted_alpha = PLANTED_FORMULA.alpha_series(data.search['Close'])
+        planted_alpha = formula.alpha_series(data.search)
         correlations = [spearman_abs(evaluate_alpha(c['expr'], engine.data), planted_alpha) for c in top]
-        exact = any(is_exact_recovery(c, PLANTED_FORMULA, engine.scaled_periods, engine.scaled_window_search)
+        exact = any(is_exact_recovery(c, formula, engine.scaled_periods, engine.scaled_window_search)
                     for c in top)
         near = any(is_near_recovery(r) for r in correlations)
         oos = out_of_sample_sharpe(top, data)
@@ -369,16 +401,17 @@ def append_run(path: str, row: Dict) -> None:
 
 
 def step_search(args) -> None:
+    formula = load_formula(args.out_dir)
     os.makedirs(args.out_dir, exist_ok=True)
     blueprint_path = args.blueprints or os.path.join(args.out_dir, 'blueprints.json')
     blueprints = load_blueprints(blueprint_path)
     runs_path = os.path.join(args.out_dir, 'runs.csv')
     workers = args.workers if args.workers else max(1, multiprocessing.cpu_count() - 2)
     base = load_base()
-    betas = {s: get_beta(base, s, args.out_dir, workers) for s in args.strengths}
+    betas = {s: get_beta(base, s, args.out_dir, formula, workers) for s in args.strengths}
     tasks = [
         {'reward_mode': args.reward_mode, 'strength': s, 'seed': seed, 'beta': betas[s],
-         'iterations': args.iterations, 'blueprints': blueprints}
+         'iterations': args.iterations, 'blueprints': blueprints, 'formula': formula}
         for s in args.strengths for seed in args.seeds
     ]
     print(f"[planted] {len(tasks)} runs, {len(blueprints)} blueprints, {args.iterations} iterations each, {workers} worker(s)")
@@ -474,6 +507,9 @@ def add_planted_parser(subparsers) -> None:
     p.add_argument('--model', default='ollama-local', choices=['ollama-local', 'ollama-9b'])
     p.add_argument('--force', action='store_true', help='Overwrite an existing frozen set')
 
+    p = steps.add_parser('select', help='Derive the planted formula from the frozen blueprint set')
+    common(p, search_options=False)
+
     p = steps.add_parser('oracle', help='Score the planted formula itself on each planted frame')
     common(p)
     p.add_argument('--workers', type=int, default=0, help='Calibration worker processes (default: cpu_count - 2)')
@@ -489,5 +525,5 @@ def add_planted_parser(subparsers) -> None:
 
 
 def run_planted(args) -> None:
-    {'blueprints': step_blueprints, 'oracle': step_oracle, 'search': step_search,
+    {'blueprints': step_blueprints, 'select': step_select, 'oracle': step_oracle, 'search': step_search,
      'summary': step_summary}[args.step](args)

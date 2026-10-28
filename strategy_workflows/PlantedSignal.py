@@ -20,8 +20,9 @@ import ast
 import os
 import sys
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass
-from typing import Callable, List, Optional, Sequence
+from dataclasses import dataclass, field
+from functools import lru_cache
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -30,10 +31,11 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from core_engine.AlphaPrimitives import ts_mean, ts_zscore
-from strategy_workflows.MCTSDimensions import OPERATOR_REGISTRY, OperatorGroup
-from strategy_workflows.MCTSEngine import ast_to_code
-from strategy_workflows.SemanticCompiler import ASTNode
+from core_engine.AlphaEngine import AlphaDataProxy
+from core_engine.AlphaPrimitives import ts_zscore
+from strategy_workflows.MCTSDimensions import DATA_FIELD_DIMENSIONS, OPERATOR_REGISTRY, OperatorGroup
+from strategy_workflows.MCTSEngine import FIELD_EXPRESSIONS, TS_FUNCTIONS, ast_to_code, evaluate_alpha
+from strategy_workflows.SemanticCompiler import ASTNode, SemanticCompiler
 
 SEARCH_START = '2018-08-13'
 SEARCH_END = '2020-06-30'
@@ -48,58 +50,141 @@ NEAR_CORRELATION = 0.7
 
 # --------------------------------------------------------------------------- formula
 
+# Variable names of the generated code that come from the bar shape rather than from Close.
+FORMULA_RULE = ("first blueprint in file order with >= 2 '?' slots and a NORMALIZED root; every '?' = pv_close, "
+                "every window = 10 (nearest allowed), z-score window 10; a verbatim copy of a blueprint -> next one")
+SLOT_FILL_FIELD = 'pv_close'
+TARGET_WINDOW = 10
+
 
 @dataclass(frozen=True)
 class PlantedFormula:
     """
-    The planted alpha A = close - ts_mean(close, period) and signal s = ts_zscore(A, window).
+    A planted alpha A (`tree`, every ts_* node has a window) and its signal s = ts_zscore(A, z_window).
 
-    `period` must be one of the engine's scaled periods and `window` one of its scaled z-score
-    windows for the timeframe, otherwise the search can never produce the formula.
+    The windows must be values the engine's scaled periods / z-score windows offer for the
+    timeframe, otherwise the search can never produce the formula (`assert_in_search_space`).
     """
-    period: int = 10
-    window: int = 10
-
-    @property
-    def lookback(self) -> int:
-        # Closes needed to compute s at one bar: `period` for the mean, then `window` values of A.
-        return self.period + self.window - 1
-
-    def expr_ast(self) -> ASTNode:
-        return ASTNode(name='sub', children=[
-            ASTNode(name='pv_close'),
-            ASTNode(name='ts_mean', children=[ASTNode(name='pv_close')], window=self.period),
-        ])
+    tree: ASTNode = field(compare=False)
+    z_window: int
+    source: str = ''
+    rule: str = ''
 
     @property
     def expr(self) -> str:
         """Expression text exactly as the search renders it."""
-        return ast_to_code(self.expr_ast())
+        return ast_to_code(self.tree)
 
-    def signal_last(self, closes: np.ndarray) -> float:
-        """Signal at the last bar of `closes` (NaN when fewer than `lookback` closes)."""
-        if len(closes) < self.lookback:
+    def expr_ast(self) -> ASTNode:
+        return self.tree
+
+    @property
+    def windows(self) -> List[int]:
+        return sorted(set(_collect_windows(self.tree)))
+
+    @property
+    def used_fields(self) -> List[str]:
+        """Variable names (open_/high/low/close/volume) the expression reads."""
+        return sorted({FIELD_EXPRESSIONS[n] for n in _collect_fields(self.tree)})
+
+    @property
+    def lookback(self) -> int:
+        """Bars needed to compute s at one bar: deepest chain of nested windows, then the z-score window."""
+        return _history_needed(self.tree) + self.z_window
+
+    def signal_last(self, window: Dict[str, np.ndarray]) -> float:
+        """
+        Signal at the last bar of a trailing window of bars (keys: the variable names in
+        `used_fields` plus close, each a 1-D array of equal length). NaN when fewer than `lookback` bars.
+        """
+        if len(window['close']) < self.lookback:
             return float('nan')
-        closes = np.asarray(closes[-self.lookback:], dtype=np.float64)
-        alpha = closes - ts_mean(closes, self.period)
-        return float(ts_zscore(alpha, self.window)[-1])
+        namespace = {k: np.asarray(v[-self.lookback:], dtype=np.float64) for k, v in window.items()}
+        namespace.update(TS_FUNCTIONS)
+        alpha = eval(_compiled_expression(self.expr), {"__builtins__": {}}, namespace)
+        return float(ts_zscore(alpha, self.z_window)[-1])
 
-    def alpha_series(self, close: pd.Series) -> pd.Series:
-        return close - ts_mean(close, self.period)
+    def alpha_series(self, frame: pd.DataFrame) -> pd.Series:
+        return evaluate_alpha(self.expr, AlphaDataProxy(frame))
 
-    def signal_series(self, close: pd.Series) -> pd.Series:
-        return ts_zscore(self.alpha_series(close), self.window)
-
-
-PLANTED_FORMULA = PlantedFormula()
+    def signal_series(self, frame: pd.DataFrame) -> pd.Series:
+        return ts_zscore(self.alpha_series(frame), self.z_window)
 
 
-def assert_in_search_space(engine, formula: PlantedFormula = PLANTED_FORMULA) -> None:
+@lru_cache(maxsize=None)
+def _compiled_expression(expr: str):
+    return compile(expr, '<planted>', 'eval')
+
+
+def _data_children(node: ASTNode) -> List[ASTNode]:
+    """Data arguments of a node; for TIME_SERIES operators the window constant is not one."""
+    meta = OPERATOR_REGISTRY.get(node.name)
+    if meta is not None and meta["group"] == OperatorGroup.TIME_SERIES:
+        arity = len(meta["input_dims"])
+        series = [c for c in node.children if c.name != "Constant"]
+        return series if len(series) == arity else node.children[:arity]
+    return node.children
+
+
+def _collect_windows(node: ASTNode) -> List[int]:
+    found = [node.window] if node.window is not None else []
+    for child in _data_children(node):
+        found.extend(_collect_windows(child))
+    return found
+
+
+def _collect_fields(node: ASTNode) -> List[str]:
+    found = [node.name] if node.name in DATA_FIELD_DIMENSIONS else []
+    for child in _data_children(node):
+        found.extend(_collect_fields(child))
+    return found
+
+
+def _history_needed(node: ASTNode) -> int:
+    """Bars before the last one that `node` reads: a ts_* window adds window - 1 on top of its deepest operand."""
+    deepest = max((_history_needed(c) for c in _data_children(node)), default=0)
+    return deepest + (node.window - 1 if node.window is not None else 0)
+
+
+def mean_reversion_formula(period: int = TARGET_WINDOW, window: int = TARGET_WINDOW) -> PlantedFormula:
+    """A = close - ts_mean(close, period), s = ts_zscore(A, window): a simple formula for checks."""
+    tree = ASTNode(name='sub', children=[
+        ASTNode(name='pv_close'),
+        ASTNode(name='ts_mean', children=[ASTNode(name='pv_close')], window=period),
+    ])
+    return PlantedFormula(tree=tree, z_window=window, source='mean_reversion', rule='fixed')
+
+
+def assert_in_search_space(engine, formula: PlantedFormula) -> None:
     """Fail loudly when the engine's scaled windows cannot express the planted formula."""
-    if formula.period not in engine.scaled_periods:
-        raise ValueError(f"Planted period {formula.period} not in scaled_periods {engine.scaled_periods}")
-    if formula.window not in engine.scaled_window_search:
-        raise ValueError(f"Planted window {formula.window} not in scaled_window_search {engine.scaled_window_search}")
+    for window in formula.windows:
+        if window not in engine.scaled_periods:
+            raise ValueError(f"Planted period {window} not in scaled_periods {engine.scaled_periods}")
+    if formula.z_window not in engine.scaled_window_search:
+        raise ValueError(f"Planted window {formula.z_window} not in scaled_window_search {engine.scaled_window_search}")
+
+
+def formula_to_dict(formula: PlantedFormula) -> dict:
+    def node(n: ASTNode) -> dict:
+        out = {'name': n.name}
+        if n.window is not None:
+            out['window'] = n.window
+        kids = _data_children(n)
+        if kids:
+            out['children'] = [node(c) for c in kids]
+        return out
+    return {'expression': formula.expr, 'z_window': formula.z_window, 'source_blueprint': formula.source,
+            'rule': formula.rule, 'tree': node(formula.tree)}
+
+
+def formula_from_dict(data: dict) -> PlantedFormula:
+    def node(d: dict) -> ASTNode:
+        return ASTNode(name=d['name'], children=[node(c) for c in d.get('children', [])], window=d.get('window'))
+    formula = PlantedFormula(tree=node(data['tree']), z_window=int(data['z_window']),
+                             source=data.get('source_blueprint', ''), rule=data.get('rule', ''))
+    if formula.expr != data['expression']:
+        raise ValueError(f"Stored expression {data['expression']} does not match its tree {formula.expr}")
+    return formula
 
 
 # --------------------------------------------------------------------------- placebo base
@@ -156,30 +241,51 @@ class PlantResult:
     signal: np.ndarray    # s_t before NaN -> 0; NaN during warm-up
 
 
+def shape_fields(bars: pd.DataFrame, formula: PlantedFormula) -> Dict[str, np.ndarray]:
+    """Per-bar arrays the formula needs besides close: open_/high/low as ratios to Close, raw volume."""
+    ratio_columns = {'open_': 'open_ratio', 'high': 'high_ratio', 'low': 'low_ratio'}
+    out = {}
+    for name in formula.used_fields:
+        if name in ratio_columns:
+            out[name] = bars[ratio_columns[name]].to_numpy(dtype=np.float64)
+        elif name == 'volume':
+            out[name] = np.nan_to_num(bars['Volume'].to_numpy(dtype=np.float64), nan=0.0)
+    return out
+
+
 def plant_signal(
     eps: np.ndarray,
     sigma: np.ndarray,
     first_close: float,
     beta: float,
-    signal_fn: Callable[[np.ndarray], float],
+    signal_fn: Callable[[Dict[str, np.ndarray]], float],
     lookback: int,
+    shape: Optional[Dict[str, np.ndarray]] = None,
 ) -> PlantResult:
     """
     Sequentially add the predictable part to placebo returns `eps`.
 
-    For each bar t the signal is computed from the reconstructed closes up to t (a trailing
-    window of `lookback` closes is enough for the formula), then the next return becomes
+    For each bar t the signal is computed from the reconstructed bars up to t (a trailing
+    window of `lookback` bars is enough for the formula), then the next return becomes
     eps[t+1] + beta * sigma[t+1] * s_t, with NaN signals counted as 0. Index 0 carries no return.
-    `sigma[i]` is the placebo return std of the segment that bar i belongs to.
+    `sigma[i]` is the placebo return std of the segment that bar i belongs to. `shape` maps
+    open_/high/low to each bar's ratio against its own Close and volume to its Volume; the window
+    handed to `signal_fn` holds those fields rebuilt as in `build_ohlcv_from_returns`, plus close.
     """
     n = len(eps)
+    shape = shape or {}
     returns = np.zeros(n)
     cumulative = np.ones(n)
     closes = np.empty(n)
     closes[0] = first_close
+    fields = {name: np.empty(n) for name in shape}
     signal = np.full(n, np.nan)
     for t in range(n):
-        window = closes[max(0, t - lookback + 1): t + 1]
+        for name, values in shape.items():
+            fields[name][t] = values[t] if name == 'volume' else closes[t] * values[t]
+        lo = max(0, t - lookback + 1)
+        window = {name: arr[lo: t + 1] for name, arr in fields.items()}
+        window['close'] = closes[lo: t + 1]
         s_t = signal_fn(window)
         signal[t] = s_t
         if t + 1 < n:
@@ -227,12 +333,12 @@ def placebo_arrays(bars: pd.DataFrame, n_search: int, seed: int):
 
 def search_ic_for_seed(
     bars: pd.DataFrame, n_search: int, first_close: float, beta: float, seed: int,
-    formula: PlantedFormula = PLANTED_FORMULA,
+    formula: PlantedFormula,
 ) -> float:
     """Realized search-segment IC of the signal planted with `beta` on the placebo of `seed`."""
-    _, eps, sigma = placebo_arrays(bars, n_search, seed)
-    planted = plant_signal(eps[:n_search], sigma[:n_search], first_close, beta,
-                           formula.signal_last, formula.lookback)
+    perm, eps, sigma = placebo_arrays(bars, n_search, seed)
+    planted = plant_signal(eps[:n_search], sigma[:n_search], first_close, beta, formula.signal_last,
+                           formula.lookback, shape_fields(perm.iloc[:n_search], formula))
     return realized_ic(pd.Series(planted.signal), pd.Series(planted.closes))
 
 
@@ -253,7 +359,7 @@ def calibrate_beta(
     base: pd.DataFrame,
     search_end: str,
     target_ic: float,
-    formula: PlantedFormula = PLANTED_FORMULA,
+    formula: PlantedFormula,
     seeds: Sequence[int] = CALIBRATION_SEEDS,
     tolerance: float = CALIBRATION_TOLERANCE,
     max_iterations: int = CALIBRATION_MAX_ITERATIONS,
@@ -335,7 +441,7 @@ def build_planted_data(
     strength: float,
     seed: int,
     beta: float,
-    formula: PlantedFormula = PLANTED_FORMULA,
+    formula: PlantedFormula,
 ) -> PlantedData:
     """
     Placebo-plus-signal series from a real OHLCV frame covering both segments.
@@ -349,7 +455,8 @@ def build_planted_data(
         raise ValueError("Both segments must be non-empty")
     perm, eps, sigma = placebo_arrays(split_bars(base), n_search, seed)
     first_close = float(base['Close'].iloc[0])
-    planted = plant_signal(eps, sigma, first_close, beta, formula.signal_last, formula.lookback)
+    planted = plant_signal(eps, sigma, first_close, beta, formula.signal_last, formula.lookback,
+                           shape_fields(perm, formula))
     full = build_ohlcv_from_returns(perm, planted.returns, first_close)
     signal = pd.Series(planted.signal, index=full.index, name='signal')
 
@@ -363,16 +470,6 @@ def build_planted_data(
 
 
 # --------------------------------------------------------------------------- blueprint coverage
-
-
-def _data_children(node: ASTNode) -> List[ASTNode]:
-    """Data arguments of a node; for TIME_SERIES operators the window constant is not one."""
-    meta = OPERATOR_REGISTRY.get(node.name)
-    if meta is not None and meta["group"] == OperatorGroup.TIME_SERIES:
-        arity = len(meta["input_dims"])
-        series = [c for c in node.children if c.name != "Constant"]
-        return series if len(series) == arity else node.children[:arity]
-    return node.children
 
 
 def _depth_fits(target: ASTNode, depth: int, max_depth: int) -> bool:
@@ -434,6 +531,69 @@ def is_verbatim(blueprint: ASTNode, expr: ASTNode, max_depth: int = 4) -> bool:
     """True when the blueprint already spells out `expr` with no '?' left (only windows to find)."""
     body = _blueprint_body(blueprint)
     return body is not None and not _has_hole(body) and _unify_root(body, expr, 1, max_depth)
+
+
+# --------------------------------------------------------------------------- formula selection
+
+
+def _nearest(target: int, allowed: Sequence[int]) -> int:
+    return min(sorted(allowed), key=lambda v: abs(v - target))
+
+
+def _count_slots(node: ASTNode) -> int:
+    return (1 if node.name == '?' else 0) + sum(_count_slots(c) for c in _data_children(node))
+
+
+def _fill_slots(node: ASTNode, period: int) -> ASTNode:
+    """Copy of a blueprint body: every '?' becomes pv_close and every ts_* node gets window `period`."""
+    if node.name == '?':
+        return ASTNode(name=SLOT_FILL_FIELD)
+    meta = OPERATOR_REGISTRY.get(node.name)
+    is_ts = meta is not None and meta["group"] == OperatorGroup.TIME_SERIES
+    return ASTNode(name=node.name, children=[_fill_slots(c, period) for c in _data_children(node)],
+                   value=node.value, window=period if is_ts else None)
+
+
+def assert_not_degenerate(formula: PlantedFormula, bars: int = 400) -> None:
+    """Raise when A is constant on synthetic bars (e.g. close - close), which would plant nothing."""
+    rng = np.random.default_rng(0)
+    close = 1000.0 * np.cumprod(1.0 + rng.normal(0.0, 0.003, bars))
+    frame = pd.DataFrame({'Open': close * rng.uniform(0.998, 1.002, bars), 'High': close * rng.uniform(1.0, 1.01, bars),
+                          'Low': close * rng.uniform(0.99, 1.0, bars), 'Close': close,
+                          'Volume': rng.uniform(1000, 5000, bars)})
+    alpha = formula.alpha_series(frame).dropna()
+    if len(alpha) == 0 or float(alpha.std()) < 1e-9 * max(1.0, float(alpha.abs().max())):
+        raise ValueError(f"Selected formula {formula.expr} is constant on synthetic bars; it cannot be planted")
+
+
+def select_planted_formula(blueprints: Sequence[Dict[str, str]], engine) -> Tuple[PlantedFormula, Dict]:
+    """
+    Derive the planted formula from the frozen blueprint set (rule: FORMULA_RULE).
+
+    Returns (formula, info); info records the window values actually used and the blueprints
+    skipped because the filled formula was spelled out by one of them. Raises ValueError when no
+    blueprint qualifies: the rule is never loosened.
+    """
+    compiler = SemanticCompiler()
+    roots = [(bp['name'], compiler.compile_blueprint(bp['macro_blueprint'])) for bp in blueprints]
+    period = _nearest(TARGET_WINDOW, engine.scaled_periods)
+    z_window = _nearest(TARGET_WINDOW, engine.scaled_window_search)
+    max_depth = getattr(engine, 'max_depth', 4)
+    skipped_verbatim = []
+    for name, root in roots:
+        body = _blueprint_body(root)
+        if body is None or _count_slots(body) < 2:
+            continue
+        tree = _fill_slots(body, period)
+        if any(is_verbatim(other, tree, max_depth) for _, other in roots):
+            skipped_verbatim.append(name)
+            continue
+        formula = PlantedFormula(tree=tree, z_window=z_window, source=name, rule=FORMULA_RULE)
+        assert_not_degenerate(formula)
+        return formula, {'period': period, 'z_window': z_window, 'skipped_verbatim': skipped_verbatim,
+                         'adjusted': period != TARGET_WINDOW or z_window != TARGET_WINDOW}
+    raise ValueError("No blueprint has >= 2 '?' slots under a NORMALIZED root whose filled formula is not "
+                     "already spelled out by a blueprint; the rule is not loosened")
 
 
 # --------------------------------------------------------------------------- recovery
@@ -530,7 +690,7 @@ def is_exact_recovery(
     """
     if candidate.get('template') != 'NORMALIZED' or candidate.get('direction') not in (1.0, -1.0):
         return False
-    if not _within_steps(candidate.get('window'), formula.window, scaled_window_search, tolerance):
+    if not _within_steps(candidate.get('window'), formula.z_window, scaled_window_search, tolerance):
         return False
     try:
         cand_tree = parse_expression(candidate['expr'])

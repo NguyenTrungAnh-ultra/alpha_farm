@@ -4,17 +4,18 @@ import pytest
 
 from strategy_workflows.MCTSEngine import MCTSEngine
 from strategy_workflows.PlantedSignal import (
-    PLANTED_FORMULA, PlantedFormula, assert_in_search_space, build_ohlcv_from_returns,
-    build_planted_data, calibrate_beta, can_express, search_ic_for_seed, combine_positions, is_exact_recovery, is_near_recovery,
-    is_verbatim, parse_expression, permute_returns, plant_signal, realized_ic, spearman_abs,
-    split_bars, top_candidates,
+    PlantedFormula, assert_in_search_space, build_ohlcv_from_returns,
+    build_planted_data, calibrate_beta, can_express, search_ic_for_seed, combine_positions, formula_from_dict,
+    formula_to_dict, is_exact_recovery, is_near_recovery, is_verbatim, mean_reversion_formula, parse_expression,
+    permute_returns, plant_signal, realized_ic, select_planted_formula, shape_fields, spearman_abs, split_bars,
+    top_candidates,
 )
 from strategy_workflows.RunPlantedSignal import (
-    DEFAULT_STRENGTHS, annotate_blueprints, summarize_runs, criteria_report,
+    DEFAULT_STRENGTHS, annotate_blueprints, calibration_key, summarize_runs, criteria_report,
 )
 from strategy_workflows.SemanticCompiler import ASTNode, SemanticCompiler
 
-FORMULA = PLANTED_FORMULA
+FORMULA = mean_reversion_formula()
 PERIODS = [2, 3, 5, 10]
 WINDOWS = [2, 3, 5, 7, 10]
 
@@ -23,6 +24,11 @@ def synthetic_eps(n, seed=0, scale=0.003):
     eps = np.random.default_rng(seed).normal(0.0, scale, n)
     eps[0] = 0.0
     return eps
+
+
+def close_frame(closes):
+    closes = pd.Series(closes).to_numpy()
+    return pd.DataFrame({'Open': closes, 'High': closes, 'Low': closes, 'Close': closes, 'Volume': 1.0})
 
 
 def plant(eps, ic, sigma=0.003):
@@ -73,7 +79,7 @@ def test_ic_zero_returns_equal_permuted_returns_exactly():
 def test_signal_matches_full_series_recomputation():
     result = plant(synthetic_eps(3000), 0.05)
     closes = pd.Series(result.closes)
-    expected = FORMULA.signal_series(closes).to_numpy()
+    expected = FORMULA.signal_series(close_frame(closes)).to_numpy()
     assert np.array_equal(np.isnan(expected), np.isnan(result.signal))
     assert np.allclose(expected[~np.isnan(expected)], result.signal[~np.isnan(result.signal)], atol=1e-9)
 
@@ -128,24 +134,24 @@ CAL_SEEDS = range(1001, 1006)
 def test_calibration_hits_mean_target_with_nonnegative_beta_and_is_deterministic():
     base = heavy_tailed_base()
     search_end = str(base.index[50 * 24 - 1].date())
-    result = calibrate_beta(base, search_end, 0.05, seeds=CAL_SEEDS, tolerance=0.004)
+    result = calibrate_beta(base, search_end, 0.05, FORMULA, seeds=CAL_SEEDS, tolerance=0.004)
     assert result.beta > 0.0
     assert abs(result.mean_ic - 0.05) <= 0.004
     # Recompute the mean independently at the returned beta.
     bars, n_search = split_bars(base), len(base.loc[:search_end])
-    recomputed = np.mean([search_ic_for_seed(bars, n_search, float(base['Close'].iloc[0]), result.beta, sd)
+    recomputed = np.mean([search_ic_for_seed(bars, n_search, float(base['Close'].iloc[0]), result.beta, sd, FORMULA)
                           for sd in CAL_SEEDS])
     assert recomputed == pytest.approx(result.mean_ic)
-    again = calibrate_beta(base, search_end, 0.05, seeds=CAL_SEEDS, tolerance=0.004)
+    again = calibrate_beta(base, search_end, 0.05, FORMULA, seeds=CAL_SEEDS, tolerance=0.004)
     assert again.beta == result.beta
-    assert calibrate_beta(base, search_end, 0.0, seeds=CAL_SEEDS).beta == 0.0
+    assert calibrate_beta(base, search_end, 0.0, FORMULA, seeds=CAL_SEEDS).beta == 0.0
 
 
 def test_calibration_does_not_chase_chance_ic_with_negative_beta():
     # A target below the placebo's chance mean IC must leave beta at 0, never negative.
     base = heavy_tailed_base()
     search_end = str(base.index[50 * 24 - 1].date())
-    result = calibrate_beta(base, search_end, 0.0005, seeds=CAL_SEEDS, tolerance=0.01)
+    result = calibrate_beta(base, search_end, 0.0005, FORMULA, seeds=CAL_SEEDS, tolerance=0.01)
     assert result.beta == 0.0
 
 
@@ -159,28 +165,35 @@ def test_get_beta_caches_in_calibration_json(tmp_path, monkeypatch):
 
     monkeypatch.setattr(run, 'calibrate_beta', fake)
     base = heavy_tailed_base()
-    assert run.get_beta(base, 0.05, str(tmp_path)) == 0.03
-    assert run.get_beta(base, 0.05, str(tmp_path)) == 0.03
-    assert run.get_beta(base, 0.0, str(tmp_path)) == 0.0
+    assert run.get_beta(base, 0.05, str(tmp_path), FORMULA) == 0.03
+    assert run.get_beta(base, 0.05, str(tmp_path), FORMULA) == 0.03
+    assert run.get_beta(base, 0.0, str(tmp_path), FORMULA) == 0.0
     assert calls == [0.05]
     other = base.copy()
     other['Close'] = other['Close'] * 1.01
-    run.get_beta(other, 0.05, str(tmp_path))
+    run.get_beta(other, 0.05, str(tmp_path), FORMULA)
     assert calls == [0.05, 0.05]
+    # A different expression or z-score window is a different calibration.
+    run.get_beta(base, 0.05, str(tmp_path), mean_reversion_formula(period=5))
+    run.get_beta(base, 0.05, str(tmp_path), mean_reversion_formula(window=7))
+    assert calls == [0.05, 0.05, 0.05, 0.05]
+    run.get_beta(base, 0.05, str(tmp_path), mean_reversion_formula(period=5))
+    assert len(calls) == 4
+    assert calibration_key(base, 0.05, FORMULA) != calibration_key(base, 0.05, two_slot_formula())
 
 
 def test_realized_ic_matches_engine_definition(dummy_ohlcv_data):
     engine = MCTSEngine(timeframe='60m', data=dummy_ohlcv_data, seed=1)
     close = dummy_ohlcv_data['Close']
-    alpha = FORMULA.signal_series(close)
+    alpha = FORMULA.signal_series(dummy_ohlcv_data)
     assert realized_ic(alpha, close) == pytest.approx(engine.compute_rank_ic(alpha, close))
 
 
 def test_build_planted_data_is_continuous_and_reproducible(dummy_ohlcv_data):
     search_end = '2024-01-07'
-    a = build_planted_data(dummy_ohlcv_data, search_end, 0.05, seed=4, beta=0.02)
-    b = build_planted_data(dummy_ohlcv_data, search_end, 0.05, seed=4, beta=0.02)
-    c = build_planted_data(dummy_ohlcv_data, search_end, 0.05, seed=5, beta=0.02)
+    a = build_planted_data(dummy_ohlcv_data, search_end, 0.05, seed=4, beta=0.02, formula=FORMULA)
+    b = build_planted_data(dummy_ohlcv_data, search_end, 0.05, seed=4, beta=0.02, formula=FORMULA)
+    c = build_planted_data(dummy_ohlcv_data, search_end, 0.05, seed=5, beta=0.02, formula=FORMULA)
     assert a.full.equals(b.full)
     assert not a.full['Close'].equals(c.full['Close'])
     assert len(a.search) + len(a.evaluation) == len(dummy_ohlcv_data)
@@ -194,9 +207,11 @@ def test_build_planted_data_is_continuous_and_reproducible(dummy_ohlcv_data):
 
 def test_formula_is_in_search_space_at_60m(dummy_ohlcv_data):
     engine = MCTSEngine(timeframe='60m', data=dummy_ohlcv_data, seed=1)
-    assert_in_search_space(engine)
+    assert_in_search_space(engine, FORMULA)
     with pytest.raises(ValueError):
-        assert_in_search_space(engine, PlantedFormula(period=11, window=10))
+        assert_in_search_space(engine, mean_reversion_formula(period=11))
+    with pytest.raises(ValueError):
+        assert_in_search_space(engine, mean_reversion_formula(window=11))
     assert FORMULA.expr == "(close - ts_mean(close, 10))"
 
 
@@ -271,11 +286,11 @@ def test_can_express_respects_depth_limit():
 
 
 def test_annotate_blueprints_flags():
-    flags = annotate_blueprints([
+    flags = annotate_blueprints(blueprints=[
         {'name': 'hole', 'macro_blueprint': 'sub(?, ts_mean(?))'},
         {'name': 'other', 'macro_blueprint': 'add(?, ts_max(?))'},
         {'name': 'same', 'macro_blueprint': 'sub(pv_close, ts_mean(pv_close, 10))'},
-    ])
+    ], formula=FORMULA)
     assert [(f['can_express'], f['verbatim']) for f in flags] == [(True, False), (False, False), (True, True)]
 
 
@@ -340,3 +355,158 @@ def test_summary_keeps_last_rerun_and_criteria():
     assert any('IC 0.05' in l and 'PASS' in l for l in lines)
     assert any('IC 0.0' in l and 'PASS' in l for l in lines)
     assert DEFAULT_STRENGTHS == [0.0, 0.01, 0.02, 0.05]
+
+
+# ─── Generic formulas and selection ──────────────────────────────────────
+
+def two_slot_formula(z_window=5):
+    """ts_mean(pv_high - ts_mean(pv_close, 5), 3): two fields, nested windows."""
+    tree = ASTNode(name='ts_mean', window=3, children=[
+        ASTNode(name='sub', children=[
+            ASTNode(name='pv_high'),
+            ASTNode(name='ts_mean', window=5, children=[ASTNode(name='pv_close')]),
+        ])])
+    return PlantedFormula(tree=tree, z_window=z_window, source='two_slot')
+
+
+def volume_formula():
+    tree = ASTNode(name='mult', children=[
+        ASTNode(name='sub', children=[ASTNode(name='pv_open'), ASTNode(name='pv_low')]),
+        ASTNode(name='pv_volume')])
+    return PlantedFormula(tree=tree, z_window=3, source='volume')
+
+
+def synthetic_shape(n, seed=0):
+    rng = np.random.default_rng(seed)
+    bars = pd.DataFrame({
+        'open_ratio': rng.uniform(0.998, 1.002, n), 'high_ratio': rng.uniform(1.0, 1.01, n),
+        'low_ratio': rng.uniform(0.99, 1.0, n), 'Volume': rng.uniform(1000, 5000, n),
+    })
+    bars.loc[7, 'Volume'] = np.nan
+    return bars
+
+
+def test_formula_lookback_and_fields():
+    two = two_slot_formula()
+    assert two.expr == "ts_mean((high - ts_mean(close, 5)), 3)"
+    assert two.lookback == (3 - 1) + (5 - 1) + 5          # nested windows, then the z-score window
+    assert two.used_fields == ['close', 'high']
+    assert two.windows == [3, 5]
+    assert FORMULA.lookback == 10 + 10 - 1
+    assert volume_formula().used_fields == ['low', 'open_', 'volume']
+
+
+@pytest.mark.parametrize("make", [two_slot_formula, volume_formula])
+def test_generic_trailing_signal_equals_full_series(make):
+    formula = make()
+    n = 1500
+    bars = synthetic_shape(n)
+    eps = synthetic_eps(n, seed=2)
+    planted = plant_signal(eps, np.full(n, 0.003), 1000.0, 0.05, formula.signal_last, formula.lookback,
+                           shape_fields(bars, formula))
+    frame = build_ohlcv_from_returns(bars, planted.returns, 1000.0)
+    expected = formula.signal_series(frame).to_numpy()
+    assert np.array_equal(np.isnan(expected), np.isnan(planted.signal))
+    ok = ~np.isnan(expected)
+    assert ok.sum() > n - 50
+    assert np.allclose(expected[ok], planted.signal[ok], rtol=1e-9, atol=1e-12)
+
+
+def test_generic_planting_does_not_look_ahead():
+    formula = two_slot_formula()
+    n, t = 1200, 600
+    bars = synthetic_shape(n, seed=1)
+    eps = synthetic_eps(n, seed=3)
+    altered = eps.copy()
+    altered[t + 1:] = np.random.default_rng(7).normal(0.0, 0.003, n - t - 1)
+    shape = shape_fields(bars, formula)
+    a = plant_signal(eps, np.full(n, 0.003), 1000.0, 0.05, formula.signal_last, formula.lookback, shape)
+    b = plant_signal(altered, np.full(n, 0.003), 1000.0, 0.05, formula.signal_last, formula.lookback, shape)
+    assert np.array_equal(a.signal[:t + 1], b.signal[:t + 1], equal_nan=True)
+    assert np.array_equal(a.closes[:t + 1], b.closes[:t + 1])
+    assert not np.array_equal(a.closes[t + 1:], b.closes[t + 1:])
+
+
+def test_build_planted_data_signal_matches_full_series_for_generic_formula(dummy_ohlcv_data):
+    formula = two_slot_formula()
+    data = build_planted_data(dummy_ohlcv_data, '2024-01-07', 0.05, seed=2, beta=0.05, formula=formula)
+    expected = formula.signal_series(data.full)
+    both = expected.notna() & data.signal.notna()
+    assert (expected.isna() == data.signal.isna()).all()
+    assert both.sum() > 900
+    assert np.allclose(expected[both], data.signal[both], rtol=1e-9, atol=1e-12)
+
+
+def test_formula_dict_roundtrip():
+    formula = two_slot_formula()
+    back = formula_from_dict(formula_to_dict(formula))
+    assert back == formula and back.expr == formula.expr and back.windows == formula.windows
+    broken = formula_to_dict(formula)
+    broken['expression'] = "close"
+    with pytest.raises(ValueError):
+        formula_from_dict(broken)
+
+
+def blueprint(name, text):
+    return {'name': name, 'macro_blueprint': text}
+
+
+@pytest.fixture
+def engine_60m(dummy_ohlcv_data):
+    return MCTSEngine(timeframe='60m', data=dummy_ohlcv_data, seed=1)
+
+
+def test_select_skips_one_slot_non_normalized_and_verbatim(engine_60m):
+    assert compile_("sub(?, ts_mean(?))").name == 'normalized_template'
+    assert compile_("ts_corr(?, ?)").name != 'normalized_template'
+    blueprints = [
+        blueprint('one_slot', 'sub(pv_high, ts_mean(?))'),                        # 1 slot
+        blueprint('ratio_root', 'ts_corr(?, ?)'),                                 # not NORMALIZED
+        blueprint('boolean_root', 'greater_than(?, ?)'),                          # not NORMALIZED
+        blueprint('spelled_out', 'sub(pv_close, ts_mean(pv_close, 10))'),         # 0 slots
+        blueprint('verbatim_case', 'sub(?, ts_mean(?))'),                         # fills to the line above
+        blueprint('good', 'mult(sub(ts_max(?), ts_min(?)), pv_volume)'),
+        blueprint('later', 'add(?, ts_mean(?))'),
+    ]
+    formula, info = select_planted_formula(blueprints, engine_60m)
+    assert formula.source == 'good'
+    assert formula.expr == "((ts_max(close, 10) - ts_min(close, 10)) * volume)"
+    assert formula.z_window == 10 and formula.windows == [10]
+    assert formula.used_fields == ['close', 'volume']
+    assert info['skipped_verbatim'] == ['verbatim_case'] and not info['adjusted']
+    # Without the spelled-out blueprint, 'verbatim_case' is the first qualifying one.
+    formula, _ = select_planted_formula([b for b in blueprints if b['name'] != 'spelled_out'], engine_60m)
+    assert formula.source == 'verbatim_case' and formula.expr == "(close - ts_mean(close, 10))"
+
+
+def test_select_first_qualifying_wins_and_none_fails_loudly(engine_60m):
+    formula, _ = select_planted_formula(
+        [blueprint('a', 'add(?, ts_mean(?))'), blueprint('b', 'mult(?, ts_max(?))')], engine_60m)
+    assert formula.source == 'a' and formula.expr == "(close + ts_mean(close, 10))"
+    with pytest.raises(ValueError, match="not loosened"):
+        select_planted_formula([blueprint('x', 'sub(pv_high, ts_mean(?))'), blueprint('y', 'ts_corr(?, ?)')], engine_60m)
+    with pytest.raises(ValueError, match="constant"):
+        select_planted_formula([blueprint('degenerate', 'sub(?, ?)')], engine_60m)
+
+
+def test_select_uses_nearest_allowed_windows():
+    from types import SimpleNamespace
+    engine = SimpleNamespace(scaled_periods=[5, 14], scaled_window_search=[7, 12], max_depth=4)
+    formula, info = select_planted_formula([blueprint('a', 'sub(?, ts_mean(?))')], engine)
+    assert formula.windows == [14] and formula.z_window == 12 and info['adjusted']
+    assert formula.expr == "(close - ts_mean(close, 14))"
+
+
+def test_selected_formula_drives_recovery_checks(engine_60m):
+    formula, _ = select_planted_formula([blueprint('g', 'sub(pv_high, ts_mean(?))'),
+                                         blueprint('h', 'sub(ts_max(?), ts_mean(?))')], engine_60m)
+    assert formula.expr == "(ts_max(close, 10) - ts_mean(close, 10))"
+    good = candidate("(ts_max(close, 10) - ts_mean(close, 10))")
+    assert is_exact_recovery(good, formula, PERIODS, WINDOWS)
+    assert is_exact_recovery(candidate("(ts_max(close, 5) - ts_mean(close, 10))"), formula, PERIODS, WINDOWS)
+    swapped = candidate("(ts_mean(close, 10) - ts_max(close, 10))", direction=-1.0)
+    assert is_exact_recovery(swapped, formula, PERIODS, WINDOWS)
+    assert not is_exact_recovery(candidate(), formula, PERIODS, WINDOWS)         # a different formula
+    assert not is_exact_recovery(candidate("(ts_max(high, 10) - ts_mean(close, 10))"), formula, PERIODS, WINDOWS)
+    assert can_express(compile_("sub(ts_max(?), ?)"), formula.expr_ast())
+    assert not can_express(compile_("sub(ts_min(?), ?)"), formula.expr_ast())
