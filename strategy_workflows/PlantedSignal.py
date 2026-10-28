@@ -396,6 +396,19 @@ def _unify(blueprint: ASTNode, target: ASTNode, depth: int, max_depth: int) -> b
     return all(_unify(b, t, depth + 1, max_depth) for b, t in zip(b_kids, t_kids))
 
 
+def _unify_root(blueprint: ASTNode, target: ASTNode, depth: int, max_depth: int) -> bool:
+    """`_unify`, plus a root `sub(x, y)` may match the target with its arguments swapped (-A is the same
+    signal: the backtest tries both directions). Only the root; deeper nodes must match in order."""
+    if _unify(blueprint, target, depth, max_depth):
+        return True
+    if blueprint.name == 'sub' and target.name == 'sub':
+        b_kids, t_kids = _data_children(blueprint), _data_children(target)
+        if len(b_kids) == len(t_kids) == 2:
+            return (_unify(b_kids[0], t_kids[1], depth + 1, max_depth)
+                    and _unify(b_kids[1], t_kids[0], depth + 1, max_depth))
+    return False
+
+
 def _has_hole(node: ASTNode) -> bool:
     return node.name == '?' or any(_has_hole(c) for c in _data_children(node))
 
@@ -411,16 +424,16 @@ def can_express(blueprint: ASTNode, expr: ASTNode, max_depth: int = 4) -> bool:
     """
     True when filling the blueprint's '?' slots (a slot matches any subtree that fits the depth
     limit) can give `expr`, under a NORMALIZED template. Window values are ignored: the search
-    chooses them.
+    chooses them. A root `sub` also matches `expr` with its two arguments swapped.
     """
     body = _blueprint_body(blueprint)
-    return body is not None and _unify(body, expr, 1, max_depth)
+    return body is not None and _unify_root(body, expr, 1, max_depth)
 
 
 def is_verbatim(blueprint: ASTNode, expr: ASTNode, max_depth: int = 4) -> bool:
     """True when the blueprint already spells out `expr` with no '?' left (only windows to find)."""
     body = _blueprint_body(blueprint)
-    return body is not None and not _has_hole(body) and _unify(body, expr, 1, max_depth)
+    return body is not None and not _has_hole(body) and _unify_root(body, expr, 1, max_depth)
 
 
 # --------------------------------------------------------------------------- recovery
@@ -477,6 +490,20 @@ def _within_steps(value: int, target: int, ladder: Sequence[int], tolerance: int
     return abs(list(ladder).index(value) - list(ladder).index(target)) <= tolerance
 
 
+def _root_match_direction(cand, target, periods: Sequence[int], tolerance: int) -> Optional[float]:
+    """
+    Direction (+1 / -1) a candidate must be traded with to equal the target signal, or None.
+    Same-order match -> +1. A root `sub` with swapped arguments is -A -> -1 (same argument as `can_express`).
+    """
+    if _trees_match(cand, target, periods, tolerance):
+        return 1.0
+    if cand[0] == 'sub' and target[0] == 'sub' and len(cand[1]) == len(target[1]) == 2:
+        swapped = (cand[0], (cand[1][1], cand[1][0]), cand[2])
+        if _trees_match(swapped, target, periods, tolerance):
+            return -1.0
+    return None
+
+
 def _trees_match(cand, target, periods: Sequence[int], tolerance: int) -> bool:
     c_label, c_kids, c_window = cand
     t_label, t_kids, t_window = target
@@ -499,8 +526,9 @@ def is_exact_recovery(
     """
     Leaderboard candidate has the planted structure and fields, long direction, NORMALIZED
     template, rolling windows and z-score window each within `tolerance` steps of the planted ones.
+    A root `sub` with swapped arguments is -A and counts only with direction -1; same-order needs +1.
     """
-    if candidate.get('template') != 'NORMALIZED' or candidate.get('direction') != 1.0:
+    if candidate.get('template') != 'NORMALIZED' or candidate.get('direction') not in (1.0, -1.0):
         return False
     if not _within_steps(candidate.get('window'), formula.window, scaled_window_search, tolerance):
         return False
@@ -509,7 +537,7 @@ def is_exact_recovery(
         target_tree = parse_expression(formula.expr)
     except (ValueError, SyntaxError):
         return False
-    return _trees_match(cand_tree, target_tree, scaled_periods, tolerance)
+    return _root_match_direction(cand_tree, target_tree, scaled_periods, tolerance) == candidate['direction']
 
 
 def spearman_abs(a: pd.Series, b: pd.Series) -> float:

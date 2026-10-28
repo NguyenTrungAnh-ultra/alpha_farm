@@ -25,6 +25,7 @@ Nếu dữ liệu thật sự chứa một công thức mà ngữ pháp biểu d
 - **[đề xuất]** Sinh bộ blueprint một lần bằng `ollama-local` (20 ý tưởng, khung 60m) và đóng băng vào `results/planted/blueprints.json`. Bộ này dùng lại cho walk-forward.
 - Chọn công thức cài sao cho **ít nhất một** blueprint trong bộ biểu diễn được nó, nhưng không trùng nguyên văn blueprint nào. Ứng viên mặc định: `sub(close, ts_mean(close, 10))` dưới template NORMALIZED, cửa sổ z-score 10. (Sửa 2026-10-28: ở 60m các chu kỳ quy đổi từ 10m chỉ còn {2, 3, 5, 10}, nên 20 không nằm trong không gian tìm.) Ghi rõ blueprint nào chạm được công thức đó.
 - Lý do: nếu không blueprint nào biểu diễn được công thức cài thì "không tìm lại" là do bộ blueprint chứ không do MCTS, bài test vô nghĩa.
+- ⛔ **Bộ sinh lần 1 (2026-10-28, `results/planted/blueprints.json`, 20/20 qua biên dịch) không dùng được:** 19/20 blueprint không có ô `?` nào (LLM viết công thức trọn vẹn), nên MCTS chỉ còn chọn cửa sổ và ngưỡng. Không blueprint nào biểu diễn được công thức cài theo phép khớp cấu trúc; riêng `sub(ts_mean(pv_close), pv_close)` là −A (cùng nghĩa vì backtest thử cả hai chiều) nhưng không có ô nào. Người dùng chốt (2026-10-28): sửa prompt + loại blueprint không có `?` (áp cho cả `main.py generate`), thử 5 blueprint với 4B trước; chỉ khi hết cách mới thử `ollama-9b`; không dùng bộ viết tay.
 
 ## 4. Chạy
 

@@ -31,6 +31,19 @@ DIMENSIONAL_FUNCTIONS = f"""
 {', '.join(DATA_FIELDS)}  (or `?` to let the search choose the series)
 """
 
+# Wrong example is a complete formula (no slot); the tests check it is rejected.
+SLOT_WRONG_EXAMPLE = "sub(ts_mean(pv_high), ts_mean(pv_low))"
+SLOT_RIGHT_EXAMPLE = "sub(ts_mean(?), ts_mean(?))"
+
+SLOT_RULES = f"""
+## WHAT `?` MEANS (READ FIRST)
+`?` is an OPEN SLOT. You write only the SKELETON of the formula; the search later fills every `?` with a data field or a whole sub-formula.
+- EVERY blueprint MUST contain at least one `?` (prefer 2 or 3). A blueprint with no `?` is REJECTED.
+- Data fields such as `pv_close` or `pv_volume` may appear in the skeleton, but the parts you leave open MUST be `?`.
+- WRONG (complete formula, no `?`, rejected): `{SLOT_WRONG_EXAMPLE}`
+- RIGHT (same skeleton with open slots): `{SLOT_RIGHT_EXAMPLE}`
+"""
+
 OPERATOR_FUNCTIONS = f"""
 ## Available Operator Functions
 
@@ -44,10 +57,10 @@ OPERATOR_FUNCTIONS = f"""
 
 # Every example must compile with SemanticCompiler (checked by tests).
 FEW_SHOT_EXAMPLES = [
-    ("statistical-mean-reversion", "sub(?, ts_mean(?))"),
+    ("statistical-mean-reversion", "sub(ts_max(?), ts_mean(?))"),
     ("time-series-kinematics", "sub(ts_mean(?), ts_mean(?))"),
-    ("volatility-regime", "sub(ts_max(?), ts_min(?))"),
-    ("cross-dimensional-arbitrage", "mult(ts_zscore(?), ts_corr(?, ?))"),
+    ("volatility-regime", "sub(ts_max(pv_high), ts_min(?))"),
+    ("cross-dimensional-arbitrage", "mult(ts_zscore(?), ts_corr(pv_volume, ?))"),
     ("cross-dimensional-arbitrage, BOOLEAN root", "and_(greater_than(ts_mean(?), ts_mean(?)), less_than(ts_zscore(?), ts_corr(?, ?)))"),
 ]
 
@@ -205,7 +218,7 @@ def build_idea_prompt(
 ## REFERENCE LIBRARY
 {DIMENSIONAL_FUNCTIONS}
 {OPERATOR_FUNCTIONS}
-
+{SLOT_RULES}
 ## OUTPUT FORMAT
 You MUST return EXACTLY the following JSON structure. 
 
@@ -215,11 +228,11 @@ You MUST return EXACTLY the following JSON structure.
     "timeframe": "10m",
     "family": "statistical-mean-reversion|time-series-kinematics|volatility-regime|cross-dimensional-arbitrage",
     "description": "Financial intuition behind the strategy.",
-    "macro_blueprint": "sub(ts_mean(?), ts_mean(?))"
+    "macro_blueprint": "{SLOT_RIGHT_EXAMPLE}"
 }}
 ```
 
-**Few-Shot Examples for macro_blueprint:**
+**Examples for macro_blueprint (each contains `?`):**
 {few_shot}
 
 ## CRITICAL RULES (MUST FOLLOW STRICTLY)
@@ -229,8 +242,9 @@ You MUST return EXACTLY the following JSON structure.
    - AVOID a RATIO root (`div`, `ts_rank`, `ts_corr`, `ts_zscore`): it is read as a 0-100 oscillator (long above 60-80, short below 20-40), which does not fit these outputs.
 2. **Valid Functions ONLY**: RESTRICT YOURSELF EXCLUSIVELY to the exact names listed in the REFERENCE LIBRARY. Do not invent indicators (no `ema`, `rsi`, `macd`, `zscore`, `diff`, `shift`).
 3. **No Hardcoded Numbers**: Window lengths and thresholds are searched by the engine. Keep NO numbers in the blueprint.
-4. **Syntax & Depth Limit**: DO NOT nest functions deeper than 3 levels. Ensure all parentheses are closed. Use `?` (or a data field name) for each series argument and never for a window: `ts_mean(?)` is correct, `ts_mean(?, ?)` is wrong, `ts_mean(?, 20)` is wrong.
-5. **JSON Only**: OUTPUT ONLY a valid JSON block.
+4. **Syntax & Depth Limit**: DO NOT nest functions deeper than 3 levels. Ensure all parentheses are closed. Use `?` for each open series argument (a data field name only where you fix it on purpose) and never for a window: `ts_mean(?)` is correct, `ts_mean(?, ?)` is wrong, `ts_mean(?, 20)` is wrong.
+5. **At least one `?`** in `macro_blueprint` (see WHAT `?` MEANS).
+6. **JSON Only**: OUTPUT ONLY a valid JSON block.
 """
 
     dynamic_suffix = f"""
@@ -285,7 +299,7 @@ Here is the error traceback from the sandbox:
 
 CRITICAL RULES FOR CORRECTION:
 1. Identify the source of the error in your formulas or parameter space.
-   - For example: syntax errors, unknown function names, wrong number of series arguments (`ts_mean(?)` takes one, `ts_corr(?, ?)` takes two), numbers written into the blueprint, mixing price and volume in one `add`/`sub`/comparison, or a BOOLEAN function fed with a non-BOOLEAN argument.
+   - For example: syntax errors, unknown function names, wrong number of series arguments (`ts_mean(?)` takes one, `ts_corr(?, ?)` takes two), numbers written into the blueprint, mixing price and volume in one `add`/`sub`/comparison, or a BOOLEAN function fed with a non-BOOLEAN argument, or a blueprint with no `?` slot (it must contain at least one `?`: replace an open part by `?`).
 2. Fix the errors while preserving the core trading concept.
 3. Return ONLY a valid JSON block containing the corrected fields. Do not return the entire original JSON. Do not include any explanations or commentary.
 """

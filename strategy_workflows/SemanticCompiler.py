@@ -56,7 +56,28 @@ HALLUCINATION_MAP = {
     "lowest": "ts_min",
 }
 
+def count_slots(node: ASTNode) -> int:
+    """Number of open `?` series slots in a compiled tree (template window/threshold slots are not counted)."""
+    return (1 if node.name == "?" else 0) + sum(count_slots(c) for c in node.children)
+
+
 class SemanticCompiler:
+    def compile_open_blueprint(self, blueprint_str: str) -> ASTNode:
+        """
+        Compile a blueprint and require at least one `?` series slot.
+
+        A blueprint without a slot leaves the search only windows and thresholds to tune, so it
+        is rejected with a message meant to be fed back to the LLM.
+        """
+        root = self.compile_blueprint(blueprint_str)
+        if count_slots(root) == 0:
+            raise SemanticCompilerError(
+                f"Blueprint `{blueprint_str}` has no `?` slot. Every blueprint must contain at least "
+                "one `?` (prefer 2-3): replace the open parts (a data field or a whole sub-formula) "
+                "with `?`, e.g. `sub(ts_mean(?), ts_mean(?))`."
+            )
+        return root
+
     def compile_blueprint(self, blueprint_str: str) -> ASTNode:
         """
         Parse a Macro-Blueprint string into an ASTNode tree and validate dimensional consistency.

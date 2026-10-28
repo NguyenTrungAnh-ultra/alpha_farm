@@ -146,13 +146,12 @@ def annotate_blueprints(blueprints: List[Dict[str, str]]) -> List[Dict]:
 def generate_blueprints(n: int, model: str) -> List[Dict[str, str]]:
     """Ask the local LLM for `n` compilable 60m blueprints; nothing is written to results/ideas."""
     from llm_clients.OllamaClient import OllamaChatClient, extract_json
-    from strategy_workflows.GenerateStrategies import StrategyBlueprint, load_experience_log
-    from utilities.Prompts import build_idea_prompt
+    from strategy_workflows.GenerateStrategies import load_experience_log, validate_idea
+    from utilities.Prompts import build_correction_prompt, build_idea_prompt
 
     model_name = "qwen3.5:9b" if model == "ollama-9b" else "qwen3.5:4b"
     chat = OllamaChatClient(model=model_name, verbose=True)
     experience = load_experience_log()
-    compiler = SemanticCompiler()
     accepted: List[Dict[str, str]] = []
     seen_names, seen_blueprints = set(), set()
     consecutive_failures = 0
@@ -179,14 +178,31 @@ def generate_blueprints(n: int, model: str) -> List[Dict[str, str]]:
                     break
                 continue
             consecutive_failures = 0
-            try:
-                idea = StrategyBlueprint.model_validate(idea_json).model_dump()
-                root = compiler.compile_blueprint(idea['macro_blueprint'])
-                unimplemented = find_unimplemented_operator(root)
-                if unimplemented is not None:
-                    raise ValueError(f"operator {unimplemented} has no code generation")
-            except Exception as exc:
-                print(f"[planted] rejected idea: {exc}")
+            idea = None
+            for attempt in (1, 2):
+                try:
+                    idea, root = validate_idea(idea_json)
+                    unimplemented = find_unimplemented_operator(root)
+                    if unimplemented is not None:
+                        raise ValueError(f"operator {unimplemented} has no code generation")
+                    print(f"[planted] round {round_num} attempt {attempt}: accepted {idea['macro_blueprint']}")
+                    break
+                except Exception as exc:
+                    idea = None
+                    print(f"[planted] round {round_num} attempt {attempt}: rejected ({exc})")
+                    if attempt == 2:
+                        break
+                    failed = {'macro_blueprint': idea_json['macro_blueprint']} \
+                        if isinstance(idea_json, dict) and 'macro_blueprint' in idea_json else idea_json
+                    try:
+                        corrected = extract_json(chat.send(build_correction_prompt(json.dumps(failed, indent=4), str(exc))))
+                    except Exception as chat_exc:
+                        print(f"[planted] chat error during correction: {chat_exc}")
+                        break
+                    if not isinstance(corrected, dict):
+                        break
+                    idea_json = {**idea_json, **corrected}
+            if idea is None:
                 continue
             name = re.sub(r'[^a-zA-Z0-9_]', '', idea['name']) or f"Idea_{round_num}"
             if name in seen_names or idea['macro_blueprint'] in seen_blueprints:

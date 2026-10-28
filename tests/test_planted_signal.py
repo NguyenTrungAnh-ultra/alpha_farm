@@ -12,7 +12,7 @@ from strategy_workflows.PlantedSignal import (
 from strategy_workflows.RunPlantedSignal import (
     DEFAULT_STRENGTHS, annotate_blueprints, summarize_runs, criteria_report,
 )
-from strategy_workflows.SemanticCompiler import SemanticCompiler
+from strategy_workflows.SemanticCompiler import ASTNode, SemanticCompiler
 
 FORMULA = PLANTED_FORMULA
 PERIODS = [2, 3, 5, 10]
@@ -244,8 +244,21 @@ def test_can_express_hole_blueprint_and_rejects_unrelated():
     assert not can_express(compile_("sub(pv_volume, ts_mean(?))"), target)
 
 
+def test_can_express_root_sub_swap_only():
+    target = FORMULA.expr_ast()
+    assert can_express(compile_("sub(ts_mean(?), ?)"), target)
+    assert can_express(compile_("sub(ts_mean(pv_close), pv_close)"), target)
+    assert not can_express(compile_("sub(ts_mean(pv_close), pv_open)"), target)
+    assert not can_express(compile_("add(ts_mean(?), ?)"), target)
+    # A swapped sub below the root does not match.
+    nested = ASTNode(name='ts_mean', children=[target], window=10)
+    assert can_express(compile_("ts_mean(sub(pv_close, ts_mean(?)))"), nested)
+    assert not can_express(compile_("ts_mean(sub(ts_mean(?), pv_close))"), nested)
+
+
 def test_verbatim_means_no_hole_left():
     target = FORMULA.expr_ast()
+    assert is_verbatim(compile_("sub(ts_mean(pv_close, 10), pv_close)"), target)
     assert is_verbatim(compile_("sub(pv_close, ts_mean(pv_close, 10))"), target)
     assert not is_verbatim(compile_("sub(?, ts_mean(?))"), target)
 
@@ -282,10 +295,12 @@ def test_exact_recovery_cases():
     assert exact(candidate(window=7))                                  # one step in z-score windows
     assert not exact(candidate("(close - ts_mean(close, 3))"))        # two steps
     assert not exact(candidate(window=5))                              # two steps
-    assert not exact(candidate(direction=-1.0))
     assert not exact(candidate(template='RATIO'))
     assert not exact(candidate("(close - ts_mean(open_, 10))"))        # different field
-    assert not exact(candidate("(ts_mean(close, 10) - close)"))        # different structure
+    assert exact(candidate("(ts_mean(close, 10) - close)", direction=-1.0))   # root sub swapped (-A), traded short
+    assert not exact(candidate("(ts_mean(close, 10) - close)", direction=1.0))  # -A long is the opposite signal
+    assert not exact(candidate(direction=-1.0))                        # A short is the opposite signal
+    assert not exact(candidate("(ts_mean(close, 10) + close)"))        # add is not special-cased
     assert not exact(candidate("(close - ts_max(close, 10))"))
     assert not exact(candidate("(close - ts_mean(close, 4))"))         # window outside the ladder
 

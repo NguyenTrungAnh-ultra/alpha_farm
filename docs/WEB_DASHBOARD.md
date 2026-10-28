@@ -36,7 +36,7 @@ tailscale serve (trên máy này)
 - Một server FastAPI phục vụ cả giao diện lẫn API.
 - **[đề xuất]** Giao diện render phía server (Jinja2 + HTMX), biểu đồ bằng uPlot hoặc Chart.js nạp sẵn trong `web/static/`. Không cần Node / bước build; cập nhật trực tiếp bằng Server-Sent Events (hoặc hỏi lại mỗi 2 giây nếu SSE gặp lỗi).
 - **Runner là tiến trình riêng**, web chỉ tạo bản ghi lượt chạy rồi khởi động runner. Khởi động lại web không giết lượt đang chạy. Mỗi lúc chỉ một lượt chạy (MCTS đã dùng hết CPU với 7 khung).
-- Thư viện thêm vào `requirements.in`: `fastapi`, `uvicorn`, `jinja2`. Tailscale đã cài sẵn trên máy (người dùng xác nhận 2026-10-28).
+- Thư viện thêm vào `requirements.in`: `fastapi`, `uvicorn`, `jinja2`, `psutil` (CPU / RAM). GPU đọc bằng `nvidia-smi --query-gpu=... --format=csv` (máy có RTX 5060 8 GB, Ollama chạy trên đó), không thêm thư viện. Tailscale đã cài sẵn trên máy (người dùng xác nhận 2026-10-28).
 
 ## 3. Các bước pipeline mà web hiển thị
 
@@ -94,6 +94,7 @@ Tệp `results/app.db`, chế độ WAL, `busy_timeout` để các worker cùng 
 | `validation` | (candidate_id, kind) | passed, tier_failed, reason, details_json | kết quả HMM |
 | `artifact` | id | run_id, candidate_id, kind (code / equity / positions), path | tệp trên đĩa |
 | `log_line` | id | run_id, created_at, level, source, message | stdout của runner |
+| `system_sample` | sampled_at | cpu_pct, ram_used_mb, ram_total_mb, gpu_pct, vram_used_mb, vram_total_mb | một lần đo máy (mỗi 5 giây khi web chạy); `run_id` không lưu, lượt chạy suy ra từ khoảng thời gian của `run`. Giữ 7 ngày rồi xoá |
 
 Tiến độ "bước đang chạy" và "xong bao nhiêu" **tính ra từ** `search_task` / `candidate`, không lưu thành cột riêng, để không có hai nơi chứa một sự thật.
 
@@ -108,6 +109,7 @@ Dữ liệu cũ (`results/portfolio_summary.json`, chiến lược thế hệ đ
 5. **Ứng viên và alpha** — bảng lọc theo khung / template / reward; chi tiết: công thức, tham số, chỉ số đoạn tìm và đoạn đánh giá, đường vốn so với mua-và-giữ, vị thế, kết quả HMM từng tầng, code xuất ra.
 6. **Thí nghiệm luận văn** (mở khi từng phần có code) — bài cài tín hiệu: bảng độ mạnh × tỷ lệ tìm lại + điểm "đáp án"; walk-forward: 11 cửa sổ × 7 cấu hình; placebo: biểu đồ phân bố 19 lần so với kết quả thật; SPA / DSR.
 7. **Dữ liệu và hệ thống** — tệp dữ liệu từng khung, khoảng ngày, số ngày thiếu (nợ 126 ngày ở khung phút), cache HMM có / chưa, Ollama có đang chạy, mô hình nào có.
+8. **Tài nguyên máy** (người dùng yêu cầu 2026-10-28) — CPU tổng và theo từng nhân, RAM, GPU % và VRAM, đồ thị 1 giờ gần nhất; ổ đĩa còn trống (cache HMM có thể tới hàng GB). Ô nhỏ CPU / RAM / GPU hiện cả ở trang Tổng quan, và đồ thị tài nguyên nằm trong trang Chi tiết lượt chạy theo khoảng thời gian của lượt đó. Không có GPU / `nvidia-smi` lỗi thì hiện "không đọc được", không làm hỏng trang.
 
 Giao diện phải dùng được trên điện thoại (chủ yếu để xem).
 
@@ -126,7 +128,7 @@ Web có nút khởi chạy tính toán trên máy này, nên chỉ được mở
 | W0 | Chốt mục 9 | ROADMAP ghi quyết định |
 | W1 | Móc tiến độ / dừng / danh sách blueprint / đếm −10 vào lõi (mục 4, điểm 1–4; điểm 5 làm ở W2 cùng bảng `run`) | test mục 4 xanh, CLI ra cùng kết quả |
 | W2 | Schema SQLite + bộ ghi + runner chạy được từ dòng lệnh | một lượt `mcts` thật ghi đủ bảng, đo được tốc độ chậm đi bao nhiêu |
-| W3 | Web chỉ xem: trang 1, 3, 5 | xem được lượt đang chạy trên `127.0.0.1` |
+| W3 | Web chỉ xem: trang 1, 3, 5, 8 | xem được lượt đang chạy trên `127.0.0.1` |
 | W4 | Khởi chạy / dừng / chạy tiếp: trang 2, 4 | khởi chạy từ bước 3 với bộ đã đóng băng, dừng giữa chừng, chạy tiếp |
 | W5 | `tailscale serve` tới cổng 8000 | mở được `https://<tên-máy>.<tailnet>.ts.net` từ điện thoại; máy ngoài tailnet và máy cùng Wi-Fi không mở được |
 | W6 | Trang 6, 7 theo tiến độ luận văn | mỗi thí nghiệm có trang khi có code |

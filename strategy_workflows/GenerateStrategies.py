@@ -47,6 +47,22 @@ class StrategyBlueprint(BaseModel):
 
 
 
+def validate_idea(idea_json: dict):
+    """
+    Schema-check an LLM idea and compile its blueprint, requiring at least one `?` slot.
+
+    Returns (idea dict, compiled root). Compile and slot errors are raised as ValueError with a
+    "Macro-Blueprint Semantic Error" prefix, which the self-correction loop keys on.
+    """
+    from strategy_workflows.SemanticCompiler import SemanticCompiler
+    idea = StrategyBlueprint.model_validate(idea_json).model_dump()
+    try:
+        root = SemanticCompiler().compile_open_blueprint(idea['macro_blueprint'])
+    except Exception as compile_e:
+        raise ValueError(f"Macro-Blueprint Semantic Error: {compile_e}")
+    return idea, root
+
+
 def load_experience_log(filepath: str = None) -> str:
     """
     Load the quantitative experience log from experience_log.md.
@@ -232,16 +248,8 @@ def run_pipeline(
             while correction_attempt < max_correction_attempts + 1:
                 try:
                     # Validate JSON against schema
-                    valid_idea = StrategyBlueprint.model_validate(idea_json).model_dump()
-                    
-                    # Validate AST Syntax and Semantic constraints
-                    from strategy_workflows.SemanticCompiler import SemanticCompiler
-                    compiler = SemanticCompiler()
-                    try:
-                        compiler.compile_blueprint(valid_idea['macro_blueprint'])
-                    except Exception as compile_e:
-                        raise ValueError(f"Macro-Blueprint Semantic Error: {str(compile_e)}")
-                        
+                    valid_idea, _ = validate_idea(idea_json)
+
                     name = valid_idea.get('name', f'Idea_{round_num}_{tf}')
                     import re
                     name = re.sub(r'[^a-zA-Z0-9_]', '', name)
