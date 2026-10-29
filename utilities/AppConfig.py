@@ -26,7 +26,8 @@ MCTS_QUALITY_THRESHOLDS = {
 MIN_TRADES = 15
 
 # "gated": candidates below the Calmar / trade-count gate score -10. "soft": no gate, the score only shrinks.
-REWARD_MODES = ("gated", "soft")
+# "sharpe": no gate; the Calmar slot holds clip(Sharpe / max_sharpe, 0, 1) and NORMALIZED IC is taken on the z-score.
+REWARD_MODES = ("gated", "soft", "sharpe")
 REWARD_MODE = "gated"
 
 # === MCTS One-pass Pipeline Config ===
@@ -35,6 +36,7 @@ REWARD_WEIGHTS = {
     'ic_weight': 0.4,
     'max_ic': 0.15,
     'max_calmar': 3.0,
+    'max_sharpe': 3.0,
     'burn_in': 15000,
     'entropy_threshold': 0.15,
     'patience': 5000

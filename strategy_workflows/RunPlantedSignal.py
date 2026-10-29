@@ -47,6 +47,7 @@ from strategy_workflows.PlantedSignal import (
     distinct_expressions, rank_by_validation, select_planted_formula, spearman_abs,
 )
 from strategy_workflows.SemanticCompiler import ASTNode, SemanticCompiler
+from utilities.AppConfig import REWARD_MODES
 
 TIMEFRAME = '60m'
 # The search segment is split (see Segments): MCTS sees only bars up to train_end; the leaderboard is then
@@ -70,6 +71,7 @@ RUN_FIELDS = RUN_KEY + [
 ORACLE_FIELDS = [
     'strength', 'seed', 'beta', 'ic_search', 'ic_eval', 'reward_gated', 'reward_soft', 'z_gated', 'z_soft',
     'calmar', 'trades', 'rank_ic', 'reward_soft_train', 'reward_soft_val',
+    'reward_sharpe', 'z_sharpe', 'reward_sharpe_train', 'reward_sharpe_val',
 ]
 
 
@@ -328,8 +330,9 @@ def score_planted_formula(engine: MCTSEngine, formula: PlantedFormula) -> Dict:
 def planted_split_rewards(train_engine: MCTSEngine, formula: PlantedFormula, search: pd.DataFrame,
                           segments: Segments) -> Dict:
     """
-    Reward of the planted formula on the train part and on the validation part. The z-score threshold
-    and direction are the ones that score best on train; validation then scores that fixed strategy.
+    Reward of the planted formula on the train part and on the validation part, in the reward mode of
+    `train_engine`. The z-score threshold and direction are the ones that score best on train;
+    validation then scores that fixed strategy.
     """
     best = score_planted_formula(train_engine, formula)
     desc = describe_candidate(best['tree'])
@@ -355,16 +358,18 @@ def step_oracle(args) -> None:
         for seed in args.seeds:
             data = build_planted_data(base, segments.search_end, strength, seed, beta, formula)
             scored = {}
-            for mode in ('gated', 'soft'):
+            for mode in ('gated', 'soft', 'sharpe'):
                 with quiet():
                     engine = MCTSEngine(timeframe=TIMEFRAME, data=data.search, seed=seed,
                                         reward_mode=mode, global_position_matrix=None)
                 assert_in_search_space(engine, formula)
                 scored[mode] = score_planted_formula(engine, formula)
-            with quiet():
-                train_engine = MCTSEngine(timeframe=TIMEFRAME, data=data.search.loc[:segments.train_end], seed=seed,
-                                          reward_mode='soft', global_position_matrix=None)
-                split = planted_split_rewards(train_engine, formula, data.search, segments)
+            split = {}
+            for mode in ('soft', 'sharpe'):
+                with quiet():
+                    train_engine = MCTSEngine(timeframe=TIMEFRAME, data=data.search.loc[:segments.train_end],
+                                              seed=seed, reward_mode=mode, global_position_matrix=None)
+                    split[mode] = planted_split_rewards(train_engine, formula, data.search, segments)
             soft_metrics = scored['soft']['metrics']
             rows.append({
                 'strength': strength, 'seed': seed, 'beta': data.beta, 'ic_search': data.ic_search, 'ic_eval': data.ic_eval,
@@ -372,7 +377,9 @@ def step_oracle(args) -> None:
                 'z_gated': scored['gated']['z'], 'z_soft': scored['soft']['z'],
                 'calmar': soft_metrics.get('calmar_ratio'), 'trades': soft_metrics.get('total_trades'),
                 'rank_ic': soft_metrics.get('rank_ic'),
-                'reward_soft_train': split['train'], 'reward_soft_val': split['validation'],
+                'reward_soft_train': split['soft']['train'], 'reward_soft_val': split['soft']['validation'],
+                'reward_sharpe': scored['sharpe']['reward'], 'z_sharpe': scored['sharpe']['z'],
+                'reward_sharpe_train': split['sharpe']['train'], 'reward_sharpe_val': split['sharpe']['validation'],
             })
     frame = pd.DataFrame(rows, columns=ORACLE_FIELDS)
     path = os.path.join(args.out_dir, 'oracle.csv')
@@ -618,7 +625,7 @@ def add_planted_parser(subparsers) -> None:
     common(p)
     segment_options(p)
     p.add_argument('--formula', default=None, help='Planted formula file (default: <out-dir>/planted_formula.json)')
-    p.add_argument('--reward-mode', required=True, choices=['gated', 'soft'])
+    p.add_argument('--reward-mode', required=True, choices=list(REWARD_MODES))
     p.add_argument('--iterations', type=int, default=DEFAULT_ITERATIONS)
     p.add_argument('--workers', type=int, default=0, help='Worker processes (default: cpu_count - 2)')
 

@@ -100,7 +100,27 @@ Người dùng chọn hướng "thêm dữ liệu" (2026-10-29) để kiểm gi�
   - Nhưng reward soft của chính A trên đoạn học tụt mạnh: trung bình 0.05 / 0.07 / 0.23 ở IC 0 / 0.05 / 0.1 (lần 2: 0.32 / 0.58 / 0.78). Ở IC 0.1, 4/5 seed chỉ còn 0.09–0.14.
   - Nguyên nhân đo được: không phải gọi ký quỹ (chỉ 1/20 trường hợp kiểm có đóng băng vốn). Vốn của A vẫn tăng tương đương lần 2 (IC 0.1: ×1.24–3.06 sau ~3,9 năm), nhưng sụt giảm lớn nhất (MDD) tăng theo độ dài đoạn ⇒ Calmar tụt xuống dưới ngưỡng 1.1 ⇒ phần Calmar của reward (trọng số 0.6) gần như luôn bằng 0. Reward lần 3 thực chất chỉ còn phần IC; vì phần IC không phụ thuộc ngưỡng z nên ngưỡng z chọn ra luôn là 0.5 (hoà điểm, lấy giá trị đầu).
   - Phần IC tính trên giá trị thô của công thức, không trên z-score: ở IC 0.05, IC thô của A chỉ ≈ 0.017 trong khi IC của tín hiệu đã cài ≈ 0.04 (suy đoán của Claude: giá trị thô đổi thang theo mức giá qua nhiều năm).
-  - Hệ quả: lần 3 không còn "chỉ đổi độ dài dữ liệu"; độ dài làm đổi luôn hình dạng reward. Chờ người dùng quyết có chạy như thiết kế hay sửa reward trước.
+  - Hệ quả: lần 3 không còn "chỉ đổi độ dài dữ liệu"; độ dài làm đổi luôn hình dạng reward. Người dùng chọn sửa reward trước (2026-10-29).
+- 🔧 **Reward thứ ba `sharpe` (Claude thiết kế 2026-10-29, người dùng cho sửa reward; giữ `gated` / `soft` để chạy lại được lần 1–2):**
+  - `reward = 0.6 · s_sharpe + 0.4 · s_ic` (nhân `s_corr` như cũ); lỗi vẫn −10; không có cổng.
+  - `s_sharpe = clip(Sharpe năm / 3.0, 0, 1)`, Sharpe tính như mọi nơi (`compute_metrics`, lợi suất ngày, √252); dưới 15 lệnh thì `s_sharpe = 0`. Lý do: kỳ vọng của Sharpe không đổi theo độ dài đoạn, còn MDD (mẫu số Calmar) tăng theo độ dài; proposal cũng lấy Sharpe năm làm thước đo chính. Mốc 3.0 lấy bằng `max_calmar` cũ, không chỉnh theo kết quả.
+  - `s_ic = min(1, |IC| / 0.15)` như cũ, nhưng với template NORMALIZED, IC tính trên `ts_zscore(alpha, cửa sổ z)` — đúng tín hiệu được giao dịch — thay vì giá trị thô. RATIO / BOOLEAN giữ IC trên giá trị thô.
+  - **Kiểm trước khi chạy `search` (chốt trước):** chấm đáp án bằng `sharpe` trên cả cách chia lần 2 và lần 3. Đạt nếu (1) reward trung bình của A trên đoạn học tăng theo IC ở cả hai cách chia, và (2) ở IC 0 hai cách chia cho reward trung bình chênh nhau không quá 0.1. Không đạt ⇒ báo người dùng, không tự chỉnh mốc.
+  - ✅ Code (2026-10-29): `REWARD_MODES` thêm `"sharpe"`, `REWARD_WEIGHTS['max_sharpe'] = 3.0`, `MCTSEngine._ic_input`; oracle.csv thêm `reward_sharpe*`. Test 172 pass, 1 fail (có từ trước); cấy lỗi "dùng Calmar thay Sharpe" ⇒ 8 ca đỏ.
+  - ⏸️ **Kết quả kiểm (oracle, 5 seed, IC 0 / 0.02 / 0.05 / 0.1; `results/planted_run2_sharpe/`, `results/planted_run3/`):**
+
+    | Reward trên đoạn học | IC 0 | 0.02 | 0.05 | 0.1 |
+    |---|---|---|---|---|
+    | lần 2, soft | 0.32 ± 0.33 | 0.47 | 0.58 (cách 0.8 độ lệch) | 0.78 (1.4) |
+    | lần 2, sharpe | 0.29 ± 0.21 | 0.38 | 0.50 (1.0) | 0.67 (1.8) |
+    | lần 3, soft | 0.05 ± 0.02 | 0.03 | 0.07 | 0.23 |
+    | lần 3, sharpe | 0.15 ± 0.08 | 0.16 | 0.24 (1.2) | 0.49 (4.2) |
+
+    ("cách x độ lệch" = (trung bình − trung bình IC 0) / độ lệch giữa seed ở IC 0.)
+    - (1) Tăng theo IC ở cả hai cách chia: **đạt**.
+    - (2) Chênh ở IC 0 ≤ 0.1: **trượt** (0.29 vs 0.15, chênh 0.15).
+    - Giải thích của Claude: ở IC 0, reward của A chỉ là nhiễu, lại lấy tốt nhất qua 5 ngưỡng z × 2 chiều và |IC|, nên mức của nó tỷ lệ với sai số ≈ 1/√số bar. Dự đoán theo tỷ lệ đó: 0.29 × √(1.738 / 4.831) ≈ 0.18, đo được 0.15. Tức là phần chênh còn lại đúng là "mức hên giảm khi có thêm dữ liệu" — thứ lần 3 muốn đo — chứ không phải lỗi thang đo; tiêu chí (2) do Claude đặt đã sai cách. Theo luật đã ghi, không tự đổi tiêu chí: chờ người dùng quyết.
+  - Lần 3 chạy với `sharpe`; để so công bằng, chạy thêm lần 2 bằng `sharpe` (cùng cách chia lần 2) nếu thời gian máy cho phép — ghi riêng.
 
 ## 4. Chạy
 

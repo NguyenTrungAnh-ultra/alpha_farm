@@ -473,7 +473,7 @@ class MCTSEngine:
             OHLCV frame to search on (datetime index). The engine reads nothing beyond it, so a
             sub-window or synthetic frame can be injected. None loads `load_data(timeframe)`.
         reward_mode : Optional[str], default None
-            "gated" or "soft" (see `evaluate_expression`); None takes AppConfig.REWARD_MODE.
+            One of AppConfig.REWARD_MODES (see `evaluate_expression`); None takes AppConfig.REWARD_MODE.
         """
         if reward_mode is None:
             reward_mode = REWARD_MODE
@@ -537,6 +537,16 @@ class MCTSEngine:
             return 0.0
         return valid['alpha'].corr(valid['fwd_ret'], method='spearman')
 
+    def _ic_input(self, desc: Dict[str, Any], alpha_val: pd.Series) -> pd.Series:
+        """
+        Series whose rank IC enters the reward. "sharpe" mode scores the traded signal, so a NORMALIZED
+        candidate uses the rolling z-score of the alpha (the one `compute_positions` thresholds); every
+        other case uses the raw alpha. Rolling warm-up stays in `alpha_val`, so slice after calling.
+        """
+        if self.reward_mode == "sharpe" and desc['template'] == "NORMALIZED":
+            return ts_zscore(alpha_val, desc['window'])
+        return alpha_val
+
     def _record_error(self, stage: str, exc: Exception) -> None:
         key = f"{type(exc).__name__}: {exc}"[:200]
         self.error_counts[key] += 1
@@ -590,6 +600,9 @@ class MCTSEngine:
                 total_trades = metrics.get('total_trades', 0)
                 calmar_threshold = MCTS_QUALITY_THRESHOLDS['calmar_ratio']
                 too_few_trades = total_trades < MIN_TRADES
+                sharpe = metrics.get('sharpe_ratio', 0.0)
+                if sharpe is None or np.isnan(sharpe):
+                    sharpe = 0.0
                 if self.reward_mode == "gated" and (too_few_trades or calmar < calmar_threshold):
                     reward = -10.0
                     gate_too_few_trades.append(too_few_trades)
@@ -606,7 +619,10 @@ class MCTSEngine:
                                 max_corr = 0.0
 
                     if too_few_trades:
-                        s_calmar = 0.0  # only reachable in "soft" mode
+                        s_calmar = 0.0  # only reachable in "soft" / "sharpe" mode
+                    elif self.reward_mode == "sharpe":
+                        # Annualised Sharpe in the Calmar slot: no gate, zero point at Sharpe 0.
+                        s_calmar = min(1.0, max(0.0, sharpe / REWARD_WEIGHTS['max_sharpe']))
                     else:
                         s_calmar = min(1.0, max(0.0, (calmar - calmar_threshold) / (REWARD_WEIGHTS['max_calmar'] - calmar_threshold)))
                     s_ic = min(1.0, abs(rank_ic) / REWARD_WEIGHTS['max_ic'])
@@ -646,7 +662,8 @@ class MCTSEngine:
         bars = frame.loc[start:end].index
         try:
             alpha_val = evaluate_alpha(desc['expr'], AlphaDataProxy(frame))
-            rank_ic = self.compute_rank_ic(alpha_val.loc[bars].astype(np.float64), frame.loc[bars, 'Close'])
+            ic_alpha = self._ic_input(desc, alpha_val)
+            rank_ic = self.compute_rank_ic(ic_alpha.loc[bars].astype(np.float64), frame.loc[bars, 'Close'])
         except Exception as exc:
             self._record_error("expression", exc)
             return -10.0
@@ -667,6 +684,8 @@ class MCTSEngine:
         against global_position_matrix. `self.reward_mode` decides what happens to weak candidates:
         - "gated": total_trades < MIN_TRADES or Calmar below the threshold -> reward -10.0.
         - "soft": no gate; S_calmar is 0 when total_trades < MIN_TRADES, the IC term stays.
+        - "sharpe": no gate; S_calmar is replaced by clip(Sharpe / max_sharpe, 0, 1) (0 when
+          total_trades < MIN_TRADES), and for NORMALIZED the IC is taken on the rolling z-score.
 
         Parameters
         ----------
@@ -704,7 +723,7 @@ class MCTSEngine:
         }
         try:
             alpha_val = evaluate_alpha(desc['expr'], self.data)
-            rank_ic = self.compute_rank_ic(alpha_val.astype(np.float64), self.df_search['Close'])
+            rank_ic = self.compute_rank_ic(self._ic_input(desc, alpha_val).astype(np.float64), self.df_search['Close'])
         except Exception as exc:
             self._record_error("expression", exc)
             self.failed_evaluation_count += 1

@@ -167,7 +167,7 @@ def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_da
         Forwarded to `MCTSEngine.run_search_from_blueprint`; each snapshot gets the extra keys
         `timeframe` and `idea_name`. Must be plain (picklable) callables.
     reward_mode : str, optional
-        "gated" or "soft", passed to `MCTSEngine`; None uses AppConfig.REWARD_MODE.
+        One of AppConfig.REWARD_MODES, passed to `MCTSEngine`; None uses AppConfig.REWARD_MODE.
 
     Returns
     -------
