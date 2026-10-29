@@ -119,8 +119,22 @@ Người dùng chọn hướng "thêm dữ liệu" (2026-10-29) để kiểm gi�
     ("cách x độ lệch" = (trung bình − trung bình IC 0) / độ lệch giữa seed ở IC 0.)
     - (1) Tăng theo IC ở cả hai cách chia: **đạt**.
     - (2) Chênh ở IC 0 ≤ 0.1: **trượt** (0.29 vs 0.15, chênh 0.15).
-    - Giải thích của Claude: ở IC 0, reward của A chỉ là nhiễu, lại lấy tốt nhất qua 5 ngưỡng z × 2 chiều và |IC|, nên mức của nó tỷ lệ với sai số ≈ 1/√số bar. Dự đoán theo tỷ lệ đó: 0.29 × √(1.738 / 4.831) ≈ 0.18, đo được 0.15. Tức là phần chênh còn lại đúng là "mức hên giảm khi có thêm dữ liệu" — thứ lần 3 muốn đo — chứ không phải lỗi thang đo; tiêu chí (2) do Claude đặt đã sai cách. Theo luật đã ghi, không tự đổi tiêu chí: chờ người dùng quyết.
+    - Giải thích của Claude: ở IC 0, reward của A chỉ là nhiễu, lại lấy tốt nhất qua 5 ngưỡng z × 2 chiều và |IC|, nên mức của nó tỷ lệ với sai số ≈ 1/√số bar. Dự đoán theo tỷ lệ đó: 0.29 × √(1.738 / 4.831) ≈ 0.18, đo được 0.15. Tức là phần chênh còn lại đúng là "mức hên giảm khi có thêm dữ liệu" — thứ lần 3 muốn đo — chứ không phải lỗi thang đo; tiêu chí (2) do Claude đặt đã sai cách. Theo luật đã ghi, không tự đổi tiêu chí: chờ người dùng quyết. Người dùng cho chạy lần 3 (2026-10-29).
   - Lần 3 chạy với `sharpe`; để so công bằng, chạy thêm lần 2 bằng `sharpe` (cùng cách chia lần 2) nếu thời gian máy cho phép — ghi riêng.
+- **Kết quả lần 3 (2026-10-29, sharpe, 20 lượt, mỗi lượt 3.210–3.990 s, tổng ≈ 2 giờ 10 phút trên 10 tiến trình; `results/planted_run3/`):**
+
+  | IC mục tiêu | IC đo đoạn tìm | tìm lại đúng | tìm lại gần | Sharpe ngoài mẫu (2024) | lần 2: gần / Sharpe |
+  |---|---|---|---|---|---|
+  | 0 | −0.004 | 0/5 | 0/5 | −0.30 ± 1.14 | 0/5 / −2.17 |
+  | 0.02 | 0.013 | 0/5 | 0/5 | −0.33 ± 0.52 | 0/5 / 0.12 |
+  | 0.05 | 0.043 | 1/5 | 1/5 | −0.05 ± 1.14 | 1/5 / −0.65 |
+  | 0.1 | 0.093 | 1/5 | **5/5** | 1.13 ± 0.97 | 3/5 / 0.74 |
+
+  - ⛔ Tiêu chí IC 0.05 vẫn trượt (1/5); IC 0 đạt (0/5).
+  - So với dự đoán chốt trước: ủng hộ một nửa. IC 0.1 tăng 3/5 → 5/5 (ngưỡng phát hiện tụt xuống giữa 0.05 và 0.1); IC 0.05 không tăng (1/5), thấp nhất trong khoảng dự đoán 1–3/5.
+  - Ở IC 0.05, công thức gần A (|Spearman| ≥ 0.7) chỉ có trong ≤ 100 ứng viên ở 1/5 seed (lần 2: 2/5) ⇒ chặng nghẽn vẫn là đoạn học. IC đo được trên đoạn tìm của 5 seed chỉ 0.021–0.063.
+  - Placebo tốt hơn hẳn: top-5 ở IC 0 lỗ ngoài mẫu ít hơn (−0.30 so với −2.17).
+  - Lần 3 đổi cả độ dài dữ liệu lẫn reward nên chưa tách được phần nào do dữ liệu; muốn tách cần chạy lần 2 bằng `sharpe` (chưa chạy).
 
 ## 4. Chạy
 
