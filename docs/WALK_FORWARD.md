@@ -5,7 +5,7 @@ Trạng thái: ⏸️ bản nháp của Claude (2026-10-29), chờ người dùn
 
 ## 1. Câu hỏi
 
-Chạy quy trình tìm alpha như thể đứng ở từng thời điểm trong quá khứ: chỉ thấy dữ liệu trước thời điểm đó, chọn top-5, giao dịch 6 tháng kế tiếp. Ghép các đoạn 6 tháng thành một chuỗi lợi suất ngày ngoài mẫu 2022-07 → 2025-12. Sharpe năm của chuỗi đó là thước đo chính cho RQ1 và RQ3 (proposal mục "Walk-forward"; RQ2 đã bỏ, `docs/ROADMAP.md` mục 3, 2026-10-29).
+Chạy quy trình tìm alpha như thể đứng ở từng thời điểm trong quá khứ: chỉ thấy dữ liệu trước thời điểm đó, chọn top-5, giao dịch 6 tháng kế tiếp. Ghép các đoạn 6 tháng thành một chuỗi lợi suất ngày ngoài mẫu 2022-07 → 2025-12. Sharpe năm của chuỗi đó là thước đo chính cho RQ1 và RQ2 (proposal mục "Walk-forward"; RQ2 cũ về chỉ báo kỹ thuật đã bỏ, RQ3 cũ đánh số lại thành RQ2, `docs/ROADMAP.md` mục 3, 2026-10-29).
 
 ## 2. Cửa sổ
 
@@ -47,7 +47,7 @@ Cùng ngân sách 100.000 lượt chấm mỗi cửa sổ, cùng bước 2–4.
 | Mua và giữ | luôn long | tham chiếu | dễ |
 | TSMOM | momentum chuỗi thời gian (Moskowitz 2012), chuyển sang bar trong ngày | tham chiếu | ⛔ |
 
-## 5. Placebo (RQ3)
+## 5. Placebo (RQ2)
 
 - Lặp toàn bộ walk-forward của LLM + MCTS trên K = 19 bộ placebo: hoán vị lợi suất trong từng đoạn (học, kiểm định, đánh giá xáo riêng), như bài cài tín hiệu. Một seed mỗi bộ.
 - p = tỷ lệ lần chạy (kể cả lần thật) có Sharpe ngoài mẫu ≥ lần thật; nhỏ nhất 1/20 = 0.05.

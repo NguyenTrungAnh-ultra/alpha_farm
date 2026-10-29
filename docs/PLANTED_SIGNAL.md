@@ -1,4 +1,4 @@
-# Thiết kế — Bài cài tín hiệu (việc 3, kiểm soát dương RQ3)
+# Thiết kế — Bài cài tín hiệu (việc 3, kiểm soát dương RQ2)
 
 Bản hiện hành. Đổi ý thì sửa đúng chỗ, kèm một dòng lý do + ngày.
 Nguồn: proposal mục "Planted-Signal Test"; ROADMAP mục 2 việc 3.

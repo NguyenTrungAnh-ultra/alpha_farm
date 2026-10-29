@@ -33,10 +33,10 @@ THESIS = {
          'text': 'LLM + MCTS có cho bộ alpha tốt hơn ngoài mẫu so với MCTS không LLM, LLM không tìm, '
                  'và tìm ngẫu nhiên không?',
          'nodes': ['blueprints', 'mcts', 'rq1']},
-        {'id': 'RQ3', 'name': 'Bằng chứng tìm thấy',
+        {'id': 'RQ2', 'name': 'Bằng chứng tìm thấy',
          'text': 'Hệ thống có tốt hơn chính nó chạy trên dữ liệu placebo (không có gì để tìm), và có tìm lại được '
                  'tín hiệu cài sẵn không?',
-         'nodes': ['rq3_planted', 'rq3_placebo', 'oos']},
+         'nodes': ['rq2_planted', 'rq2_placebo', 'oos']},
     ],
     'method': [
         'LLM đề xuất khung công thức (blueprint) có ô `?`; MCTS điền ô trong ngữ pháp có kiểm tra chiều '
@@ -44,7 +44,7 @@ THESIS = {
         'Đơn vị đánh giá: gộp top-5 trọng số đều, chỉ số chính là Sharpe năm của lợi suất ngày ngoài mẫu.',
         'Walk-forward nở dần: 7 cửa sổ, ngoài mẫu 2022-07 → 2025-12, mỗi cấu hình 5 seed.',
         'So các cấu hình cùng ngân sách 100.000 lượt chấm mỗi cửa sổ (RQ1).',
-        'Kiểm soát âm: 19 bộ placebo xáo lợi suất. Kiểm soát dương: bài cài tín hiệu (RQ3).',
+        'Kiểm soát âm: 19 bộ placebo xáo lợi suất. Kiểm soát dương: bài cài tín hiệu (RQ2).',
         'Kiểm định SPA và Deflated Sharpe; HMM chỉ mô tả rủi ro.',
         'Đóng băng mọi lựa chọn trước, chạy dữ liệu thật đúng một lần.',
     ],
@@ -110,7 +110,7 @@ NODES: List[Dict] = [
          '5 seed cho mỗi cấu hình.']},
     {'id': 'hmm', 'label': 'HMM mô tả rủi ro', 'group': 'result', 'status': 'reference', 'x': 480, 'y': 370,
      'details': ['Chỉ mô tả rủi ro của chiến lược cuối cùng (đường bootstrap), không loại gì.']},
-    {'id': 'rq3_planted', 'label': 'RQ3: bài cài tín hiệu (độ nhạy)', 'group': 'compare', 'status': 'done',
+    {'id': 'rq2_planted', 'label': 'RQ2: bài cài tín hiệu (độ nhạy)', 'group': 'compare', 'status': 'done',
      'x': 20, 'y': 520, 'note': 'lần chạy 1–3', 'link': '/planted',
      'details': [
          'Cài công thức A vào dữ liệu placebo với IC 0 / 0.02 / 0.05 / 0.1.',
@@ -120,7 +120,7 @@ NODES: List[Dict] = [
      'details': [
          'Cùng quy trình, thay ① bằng: MCTS không LLM (gốc là một `?` rỗng), LLM không tìm kiếm, và tìm ngẫu nhiên.',
          'Cùng ngân sách 100.000 lần đánh giá.']},
-    {'id': 'rq3_placebo', 'label': 'RQ3: placebo (19 bộ dữ liệu xáo)', 'group': 'compare', 'status': 'todo',
+    {'id': 'rq2_placebo', 'label': 'RQ2: placebo (19 bộ dữ liệu xáo)', 'group': 'compare', 'status': 'todo',
      'x': 480, 'y': 520,
      'details': [
          'Lặp lại toàn bộ walk-forward trên 19 bộ dữ liệu có lợi suất bị xáo trong từng đoạn.',
@@ -136,8 +136,8 @@ EDGES: List[Dict] = [
     {'from': 'trade', 'to': 'oos'},
     {'from': 'oos', 'to': 'hmm'},
     {'from': 'oos', 'to': 'rq1'},
-    {'from': 'oos', 'to': 'rq3_placebo'},
-    {'from': 'rq3_planted', 'to': 'mcts', 'dashed': True, 'label': 'đo độ nhạy của a–d'},
+    {'from': 'oos', 'to': 'rq2_placebo'},
+    {'from': 'rq2_planted', 'to': 'mcts', 'dashed': True, 'label': 'đo độ nhạy của a–d'},
     {'from': 'trade', 'to': 'mcts', 'dashed': True, 'arc': True, 'loop': True,
      'label': '↻ lặp lại a–d cho cửa sổ kế tiếp (×7 cửa sổ, ×5 seed)'},
 ]
