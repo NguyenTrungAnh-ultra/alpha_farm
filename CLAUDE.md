@@ -33,7 +33,7 @@ Code changes go to the `coder` agent (`.claude/agents/coder.md`, Sonnet, medium 
 
 `--model` accepts: `ollama-local`, `ollama-9b`.
 
-As of 2026-10-28, the suite in `.venv` gives 82 passed and 1 failed. The failure is `test_core_engine.py::test_alpha_data_proxy`, an identity check (`is`) on a copied Series.
+As of 2026-10-29, the suite in `.venv` gives 183 passed and 1 failed. The failure is `test_core_engine.py::test_alpha_data_proxy`, an identity check (`is`) on a copied Series.
 
 ## Pipeline gotchas
 
@@ -41,7 +41,7 @@ Stages (generate → MCTS → scoring → HMM validation → portfolio) are desc
 
 - `RunMCTS` moves idea files to `results/ideas/processed/` even on error, so failures are easy to miss.
 - MCTS selection is UCT on **max** reward, not mean.
-- The portfolio has no acceptance criteria. Reward mode (`REWARD_MODE` in AppConfig: "gated" default, or "soft") stays undecided until the planted-signal answer-key check; do not change the default without that measurement.
+- The portfolio has no acceptance criteria. Reward modes are `REWARD_MODES` in AppConfig ("gated", "soft", "sharpe"). The user froze "sharpe" for all thesis runs on 2026-10-29 (`docs/ROADMAP.md` section 3), but the `REWARD_MODE` default is still "gated"; pass the mode explicitly.
 - HMM synthetic paths are cached per (timeframe, data fingerprint) in `data/MCdata/synthetic/`. The legacy `data/MCdata/synthetic_data.pkl` (~13 GB) is never read; until `--retrain-hmm` builds keyed files, `main.py mcts` skips the HMM step with a message.
 
 ## Core engine conventions

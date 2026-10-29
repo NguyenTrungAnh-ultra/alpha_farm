@@ -13,7 +13,7 @@ Khung nghiên cứu: `docs/proposal/thesis_proposal/Thesis_Proposal.pdf` (chươ
 - ✅ Pipeline `ts_*` chạy hết từ blueprint tới code chiến lược xuất ra (2026-10-28, việc 1 ở mục 2).
 - ⛔ Chưa có thành phần nào của quy trình đánh giá mới (walk-forward, gộp top-k, seed, baseline, placebo, cài tín hiệu, SPA/DSR).
 - ✅ Quy đổi theo năm thống nhất, CAGR theo lịch (2026-10-28, việc 4).
-- ⛔ Test: `.venv` cho 82 pass, 1 fail (`test_core_engine.py::test_alpha_data_proxy`, có từ trước).
+- ⛔ Test: `.venv` cho 183 pass, 1 fail (`test_core_engine.py::test_alpha_data_proxy`, có từ trước) — đo 2026-10-29.
 
 - ✅ Dọn tài liệu (2026-10-13): `docs/ARCH.md` và `README.md` viết lại theo code; bài báo vào `docs/references/`; tài liệu thời XNOQuant vào `docs/archive/` (lý do từng tệp ở `docs/archive/README.md`).
 
@@ -21,10 +21,12 @@ Khung nghiên cứu: `docs/proposal/thesis_proposal/Thesis_Proposal.pdf` (chươ
 
 1. ✅ **Nối lại pipeline** (2026-10-28): sửa 4 chỗ nối ở mục 1, đặt seed cho MCTS, cửa sổ cố định trên từng nút. Đo thật: 60m, `sub(ts_mean(?), ts_mean(?))`, seed 1, 300 vòng → 4 ứng viên reward ≠ −10, tốt nhất 0.26; cùng seed cho cùng kết quả kể cả khác tiến trình. Test: `tests/test_mcts_pipeline.py` (12 ca). `main.py mcts` thật (cần cache HMM) chưa chạy.
 2. ✅ **Tách dữ liệu khỏi engine** (2026-10-28): `MCTSEngine`, HMM và `process_timeframe` nhận DataFrame từ ngoài; cache HMM khoá theo khung + dấu vân tay dữ liệu. Test: `tests/test_data_injection.py` với `load_data` bị chặn. Cache cũ 13 GB không còn được đọc: chạy `--retrain-hmm` một lần trước lượt `mcts` thật.
-3. ⏸️ **Bài cài tín hiệu (kiểm soát dương), một khung thời gian** — thiết kế: `docs/PLANTED_SIGNAL.md`, người dùng duyệt 2026-10-28. Lần 2 (mục 9): IC 0.05 trượt (gần 1/5), IC 0 đạt, ngưỡng phát hiện ≈ IC 0.1. Lần 3 (mục 10: dữ liệu 2018-08 → 2024-12, reward `sharpe`): IC 0.05 vẫn 1/5, IC 0.1 lên 5/5, IC 0 đạt; ngưỡng nằm giữa 0.05 và 0.1. Chờ người dùng chọn hướng tiếp. Mục tiêu gốc: cài một công thức biết trước vào lợi suất placebo với IC 0.01 / 0.02 / 0.05, xem MCTS có tìm lại được không. Xong khi: có bảng tỷ lệ tìm lại theo cường độ.
+3. ⏸️ **Bài cài tín hiệu (kiểm soát dương), một khung thời gian** — thiết kế: `docs/PLANTED_SIGNAL.md`, người dùng duyệt 2026-10-28. Lần 2 (mục 9): IC 0.05 trượt (gần 1/5), IC 0 đạt, ngưỡng phát hiện ≈ IC 0.1. Lần 3 (mục 10: dữ liệu 2018-08 → 2024-12, reward `sharpe`): IC 0.05 vẫn 1/5, IC 0.1 lên 5/5, IC 0 đạt; ngưỡng nằm giữa 0.05 và 0.1. Tách tác động: phần cải thiện chủ yếu do dữ liệu. Đã đủ để chốt (mục 3, 2026-10-29); dùng lại bài này để đo độ nhạy ở cách chia của cửa sổ walk-forward đầu tiên. Mục tiêu gốc: cài một công thức biết trước vào lợi suất placebo với IC 0.01 / 0.02 / 0.05, xem MCTS có tìm lại được không. Xong khi: có bảng tỷ lệ tìm lại theo cường độ.
 4. ✅ Sửa quy đổi theo năm (2026-10-28): mọi chỉ số đi qua `compute_metrics`; CAGR theo thời gian lịch. Đo thật CAGR mua-và-giữ 2020–2024: 8.94% (1m), 8.93% (15m), 8.90% (60m) — trước đây 0.76% / 20.0% trong HMM và 10.1% trong `compute_metrics` khung phút (do thiếu ngày). Kết quả cũ trong `results/` (`portfolio_summary.json`…) vẫn tính theo công thức cũ.
 
 5. ⏸️ **Web điều khiển và theo dõi** (người dùng yêu cầu 2026-10-28; ngoài lịch proposal; mở từ xa qua Tailscale, người dùng chốt 2026-10-28) — kế hoạch: `docs/WEB_DASHBOARD.md`. ✅ W1 (móc tiến độ, dừng, danh sách blueprint, đếm −10 theo lý do) xong 2026-10-28; ✅ W3a (web chỉ xem bài cài tín hiệu + tài nguyên máy, `main.py web`) xong 2026-10-29 — người dùng cho làm sớm vì khó hình dung kết quả qua chat; W2, W3–W6 còn lại.
+
+6. 🔧 **Walk-forward (Tháng 2)** — thiết kế: `docs/WALK_FORWARD.md` (đang viết, chờ người dùng duyệt trước khi code).
 
 Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + placebo + baseline → chạy RQ1/RQ2 → RQ3, SPA, DSR.
 
@@ -41,7 +43,12 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
   - Tiêu chí danh mục (`meets_criteria`, `force_add`, loại theo tương quan) và phạt −100 FSA: xoá, vì là code chết (FSA chỉ kích khi reward > 1.0, mà reward tối đa là 1.0).
   - Lọc `reward > 0` trước khi chọn: giữ tới khi làm gộp top-5.
 - ✅ Bài cài tín hiệu lần 1 trượt ở IC 0.05 (`docs/PLANTED_SIGNAL.md` mục 8): công thức nhiễu tốt nhất luôn thắng tín hiệu thật trong mẫu. Người dùng chốt làm cả ba (2026-10-28): (a) sửa lỗi top-5 trùng công thức; (b) chọn top-5 trên một đoạn kiểm định tách riêng trong đoạn tìm (ví dụ 6 tháng cuối) thay vì reward trong mẫu; (c) thêm độ mạnh IC 0.1 / 0.2 để tìm ngưỡng phát hiện.
-- ⏸️ Độ dài cửa sổ walk-forward (2 năm tìm / 6 tháng đánh giá) và số seed (5), K = 19 lần placebo: do Claude đề xuất, người dùng chưa xác nhận.
+- ✅ **Sau bài cài tín hiệu (người dùng chốt 2026-10-29 theo đề xuất của Claude):**
+  - Báo cáo bài cài tín hiệu theo **ngưỡng phát hiện** ứng với lượng dữ liệu (≈ IC 0.1 với ~2 năm; giữa 0.05 và 0.1 với ~5 năm), không theo đạt / trượt ở IC 0.05. Proposal chỉ ghi các mức IC "for example", không có tiêu chí đạt.
+  - **Reward đóng băng: `sharpe`** (`docs/PLANTED_SIGNAL.md` mục 10). Lý do: không lệch theo độ dài dữ liệu như Calmar, khớp thước đo chính của proposal, không báo nhầm trên placebo với dữ liệu dài.
+  - **Walk-forward đổi so với proposal:** cửa sổ nở dần từ 2018-08-13 (mỗi cửa sổ dùng toàn bộ dữ liệu trước nó), đoạn tìm ngắn nhất ≈ 4 năm, đánh giá 6 tháng lăn 6 tháng, 7 cửa sổ đánh giá 2022-07 → 2025-12 (dùng cả 2025, đúng như proposal). Lý do: 2 năm tìm chỉ phát hiện được IC ≥ 0.1. Đánh đổi: 3,5 năm ngoài mẫu thay vì 5,5 ⇒ Sharpe tối thiểu chứng minh được ≈ 1.07 thay vì 0.85. Người dùng: proposal là bản "sẽ làm gì" cho thầy xem, đổi được.
+  - **Quy tắc dữ liệu thật:** mọi lựa chọn (reward, cách chia đoạn, bộ blueprint, ngân sách, seed) ghi vào tài liệu và đóng băng **trước** lần chạy walk-forward đầu tiên trên dữ liệu thật; chạy một lần, không sửa theo kết quả. Mọi lần chỉnh tới nay chỉ chạy trên dữ liệu đã xáo.
+- ⏸️ Số seed (5), K = 19 lần placebo: do Claude đề xuất (theo proposal), người dùng chưa xác nhận riêng.
 
 ## 4. Nợ
 
