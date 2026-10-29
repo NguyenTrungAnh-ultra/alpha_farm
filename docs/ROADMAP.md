@@ -28,7 +28,7 @@ Khung nghiên cứu: `docs/proposal/thesis_proposal/Thesis_Proposal.pdf` (chươ
 
 6. 🔧 **Walk-forward (Tháng 2)** — thiết kế: `docs/WALK_FORWARD.md` (đang viết, chờ người dùng duyệt trước khi code).
 
-Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + placebo + baseline → chạy RQ1/RQ2 → RQ3, SPA, DSR.
+Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + placebo + baseline → chạy RQ1 → RQ3, SPA, DSR (RQ2 đã bỏ, mục 3).
 
 ## 3. Câu chưa ai trả lời (⏸️ chờ người quyết)
 
@@ -47,6 +47,8 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
   - Báo cáo bài cài tín hiệu theo **ngưỡng phát hiện** ứng với lượng dữ liệu (≈ IC 0.1 với ~2 năm; giữa 0.05 và 0.1 với ~5 năm), không theo đạt / trượt ở IC 0.05. Proposal chỉ ghi các mức IC "for example", không có tiêu chí đạt.
   - **Reward đóng băng: `sharpe`** (`docs/PLANTED_SIGNAL.md` mục 10). Lý do: không lệch theo độ dài dữ liệu như Calmar, khớp thước đo chính của proposal, không báo nhầm trên placebo với dữ liệu dài.
   - **Walk-forward đổi so với proposal:** cửa sổ nở dần từ 2018-08-13 (mỗi cửa sổ dùng toàn bộ dữ liệu trước nó), đoạn tìm ngắn nhất ≈ 4 năm, đánh giá 6 tháng lăn 6 tháng, 7 cửa sổ đánh giá 2022-07 → 2025-12 (dùng cả 2025, đúng như proposal). Lý do: 2 năm tìm chỉ phát hiện được IC ≥ 0.1. Đánh đổi: 3,5 năm ngoài mẫu thay vì 5,5 ⇒ Sharpe tối thiểu chứng minh được ≈ 1.07 thay vì 0.85. Người dùng: proposal là bản "sẽ làm gì" cho thầy xem, đổi được.
+  - **Bỏ RQ2** (toán tử cơ bản vs chỉ báo kỹ thuật; người dùng chốt 2026-10-29, Claude đồng ý). Lý do: không trả lời câu hỏi chính (hệ thống có tìm ra tín hiệu thật không); chỉ báo kỹ thuật vốn là tổ hợp toán tử cơ bản nên so sánh chỉ đo độ thô của ngữ pháp; với ngưỡng phát hiện ≈ IC 0.1 kết quả gần chắc "không phân biệt được"; chi phí lớn nhất (dựng lại toán tử chỉ báo sau khi gỡ TA-Lib). Độ nhạy theo lượng dữ liệu báo trong RQ3 (bài cài tín hiệu), không thành câu riêng. Luận văn ghi RQ2 vào hướng phát triển; cần báo thầy vì proposal có RQ2.
+  - ⏸️ Đánh số lại RQ3 → RQ2: chưa chốt; tài liệu và web tạm giữ nhãn RQ1 / RQ3.
   - **Quy tắc dữ liệu thật:** mọi lựa chọn (reward, cách chia đoạn, bộ blueprint, ngân sách, seed) ghi vào tài liệu và đóng băng **trước** lần chạy walk-forward đầu tiên trên dữ liệu thật; chạy một lần, không sửa theo kết quả. Mọi lần chỉnh tới nay chỉ chạy trên dữ liệu đã xáo.
 - ⏸️ Số seed (5), K = 19 lần placebo: do Claude đề xuất (theo proposal), người dùng chưa xác nhận riêng.
 
@@ -56,7 +58,7 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
 - Rò rỉ qua trọng số LLM (nêu 2026-10-28, người dùng cho vào nợ): `qwen3.5:4b` được huấn luyện trên văn bản có thể đã nói về 2020–2025, nên lợi ích của LLM ở RQ1 có thể lẫn "biết trước". Prompt ghi tên "VN30 Index Futures" nhưng không ghi ngày. Cách kiểm Claude đề xuất: (1) ẩn tên thị trường trong prompt; (2) so blueprint có tên và ẩn danh cùng ngân sách; (3) tra ngày cắt dữ liệu huấn luyện của qwen3.5, tách cửa sổ đánh giá sau ngày đó; (4) nêu trong mục hạn chế. Chưa đo.
 - ⛔ Dữ liệu thiếu ngày (đo 2026-10-28): giai đoạn 2020–2024, tệp 1m/5m/15m/30m có 1.121 ngày giao dịch, tệp 1H có 1.247; 126 ngày chỉ có ở 1H, rải từ 2023-03-22 tới 2024-03-14. Backtest khung phút nhảy qua các ngày đó như một bar. Cần kiểm tệp CSV gốc / tải lại trước khi chạy RQ trên khung phút.
 - Test `test_hardware_concurrency.py` gọi `run_mcts_pipeline` thật nên mỗi lần chạy test ghi thêm vào `results/mcts_stats.json`.
-- `results/pushed/` (chiến lược thế hệ đầu) bị xoá ở commit `c6b1f03`; khôi phục bằng `git checkout cfeb770 -- results/pushed` nếu cần so sánh RQ2.
+- `results/pushed/` (chiến lược thế hệ đầu) bị xoá ở commit `c6b1f03`; khôi phục bằng `git checkout cfeb770 -- results/pushed` nếu cần (RQ2 đã bỏ nên không còn dùng để so sánh).
 - ~~`GenerateStrategies.load_experience_log` đọc tệp không tồn tại~~ → ✅ báo rõ khi thiếu, prompt ghi "(No experience log is available.)" (2026-10-28).
 - Không gian tìm phí: 12% lượt chấm lỗi vì biểu thức toàn hằng (`ts_mean((0.2 + 0.5), 10)`); MCTS còn sinh `(0.1 + low)` — cộng hằng vào giá không đổi z-score. Cần lọc hằng theo nút cha.
 - Template BOOLEAN luôn có vị thế: bar NaN lúc khởi động (và mọi bar False) thành vị thế short. Template RATIO với ngưỡng 60–80 / 20–40 làm gốc `ts_zscore` gần như luôn short; prompt đang bảo LLM tránh gốc RATIO.

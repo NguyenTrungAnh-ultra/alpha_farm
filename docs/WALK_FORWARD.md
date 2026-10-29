@@ -5,7 +5,7 @@ Trạng thái: ⏸️ bản nháp của Claude (2026-10-29), chờ người dùn
 
 ## 1. Câu hỏi
 
-Chạy quy trình tìm alpha như thể đứng ở từng thời điểm trong quá khứ: chỉ thấy dữ liệu trước thời điểm đó, chọn top-5, giao dịch 6 tháng kế tiếp. Ghép các đoạn 6 tháng thành một chuỗi lợi suất ngày ngoài mẫu 2022-07 → 2025-12. Sharpe năm của chuỗi đó là thước đo chính cho RQ1, RQ2, RQ3 (proposal mục "Walk-forward").
+Chạy quy trình tìm alpha như thể đứng ở từng thời điểm trong quá khứ: chỉ thấy dữ liệu trước thời điểm đó, chọn top-5, giao dịch 6 tháng kế tiếp. Ghép các đoạn 6 tháng thành một chuỗi lợi suất ngày ngoài mẫu 2022-07 → 2025-12. Sharpe năm của chuỗi đó là thước đo chính cho RQ1 và RQ3 (proposal mục "Walk-forward"; RQ2 đã bỏ, `docs/ROADMAP.md` mục 3, 2026-10-29).
 
 ## 2. Cửa sổ
 
@@ -40,11 +40,10 @@ Cùng ngân sách 100.000 lượt chấm mỗi cửa sổ, cùng bước 2–4.
 
 | Cấu hình | Cách làm [đề xuất] | RQ | Có code chưa |
 |---|---|---|---|
-| LLM + MCTS | như mục 3 | 1, 2, 3 | ✅ (ghép từ bài cài tín hiệu) |
+| LLM + MCTS | như mục 3 | 1, 3 | ✅ (ghép từ bài cài tín hiệu) |
 | MCTS không có LLM | MCTS từ gốc là một ô `?` dưới template NORMALIZED, 100.000 vòng | 1 | ⛔ |
 | LLM không tìm | LLM viết công thức hoàn chỉnh (không `?`); chấm hết số LLM viết được, không đủ 100.000 — ghi rõ là ngoại lệ về ngân sách | 1 | ⛔ |
 | Tìm ngẫu nhiên | 100.000 công thức hợp lệ về chiều, sinh ngẫu nhiên đều theo ngữ pháp | 1 | ⛔ |
-| Chỉ báo kỹ thuật | LLM + MCTS trên toán tử chỉ báo (RSI, MACD…) thay toán tử cơ bản | 2 | ⛔ (TA-Lib đã gỡ; làm lại là việc lớn) |
 | Mua và giữ | luôn long | tham chiếu | dễ |
 | TSMOM | momentum chuỗi thời gian (Moskowitz 2012), chuyển sang bar trong ngày | tham chiếu | ⛔ |
 
@@ -83,4 +82,4 @@ Lần 3 bài cài tín hiệu: ≈ 3.600 s / lượt với 4.831 bar học, 10 l
 
 ## 9. Ngoài phạm vi lần này
 
-SPA / DSR (Tháng 4), cấu hình chỉ báo kỹ thuật (RQ2), khung phút, kiểm tra rò rỉ qua trọng số LLM (nợ ở ROADMAP mục 4).
+SPA / DSR (Tháng 4), khung phút, kiểm tra rò rỉ qua trọng số LLM (nợ ở ROADMAP mục 4).

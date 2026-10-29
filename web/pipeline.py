@@ -33,9 +33,6 @@ THESIS = {
          'text': 'LLM + MCTS có cho bộ alpha tốt hơn ngoài mẫu so với MCTS không LLM, LLM không tìm, '
                  'và tìm ngẫu nhiên không?',
          'nodes': ['blueprints', 'mcts', 'rq1']},
-        {'id': 'RQ2', 'name': 'Không gian tìm',
-         'text': 'Toán tử chuỗi thời gian cơ bản có cho bộ alpha tốt hơn chỉ báo kỹ thuật không?',
-         'nodes': ['mcts', 'rq2']},
         {'id': 'RQ3', 'name': 'Bằng chứng tìm thấy',
          'text': 'Hệ thống có tốt hơn chính nó chạy trên dữ liệu placebo (không có gì để tìm), và có tìm lại được '
                  'tín hiệu cài sẵn không?',
@@ -46,7 +43,7 @@ THESIS = {
         '(giá, khối lượng, tỉ lệ, logic); backtest VN30F1M (phí, ký quỹ, khớp nến sau) cho reward.',
         'Đơn vị đánh giá: gộp top-5 trọng số đều, chỉ số chính là Sharpe năm của lợi suất ngày ngoài mẫu.',
         'Walk-forward nở dần: 7 cửa sổ, ngoài mẫu 2022-07 → 2025-12, mỗi cấu hình 5 seed.',
-        'So các cấu hình cùng ngân sách 100.000 lượt chấm mỗi cửa sổ (RQ1, RQ2).',
+        'So các cấu hình cùng ngân sách 100.000 lượt chấm mỗi cửa sổ (RQ1).',
         'Kiểm soát âm: 19 bộ placebo xáo lợi suất. Kiểm soát dương: bài cài tín hiệu (RQ3).',
         'Kiểm định SPA và Deflated Sharpe; HMM chỉ mô tả rủi ro.',
         'Đóng băng mọi lựa chọn trước, chạy dữ liệu thật đúng một lần.',
@@ -64,7 +61,7 @@ GROUPS = [
     {'id': 'prepare', 'label': 'Chuẩn bị', 'x': 10, 'y': 10, 'w': 920, 'h': 125},
     {'id': 'window', 'label': 'Mỗi cửa sổ walk-forward (7 cửa sổ)', 'x': 10, 'y': 140, 'w': 920, 'h': 160},
     {'id': 'result', 'label': 'Kết quả', 'x': 470, 'y': 340, 'w': 460, 'h': 115},
-    {'id': 'compare', 'label': 'So sánh (trả lời câu hỏi)', 'x': 10, 'y': 490, 'w': 920, 'h': 140},
+    {'id': 'compare', 'label': 'So sánh (trả lời câu hỏi)', 'x': 10, 'y': 490, 'w': 690, 'h': 140},
 ]
 
 NODES: List[Dict] = [
@@ -123,11 +120,8 @@ NODES: List[Dict] = [
      'details': [
          'Cùng quy trình, thay ① bằng: MCTS không LLM (gốc là một `?` rỗng), LLM không tìm kiếm, và tìm ngẫu nhiên.',
          'Cùng ngân sách 100.000 lần đánh giá.']},
-    {'id': 'rq2', 'label': 'RQ2: toán tử cơ bản vs chỉ báo kỹ thuật', 'group': 'compare', 'status': 'todo',
-     'x': 480, 'y': 520,
-     'details': ['Cần một cấu hình chỉ báo kỹ thuật (đã bỏ TA-Lib nên việc này lớn).']},
     {'id': 'rq3_placebo', 'label': 'RQ3: placebo (19 bộ dữ liệu xáo)', 'group': 'compare', 'status': 'todo',
-     'x': 710, 'y': 520,
+     'x': 480, 'y': 520,
      'details': [
          'Lặp lại toàn bộ walk-forward trên 19 bộ dữ liệu có lợi suất bị xáo trong từng đoạn.',
          'p = tỉ lệ lần chạy có Sharpe ≥ lần chạy thật; giá trị nhỏ nhất có thể là 0.05.']},
@@ -142,7 +136,6 @@ EDGES: List[Dict] = [
     {'from': 'trade', 'to': 'oos'},
     {'from': 'oos', 'to': 'hmm'},
     {'from': 'oos', 'to': 'rq1'},
-    {'from': 'oos', 'to': 'rq2'},
     {'from': 'oos', 'to': 'rq3_placebo'},
     {'from': 'rq3_planted', 'to': 'mcts', 'dashed': True, 'label': 'đo độ nhạy của a–d'},
     {'from': 'trade', 'to': 'mcts', 'dashed': True, 'arc': True, 'loop': True,
