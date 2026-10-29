@@ -21,15 +21,15 @@ from core_engine.AlphaPrimitives import ts_mean, ts_sum, ts_max, ts_min, ts_rank
 from core_engine.BacktestEngine import AlphaBacktestEngine, load_data
 from core_engine.CalculateMetrics import compute_metrics
 from strategy_workflows.MCTSDimensions import (
-    Dimension, OPERATOR_REGISTRY, get_operators_by_return_dim, DATA_FIELD_DIMENSIONS,
-    OperatorGroup, UNIMPLEMENTED_OPERATORS,
+    Dimension, OPERATOR_REGISTRY, DATA_FIELD_DIMENSIONS, OperatorGroup, UNIMPLEMENTED_OPERATORS,
+    BOOLEAN_DIMS, NUMERIC_DIMS, UNBOUNDED_DEPTH, analyze_dimensions, operators_for_slot,
 )
 from strategy_workflows.PortfolioManager import PortfolioManager
 from strategy_workflows.SemanticCompiler import ASTNode
 from utilities.AppConfig import (
     REWARD_WEIGHTS, BASE_PERIODS, BASE_WINDOW_SEARCH,
     BASELINE_TF_MINUTES, TIMEFRAME_MINUTES, MCTS_QUALITY_THRESHOLDS,
-    MIN_TRADES, REWARD_MODE, REWARD_MODES
+    MIN_TRADES, REWARD_MODE, REWARD_MODES, MCTS_MAX_DEPTH
 )
 
 logger = logging.getLogger(__name__)
@@ -238,18 +238,14 @@ def find_parent(root: ASTNode, target: ASTNode) -> Optional[ASTNode]:
             return found
     return None
 
-def required_dimension(root: ASTNode, ph: ASTNode) -> Dimension:
-    """Dimension a '?' slot must produce: stashed on the slot, else taken from its parent's signature."""
-    if isinstance(ph.value, Dimension):
-        return ph.value
-    parent = find_parent(root, ph)
-    if parent is not None and parent.name in OPERATOR_REGISTRY:
-        data_children = [c for c in parent.children if c.name != "Constant"]
-        input_dims = OPERATOR_REGISTRY[parent.name]["input_dims"]
-        for i, child in enumerate(data_children):
-            if child is ph and i < len(input_dims):
-                return input_dims[i]
-    return Dimension.ANY
+def required_dimensions(root: ASTNode, ph: ASTNode, max_depth: Optional[int] = None) -> frozenset:
+    """
+    Dimensions a '?' slot can take so the whole tree stays valid (empty if the tree is invalid).
+
+    Sibling and ancestor dimensions constrain it, e.g. the slot in `sub(pv_close, ts_mean(?))`
+    is CURRENCY only. `max_depth` limits what the slot can still grow into.
+    """
+    return analyze_dimensions(root, max_depth).slot_dims.get(id(ph), frozenset())
 
 def get_node_depth(root: ASTNode, target: ASTNode, current_depth: int = 0) -> Optional[int]:
     if root is target:
@@ -261,49 +257,50 @@ def get_node_depth(root: ASTNode, target: ASTNode, current_depth: int = 0) -> Op
     return None
 
 # MCTS Expansions
-def get_terminals_for_dimension(dim: Dimension) -> List[ASTNode]:
-    """Returns possible leaf expansions for a given dimension."""
+def terminals_for_dimensions(allowed, in_time_series: bool = False) -> List[ASTNode]:
+    """Leaf expansions (data fields, constants) whose dimension is in `allowed`."""
     terminals = []
-    if dim == Dimension.BOOLEAN:
-        # No leaf operator produces a BOOLEAN; a BOOLEAN slot always needs an operator.
+    if allowed == BOOLEAN_DIMS:
+        # No leaf produces a BOOLEAN; a BOOLEAN slot always needs an operator.
         return terminals
 
     for field, field_dim in DATA_FIELD_DIMENSIONS.items():
-        if field not in FIELD_EXPRESSIONS:
-            continue
-        if field_dim == dim or dim == Dimension.ANY:
+        if field in FIELD_EXPRESSIONS and field_dim in allowed:
             terminals.append(ASTNode(name=field))
 
-    if dim == Dimension.RATIO or dim == Dimension.ANY:
+    # A rolling operator needs a series, not a scalar constant.
+    if Dimension.RATIO in allowed and not in_time_series:
         for val in [0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0]:
             terminals.append(ASTNode(name="Constant", value=val))
 
     return terminals
 
-def get_operators_for_dimension(dim: Dimension, leaf_only: bool = False) -> List[ASTNode]:
+def operators_for_dimensions(allowed, remaining: int) -> List[ASTNode]:
     """
-    Backward chaining and arity matching.
+    Operator expansions (with `?` children, one per input) for a slot limited to `allowed`.
 
-    A BOOLEAN slot only accepts operators that return BOOLEAN. Operators that preserve their
-    input dimension (output ANY) would put a float series where `&`, `|`, `~` need booleans.
-    With leaf_only, operators needing a BOOLEAN input are dropped so the tree can stop growing.
+    `remaining` is the number of operator levels the slot may still use. An operator is offered
+    only if some dimension of its inputs makes its output fall into `allowed`; its children are
+    then constrained in turn when the search reaches them.
     """
-    ops = []
-    for op in get_operators_by_return_dim(dim):
-        if not is_implemented(op):
-            continue
-        meta = OPERATOR_REGISTRY[op]
-        if dim == Dimension.BOOLEAN and meta["output_dim"] != Dimension.BOOLEAN:
-            continue
-        if leaf_only and Dimension.BOOLEAN in meta["input_dims"]:
-            continue
-        # Arity Matching: Generate placeholders based on input_dims
-        children = []
-        for expected_dim in meta["input_dims"]:
-            # We attach the expected dimension to the placeholder value so MCTS knows what to fill next
-            children.append(ASTNode(name='?', value=expected_dim))
-        ops.append(ASTNode(name=op, children=children))
-    return ops
+    expect_boolean = allowed == BOOLEAN_DIMS
+    return [
+        ASTNode(name=op, children=[ASTNode(name='?') for _ in OPERATOR_REGISTRY[op]["input_dims"]])
+        for op in operators_for_slot(allowed, remaining, expect_boolean)
+    ]
+
+def _dimensions_of(dim: Dimension) -> frozenset:
+    if dim == Dimension.BOOLEAN:
+        return BOOLEAN_DIMS
+    return NUMERIC_DIMS if dim == Dimension.ANY else frozenset({dim})
+
+def get_terminals_for_dimension(dim: Dimension) -> List[ASTNode]:
+    """Leaf expansions for one dimension (ANY = every numeric dimension)."""
+    return terminals_for_dimensions(_dimensions_of(dim))
+
+def get_operators_for_dimension(dim: Dimension) -> List[ASTNode]:
+    """Operator expansions for one dimension (ANY = every numeric dimension), with unlimited depth."""
+    return operators_for_dimensions(_dimensions_of(dim), UNBOUNDED_DEPTH)
 
 class MCTSState:
     """
@@ -354,22 +351,19 @@ class MCTSState:
         if ph.name == 'threshold_lower':
             return [ASTNode(name='threshold_lower', value=v) for v in [20.0, 25.0, 30.0, 35.0, 40.0]]
 
-        req_dim = required_dimension(self.ast_tree, ph)
-        terminals = get_terminals_for_dimension(req_dim)
+        allowed = required_dimensions(self.ast_tree, ph, self.max_depth)
+        if not allowed:
+            return []
 
-        # A rolling operator needs a series, not a scalar constant.
         parent = find_parent(self.ast_tree, ph)
-        if parent is not None and parent.name in OPERATOR_REGISTRY \
-                and OPERATOR_REGISTRY[parent.name]["group"] == OperatorGroup.TIME_SERIES:
-            terminals = [t for t in terminals if t.name != "Constant"]
+        in_time_series = parent is not None and parent.name in OPERATOR_REGISTRY \
+            and OPERATOR_REGISTRY[parent.name]["group"] == OperatorGroup.TIME_SERIES
 
-        depth = get_node_depth(self.ast_tree, ph)
-        if depth is not None and depth >= self.max_depth:
-            # A BOOLEAN slot has no terminals, so it may overshoot the depth limit by one level
-            # with a comparison whose operands are then forced to be terminals.
-            return terminals + get_operators_for_dimension(req_dim, leaf_only=True) if req_dim == Dimension.BOOLEAN else terminals
-
-        return terminals + get_operators_for_dimension(req_dim)
+        # Past the depth limit only a BOOLEAN slot still takes an operator (a comparison whose
+        # operands are then forced to be leaves), because no leaf is BOOLEAN.
+        depth = get_node_depth(self.ast_tree, ph) or 0
+        return terminals_for_dimensions(allowed, in_time_series) + \
+            operators_for_dimensions(allowed, self.max_depth - depth)
 
     def apply_action(self, action_node: ASTNode) -> 'MCTSState':
         new_tree = clone_ast(self.ast_tree)
@@ -451,7 +445,7 @@ class MCTSEngine:
         the engine overrides the state's default `max_depth` of 3 with its own 
         configured depth (typically 4).
     """
-    def __init__(self, timeframe: str = '10m', max_depth: int = 4, exploration_c: float = 1.414, global_position_matrix: pd.DataFrame = None, seed: Optional[int] = None, data: Optional[pd.DataFrame] = None, reward_mode: Optional[str] = None):
+    def __init__(self, timeframe: str = '10m', max_depth: int = MCTS_MAX_DEPTH, exploration_c: float = 1.414, global_position_matrix: pd.DataFrame = None, seed: Optional[int] = None, data: Optional[pd.DataFrame] = None, reward_mode: Optional[str] = None):
         """
         Initialize the MCTSEngine.
         
@@ -772,6 +766,9 @@ class MCTSEngine:
         unimplemented = find_unimplemented_operator(root_ast)
         if unimplemented is not None:
             raise ValueError(f"Blueprint uses operator '{unimplemented}', which has no code generation")
+        analysis = analyze_dimensions(root_ast, self.max_depth)
+        if analysis.error:
+            raise ValueError(f"Blueprint cannot be completed at max_depth={self.max_depth}: {analysis.error}")
         root_state = MCTSState(root_ast, self.max_depth, self.scaled_window_search, self.scaled_periods)
         root_node = MCTSNode(root_state)
         

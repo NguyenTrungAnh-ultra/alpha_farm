@@ -35,7 +35,7 @@ from strategy_workflows.PortfolioManager import PortfolioManager
 # TWEAK: Add more timeframes (e.g., "5m", "1h", "2h", "4h", "1d") to hunt for alphas across all market environments.
 TIMEFRAMES = ["1m", "3m", "5m", "10m", "15m", "30m", "60m"]
 
-from utilities.AppConfig import MCTS_ITERATIONS
+from utilities.AppConfig import MCTS_ITERATIONS, MCTS_MAX_DEPTH
 
 # TWEAK: Add smaller/larger scales (e.g., [0.05, 0.1, ..., 0.5]) to give the engine more flexibility in risk management.
 POSITION_SCALES = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5]
@@ -214,7 +214,7 @@ def process_timeframe(tf: str, data: pd.DataFrame, iterations: int, synthetic_da
         except Exception as pe:
             print(f"[Worker {tf}] Warning: Failed to load global position matrix: {pe}")
 
-    mcts = MCTSEngine(timeframe=tf, max_depth=4, global_position_matrix=global_position_matrix, seed=seed, data=data, reward_mode=reward_mode)
+    mcts = MCTSEngine(timeframe=tf, max_depth=MCTS_MAX_DEPTH, global_position_matrix=global_position_matrix, seed=seed, data=data, reward_mode=reward_mode)
 
     # ==========================================
     # ĐỌC Ý TƯỞNG TỪ TẦNG 1 & BIÊN DỊCH BỞI TẦNG 2

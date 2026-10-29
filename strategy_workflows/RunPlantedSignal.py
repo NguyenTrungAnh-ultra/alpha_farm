@@ -47,7 +47,7 @@ from strategy_workflows.PlantedSignal import (
     distinct_expressions, rank_by_validation, select_planted_formula, spearman_abs,
 )
 from strategy_workflows.SemanticCompiler import ASTNode, SemanticCompiler
-from utilities.AppConfig import REWARD_MODES
+from utilities.AppConfig import MCTS_MAX_DEPTH, REWARD_MODES
 
 TIMEFRAME = '60m'
 # The search segment is split (see Segments): MCTS sees only bars up to train_end; the leaderboard is then
@@ -373,7 +373,7 @@ def run_single(task: Dict) -> Dict:
     blueprints, formula, segments = task['blueprints'], task['formula'], task['segments']
     with quiet():
         data = build_planted_data(load_base(segments), segments.search_end, strength, seed, task['beta'], formula)
-        engine = MCTSEngine(timeframe=TIMEFRAME, max_depth=4, global_position_matrix=None, seed=seed,
+        engine = MCTSEngine(timeframe=TIMEFRAME, max_depth=MCTS_MAX_DEPTH, global_position_matrix=None, seed=seed,
                             data=data.search.loc[:segments.train_end], reward_mode=mode)
         assert_in_search_space(engine, formula)
         compiler = SemanticCompiler()

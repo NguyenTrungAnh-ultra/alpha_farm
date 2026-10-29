@@ -30,6 +30,9 @@ MIN_TRADES = 15
 REWARD_MODES = ("gated", "soft", "sharpe")
 REWARD_MODE = "gated"
 
+# Deepest formula tree MCTS builds; blueprint acceptance checks that every `?` can be filled within it.
+MCTS_MAX_DEPTH = 4
+
 # === MCTS One-pass Pipeline Config ===
 REWARD_WEIGHTS = {
     'calmar_weight': 0.6,

@@ -7,7 +7,8 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 import ast
-from .MCTSDimensions import OPERATOR_REGISTRY, DATA_FIELD_DIMENSIONS, Dimension
+from utilities.AppConfig import MCTS_MAX_DEPTH
+from .MCTSDimensions import OPERATOR_REGISTRY, DATA_FIELD_DIMENSIONS, Dimension, analyze_dimensions
 
 class ASTNode:
     def __init__(self, name: str, children: list = None, value=None, window: int = None):
@@ -62,9 +63,10 @@ def count_slots(node: ASTNode) -> int:
 
 
 class SemanticCompiler:
-    def compile_open_blueprint(self, blueprint_str: str) -> ASTNode:
+    def compile_open_blueprint(self, blueprint_str: str, max_depth: int = MCTS_MAX_DEPTH) -> ASTNode:
         """
-        Compile a blueprint and require at least one `?` series slot.
+        Compile a blueprint and require at least one `?` series slot, and that every slot can
+        be filled within `max_depth` (the MCTS depth limit) so that the tree stays dimensionally valid.
 
         A blueprint without a slot leaves the search only windows and thresholds to tune, so it
         is rejected with a message meant to be fed back to the LLM.
@@ -75,6 +77,13 @@ class SemanticCompiler:
                 f"Blueprint `{blueprint_str}` has no `?` slot. Every blueprint must contain at least "
                 "one `?` (prefer 2-3): replace the open parts (a data field or a whole sub-formula) "
                 "with `?`, e.g. `sub(ts_mean(?), ts_mean(?))`."
+            )
+        analysis = analyze_dimensions(root, max_depth)
+        if analysis.error:
+            raise SemanticCompilerError(
+                f"Blueprint `{blueprint_str}` cannot be completed within the depth limit of {max_depth}: "
+                f"{analysis.error}. A `?` that must be dimensionless (RATIO), e.g. inside a `mult` or beside "
+                "a `ts_zscore`, needs extra nesting under every rolling operator. Use a shallower skeleton."
             )
         return root
 
@@ -113,9 +122,18 @@ class SemanticCompiler:
         root_node = self._build_node(tree.body)
         
         # Fail-Fast Drop: Verify dimensions
-        out_dim = self._check_dimensions(root_node)
-        
+        root_dims = self._analyze(root_node).root_dims
+
         from .MCTSDimensions import TemplateType, DIMENSION_TO_TEMPLATE
+        # The declared kind of the root operator picks the template, not the inferred dimension:
+        # `div` is declared RATIO although it can also return the dimension of its numerator.
+        root_meta = OPERATOR_REGISTRY.get(root_node.name)
+        if root_dims == frozenset({Dimension.BOOLEAN}):
+            out_dim = Dimension.BOOLEAN
+        elif root_meta is not None and root_meta["output_dim"] == Dimension.RATIO:
+            out_dim = Dimension.RATIO
+        else:
+            out_dim = Dimension.ANY
         template = DIMENSION_TO_TEMPLATE.get(out_dim, TemplateType.NORMALIZED)
         
         if template == TemplateType.NORMALIZED:
@@ -139,7 +157,9 @@ class SemanticCompiler:
             
         if out_dim != Dimension.BOOLEAN:
             raise SemanticCompilerError(f"Root node must return BOOLEAN, got {out_dim}")
-            
+
+        # The wrapped tree must still be valid (a ratio_template needs a RATIO child).
+        self._analyze(root_node)
         return root_node
 
     def _build_node(self, node) -> ASTNode:
@@ -257,58 +277,22 @@ class SemanticCompiler:
         else:
             raise SemanticCompilerError(f"Unsupported AST node type: {type(node)}")
 
+    def _analyze(self, node: ASTNode, max_depth: int = None):
+        """
+        Run the dimension inference (see `analyze_dimensions`) and raise on the first invalid node.
+
+        Dimensions propagate through every operator, so a mismatch is caught at any depth, and a
+        blueprint whose `?` slots cannot take any dimension that keeps the tree valid is rejected.
+        """
+        analysis = analyze_dimensions(node, max_depth)
+        if analysis.error:
+            raise SemanticCompilerError(analysis.error)
+        return analysis
+
     def _check_dimensions(self, node: ASTNode) -> Dimension:
         """
-        Recursively check the dimensional consistency of an ASTNode tree.
-        
-        Ensures that data fields, operators, and their arguments are compatible
-        based on the definitions in OPERATOR_REGISTRY and DATA_FIELD_DIMENSIONS.
-        Verifies arity matches and guards against dimensional bleeding (mixing different
-        units like volume and price in addition/subtraction or comparison operators).
-        
-        Parameters
-        ----------
-        node : ASTNode
-            The ASTNode to perform dimensional check on.
-            
-        Returns
-        -------
-        Dimension
-            The resolved output dimension of the node.
-            
-        Raises
-        ------
-        SemanticCompilerError
-            If an arity mismatch, dimension mismatch, or dimensional bleeding is detected.
+        Dimension of a tree: the single dimension it must have, or ANY while `?` slots leave
+        several possible. Raises SemanticCompilerError on arity, dimension or bleeding errors.
         """
-        if node.name == "?":
-            return Dimension.ANY # Placeholders can be anything for now, MCTS will fill them
-        elif node.name == "Constant":
-            return Dimension.ANY # Constants scale/shift without forcing a unit (usually)
-        elif node.name in DATA_FIELD_DIMENSIONS:
-            return DATA_FIELD_DIMENSIONS[node.name]
-            
-        meta = OPERATOR_REGISTRY[node.name]
-        expected_dims = meta["input_dims"]
-        
-        non_constant_children = [c for c in node.children if c.name != "Constant"]
-        
-        if len(non_constant_children) != len(expected_dims):
-            raise SemanticCompilerError(f"Arity mismatch for {node.name}: expected {len(expected_dims)} data args, got {len(non_constant_children)}")
-            
-        child_dims = []
-        for child, expected_dim in zip(non_constant_children, expected_dims):
-            child_dim = self._check_dimensions(child)
-            child_dims.append(child_dim)
-            # If expected is ANY, it accepts anything. If child is ANY (placeholder), it assumes it's valid.
-            if expected_dim != Dimension.ANY and child_dim != Dimension.ANY:
-                if child_dim != expected_dim:
-                    raise SemanticCompilerError(f"Dimension mismatch in {node.name}: expected {expected_dim}, got {child_dim}")
-                    
-        # Check for Dimensional Bleeding on specific operators
-        if node.name in ['add', 'sub', 'crossed', 'crossed_above', 'crossed_below', 'greater_than', 'less_than', 'equal']:
-            resolved_dims = set(d for d in child_dims if d != Dimension.ANY)
-            if len(resolved_dims) > 1:
-                raise SemanticCompilerError(f"Dimensional Bleeding in {node.name}: inputs have mixed dimensions {resolved_dims}")
-
-        return meta["output_dim"]
+        dims = self._analyze(node).root_dims
+        return next(iter(dims)) if len(dims) == 1 else Dimension.ANY
