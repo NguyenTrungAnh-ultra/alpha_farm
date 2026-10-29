@@ -41,7 +41,7 @@ from strategy_workflows.MCTSEngine import (
     find_unimplemented_operator,
 )
 from strategy_workflows.PlantedSignal import (
-    EVAL_END, SEARCH_END, SEARCH_START, TOP_K, Calibration, PlantedData, PlantedFormula,
+    TOP_K, Calibration, PlantedData, PlantedFormula, Segments,
     assert_in_search_space, build_planted_data, calibrate_beta, can_express, combine_positions,
     formula_from_dict, formula_to_dict, is_exact_recovery, is_near_recovery, is_verbatim,
     distinct_expressions, rank_by_validation, select_planted_formula, spearman_abs,
@@ -49,10 +49,9 @@ from strategy_workflows.PlantedSignal import (
 from strategy_workflows.SemanticCompiler import ASTNode, SemanticCompiler
 
 TIMEFRAME = '60m'
-# The search segment is split: MCTS sees only bars up to TRAIN_END; the leaderboard is then ranked by
-# reward on VALIDATION_START..SEARCH_END. Dates are day-granular; a slice end includes the whole day.
-TRAIN_END = '2019-12-31'
-VALIDATION_START = '2020-01-01'
+# The search segment is split (see Segments): MCTS sees only bars up to train_end; the leaderboard is then
+# ranked by reward on validation_start..search_end. The split is configurable per run from the command line
+# and stored in <out-dir>/segments.json so one output folder never mixes splits.
 MAX_RANKED = 100
 DEFAULT_STRENGTHS = [0.0, 0.01, 0.02, 0.05, 0.1, 0.2]
 DEFAULT_SEEDS = [1, 2, 3, 4, 5]
@@ -81,9 +80,36 @@ def default_out_dir() -> str:
     return os.path.join(PROJECT_ROOT, 'results', 'planted')
 
 
-def load_base() -> pd.DataFrame:
+def load_base(segments: Segments) -> pd.DataFrame:
     """Real 60m OHLCV covering the search and evaluation segments."""
-    return load_data(TIMEFRAME, start=SEARCH_START, end=EVAL_END)
+    return load_data(TIMEFRAME, start=segments.search_start, end=segments.eval_end)
+
+
+def segments_path(out_dir: str) -> str:
+    return os.path.join(out_dir, 'segments.json')
+
+
+def ensure_segments(out_dir: str, segments: Segments, force: bool = False) -> None:
+    """
+    Record the segments of this output folder on first use; refuse a different split afterwards
+    (runs.csv / oracle.csv rows are only comparable within one split). `force` overwrites the record.
+    """
+    path = segments_path(out_dir)
+    if os.path.exists(path) and not force:
+        with open(path, 'r', encoding='utf-8') as f:
+            stored = Segments.from_dict(json.load(f))
+        if stored != segments:
+            raise SystemExit(f"[planted] {path} holds {stored.to_dict()} but {segments.to_dict()} was requested; "
+                             f"use another --out-dir (or --force to overwrite the record).")
+        return
+    os.makedirs(out_dir, exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(segments.to_dict(), f, indent=2)
+
+
+def segments_from_args(args) -> Segments:
+    return Segments(search_start=args.search_start, train_end=args.train_end,
+                    search_end=args.search_end, eval_end=args.eval_end)
 
 
 def load_blueprints(path: str) -> List[Dict[str, str]]:
@@ -96,23 +122,25 @@ def formula_path(out_dir: str) -> str:
     return os.path.join(out_dir, 'planted_formula.json')
 
 
-def load_formula(out_dir: str) -> PlantedFormula:
-    """The formula stored by the `select` step; refuses to continue without it."""
-    path = formula_path(out_dir)
+def load_formula(out_dir: str, path: Optional[str] = None) -> PlantedFormula:
+    """The formula stored by the `select` step (or the file given in `path`); refuses to continue without it."""
+    path = path or formula_path(out_dir)
     if not os.path.exists(path):
         raise SystemExit(f"[planted] {path} not found; run the select step first.")
     with open(path, 'r', encoding='utf-8') as f:
         return formula_from_dict(json.load(f))
 
 
-def calibration_key(base: pd.DataFrame, strength: float, formula: PlantedFormula) -> str:
+def calibration_key(base: pd.DataFrame, strength: float, formula: PlantedFormula,
+                    segments: Segments = Segments()) -> str:
     """Cache key: strength, formula (expression and z-score window) and the data window (bounds, size, price checksum)."""
     checksum = hashlib.md5(base['Close'].to_numpy().tobytes()).hexdigest()[:12]
     return (f"strength={strength}|expr={formula.expr}|z_window={formula.z_window}"
-            f"|data={base.index[0]}..{base.index[-1]}|n={len(base)}|search_end={SEARCH_END}|close={checksum}")
+            f"|data={base.index[0]}..{base.index[-1]}|n={len(base)}|search_end={segments.search_end}|close={checksum}")
 
 
-def get_beta(base: pd.DataFrame, strength: float, out_dir: str, formula: PlantedFormula, workers: int = 1) -> float:
+def get_beta(base: pd.DataFrame, strength: float, out_dir: str, formula: PlantedFormula, workers: int = 1,
+             segments: Segments = Segments()) -> float:
     """Calibrated beta for `strength`, from calibration.json when cached, else computed and stored."""
     if strength == 0.0:
         return 0.0
@@ -121,10 +149,10 @@ def get_beta(base: pd.DataFrame, strength: float, out_dir: str, formula: Planted
     if os.path.exists(path):
         with open(path, 'r', encoding='utf-8') as f:
             cache = json.load(f)
-    key = calibration_key(base, strength, formula)
+    key = calibration_key(base, strength, formula, segments)
     if key not in cache:
         started = time.time()
-        result = calibrate_beta(base, SEARCH_END, strength, formula, workers=workers)
+        result = calibrate_beta(base, segments.search_end, strength, formula, workers=workers)
         cache[key] = {
             'beta': result.beta, 'target_ic': strength, 'mean_ic': result.mean_ic, 'std_ic': result.std_ic,
             'perm_seeds': result.seeds, 'evaluations': result.iterations,
@@ -257,9 +285,11 @@ def step_blueprints(args) -> None:
 def step_select(args) -> None:
     path = args.blueprints or os.path.join(args.out_dir, 'blueprints.json')
     blueprints = load_blueprints(path)
-    base = load_base()
+    segments = segments_from_args(args)
+    ensure_segments(args.out_dir, segments, args.force)
+    base = load_base(segments)
     with quiet():
-        engine = MCTSEngine(timeframe=TIMEFRAME, data=base.loc[:SEARCH_END], global_position_matrix=None)
+        engine = MCTSEngine(timeframe=TIMEFRAME, data=base.loc[:segments.search_end], global_position_matrix=None)
     formula, info = select_planted_formula(blueprints, engine)
     annotated = annotate_blueprints(blueprints, formula)
     source = next(b for b in annotated if b['name'] == formula.source)
@@ -295,7 +325,8 @@ def score_planted_formula(engine: MCTSEngine, formula: PlantedFormula) -> Dict:
     return {'reward': best[0], 'z': best[1], 'metrics': best[3], 'tree': best[2]}
 
 
-def planted_split_rewards(train_engine: MCTSEngine, formula: PlantedFormula, search: pd.DataFrame) -> Dict:
+def planted_split_rewards(train_engine: MCTSEngine, formula: PlantedFormula, search: pd.DataFrame,
+                          segments: Segments) -> Dict:
     """
     Reward of the planted formula on the train part and on the validation part. The z-score threshold
     and direction are the ones that score best on train; validation then scores that fixed strategy.
@@ -307,19 +338,22 @@ def planted_split_rewards(train_engine: MCTSEngine, formula: PlantedFormula, sea
                  'z_score': desc['z_score_threshold'], 'threshold_upper': desc['threshold_upper'],
                  'threshold_lower': desc['threshold_lower'], 'direction': direction}
     return {'train': best['reward'],
-            'validation': train_engine.score_on_span(candidate, search, VALIDATION_START, SEARCH_END)}
+            'validation': train_engine.score_on_span(candidate, search, segments.validation_start,
+                                                  segments.search_end)}
 
 
 def step_oracle(args) -> None:
-    formula = load_formula(args.out_dir)
+    segments = segments_from_args(args)
+    ensure_segments(args.out_dir, segments, args.force)
+    formula = load_formula(args.out_dir, args.formula)
     started = time.time()
-    base = load_base()
+    base = load_base(segments)
     workers = args.workers if args.workers else max(1, multiprocessing.cpu_count() - 2)
     rows = []
     for strength in args.strengths:
-        beta = get_beta(base, strength, args.out_dir, formula, workers)
+        beta = get_beta(base, strength, args.out_dir, formula, workers, segments)
         for seed in args.seeds:
-            data = build_planted_data(base, SEARCH_END, strength, seed, beta, formula)
+            data = build_planted_data(base, segments.search_end, strength, seed, beta, formula)
             scored = {}
             for mode in ('gated', 'soft'):
                 with quiet():
@@ -328,9 +362,9 @@ def step_oracle(args) -> None:
                 assert_in_search_space(engine, formula)
                 scored[mode] = score_planted_formula(engine, formula)
             with quiet():
-                train_engine = MCTSEngine(timeframe=TIMEFRAME, data=data.search.loc[:TRAIN_END], seed=seed,
+                train_engine = MCTSEngine(timeframe=TIMEFRAME, data=data.search.loc[:segments.train_end], seed=seed,
                                           reward_mode='soft', global_position_matrix=None)
-                split = planted_split_rewards(train_engine, formula, data.search)
+                split = planted_split_rewards(train_engine, formula, data.search, segments)
             soft_metrics = scored['soft']['metrics']
             rows.append({
                 'strength': strength, 'seed': seed, 'beta': data.beta, 'ic_search': data.ic_search, 'ic_eval': data.ic_eval,
@@ -360,14 +394,14 @@ def candidate_positions(candidate: dict, full: pd.DataFrame) -> pd.Series:
     )
 
 
-def rank_leaderboard(engine: MCTSEngine, search: pd.DataFrame, k: int = TOP_K) -> Dict:
+def rank_leaderboard(engine: MCTSEngine, search: pd.DataFrame, segments: Segments, k: int = TOP_K) -> Dict:
     """
     Distinct expressions of the train leaderboard (at most MAX_RANKED, train-reward order), scored on the
-    validation part of `search` (the continuous frame up to SEARCH_END), and the best `k` by that score.
+    validation part of `search` (the continuous frame up to search_end), and the best `k` by that score.
     Returns the train-ordered list, validation rewards aligned with it, and the chosen indices.
     """
     ranked = distinct_expressions(engine.get_best_candidates())[:MAX_RANKED]
-    rewards = [engine.score_on_span(c, search, VALIDATION_START, SEARCH_END) for c in ranked]
+    rewards = [engine.score_on_span(c, search, segments.validation_start, segments.search_end) for c in ranked]
     return {'ranked': ranked, 'val_rewards': rewards, 'chosen': rank_by_validation(ranked, rewards)[:k]}
 
 
@@ -390,11 +424,11 @@ def run_single(task: Dict) -> Dict:
     warnings.filterwarnings('ignore')
     started = time.time()
     mode, strength, seed, iterations = task['reward_mode'], task['strength'], task['seed'], task['iterations']
-    blueprints, formula = task['blueprints'], task['formula']
+    blueprints, formula, segments = task['blueprints'], task['formula'], task['segments']
     with quiet():
-        data = build_planted_data(load_base(), SEARCH_END, strength, seed, task['beta'], formula)
+        data = build_planted_data(load_base(segments), segments.search_end, strength, seed, task['beta'], formula)
         engine = MCTSEngine(timeframe=TIMEFRAME, max_depth=4, global_position_matrix=None, seed=seed,
-                            data=data.search.loc[:TRAIN_END], reward_mode=mode)
+                            data=data.search.loc[:segments.train_end], reward_mode=mode)
         assert_in_search_space(engine, formula)
         compiler = SemanticCompiler()
         stop_reasons: Counter = Counter()
@@ -408,7 +442,7 @@ def run_single(task: Dict) -> Dict:
                 print(f"blueprint {bp['name']} failed: {exc}")
 
         summary = engine.error_summary()
-        picked = rank_leaderboard(engine, data.search, TOP_K)
+        picked = rank_leaderboard(engine, data.search, segments, TOP_K)
         ranked, val_rewards, chosen = picked['ranked'], picked['val_rewards'], picked['chosen']
         top = [ranked[i] for i in chosen]
 
@@ -454,17 +488,19 @@ def append_run(path: str, row: Dict) -> None:
 
 
 def step_search(args) -> None:
-    formula = load_formula(args.out_dir)
+    segments = segments_from_args(args)
+    ensure_segments(args.out_dir, segments, args.force)
+    formula = load_formula(args.out_dir, args.formula)
     os.makedirs(args.out_dir, exist_ok=True)
     blueprint_path = args.blueprints or os.path.join(args.out_dir, 'blueprints.json')
     blueprints = load_blueprints(blueprint_path)
     runs_path = os.path.join(args.out_dir, 'runs.csv')
     workers = args.workers if args.workers else max(1, multiprocessing.cpu_count() - 2)
-    base = load_base()
-    betas = {s: get_beta(base, s, args.out_dir, formula, workers) for s in args.strengths}
+    base = load_base(segments)
+    betas = {s: get_beta(base, s, args.out_dir, formula, workers, segments) for s in args.strengths}
     tasks = [
         {'reward_mode': args.reward_mode, 'strength': s, 'seed': seed, 'beta': betas[s],
-         'iterations': args.iterations, 'blueprints': blueprints, 'formula': formula}
+         'iterations': args.iterations, 'blueprints': blueprints, 'formula': formula, 'segments': segments}
         for s in args.strengths for seed in args.seeds
     ]
     print(f"[planted] {len(tasks)} runs, {len(blueprints)} blueprints, {args.iterations} iterations each, {workers} worker(s)")
@@ -547,6 +583,14 @@ def add_planted_parser(subparsers) -> None:
     parser = subparsers.add_parser('planted', help='Planted-signal test')
     steps = parser.add_subparsers(dest='step', required=True)
 
+    def segment_options(p):
+        defaults = Segments()
+        p.add_argument('--search-start', default=defaults.search_start, help='First day of the train segment')
+        p.add_argument('--train-end', default=defaults.train_end, help='Last day MCTS sees; validation starts the day after')
+        p.add_argument('--search-end', default=defaults.search_end, help='Last day of validation; evaluation starts the day after')
+        p.add_argument('--eval-end', default=defaults.eval_end, help='Last day of the evaluation segment')
+        p.add_argument('--force', action='store_true', help='Overwrite <out-dir>/segments.json when it differs')
+
     def common(p, search_options=True):
         p.add_argument('--out-dir', default=default_out_dir(), help='Output folder (default: results/planted)')
         p.add_argument('--blueprints', default=None, help='Frozen blueprint file (default: <out-dir>/blueprints.json)')
@@ -562,13 +606,18 @@ def add_planted_parser(subparsers) -> None:
 
     p = steps.add_parser('select', help='Derive the planted formula from the frozen blueprint set')
     common(p, search_options=False)
+    segment_options(p)
 
     p = steps.add_parser('oracle', help='Score the planted formula itself on each planted frame')
     common(p)
+    segment_options(p)
+    p.add_argument('--formula', default=None, help='Planted formula file (default: <out-dir>/planted_formula.json)')
     p.add_argument('--workers', type=int, default=0, help='Calibration worker processes (default: cpu_count - 2)')
 
     p = steps.add_parser('search', help='MCTS per (strength, seed), recovery and out-of-sample Sharpe')
     common(p)
+    segment_options(p)
+    p.add_argument('--formula', default=None, help='Planted formula file (default: <out-dir>/planted_formula.json)')
     p.add_argument('--reward-mode', required=True, choices=['gated', 'soft'])
     p.add_argument('--iterations', type=int, default=DEFAULT_ITERATIONS)
     p.add_argument('--workers', type=int, default=0, help='Worker processes (default: cpu_count - 2)')

@@ -73,7 +73,34 @@ Nếu dữ liệu thật sự chứa một công thức mà ngữ pháp biểu d
 - **Tầng 1 — MCTS có chấm tới A (cửa sổ lệch ≤ 1 nấc) không:** 26/30 lượt, thường trong 1.000 vòng đầu (IC 0.05: 4/5). Bước tìm không phải chỗ nghẽn chính.
 - **Tầng 2 — chấm đủ tham số template:** ở IC 0 – 0.05, A chỉ được thử trung bình 2–5 tổ hợp (cửa sổ z × ngưỡng z), thường chỉ 1–2; tổ hợp đầu điểm thấp thì UCT theo max không quay lại. Điểm A lúc tìm ở IC 0.05: trung bình 0.30, so với 0.58 khi chấm với tham số tốt nhất (oracle).
 - **Tầng 3 — kể cả với tham số tốt nhất, A có thắng nhiễu không:** điểm oracle của A trên đoạn học ở IC 0.05 dao động 0.11–0.79 theo seed. Nó vượt ngưỡng 100 ứng viên của **riêng blueprint này** ở 2/5 seed, vượt ứng viên tốt nhất của blueprint ở 1/5 (IC 0.1: 3/5 và 2/5; IC 0.2: 5/5 và 2/5). Toàn bộ 20 blueprint chung một bảng 100 nên ngưỡng thật còn cao hơn.
+- **A "tốt" đến đâu trên dữ liệu hữu hạn (2026-10-29, người dùng hỏi "dựa vào chỉ số nào bảo A tốt"):** A tốt theo cách dựng dữ liệu (quan hệ dự báo duy nhất có thật), không theo chỉ số nào của hệ thống. Đo trên đoạn đánh giá (6 tháng): IC của A ở mức 0.05 chỉ còn trung bình 0.03 (−0.01 … 0.10 theo seed). Sharpe ngoài mẫu của chính A (chiều +1, cửa sổ z 10, trung bình 5 ngưỡng z): 0.22 / 0.84 / 1.29 / 2.20 ở IC 0 / 0.05 / 0.1 / 0.2, độ lệch giữa seed ≈ ±1.5; top-5 của hệ thống −2.17 / −0.65 / 0.74 / 1.79. Ở IC 0.05, lợi thế của A so với placebo (≈ 0.6 Sharpe) nhỏ hơn nhiễu giữa seed.
+- Ước lượng của Claude (chưa kiểm): sai số IC trên đoạn học ≈ 1/√2300 ≈ 0.021; công thức nhiễu tốt nhất trong ~80.000 lượt chấm đạt khoảng √(2 ln 80000) ≈ 4.75 sai số ≈ 0.10 (cận trên, vì các công thức tương quan với nhau). Khớp ngưỡng phát hiện đo được ≈ IC 0.1 ⇒ ở IC 0.05, nghẽn chủ yếu do lượng dữ liệu so với số công thức thử, không riêng do reward hay MCTS.
 - Suy đoán của Claude (chưa đo tách riêng): chỗ nghẽn chính là reward trên ~2.300 bar không phân biệt được IC 0.05 với nhiễu (phần Calmar nặng 0.6 phụ thuộc hoán vị hơn tín hiệu); chỗ nghẽn phụ là MCTS chỉ thử A ở 1–2 bộ tham số template.
+
+## 10. Lần chạy 3: dữ liệu gấp ≈ 2–3 lần (người dùng duyệt 2026-10-29)
+
+Người dùng chọn hướng "thêm dữ liệu" (2026-10-29) để kiểm giả thuyết ở mục 9: ở IC 0.05, nghẽn chủ yếu do lượng dữ liệu so với số công thức thử. Người dùng chốt không dùng năm 2025 (giữ ngoài mọi bài test); trước 2018-08 không có dữ liệu.
+
+- **Thay đổi duy nhất so với lần 2: độ dài các đoạn.** Dùng tệp 60m từ 2018-08-13 tới 2024-12-31 (7.967 bar):
+
+  | Đoạn | Lần 2 | Lần 3 | Số bar lần 3 |
+  |---|---|---|---|
+  | Học | 2018-08 → 2019-12 | 2018-08 → 2022-06 | 4.831 (≈ 2,1×) |
+  | Kiểm định | 2020-01 → 2020-06 | 2022-07 → 2023-12 | 1.888 (≈ 3,1×) |
+  | Đánh giá | 2020-07 → 2020-12 | 2024-01 → 2024-12 | 1.248 (≈ 2,1×) |
+
+  Giữ nguyên: công thức cài A, bộ 20 blueprint, soft, 5.000 vòng, 5 seed, top-5 khác biểu thức chọn trên đoạn kiểm định, tiêu chí tìm lại. β hiệu chỉnh lại cho độ dài mới (khoá hiệu chỉnh đã gồm khoảng dữ liệu).
+- **Độ mạnh:** 0 / 0.02 / 0.05 / 0.1 (bỏ 0.01 và 0.2: dưới nhiễu và đã đạt 5/5) ⇒ 20 lượt. Ước ≈ 3 giờ trên 10 tiến trình (lần 2: ≈ 28 phút/lượt với 1/3 số bar; chưa đo).
+- **Dự đoán chốt trước khi chạy (Claude, ước lượng nhẩm):** sai số IC tỷ lệ 1/√số bar ⇒ mức hên của nhiễu giỏi nhất ở đoạn học ≈ 0.09 → 0.06, ở đoạn kiểm định (100 ứng viên) ≈ 0.10 → 0.06. Ngưỡng phát hiện dự kiến tụt từ ≈ 0.1 xuống ≈ 0.06; IC 0.05 sát ngưỡng, dự kiến tìm lại gần 1–3/5.
+  - Giả thuyết được ủng hộ nếu: tỷ lệ tìm lại gần ở IC 0.05 và 0.1 cao hơn lần 2 (1/5 và 3/5), IC 0 vẫn 0/5.
+  - Bị bác nếu: tỷ lệ ở IC 0.05 và 0.1 không tăng ⇒ nghẽn không do dữ liệu, quay lại xét reward / MCTS.
+- ✅ Code (2026-10-29): `Segments` trong `PlantedSignal.py`; `main.py planted select|oracle|search --train-end --search-end --eval-end --formula`, ghi `<out-dir>/segments.json` và từ chối trộn hai cách chia. Kết quả lần 3: `results/planted_run3/`. Test: 145 pass, 1 fail (có từ trước).
+- ⏸️ **Chấm đáp án lần 3 (`results/planted_run3/oracle.csv`, 66 s) lộ một yếu tố gây nhiễu, chưa chạy `search`:**
+  - β hiệu chỉnh đúng mục tiêu (IC trung bình 0.021 / 0.051 / 0.100).
+  - Nhưng reward soft của chính A trên đoạn học tụt mạnh: trung bình 0.05 / 0.07 / 0.23 ở IC 0 / 0.05 / 0.1 (lần 2: 0.32 / 0.58 / 0.78). Ở IC 0.1, 4/5 seed chỉ còn 0.09–0.14.
+  - Nguyên nhân đo được: không phải gọi ký quỹ (chỉ 1/20 trường hợp kiểm có đóng băng vốn). Vốn của A vẫn tăng tương đương lần 2 (IC 0.1: ×1.24–3.06 sau ~3,9 năm), nhưng sụt giảm lớn nhất (MDD) tăng theo độ dài đoạn ⇒ Calmar tụt xuống dưới ngưỡng 1.1 ⇒ phần Calmar của reward (trọng số 0.6) gần như luôn bằng 0. Reward lần 3 thực chất chỉ còn phần IC; vì phần IC không phụ thuộc ngưỡng z nên ngưỡng z chọn ra luôn là 0.5 (hoà điểm, lấy giá trị đầu).
+  - Phần IC tính trên giá trị thô của công thức, không trên z-score: ở IC 0.05, IC thô của A chỉ ≈ 0.017 trong khi IC của tín hiệu đã cài ≈ 0.04 (suy đoán của Claude: giá trị thô đổi thang theo mức giá qua nhiều năm).
+  - Hệ quả: lần 3 không còn "chỉ đổi độ dài dữ liệu"; độ dài làm đổi luôn hình dạng reward. Chờ người dùng quyết có chạy như thiết kế hay sửa reward trước.
 
 ## 4. Chạy
 

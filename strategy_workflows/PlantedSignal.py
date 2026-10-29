@@ -38,9 +38,44 @@ from strategy_workflows.MCTSEngine import FIELD_EXPRESSIONS, TS_FUNCTIONS, ast_t
 from strategy_workflows.SemanticCompiler import ASTNode, SemanticCompiler
 
 SEARCH_START = '2018-08-13'
+TRAIN_END = '2019-12-31'
 SEARCH_END = '2020-06-30'
-EVAL_START = '2020-07-01'
 EVAL_END = '2020-12-31'
+
+
+@dataclass(frozen=True)
+class Segments:
+    """
+    Data segments of one planted-signal run: train = search_start..train_end (MCTS sees only this),
+    validation = day after train_end..search_end, evaluation = day after search_end..eval_end.
+    Dates are day-granular strings; a slice end includes the whole day.
+    """
+    search_start: str = SEARCH_START
+    train_end: str = TRAIN_END
+    search_end: str = SEARCH_END
+    eval_end: str = EVAL_END
+
+    def __post_init__(self):
+        bounds = [pd.Timestamp(v) for v in (self.search_start, self.train_end, self.search_end, self.eval_end)]
+        if not bounds[0] < bounds[1] < bounds[2] < bounds[3]:
+            raise ValueError("Segments need search_start < train_end < search_end < eval_end, got "
+                             f"{self.search_start}, {self.train_end}, {self.search_end}, {self.eval_end}")
+
+    @property
+    def validation_start(self) -> str:
+        return (pd.Timestamp(self.train_end) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+
+    @property
+    def eval_start(self) -> str:
+        return (pd.Timestamp(self.search_end) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+
+    def to_dict(self) -> dict:
+        return {'search_start': self.search_start, 'train_end': self.train_end,
+                'search_end': self.search_end, 'eval_end': self.eval_end}
+
+    @staticmethod
+    def from_dict(data: dict) -> 'Segments':
+        return Segments(**{k: data[k] for k in ('search_start', 'train_end', 'search_end', 'eval_end')})
 
 # Positions are scaled like the leaderboard evaluation (NormalizedMCTSStrategy.position_scale).
 TOP_K = 5

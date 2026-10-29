@@ -6,7 +6,7 @@ import pytest
 
 from strategy_workflows.MCTSEngine import MCTSEngine, describe_candidate
 from strategy_workflows.PlantedSignal import (
-    PlantedFormula, assert_in_search_space, build_ohlcv_from_returns,
+    PlantedFormula, Segments, assert_in_search_space, build_ohlcv_from_returns,
     build_planted_data, calibrate_beta, can_express, search_ic_for_seed, combine_positions, formula_from_dict,
     formula_to_dict, is_exact_recovery, is_near_recovery, is_verbatim, mean_reversion_formula, parse_expression,
     permute_returns, plant_signal, realized_ic, select_planted_formula, shape_fields, spearman_abs, split_bars,
@@ -605,7 +605,7 @@ def test_rank_leaderboard_picks_by_validation_not_train():
     val = {'a': 0.1, 'b': 0.5, 'c': 0.9, 'd': 0.3}
     engine = SimpleNamespace(get_best_candidates=lambda: board,
                              score_on_span=lambda c, frame, start, end: val[c['expr']])
-    picked = rank_leaderboard(engine, None, k=2)
+    picked = rank_leaderboard(engine, None, Segments(), k=2)
     assert [c['expr'] for c in picked['ranked']] == ['a', 'b', 'c', 'd']
     assert [picked['ranked'][i]['expr'] for i in picked['chosen']] == ['c', 'b']
 
@@ -621,7 +621,7 @@ def planted_base():
 def test_run_single_search_never_sees_bars_after_train_end(monkeypatch):
     import strategy_workflows.RunPlantedSignal as run
     base = planted_base()
-    monkeypatch.setattr(run, 'load_base', lambda: base)
+    monkeypatch.setattr(run, 'load_base', lambda segments: base)
     seen = []
 
     class SpyEngine(MCTSEngine):
@@ -631,7 +631,8 @@ def test_run_single_search_never_sees_bars_after_train_end(monkeypatch):
 
     monkeypatch.setattr(run, 'MCTSEngine', SpyEngine)
     task = {'reward_mode': 'soft', 'strength': 0.0, 'seed': 1, 'beta': 0.0, 'iterations': 15,
-            'blueprints': [{'name': 'bp', 'macro_blueprint': 'sub(?, ts_mean(?))'}], 'formula': FORMULA}
+            'blueprints': [{'name': 'bp', 'macro_blueprint': 'sub(?, ts_mean(?))'}], 'formula': FORMULA,
+            'segments': Segments()}
     row = run.run_single(task)
     assert len(seen) == 1
     assert seen[0].equals(base.index[base.index < pd.Timestamp('2020-01-01')])
@@ -643,10 +644,163 @@ def test_run_single_search_never_sees_bars_after_train_end(monkeypatch):
     assert list(row) == run.RUN_FIELDS
 
 
-def test_split_constants_are_adjacent_days():
+def test_default_segments_equal_run_two_constants():
+    seg = Segments()
+    assert seg.to_dict() == {'search_start': '2018-08-13', 'train_end': '2019-12-31',
+                             'search_end': '2020-06-30', 'eval_end': '2020-12-31'}
+    assert seg.validation_start == '2020-01-01' and seg.eval_start == '2020-07-01'
+    assert Segments.from_dict(seg.to_dict()) == seg
+
+
+def test_segments_ordering_is_validated():
+    for bad in (dict(train_end='2018-08-13'), dict(train_end='2020-06-30'), dict(search_end='2020-12-31'),
+                dict(eval_end='2020-06-29'), dict(search_start='2020-01-01')):
+        with pytest.raises(ValueError):
+            Segments(**bad)
+    long_run = Segments(train_end='2022-06-30', search_end='2023-12-31', eval_end='2024-12-31')
+    assert long_run.validation_start == '2022-07-01' and long_run.eval_start == '2024-01-01'
+
+
+CUSTOM_SEGMENTS = Segments(train_end='2019-06-30', search_end='2020-03-31', eval_end='2020-09-30')
+
+
+def test_run_single_uses_the_segments_of_its_task_not_module_defaults(monkeypatch):
+    # The task dict is the only thing a pool worker receives, so every date must come from it.
     import strategy_workflows.RunPlantedSignal as run
-    assert pd.Timestamp(run.VALIDATION_START) - pd.Timestamp(run.TRAIN_END) == pd.Timedelta(days=1)
-    assert pd.Timestamp(run.SEARCH_END) > pd.Timestamp(run.VALIDATION_START)
+    base = planted_base()
+    loaded, trains, spans, splits = [], [], [], []
+
+    def fake_load(segments):
+        loaded.append(segments)
+        return base.loc[segments.search_start:segments.eval_end]
+
+    class SpyEngine(MCTSEngine):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            trains.append(self.df.index.copy())
+
+        def score_on_span(self, candidate, frame, start, end):
+            spans.append((start, end))
+            return super().score_on_span(candidate, frame, start, end)
+
+    real_build = run.build_planted_data
+
+    def spy_build(base_frame, search_end, *args, **kwargs):
+        splits.append(search_end)
+        return real_build(base_frame, search_end, *args, **kwargs)
+
+    monkeypatch.setattr(run, 'load_base', fake_load)
+    monkeypatch.setattr(run, 'MCTSEngine', SpyEngine)
+    monkeypatch.setattr(run, 'build_planted_data', spy_build)
+    task = {'reward_mode': 'soft', 'strength': 0.0, 'seed': 1, 'beta': 0.0, 'iterations': 15,
+            'blueprints': [{'name': 'bp', 'macro_blueprint': 'sub(?, ts_mean(?))'}], 'formula': FORMULA,
+            'segments': CUSTOM_SEGMENTS}
+    run.run_single(task)
+    assert loaded == [CUSTOM_SEGMENTS]
+    assert splits == ['2020-03-31']
+    assert len(trains) == 1 and trains[0].max() <= pd.Timestamp('2019-06-30 23:59:59')
+    assert trains[0].max() > pd.Timestamp('2019-06-29')            # the whole train day range, not a shorter one
+    assert spans and set(spans) == {('2019-07-01', '2020-03-31')}
+
+
+def test_oracle_split_rewards_use_the_given_validation_span():
+    import strategy_workflows.RunPlantedSignal as run
+    recorded = []
+
+    class FakeEngine:
+        def evaluate_expression(self, tree):
+            return 0.5, 1.0, {}
+
+        def score_on_span(self, candidate, frame, start, end):
+            recorded.append((start, end))
+            return 0.25
+
+    out = run.planted_split_rewards(FakeEngine(), FORMULA, None, CUSTOM_SEGMENTS)
+    assert out['validation'] == 0.25 and recorded == [('2019-07-01', '2020-03-31')]
+
+
+def make_search_args(run, tmp_path, *extra):
+    import argparse
+    parser = argparse.ArgumentParser()
+    run.add_planted_parser(parser.add_subparsers(dest='command'))
+    return parser.parse_args(['planted', 'search', '--out-dir', str(tmp_path), '--reward-mode', 'soft',
+                              '--strengths', '0.0', '--seeds', '1', '--workers', '1', *extra])
+
+
+def test_cli_segment_defaults_and_overrides(tmp_path):
+    import strategy_workflows.RunPlantedSignal as run
+    assert run.segments_from_args(make_search_args(run, tmp_path)) == Segments()
+    args = make_search_args(run, tmp_path, '--train-end', '2022-06-30', '--search-end', '2023-12-31',
+                            '--eval-end', '2024-12-31')
+    assert run.segments_from_args(args) == Segments(train_end='2022-06-30', search_end='2023-12-31',
+                                                    eval_end='2024-12-31')
+
+
+def test_step_search_passes_segments_to_tasks_and_records_them(tmp_path, monkeypatch):
+    import strategy_workflows.RunPlantedSignal as run
+    out_dir = tmp_path / 'fresh'
+    formula_file = tmp_path / 'formula.json'
+    formula_file.write_text(json.dumps(formula_to_dict(FORMULA)), encoding='utf-8')
+    blueprint_file = tmp_path / 'bp.json'
+    blueprint_file.write_text(json.dumps([{'name': 'bp', 'macro_blueprint': 'sub(?, ts_mean(?))'}]), encoding='utf-8')
+    tasks, loaded = [], []
+    monkeypatch.setattr(run, 'load_base', lambda segments: loaded.append(segments) or planted_base())
+    fake_row = {'reward_mode': 'soft', 'strength': 0.0, 'seed': 1, 'elapsed_s': 0.0, 'ic_search': 0.0,
+                'exact': False, 'near': False, 'oos_sharpe': 0.0}
+    monkeypatch.setattr(run, 'run_single', lambda task: tasks.append(task) or fake_row)
+    monkeypatch.setattr(run, 'append_run', lambda path, row: None)
+    monkeypatch.setattr(run, 'get_beta', lambda base, s, out, f, w, segments: 0.0)
+    args = make_search_args(run, out_dir, '--search-end', '2020-03-31', '--train-end', '2019-06-30',
+                            '--formula', str(formula_file), '--blueprints', str(blueprint_file))
+    run.step_search(args)
+    assert [t['segments'] for t in tasks] == [Segments(train_end='2019-06-30', search_end='2020-03-31')]
+    assert loaded == [tasks[0]['segments']]
+    stored = json.loads((out_dir / 'segments.json').read_text(encoding='utf-8'))
+    assert stored == tasks[0]['segments'].to_dict()
+
+
+def test_segments_json_mismatch_is_refused_unless_forced(tmp_path):
+    import strategy_workflows.RunPlantedSignal as run
+    run.ensure_segments(str(tmp_path), Segments())                 # missing file: written
+    run.ensure_segments(str(tmp_path), Segments())                 # same split: accepted
+    other = Segments(train_end='2019-06-30')
+    with pytest.raises(SystemExit):
+        run.ensure_segments(str(tmp_path), other)
+    assert json.loads((tmp_path / 'segments.json').read_text(encoding='utf-8')) == Segments().to_dict()
+    run.ensure_segments(str(tmp_path), other, force=True)
+    assert Segments.from_dict(json.loads((tmp_path / 'segments.json').read_text(encoding='utf-8'))) == other
+
+
+def test_calibration_key_and_beta_cache_depend_on_segments(tmp_path, monkeypatch):
+    import strategy_workflows.RunPlantedSignal as run
+    base = heavy_tailed_base()
+    assert calibration_key(base, 0.05, FORMULA, CUSTOM_SEGMENTS) != calibration_key(base, 0.05, FORMULA)
+    seen = []
+
+    def fake(base_frame, search_end, strength, formula, workers=1):
+        seen.append(search_end)
+        return run.Calibration(0.03, 0.05, 0.01, [1001], 3)
+
+    monkeypatch.setattr(run, 'calibrate_beta', fake)
+    run.get_beta(base, 0.05, str(tmp_path), FORMULA, 1, CUSTOM_SEGMENTS)
+    run.get_beta(base, 0.05, str(tmp_path), FORMULA, 1, Segments())
+    assert seen == ['2020-03-31', '2020-06-30']
+
+
+def test_load_base_reads_the_segment_range(monkeypatch):
+    import strategy_workflows.RunPlantedSignal as run
+    calls = []
+    monkeypatch.setattr(run, 'load_data', lambda tf, start=None, end=None: calls.append((tf, start, end)))
+    run.load_base(CUSTOM_SEGMENTS)
+    assert calls == [('60m', '2018-08-13', '2020-09-30')]
+
+
+def test_build_planted_data_splits_at_the_given_search_end():
+    base = planted_base()
+    data = build_planted_data(base, CUSTOM_SEGMENTS.search_end, 0.0, 1, 0.0, FORMULA)
+    assert data.search.index.max() <= pd.Timestamp('2020-03-31 23:59:59')
+    assert data.evaluation.index.min() >= pd.Timestamp('2020-04-01')
+    assert len(data.search) + len(data.evaluation) == len(base)
 
 
 def test_calibration_brackets_strength_point_two():
