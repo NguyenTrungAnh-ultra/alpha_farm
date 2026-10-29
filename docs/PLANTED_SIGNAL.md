@@ -68,6 +68,13 @@ Nếu dữ liệu thật sự chứa một công thức mà ngữ pháp biểu d
 - So lần 1 (không có đoạn kiểm định, cùng IC 0.05): vẫn 1/5 ⇒ riêng đoạn kiểm định không đủ để đạt tiêu chí.
 - ⏸️ Người dùng cho tạm dừng sau lần chạy này (2026-10-28); hướng tiếp theo chưa chọn.
 
+**Đo phễu (2026-10-29, người dùng hỏi "xác suất tìm được với kiến trúc hiện tại"):** chạy lại MCTS của blueprint chứa A (`sub(ts_max(?), ts_mean(?))`, đứng đầu tệp nên cùng seed cho đúng chuỗi tìm của lần 2), ghi mọi lượt chấm; 30 lượt (6 độ mạnh × 5 seed), soft.
+- Không gian: đường tới A qua 6 lựa chọn (cửa sổ 4 × ô `?` 14 × cửa sổ 4 × ô `?` 14 × cửa sổ z 5, ngưỡng z tuỳ) ⇒ một lượt rollout ngẫu nhiên đều ra đúng A với xác suất 1/15.680.
+- **Tầng 1 — MCTS có chấm tới A (cửa sổ lệch ≤ 1 nấc) không:** 26/30 lượt, thường trong 1.000 vòng đầu (IC 0.05: 4/5). Bước tìm không phải chỗ nghẽn chính.
+- **Tầng 2 — chấm đủ tham số template:** ở IC 0 – 0.05, A chỉ được thử trung bình 2–5 tổ hợp (cửa sổ z × ngưỡng z), thường chỉ 1–2; tổ hợp đầu điểm thấp thì UCT theo max không quay lại. Điểm A lúc tìm ở IC 0.05: trung bình 0.30, so với 0.58 khi chấm với tham số tốt nhất (oracle).
+- **Tầng 3 — kể cả với tham số tốt nhất, A có thắng nhiễu không:** điểm oracle của A trên đoạn học ở IC 0.05 dao động 0.11–0.79 theo seed. Nó vượt ngưỡng 100 ứng viên của **riêng blueprint này** ở 2/5 seed, vượt ứng viên tốt nhất của blueprint ở 1/5 (IC 0.1: 3/5 và 2/5; IC 0.2: 5/5 và 2/5). Toàn bộ 20 blueprint chung một bảng 100 nên ngưỡng thật còn cao hơn.
+- Suy đoán của Claude (chưa đo tách riêng): chỗ nghẽn chính là reward trên ~2.300 bar không phân biệt được IC 0.05 với nhiễu (phần Calmar nặng 0.6 phụ thuộc hoán vị hơn tín hiệu); chỗ nghẽn phụ là MCTS chỉ thử A ở 1–2 bộ tham số template.
+
 ## 4. Chạy
 
 - MCTS trên đoạn tìm, rồi gộp top-5 trọng số đều, giao dịch trên đoạn đánh giá. Đây là đúng đơn vị đánh giá của proposal.
