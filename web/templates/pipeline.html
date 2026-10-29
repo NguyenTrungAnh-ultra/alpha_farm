@@ -27,7 +27,35 @@
 .legend i { border-color:var(--c); background:color-mix(in srgb, var(--c) 25%, var(--card)); }
 #detail .badge { background:var(--c, var(--accent)); }
 #detail ul { margin:6px 0 0; padding-left:20px; }
+.thesis { margin-bottom:16px; animation:thesis-in .4s ease-out; }
+@keyframes thesis-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+.thesis h2 { margin:0 0 4px; font-size:17px; }
+.thesis .question { border-left:4px solid var(--accent); padding:6px 10px; margin:10px 0; }
+.thesis .cols { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; }
+.thesis h3 { margin:6px 0; font-size:14px; }
+.thesis ol { margin:0; padding-left:20px; }
+.thesis li { margin:3px 0; }
+.rq { border-radius:6px; padding:4px 6px; margin:2px -6px; cursor:default; transition:background .2s; list-style:none; }
+.rq:hover, .rq:focus { background:color-mix(in srgb, var(--accent) 14%, transparent); outline:none; }
+.rq b { color:var(--accent); }
 </style>
+<div class="card thesis">
+  <h2>{{ thesis.title }}</h2>
+  <p class="muted small" style="margin:0">{{ thesis.title_vi }}</p>
+  <p class="question"><b>Câu hỏi:</b> {{ thesis.question }}</p>
+  <div class="cols">
+    <div>
+      <h3>Câu hỏi nghiên cứu <span class="muted small">(di chuột để thấy ô liên quan)</span></h3>
+      <ol style="padding-left:6px">
+        {% for q in thesis.rqs %}<li class="rq" tabindex="0" data-nodes="{{ q.nodes|join(' ') }}"><b>{{ q.id }}. {{ q.name }}.</b> {{ q.text }}</li>{% endfor %}
+      </ol>
+    </div>
+    <div>
+      <h3>Phương pháp</h3>
+      <ol>{% for m in thesis.method %}<li>{{ m|inline_code }}</li>{% endfor %}</ol>
+    </div>
+  </div>
+</div>
 <h1>Luồng chính</h1>
 <p class="muted small">Di chuột vào một ô (hoặc chạm trên điện thoại) để xem chi tiết. Cuộn ngang trong khung nếu màn hình hẹp.</p>
 <div class="legend">
@@ -87,6 +115,19 @@
       if (pinned) { highlight(pinned, false); document.getElementById('node-' + pinned).classList.remove('on'); }
       pinned = id; g.classList.add('on'); highlight(id, true); show(id);
     });
+  });
+  document.querySelectorAll('.rq').forEach(function (item) {
+    var ids = item.getAttribute('data-nodes').split(' ');
+    function mark(on) {
+      ids.forEach(function (id) {
+        var g = document.getElementById('node-' + id);
+        if (g && pinned !== id) { g.classList.toggle('on', on); }
+      });
+    }
+    item.addEventListener('mouseenter', function () { mark(true); });
+    item.addEventListener('mouseleave', function () { mark(false); });
+    item.addEventListener('focus', function () { mark(true); });
+    item.addEventListener('blur', function () { mark(false); });
   });
 })();
 </script>

@@ -6,6 +6,7 @@ read them and need no change. Node fields:
     id, label, group, status (STATUSES key), x, y (top-left in SVG units), details (list of
     strings; `backticks` render as code), link (optional page path), note (optional status note).
 Edge fields: from, to, label (optional), dashed (optional), arc (optional: draw over the top).
+THESIS holds the header card; each research question lists the node ids it highlights on hover.
 """
 
 import re
@@ -19,6 +20,38 @@ NODE_HEIGHT = 84
 LABEL_CHARS = 25
 VIEW_WIDTH = 940
 VIEW_HEIGHT = 650
+
+THESIS = {
+    'title': 'LLM-Guided, Dimension-Constrained Monte Carlo Tree Search for Formulaic Alpha Discovery '
+             'in VN30F Index Futures',
+    'title_vi': 'Tìm alpha dạng công thức cho hợp đồng tương lai chỉ số VN30F bằng MCTS có ràng buộc chiều, '
+                'dẫn hướng bởi LLM',
+    'question': 'Quy trình LLM + MCTS có tìm ra tín hiệu thật trên VN30F1M không, hay chỉ chọn được công thức '
+                'may mắn trên chính dữ liệu đã dò? Đối tượng đánh giá là quy trình, không phải một alpha riêng lẻ.',
+    'rqs': [
+        {'id': 'RQ1', 'name': 'Vai trò của LLM',
+         'text': 'LLM + MCTS có cho bộ alpha tốt hơn ngoài mẫu so với MCTS không LLM, LLM không tìm, '
+                 'và tìm ngẫu nhiên không?',
+         'nodes': ['blueprints', 'mcts', 'rq1']},
+        {'id': 'RQ2', 'name': 'Không gian tìm',
+         'text': 'Toán tử chuỗi thời gian cơ bản có cho bộ alpha tốt hơn chỉ báo kỹ thuật không?',
+         'nodes': ['mcts', 'rq2']},
+        {'id': 'RQ3', 'name': 'Bằng chứng tìm thấy',
+         'text': 'Hệ thống có tốt hơn chính nó chạy trên dữ liệu placebo (không có gì để tìm), và có tìm lại được '
+                 'tín hiệu cài sẵn không?',
+         'nodes': ['rq3_planted', 'rq3_placebo', 'oos']},
+    ],
+    'method': [
+        'LLM đề xuất khung công thức (blueprint) có ô `?`; MCTS điền ô trong ngữ pháp có kiểm tra chiều '
+        '(giá, khối lượng, tỉ lệ, logic); backtest VN30F1M (phí, ký quỹ, khớp nến sau) cho reward.',
+        'Đơn vị đánh giá: gộp top-5 trọng số đều, chỉ số chính là Sharpe năm của lợi suất ngày ngoài mẫu.',
+        'Walk-forward nở dần: 7 cửa sổ, ngoài mẫu 2022-07 → 2025-12, mỗi cấu hình 5 seed.',
+        'So các cấu hình cùng ngân sách 100.000 lượt chấm mỗi cửa sổ (RQ1, RQ2).',
+        'Kiểm soát âm: 19 bộ placebo xáo lợi suất. Kiểm soát dương: bài cài tín hiệu (RQ3).',
+        'Kiểm định SPA và Deflated Sharpe; HMM chỉ mô tả rủi ro.',
+        'Đóng băng mọi lựa chọn trước, chạy dữ liệu thật đúng một lần.',
+    ],
+}
 
 STATUSES = {
     'done': 'Xong',
@@ -157,5 +190,5 @@ def build_view() -> Dict:
     by_id = {n['id']: n for n in NODES}
     nodes = [dict(n, lines=wrap_label(n['label']), status_label=STATUSES[n['status']]) for n in NODES]
     edges = [dict(e, **edge_geometry(e, by_id)) for e in EDGES]
-    return {'nodes': nodes, 'edges': edges, 'groups': GROUPS, 'statuses': STATUSES,
+    return {'thesis': THESIS, 'nodes': nodes, 'edges': edges, 'groups': GROUPS, 'statuses': STATUSES,
             'width': NODE_WIDTH, 'height': NODE_HEIGHT, 'view_width': VIEW_WIDTH, 'view_height': VIEW_HEIGHT}

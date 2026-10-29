@@ -182,3 +182,14 @@ def test_pipeline_data_is_consistent():
         assert node['group'] in group_ids
     for edge in pipeline.EDGES:
         assert edge['from'] in ids and edge['to'] in ids
+    for question in pipeline.THESIS['rqs']:
+        assert set(question['nodes']) <= set(ids)
+
+
+def test_pipeline_page_shows_thesis_header(tmp_path):
+    from web import pipeline
+    html = TestClient(web_app.create_app(tmp_path)).get('/pipeline').text
+    assert pipeline.THESIS['title'] in html
+    assert html.index(pipeline.THESIS['title']) < html.index('id="node-')
+    for question in pipeline.THESIS['rqs']:
+        assert f'data-nodes="{" ".join(question["nodes"])}"' in html
