@@ -65,11 +65,13 @@ GROUPS = [
 ]
 
 NODES: List[Dict] = [
-    {'id': 'blueprints', 'label': '① LLM sinh blueprint', 'group': 'prepare', 'status': 'progress', 'x': 20, 'y': 40,
+    {'id': 'blueprints', 'label': '① LLM sinh blueprint', 'group': 'prepare', 'status': 'done', 'x': 20, 'y': 40,
+     'note': 'bộ 20 blueprint, chờ đóng băng',
      'details': [
          'Model qwen3.5 4B, Ollama chạy local.',
          '20 blueprint, mỗi cái là một khung công thức có các ô `?`.',
-         'Prompt mới giấu tên thị trường; các batch được chỉnh trước.',
+         'Prompt `anon_shapes` giấu tên thị trường và ghi luật chiều; temperature mặc định 0.3, chọn qua các lô thử 5 blueprint.',
+         'Bộ hiện tại: `results/blueprint_sets/20261029_212813/` (0 chép ví dụ, 20 khung khác nhau, ô `?` nào cũng điền được trong độ sâu 4).',
          'Blueprint bị loại nếu chép ví dụ trong prompt, trùng khung với blueprint khác, hoặc không có `?`.',
          'Mã: `utilities/Prompts.py`, `strategy_workflows/GenerateStrategies.py`.']},
     {'id': 'freeze', 'label': 'Đóng băng', 'group': 'prepare', 'status': 'todo', 'x': 250, 'y': 40,

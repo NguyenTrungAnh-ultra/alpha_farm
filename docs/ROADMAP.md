@@ -54,6 +54,9 @@ Tháng 2 trở đi theo bảng 4.1 của proposal: walk-forward + gộp top-k + 
 
 ## 4. Nợ
 
+- Bài cài tín hiệu lần 1–3 chạy trên ngữ pháp cũ (chiều không lan qua `ts_*`, `?` điền sai chiều được). Kết quả ở `docs/PLANTED_SIGNAL.md` là của không gian tìm cũ, rộng hơn; lần chạy cách chia cửa sổ 1 (đã định, `docs/WALK_FORWARD.md` mục 2) chạy trên ngữ pháp mới và là số luận văn dùng. Ghi 2026-10-29.
+- `CRITICAL_RULES` (dùng chung mọi biến thể prompt) còn xếp `ts_argmax` / `ts_argmin` vào nhóm "giữ chiều"; không sửa vì đổi hash prompt `current`. Không ảnh hưởng template (template vẫn chọn theo `output_dim` khai báo).
+
 - ⛔ Token DeepSeek từng bị đẩy lên GitHub (lịch sử git đã viết lại, tệp đã xoá khỏi máy 2026-10-28) nhưng token và cookie Gemini có thể vẫn còn hiệu lực: người dùng tự đăng xuất mọi phiên ở chat.deepseek.com và Google.
 - Rò rỉ qua trọng số LLM (nêu 2026-10-28, người dùng cho vào nợ): `qwen3.5:4b` được huấn luyện trên văn bản có thể đã nói về 2020–2025, nên lợi ích của LLM ở RQ1 có thể lẫn "biết trước". Prompt ghi tên "VN30 Index Futures" nhưng không ghi ngày. Cách kiểm Claude đề xuất: (1) ẩn tên thị trường trong prompt; (2) so blueprint có tên và ẩn danh cùng ngân sách; (3) tra ngày cắt dữ liệu huấn luyện của qwen3.5, tách cửa sổ đánh giá sau ngày đó; (4) nêu trong mục hạn chế. Chưa đo.
 - ⛔ Dữ liệu thiếu ngày (đo 2026-10-28): giai đoạn 2020–2024, tệp 1m/5m/15m/30m có 1.121 ngày giao dịch, tệp 1H có 1.247; 126 ngày chỉ có ở 1H, rải từ 2023-03-22 tới 2024-03-14. Backtest khung phút nhảy qua các ngày đó như một bar. Cần kiểm tệp CSV gốc / tải lại trước khi chạy RQ trên khung phút.
