@@ -69,7 +69,9 @@ NODES: List[Dict] = [
      'details': [
          'Trung bình có trọng số bằng nhau của các vị thế.',
          'Phí 6.000 VND mỗi hợp đồng mỗi chiều, ký quỹ 28,5%, ký quỹ duy trì 20%, tín hiệu ở nến t khớp ở nến t+1.',
-         'Mã: `core_engine/BacktestEngine.py`.']},
+         'Mã: `core_engine/BacktestEngine.py`.',
+         'Mũi tên vòng về a là vòng lặp, không phải dữ liệu quay ngược: xong cửa sổ này thì làm lại a–d cho cửa sổ kế tiếp '
+         '(thêm 6 tháng dữ liệu học). Kết quả giao dịch của d không đưa vào MCTS của cửa sổ sau.']},
     {'id': 'oos', 'label': '③ Chuỗi lợi suất ngoài mẫu 2022-07 → 2025-12 → Sharpe', 'group': 'result', 'status': 'todo',
      'x': 710, 'y': 370,
      'details': [
@@ -110,7 +112,8 @@ EDGES: List[Dict] = [
     {'from': 'oos', 'to': 'rq2'},
     {'from': 'oos', 'to': 'rq3_placebo'},
     {'from': 'rq3_planted', 'to': 'mcts', 'dashed': True, 'label': 'đo độ nhạy của a–d'},
-    {'from': 'trade', 'to': 'mcts', 'dashed': True, 'arc': True, 'label': '×7 cửa sổ, ×5 seed'},
+    {'from': 'trade', 'to': 'mcts', 'dashed': True, 'arc': True, 'loop': True,
+     'label': '↻ lặp lại a–d cho cửa sổ kế tiếp (×7 cửa sổ, ×5 seed)'},
 ]
 
 

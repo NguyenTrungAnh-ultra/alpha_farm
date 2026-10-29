@@ -18,6 +18,8 @@
 .flow .edge.dashed { stroke-dasharray:6 5; }
 .flow .edge.hl { stroke:var(--accent); stroke-width:3.2; }
 .flow .edge-label { fill:var(--muted); font-size:11px; font-style:italic; }
+.flow .edge-label.loop { fill:var(--accent); font-size:13px; font-weight:700; font-style:normal; }
+.flow .edge.loop { stroke:var(--accent); stroke-width:2; }
 .flow marker path { fill:var(--muted); }
 .st-done { --c:#2a9d6f; } .st-progress { --c:#e0a040; } .st-todo { --c:#8b95a3; } .st-reference { --c:#8a6fe0; }
 .flow .node rect.box { stroke:var(--c); fill:color-mix(in srgb, var(--c) 16%, var(--card)); }
@@ -41,8 +43,8 @@
   <text class="group-label" x="{{ g.x + 10 }}" y="{{ g.y + 18 }}">{{ g.label }}</text>
   {% endfor %}
   {% for e in edges %}
-  <path class="edge{% if e.dashed %} dashed{% endif %}" data-from="{{ e['from'] }}" data-to="{{ e.to }}" d="{{ e.d }}" marker-end="url(#arrow)"/>
-  {% if e.label %}<text class="edge-label" x="{{ e.lx }}" y="{{ e.ly }}" text-anchor="{{ e.anchor }}">{{ e.label }}</text>{% endif %}
+  <path class="edge{% if e.dashed %} dashed{% endif %}{% if e.loop %} loop{% endif %}" data-from="{{ e['from'] }}" data-to="{{ e.to }}" d="{{ e.d }}" marker-end="url(#arrow)"/>
+  {% if e.label %}<text class="edge-label{% if e.loop %} loop{% endif %}"x="{{ e.lx }}" y="{{ e.ly }}" text-anchor="{{ e.anchor }}">{{ e.label }}</text>{% endif %}
   {% endfor %}
   {% for n in nodes %}
   <g class="node st-{{ n.status }}" id="node-{{ n.id }}" data-id="{{ n.id }}" tabindex="0" role="button" aria-label="{{ n.label }}">
