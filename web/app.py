@@ -5,6 +5,7 @@ The app only reads `<results_root>/planted*/`; it never writes there. Pages:
     /, /planted             all planted folders, tables and comparison charts
     /planted/{name}         one folder
     /planted/{name}/data    rebuilt placebo / planted data for one (strength, seed)
+    /pipeline               main-flow diagram (content in web/pipeline.py)
     /system, /api/system    machine resources
 """
 
@@ -26,7 +27,7 @@ from strategy_workflows import RunPlantedSignal as planted_run
 from strategy_workflows.MCTSEngine import MCTSEngine, _FixedPositions, describe_candidate
 from strategy_workflows.PlantedSignal import PlantedData, PlantedFormula, Segments, formula_from_dict
 from utilities.AppConfig import PROJECT_ROOT
-from web import charts, planted
+from web import charts, pipeline, planted
 from web.system import read_system
 
 TEMPLATES_DIR = Path(__file__).parent / 'templates'
@@ -157,6 +158,7 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
     app.state.results_root = str(results_root or default_results_root())
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters['fmt'] = format_number
+    templates.env.filters['inline_code'] = pipeline.format_text
 
     def folder_or_404(name: str) -> str:
         if planted.resolve_dir(app.state.results_root, name) is None:
@@ -205,6 +207,10 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
             'name': name, 'strengths': strengths, 'seeds': seeds, 'strength': strength, 'seed': seed,
             'view': view, 'segments': planted.read_segments(folder).to_dict(), 'active': 'planted',
         })
+
+    @app.get('/pipeline', response_class=HTMLResponse)
+    def pipeline_page(request: Request):
+        return templates.TemplateResponse(request, 'pipeline.html', {**pipeline.build_view(), 'active': 'pipeline'})
 
     @app.get('/system', response_class=HTMLResponse)
     def system_page(request: Request):

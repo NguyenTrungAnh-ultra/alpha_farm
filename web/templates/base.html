@@ -54,6 +54,7 @@ select, button { font:inherit; padding:4px 8px; }
 <body>
 <aside>
   <div class="brand">Alpha Farm</div>
+  <a class="nav {% if active == 'pipeline' %}on{% endif %}" href="/pipeline">Luồng chính</a>
   <a class="nav {% if active == 'planted' %}on{% endif %}" href="/planted">Bài cài tín hiệu</a>
   <a class="nav {% if active == 'system' %}on{% endif %}" href="/system">Tài nguyên máy</a>
   <div id="strip">

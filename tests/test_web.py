@@ -158,3 +158,27 @@ def test_data_page_uses_directory_segments(client, results, monkeypatch):
     page = client.get('/planted/planted_full/data?strength=0.05&seed=2')
     assert 'calibration.json' in page.text and 'c-prices' not in page.text
     assert (folder / 'calibration.json').read_text() == before
+
+
+def test_pipeline_page_lists_every_node(tmp_path):
+    from web import pipeline
+    client = TestClient(web_app.create_app(tmp_path))
+    response = client.get('/pipeline')
+    assert response.status_code == 200
+    html = response.text
+    for node in pipeline.NODES:
+        assert f'id="node-{node["id"]}"' in html
+        assert node['label'].split()[0] in html
+    assert html.index('href="/pipeline"') < html.index('href="/planted"')
+
+
+def test_pipeline_data_is_consistent():
+    from web import pipeline
+    ids = [n['id'] for n in pipeline.NODES]
+    assert len(ids) == len(set(ids))
+    group_ids = {g['id'] for g in pipeline.GROUPS}
+    for node in pipeline.NODES:
+        assert node['status'] in pipeline.STATUSES
+        assert node['group'] in group_ids
+    for edge in pipeline.EDGES:
+        assert edge['from'] in ids and edge['to'] in ids

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Luồng chính{% endblock %}
+{% block content %}
+<style>
+.legend { display:flex; flex-wrap:wrap; gap:14px; margin:0 0 12px; font-size:13px; }
+.legend span { display:inline-flex; align-items:center; gap:6px; }
+.legend i { width:14px; height:14px; border-radius:4px; border:2px solid; display:inline-block; }
+.flow { overflow-x:auto; background:var(--card); border:1px solid var(--line); border-radius:8px; }
+.flow svg { display:block; min-width:940px; width:100%; height:auto; }
+.flow text { fill:var(--text); font:13px system-ui, "Segoe UI", sans-serif; pointer-events:none; }
+.flow .group-box { fill:none; stroke:var(--line); stroke-dasharray:4 4; rx:8; }
+.flow .group-label { fill:var(--muted); font-size:12px; font-weight:600; }
+.flow .node { cursor:pointer; outline:none; }
+.flow .node rect.box { stroke-width:2; transition:fill .2s, stroke-width .2s, filter .2s; }
+.flow .node:hover rect.box, .flow .node:focus rect.box, .flow .node.on rect.box { stroke-width:4; filter:drop-shadow(0 2px 6px rgba(0,0,0,.35)); }
+.flow .node .status { font-size:11px; font-weight:700; }
+.flow .edge { fill:none; stroke:var(--muted); stroke-width:1.6; transition:stroke .2s, stroke-width .2s; }
+.flow .edge.dashed { stroke-dasharray:6 5; }
+.flow .edge.hl { stroke:var(--accent); stroke-width:3.2; }
+.flow .edge-label { fill:var(--muted); font-size:11px; font-style:italic; }
+.flow marker path { fill:var(--muted); }
+.st-done { --c:#2a9d6f; } .st-progress { --c:#e0a040; } .st-todo { --c:#8b95a3; } .st-reference { --c:#8a6fe0; }
+.flow .node rect.box { stroke:var(--c); fill:color-mix(in srgb, var(--c) 16%, var(--card)); }
+.flow .node .status { fill:var(--c); }
+.legend i { border-color:var(--c); background:color-mix(in srgb, var(--c) 25%, var(--card)); }
+#detail .badge { background:var(--c, var(--accent)); }
+#detail ul { margin:6px 0 0; padding-left:20px; }
+</style>
+<h1>Luồng chính</h1>
+<p class="muted small">Di chuột vào một ô (hoặc chạm trên điện thoại) để xem chi tiết. Cuộn ngang trong khung nếu màn hình hẹp.</p>
+<div class="legend">
+  {% for key, label in statuses.items() %}<span class="st-{{ key }}"><i></i>{{ label }}</span>{% endfor %}
+  <span class="muted">đường nét đứt: quan hệ phụ / lặp</span>
+</div>
+<div class="flow">
+<svg viewBox="0 0 {{ view_width }} {{ view_height }}" role="img" aria-label="Sơ đồ luồng chính">
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  {% for g in groups %}
+  <rect class="group-box" x="{{ g.x }}" y="{{ g.y }}" width="{{ g.w }}" height="{{ g.h }}"/>
+  <text class="group-label" x="{{ g.x + 10 }}" y="{{ g.y + 18 }}">{{ g.label }}</text>
+  {% endfor %}
+  {% for e in edges %}
+  <path class="edge{% if e.dashed %} dashed{% endif %}" data-from="{{ e['from'] }}" data-to="{{ e.to }}" d="{{ e.d }}" marker-end="url(#arrow)"/>
+  {% if e.label %}<text class="edge-label" x="{{ e.lx }}" y="{{ e.ly }}" text-anchor="{{ e.anchor }}">{{ e.label }}</text>{% endif %}
+  {% endfor %}
+  {% for n in nodes %}
+  <g class="node st-{{ n.status }}" id="node-{{ n.id }}" data-id="{{ n.id }}" tabindex="0" role="button" aria-label="{{ n.label }}">
+    <rect class="box" x="{{ n.x }}" y="{{ n.y }}" width="{{ width }}" height="{{ height }}" rx="8"/>
+    {% for line in n.lines %}<text x="{{ n.x + 10 }}" y="{{ n.y + 22 + 16 * loop.index0 }}">{{ line }}</text>{% endfor %}
+    <text class="status" x="{{ n.x + 10 }}" y="{{ n.y + height - 10 }}">● {{ n.status_label }}</text>
+  </g>
+  {% endfor %}
+</svg>
+</div>
+<div class="card" id="detail" style="margin-top:14px">
+  <p class="muted">Chọn một ô trong sơ đồ.</p>
+</div>
+<div hidden>
+{% for n in nodes %}
+<div id="info-{{ n.id }}" class="st-{{ n.status }}">
+  <h2>{{ n.label }} <span class="badge">{{ n.status_label }}</span> {% if n.note %}<span class="muted small">{{ n.note }}</span>{% endif %}</h2>
+  <ul>{% for d in n.details %}<li>{{ d|inline_code }}</li>{% endfor %}</ul>
+  {% if n.link %}<p><a href="{{ n.link }}">Mở trang {{ n.link }}</a></p>{% endif %}
+</div>
+{% endfor %}
+</div>
+<script>
+(function () {
+  var detail = document.getElementById('detail');
+  var pinned = null;
+  function edgesOf(id) { return document.querySelectorAll('.edge[data-from="' + id + '"], .edge[data-to="' + id + '"]'); }
+  function show(id) {
+    var src = document.getElementById('info-' + id); if (!src) { return; }
+    detail.className = 'card ' + src.className; detail.innerHTML = src.innerHTML;
+  }
+  function highlight(id, on) { edgesOf(id).forEach(function (e) { e.classList.toggle('hl', on); }); }
+  document.querySelectorAll('.node').forEach(function (g) {
+    var id = g.getAttribute('data-id');
+    g.addEventListener('mouseenter', function () { highlight(id, true); show(id); });
+    g.addEventListener('mouseleave', function () { if (pinned !== id) { highlight(id, false); } if (pinned) { show(pinned); } });
+    g.addEventListener('focus', function () { highlight(id, true); show(id); });
+    g.addEventListener('blur', function () { if (pinned !== id) { highlight(id, false); } });
+    g.addEventListener('click', function () {
+      if (pinned) { highlight(pinned, false); document.getElementById('node-' + pinned).classList.remove('on'); }
+      pinned = id; g.classList.add('on'); highlight(id, true); show(id);
+    });
+  });
+})();
+</script>
+{% endblock %}
