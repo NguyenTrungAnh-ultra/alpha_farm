@@ -273,3 +273,21 @@ def test_build_set_writes_nothing_when_the_round_budget_runs_out(tmp_path):
     chat = FakeChat([reply(SHAPE_COPY, "A"), correction(SHAPE_COPY)] * 3)
     assert not BG.build_set(chat, 2, "anon_shapes", {}, "ollama-9b", str(out), rounds_per_blueprint=1)
     assert not out.exists()
+
+
+OUTDATED_DIMENSION_LINE = "The others keep the dimension of their input."
+
+
+@pytest.mark.parametrize("variant", ["anon_rules", "anon_shapes"])
+def test_anon_prompts_state_the_dimension_rules_and_not_the_outdated_line(variant):
+    prompt = build_idea_prompt("60m", [], 1, 1, variant=variant)
+    assert OUTDATED_DIMENSION_LINE not in prompt
+    for rule in ("`ts_argmax`, `ts_argmin`, `ts_corr` always return a RATIO",
+                 "at least one side MUST be a RATIO", "divisor is a RATIO", "fillable within the depth limit"):
+        assert rule in prompt
+    for fragment in ("ts_zscore(?)", "ts_rank(?)"):
+        assert fragment in variant_examples(variant)
+
+
+def test_current_prompt_keeps_the_original_dimension_line():
+    assert OUTDATED_DIMENSION_LINE in build_idea_prompt("60m", [], 1, 1, variant="current")

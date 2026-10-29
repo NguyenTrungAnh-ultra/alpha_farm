@@ -57,6 +57,23 @@ OPERATOR_FUNCTIONS = f"""
   - `and_`, `or_`, `not_` take BOOLEAN arguments; `greater_than`, `less_than`, `equal` take two series and return BOOLEAN.
 """
 
+
+_OUTDATED_DIMENSION_LINE = (
+    "  - `ts_rank`, `ts_corr`, `ts_zscore` return a dimensionless RATIO. The others keep the dimension of their input.\n"
+)
+
+# Anonymised variants: the shared OPERATOR_FUNCTIONS text minus its dimension line, plus rules that
+# match what the compiler enforces. `current` keeps OPERATOR_FUNCTIONS unchanged (pinned hash).
+DIMENSION_RULES = """**Dimensions** (every series has one: CURRENCY for price fields, VOLUME for `pv_volume`, or RATIO = dimensionless; the blueprint is REJECTED if they do not fit):
+  - `ts_mean`, `ts_sum`, `ts_max`, `ts_min` keep the dimension of their input.
+  - `ts_rank`, `ts_zscore`, `ts_argmax`, `ts_argmin`, `ts_corr` always return a RATIO, whatever their input.
+  - `add`, `sub`, `greater_than`, `less_than`, `equal`: both sides MUST have the same dimension (price with price, volume with volume, ratio with ratio).
+  - `mult`: at least one side MUST be a RATIO (result has the other side's dimension). Price x volume, price x price and volume x volume are REJECTED. To weight a non-RATIO series, pair it with a RATIO side such as `ts_zscore(?)` or `ts_rank(?)`.
+  - `div`: both sides have the same dimension (result is a RATIO), or the divisor is a RATIO (result keeps the numerator's dimension).
+  - Every `?` must be fillable within the depth limit: a `?` that has to be a RATIO inside a rolling function (for example both arguments of a `sub` that sits under `mult`) needs an extra nesting level there. Keep such skeletons shallow and simple.
+"""
+ANON_OPERATOR_FUNCTIONS = OPERATOR_FUNCTIONS.replace(_OUTDATED_DIMENSION_LINE, "") + DIMENSION_RULES
+
 # Every example must compile with SemanticCompiler (checked by tests).
 FEW_SHOT_EXAMPLES = [
     ("statistical-mean-reversion", "sub(ts_max(?), ts_mean(?))"),
@@ -149,6 +166,8 @@ CRITICAL_RULES = """## CRITICAL RULES (MUST FOLLOW STRICTLY)
 
 # Skeletons the library text itself illustrates syntax with (`ts_mean(?)`, `ts_corr(?, ?)`).
 LIBRARY_ILLUSTRATIONS = ["ts_mean(?)", "ts_corr(?, ?)"]
+# Fragments named by DIMENSION_RULES (anonymised variants only).
+DIMENSION_FRAGMENTS = ["ts_zscore(?)", "ts_rank(?)"]
 
 # Slot rules without any concrete formula: used by the market-anonymised variants.
 SLOT_RULES_PLAIN = """
@@ -233,7 +252,7 @@ def _anon_rules_static_prefix(timeframe: str) -> str:
 
 ## REFERENCE LIBRARY
 {DIMENSIONAL_FUNCTIONS}
-{OPERATOR_FUNCTIONS}
+{ANON_OPERATOR_FUNCTIONS}
 {SLOT_RULES_PLAIN}
 {GRAMMAR_RULES}
 {ANON_OUTPUT_FORMAT}
@@ -247,7 +266,7 @@ def _anon_shapes_static_prefix(timeframe: str) -> str:
 
 ## REFERENCE LIBRARY
 {DIMENSIONAL_FUNCTIONS}
-{OPERATOR_FUNCTIONS}
+{ANON_OPERATOR_FUNCTIONS}
 {SLOT_RULES_PLAIN}
 {GRAMMAR_RULES}
 ## SHAPES (GRAMMAR ILLUSTRATION ONLY)
@@ -274,9 +293,9 @@ PROMPT_VARIANTS = {
         "current", _current_static_prefix,
         [blueprint for _, blueprint in FEW_SHOT_EXAMPLES] + [SLOT_RIGHT_EXAMPLE] + LIBRARY_ILLUSTRATIONS,
         anonymised=False),
-    "anon_rules": PromptVariant("anon_rules", _anon_rules_static_prefix, list(LIBRARY_ILLUSTRATIONS), anonymised=True),
+    "anon_rules": PromptVariant("anon_rules", _anon_rules_static_prefix, list(LIBRARY_ILLUSTRATIONS) + DIMENSION_FRAGMENTS, anonymised=True),
     "anon_shapes": PromptVariant(
-        "anon_shapes", _anon_shapes_static_prefix, list(SHAPE_EXAMPLES) + LIBRARY_ILLUSTRATIONS, anonymised=True),
+        "anon_shapes", _anon_shapes_static_prefix, list(SHAPE_EXAMPLES) + LIBRARY_ILLUSTRATIONS + DIMENSION_FRAGMENTS, anonymised=True),
 }
 
 
