@@ -12,6 +12,7 @@ from utilities.Prompts import (
 NO_SLOT = "sub(ts_mean(pv_high), ts_mean(pv_low))"
 ONE_SLOT = "sub(pv_close, ts_mean(?))"
 TWO_SLOTS = "sub(ts_mean(?), ts_mean(?))"
+NOT_AN_EXAMPLE = "add(ts_min(?), ts_max(?))"
 
 
 def idea(blueprint, name="Idea"):
@@ -110,8 +111,8 @@ def run_planted(monkeypatch, replies, n=1):
 
 
 def test_planted_step_corrects_slot_free_blueprint_once(monkeypatch):
-    chat, accepted = run_planted(monkeypatch, [reply(NO_SLOT, "A"), json.dumps({"macro_blueprint": TWO_SLOTS})])
-    assert [b["macro_blueprint"] for b in accepted] == [TWO_SLOTS]
+    chat, accepted = run_planted(monkeypatch, [reply(NO_SLOT, "A"), json.dumps({"macro_blueprint": NOT_AN_EXAMPLE})])
+    assert [b["macro_blueprint"] for b in accepted] == [NOT_AN_EXAMPLE]
     assert "no `?` slot" in chat.prompts[1]
 
 

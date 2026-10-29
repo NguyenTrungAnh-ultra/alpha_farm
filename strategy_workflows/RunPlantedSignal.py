@@ -196,73 +196,12 @@ def annotate_blueprints(blueprints: List[Dict[str, str]], formula: PlantedFormul
 
 
 def generate_blueprints(n: int, model: str) -> List[Dict[str, str]]:
-    """Ask the local LLM for `n` compilable 60m blueprints; nothing is written to results/ideas."""
-    from llm_clients.OllamaClient import OllamaChatClient, extract_json
-    from strategy_workflows.GenerateStrategies import load_experience_log, validate_idea
-    from utilities.Prompts import build_correction_prompt, build_idea_prompt
+    """Ask the local LLM for `n` compilable 60m blueprints (prompt variant "current"); nothing is written to results/ideas."""
+    from strategy_workflows.BlueprintGeneration import create_chat, generate_set, load_variant_experience
 
-    model_name = "qwen3.5:9b" if model == "ollama-9b" else "qwen3.5:4b"
-    chat = OllamaChatClient(model=model_name, verbose=True)
-    experience = load_experience_log()
-    accepted: List[Dict[str, str]] = []
-    seen_names, seen_blueprints = set(), set()
-    consecutive_failures = 0
-    max_rounds = n * 4
+    chat = create_chat(model)
     try:
-        for round_num in range(1, max_rounds + 1):
-            if len(accepted) >= n:
-                break
-            prompt = build_idea_prompt(
-                timeframe=TIMEFRAME, existing_strategies=accepted[-20:], round_num=round_num,
-                total_rounds=max_rounds, experience=experience,
-                tried_names=list(seen_names)[-20:], fsa_forbidden_patterns=[],
-            )
-            schema_arg = {"schema": "json"} if model == "ollama-local" else {}
-            try:
-                idea_json = extract_json(chat.send(prompt, **schema_arg))
-            except Exception as exc:
-                print(f"[planted] chat error: {exc}")
-                idea_json = None
-            if idea_json is None:
-                consecutive_failures += 1
-                if consecutive_failures >= 3:
-                    print("[planted] Model returned no JSON three times in a row; stopping.")
-                    break
-                continue
-            consecutive_failures = 0
-            idea = None
-            for attempt in (1, 2):
-                try:
-                    idea, root = validate_idea(idea_json)
-                    unimplemented = find_unimplemented_operator(root)
-                    if unimplemented is not None:
-                        raise ValueError(f"operator {unimplemented} has no code generation")
-                    print(f"[planted] round {round_num} attempt {attempt}: accepted {idea['macro_blueprint']}")
-                    break
-                except Exception as exc:
-                    idea = None
-                    print(f"[planted] round {round_num} attempt {attempt}: rejected ({exc})")
-                    if attempt == 2:
-                        break
-                    failed = {'macro_blueprint': idea_json['macro_blueprint']} \
-                        if isinstance(idea_json, dict) and 'macro_blueprint' in idea_json else idea_json
-                    try:
-                        corrected = extract_json(chat.send(build_correction_prompt(json.dumps(failed, indent=4), str(exc))))
-                    except Exception as chat_exc:
-                        print(f"[planted] chat error during correction: {chat_exc}")
-                        break
-                    if not isinstance(corrected, dict):
-                        break
-                    idea_json = {**idea_json, **corrected}
-            if idea is None:
-                continue
-            name = re.sub(r'[^a-zA-Z0-9_]', '', idea['name']) or f"Idea_{round_num}"
-            if name in seen_names or idea['macro_blueprint'] in seen_blueprints:
-                continue
-            seen_names.add(name)
-            seen_blueprints.add(idea['macro_blueprint'])
-            accepted.append({'name': name, 'macro_blueprint': idea['macro_blueprint']})
-            print(f"[planted] accepted {len(accepted)}/{n}: {name}: {idea['macro_blueprint']}")
+        accepted, _ = generate_set(chat, n, 'current', model=model, experience=load_variant_experience('current'))
     finally:
         if hasattr(chat, 'stop_keepalive'):
             chat.stop_keepalive()

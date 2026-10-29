@@ -58,7 +58,11 @@ Cùng ngân sách 100.000 lượt chấm mỗi cửa sổ, cùng bước 2–4.
 
 Ghi vào `results/walkforward/frozen.json` và commit trước khi chạy: reward `sharpe` + `REWARD_WEIGHTS`, bảng cửa sổ, tệp blueprint (hash), ngân sách, seed, khung, `MAX_RANKED`, `TOP_K`, commit git, dấu vân tay dữ liệu. Code từ chối chạy dữ liệu thật nếu cấu hình khác bản đóng băng.
 
-- ⏸️ **Bộ blueprint nào:** (a) dùng lại `results/planted/blueprints.json` (20 blueprint, 4B, đã thấy trên dữ liệu xáo, có 2 blueprint chép ví dụ trong prompt); hay (b) sửa prompt cho đa dạng hơn rồi sinh và đóng băng bộ mới — người dùng từng muốn sửa prompt (2026-10-29). Sau khi đóng băng thì không đổi được nữa, nên đây là lúc cuối để sửa. Nếu (b), bài cài tín hiệu ở mục 2 chạy trên bộ mới (chọn lại A theo đúng luật cũ).
+- ✅ **Bộ blueprint: sinh lại bằng prompt mới rồi mới đóng băng** (người dùng chốt 2026-10-29 theo đề xuất của Claude). Lý do: bộ cũ có 2/20 blueprint chép nguyên ví dụ trong prompt, làm yếu RQ1. Bài cài tín hiệu ở mục 2 chạy trên bộ mới (chọn lại A theo đúng luật cũ ở `docs/PLANTED_SIGNAL.md` mục 3).
+  - Sửa prompt: ẩn tên thị trường ("hợp đồng tương lai chỉ số, bar 60 phút", không ghi VN30 / Việt Nam) — cách kiểm số 1 của nợ rò rỉ qua trọng số LLM; đổi cách đưa ví dụ để giảm chép.
+  - **Chỉnh prompt / tham số trước bằng lô nhỏ** (người dùng yêu cầu 2026-10-29: "sinh ít ít trước để test prompt / tham số … ổn rồi mới sinh thật"): mỗi cấu hình (biến thể prompt × tham số Ollama: temperature, top_p, …) sinh một lô nhỏ, đo tỷ lệ biên dịch được, tỷ lệ có `?`, tỷ lệ trùng ví dụ prompt, số khung khác nhau, số vòng tự sửa, thời gian. Chọn cấu hình rồi mới sinh bộ thật 20 blueprint và đóng băng cùng cấu hình đã chọn.
+  - **Tiêu chí bộ thật (chốt trước):** 0 blueprint trùng nguyên văn ví dụ trong prompt; không có hai blueprint cùng khung (so cấu trúc cây, bỏ qua tên trường điền sẵn); mọi blueprint có ≥ 1 `?` và biên dịch được; mô hình 4B, 20 blueprint. 4B không đạt sau 5 lần sinh thật ⇒ thử `ollama-9b` (luật 2026-10-28).
+  - Lô thử chỉ dùng để chọn prompt / tham số, không chấm trên dữ liệu nào, nên không đụng tới quy tắc dữ liệu thật.
 
 ## 7. Thời gian máy (ước, chưa đo)
 

@@ -52,6 +52,10 @@ def extract_json(text: str) -> Optional[Union[dict, list]]:
     return None
 
 
+# Sampling options a caller may override per request; anything else is ignored.
+SAMPLING_OPTION_NAMES = ("temperature", "top_p", "top_k", "repeat_penalty", "seed")
+
+
 def _find_ollama_cmd():
     """
     Search for the absolute path of the Ollama executable on Windows/PATH.
@@ -201,7 +205,7 @@ class OllamaChatClient:
         except Exception:
             pass
             
-    def send(self, prompt: str, schema: dict = None) -> str:
+    def send(self, prompt: str, schema: dict = None, options: Optional[dict] = None) -> str:
         """
         Send a prompt to the local Ollama model and return the generated text response.
 
@@ -211,6 +215,10 @@ class OllamaChatClient:
             The input prompt string.
         schema : dict, optional
             A JSON Schema dictionary (typically from Pydantic) to enforce structured JSON output.
+        options : dict, optional
+            Sampling overrides (`temperature`, `top_p`, `top_k`, `repeat_penalty`, `seed`) merged into the
+            request `options`. Keys that are None or not listed are dropped; when nothing is given the
+            request carries only `num_ctx` and the Modelfile defaults apply.
 
         Returns
         -------
@@ -231,6 +239,9 @@ class OllamaChatClient:
                 "num_ctx": 16384
             }
         }
+        for name in SAMPLING_OPTION_NAMES:
+            if options and options.get(name) is not None:
+                payload["options"][name] = options[name]
         if schema:
             payload["format"] = schema
         

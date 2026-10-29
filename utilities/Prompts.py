@@ -8,6 +8,8 @@ and helper functions to construct structured LLM prompts for generating strategy
 blueprints and self-correction instructions.
 """
 
+import hashlib
+
 from strategy_workflows.MCTSDimensions import (
     OPERATOR_REGISTRY, OperatorGroup, UNIMPLEMENTED_OPERATORS, DATA_FIELD_DIMENSIONS,
 )
@@ -131,6 +133,177 @@ STRATEGY_FAMILIES = [
     "cross-dimensional-arbitrage" # Combining price, volume and correlation series
 ]
 
+CRITICAL_RULES = """## CRITICAL RULES (MUST FOLLOW STRICTLY)
+1. **ROOT TYPE**: The root (outermost function) decides how positions are built.
+   - Prefer a root whose output keeps its input dimension: `sub`, `add`, `mult`, `ts_mean`, `ts_sum`, `ts_max`, `ts_min`, `ts_argmax`, `ts_argmin`. The engine applies a rolling Z-Score to it and trades when |Z| exceeds a searched threshold.
+   - A BOOLEAN root (`greater_than`, `less_than`, `equal`, `and_`, `or_`, `not_`) is also fine: long where true, short where false.
+   - AVOID a RATIO root (`div`, `ts_rank`, `ts_corr`, `ts_zscore`): it is read as a 0-100 oscillator (long above 60-80, short below 20-40), which does not fit these outputs.
+2. **Valid Functions ONLY**: RESTRICT YOURSELF EXCLUSIVELY to the exact names listed in the REFERENCE LIBRARY. Do not invent indicators (no `ema`, `rsi`, `macd`, `zscore`, `diff`, `shift`).
+3. **No Hardcoded Numbers**: Window lengths and thresholds are searched by the engine. Keep NO numbers in the blueprint.
+4. **Syntax & Depth Limit**: DO NOT nest functions deeper than 3 levels. Ensure all parentheses are closed. Use `?` for each open series argument (a data field name only where you fix it on purpose) and never for a window: `ts_mean(?)` is correct, `ts_mean(?, ?)` is wrong, `ts_mean(?, 20)` is wrong.
+5. **At least one `?`** in `macro_blueprint` (see WHAT `?` MEANS).
+6. **JSON Only**: OUTPUT ONLY a valid JSON block.
+"""
+
+# ─── Prompt variants (static part of the idea prompt) ───────────────
+
+# Skeletons the library text itself illustrates syntax with (`ts_mean(?)`, `ts_corr(?, ?)`).
+LIBRARY_ILLUSTRATIONS = ["ts_mean(?)", "ts_corr(?, ?)"]
+
+# Slot rules without any concrete formula: used by the market-anonymised variants.
+SLOT_RULES_PLAIN = """
+## WHAT `?` MEANS (READ FIRST)
+`?` is an OPEN SLOT. You write only the SKELETON of the formula; the search later fills every `?` with a data field or a whole sub-formula.
+- EVERY blueprint MUST contain at least one `?` (prefer 2 or 3). A blueprint with no `?` is REJECTED.
+- Data fields such as `pv_close` or `pv_volume` may appear in the skeleton, but the parts you leave open MUST be `?`.
+- WRONG: a complete formula in which every series argument is a named data field (no `?` anywhere). It is rejected.
+- RIGHT: the same skeleton with `?` written in place of the series arguments you leave open.
+"""
+
+GRAMMAR_RULES = """
+## GRAMMAR
+blueprint := FUNCTION(argument, ...)
+argument  := blueprint | DATA_FIELD | `?`
+- Each function takes exactly the number of series arguments stated in the library above.
+- Math functions take two arguments; BOOLEAN functions combine or compare series; time-series functions take one series (`ts_corr` takes two).
+- Compose the skeleton yourself from the library: pick the operators, the nesting and the positions of the `?` slots.
+"""
+
+# Structural shapes only: operator mixes that are unlikely final answers. Each must compile with a slot.
+SHAPE_EXAMPLES = [
+    "mult(ts_sum(?), ts_argmax(?))",
+    "ts_argmin(ts_max(?))",
+    "not_(greater_than(ts_argmin(?), ts_argmax(?)))",
+    "or_(less_than(ts_min(?), ts_sum(?)), greater_than(ts_argmax(?), ts_argmin(?)))",
+]
+
+ANON_INTRO = (
+    "You are an expert **Quant Researcher** designing trading strategies for an **index futures contract** "
+    "traded on **60-minute bars**."
+)
+
+ANON_OUTPUT_FORMAT = """## OUTPUT FORMAT
+You MUST return EXACTLY the following JSON structure.
+
+```json
+{
+    "name": "StrategyName",
+    "timeframe": "60m",
+    "family": "statistical-mean-reversion|time-series-kinematics|volatility-regime|cross-dimensional-arbitrage",
+    "description": "Financial intuition behind the strategy.",
+    "macro_blueprint": "<your skeleton formula, built from the library, containing at least one ? slot>"
+}
+```
+"""
+
+
+def _current_static_prefix(timeframe: str) -> str:
+    few_shot = "\n".join(
+        f"- Example {i} ({family}): `{blueprint}`"
+        for i, (family, blueprint) in enumerate(FEW_SHOT_EXAMPLES, start=1)
+    )
+    return f"""You are an expert **Quant Researcher** designing trading strategies for the **VN30 Index Futures contract**.
+
+## REFERENCE LIBRARY
+{DIMENSIONAL_FUNCTIONS}
+{OPERATOR_FUNCTIONS}
+{SLOT_RULES}
+## OUTPUT FORMAT
+You MUST return EXACTLY the following JSON structure. 
+
+```json
+{{
+    "name": "StrategyName",
+    "timeframe": "10m",
+    "family": "statistical-mean-reversion|time-series-kinematics|volatility-regime|cross-dimensional-arbitrage",
+    "description": "Financial intuition behind the strategy.",
+    "macro_blueprint": "{SLOT_RIGHT_EXAMPLE}"
+}}
+```
+
+**Examples for macro_blueprint (each contains `?`):**
+{few_shot}
+
+{CRITICAL_RULES}"""
+
+
+def _anon_rules_static_prefix(timeframe: str) -> str:
+    """Anonymised market, no formula example: grammar rules plus slot rules."""
+    return f"""{ANON_INTRO}
+
+## REFERENCE LIBRARY
+{DIMENSIONAL_FUNCTIONS}
+{OPERATOR_FUNCTIONS}
+{SLOT_RULES_PLAIN}
+{GRAMMAR_RULES}
+{ANON_OUTPUT_FORMAT}
+{CRITICAL_RULES}"""
+
+
+def _anon_shapes_static_prefix(timeframe: str) -> str:
+    """Anonymised market, structural shapes plus an explicit ban on reusing any of them."""
+    shapes = "\n".join(f"- Shape {i}: `{shape}`" for i, shape in enumerate(SHAPE_EXAMPLES, start=1))
+    return f"""{ANON_INTRO}
+
+## REFERENCE LIBRARY
+{DIMENSIONAL_FUNCTIONS}
+{OPERATOR_FUNCTIONS}
+{SLOT_RULES_PLAIN}
+{GRAMMAR_RULES}
+## SHAPES (GRAMMAR ILLUSTRATION ONLY)
+These shapes only show how functions nest and where `?` goes. They are NOT suggestions.
+{shapes}
+NEVER output any of these shapes, and never output one of them with other data fields in place of the fixed ones. Any blueprint with the same skeleton as a shape above is REJECTED. Design a DIFFERENT skeleton of your own.
+
+{ANON_OUTPUT_FORMAT}
+{CRITICAL_RULES}"""
+
+
+class PromptVariant:
+    """A named static prompt: its builder and the skeletons it shows the model (a generated copy is rejected)."""
+
+    def __init__(self, name: str, build_static, examples: list[str], anonymised: bool):
+        self.name = name
+        self.build_static = build_static
+        self.examples = examples
+        self.anonymised = anonymised
+
+
+PROMPT_VARIANTS = {
+    "current": PromptVariant(
+        "current", _current_static_prefix,
+        [blueprint for _, blueprint in FEW_SHOT_EXAMPLES] + [SLOT_RIGHT_EXAMPLE] + LIBRARY_ILLUSTRATIONS,
+        anonymised=False),
+    "anon_rules": PromptVariant("anon_rules", _anon_rules_static_prefix, list(LIBRARY_ILLUSTRATIONS), anonymised=True),
+    "anon_shapes": PromptVariant(
+        "anon_shapes", _anon_shapes_static_prefix, list(SHAPE_EXAMPLES) + LIBRARY_ILLUSTRATIONS, anonymised=True),
+}
+
+
+def get_variant(name: str) -> PromptVariant:
+    if name not in PROMPT_VARIANTS:
+        raise ValueError(f"Unknown prompt variant '{name}'; choose one of {sorted(PROMPT_VARIANTS)}")
+    return PROMPT_VARIANTS[name]
+
+
+def build_static_prefix(variant: str, timeframe: str = "60m") -> str:
+    """Static part of the idea prompt for `variant`. The anonymised variants are written for 60-minute bars only."""
+    chosen = get_variant(variant)
+    if chosen.anonymised and timeframe != "60m":
+        raise ValueError(f"Prompt variant '{variant}' is written for 60m bars, got {timeframe}")
+    return chosen.build_static(timeframe)
+
+
+def variant_examples(variant: str) -> list[str]:
+    """Skeletons shown to the model by `variant`; a generated blueprint with one of these structures is a copy."""
+    return list(get_variant(variant).examples)
+
+
+def prompt_hash(variant: str) -> str:
+    """sha256 of the static prompt text of `variant` for 60m bars."""
+    return hashlib.sha256(build_static_prefix(variant).encode("utf-8")).hexdigest()
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # Prompt Builders
 # ═══════════════════════════════════════════════════════════════════════
@@ -145,6 +318,7 @@ def build_idea_prompt(
     experience: str = "",
     tried_names: list[str] = None,
     fsa_forbidden_patterns: list[str] = None,
+    variant: str = "current",
 ) -> str:
     """
     Build a structured prompt asking the LLM to generate a new trading strategy idea in JSON.
@@ -173,6 +347,8 @@ def build_idea_prompt(
         List of names that have failed to compile previously.
     fsa_forbidden_patterns : list[str], optional
         List of root topology structures that should not be repeated.
+    variant : str, default "current"
+        Name in `PROMPT_VARIANTS` selecting the static part of the prompt.
         
     Returns
     -------
@@ -208,44 +384,7 @@ def build_idea_prompt(
         fsa_list = ", ".join(fsa_forbidden_patterns)
         fsa_section = f"\nCRITICAL CONSTRAINT: Do not generate blueprints that share the exact structural topology as the following root patterns: {fsa_list}\n"
 
-    few_shot = "\n".join(
-        f"- Example {i} ({family}): `{blueprint}`"
-        for i, (family, blueprint) in enumerate(FEW_SHOT_EXAMPLES, start=1)
-    )
-
-    static_prefix = f"""You are an expert **Quant Researcher** designing trading strategies for the **VN30 Index Futures contract**.
-
-## REFERENCE LIBRARY
-{DIMENSIONAL_FUNCTIONS}
-{OPERATOR_FUNCTIONS}
-{SLOT_RULES}
-## OUTPUT FORMAT
-You MUST return EXACTLY the following JSON structure. 
-
-```json
-{{
-    "name": "StrategyName",
-    "timeframe": "10m",
-    "family": "statistical-mean-reversion|time-series-kinematics|volatility-regime|cross-dimensional-arbitrage",
-    "description": "Financial intuition behind the strategy.",
-    "macro_blueprint": "{SLOT_RIGHT_EXAMPLE}"
-}}
-```
-
-**Examples for macro_blueprint (each contains `?`):**
-{few_shot}
-
-## CRITICAL RULES (MUST FOLLOW STRICTLY)
-1. **ROOT TYPE**: The root (outermost function) decides how positions are built.
-   - Prefer a root whose output keeps its input dimension: `sub`, `add`, `mult`, `ts_mean`, `ts_sum`, `ts_max`, `ts_min`, `ts_argmax`, `ts_argmin`. The engine applies a rolling Z-Score to it and trades when |Z| exceeds a searched threshold.
-   - A BOOLEAN root (`greater_than`, `less_than`, `equal`, `and_`, `or_`, `not_`) is also fine: long where true, short where false.
-   - AVOID a RATIO root (`div`, `ts_rank`, `ts_corr`, `ts_zscore`): it is read as a 0-100 oscillator (long above 60-80, short below 20-40), which does not fit these outputs.
-2. **Valid Functions ONLY**: RESTRICT YOURSELF EXCLUSIVELY to the exact names listed in the REFERENCE LIBRARY. Do not invent indicators (no `ema`, `rsi`, `macd`, `zscore`, `diff`, `shift`).
-3. **No Hardcoded Numbers**: Window lengths and thresholds are searched by the engine. Keep NO numbers in the blueprint.
-4. **Syntax & Depth Limit**: DO NOT nest functions deeper than 3 levels. Ensure all parentheses are closed. Use `?` for each open series argument (a data field name only where you fix it on purpose) and never for a window: `ts_mean(?)` is correct, `ts_mean(?, ?)` is wrong, `ts_mean(?, 20)` is wrong.
-5. **At least one `?`** in `macro_blueprint` (see WHAT `?` MEANS).
-6. **JSON Only**: OUTPUT ONLY a valid JSON block.
-"""
+    static_prefix = build_static_prefix(variant, timeframe)
 
     dynamic_suffix = f"""
 ## CURRENT MISSION & MARKET CONTEXT
