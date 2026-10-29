@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Alpha Farm{% endblock %}</title>
+<style>
+:root { --bg:#f6f7f9; --card:#ffffff; --text:#1c2330; --muted:#657083; --line:#dde1e8; --accent:#2a6fdb; --warn:#b26a00; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#12161c; --card:#1b212b; --text:#e6e9ee; --muted:#9aa4b2; --line:#2b3340; --accent:#6aa0f5; --warn:#e0a040; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { display:flex; min-height:100vh; }
+aside { width:210px; flex:none; background:var(--card); border-right:1px solid var(--line); padding:16px 12px; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; gap:4px; }
+aside .brand { font-weight:700; margin:0 8px 12px; }
+aside a.nav { color:var(--muted); text-decoration:none; padding:8px 10px; border-radius:6px; transition:background .2s, color .2s; }
+aside a.nav:hover { background:var(--bg); }
+aside a.nav.on { color:#fff; background:var(--accent); }
+#strip { margin-top:auto; font-size:12px; color:var(--muted); display:grid; gap:6px; }
+#strip .row { display:flex; justify-content:space-between; } #strip .row b { color:var(--text); font-weight:600; }
+main { flex:1; min-width:0; max-width:1150px; margin:0 auto; padding:20px; animation:fadein .35s ease; }
+@keyframes fadein { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+@media (max-width:760px) { body { display:block; } aside { width:auto; height:auto; position:static; flex-direction:row; flex-wrap:wrap; align-items:center; } aside .brand { display:none; } #strip { margin:0 0 0 auto; width:100%; } }
+.cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-bottom:16px; }
+.stat { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; transition:transform .2s, box-shadow .2s; }
+.stat:hover { transform:translateY(-2px); box-shadow:0 4px 14px rgba(0,0,0,.12); }
+.stat .big { font-size:26px; font-weight:700; font-variant-numeric:tabular-nums; }
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.chip { font-size:12px; padding:2px 8px; border-radius:10px; background:var(--bg); border:1px solid var(--line); }
+.chip.hit { border-color:var(--accent); color:var(--accent); }
+.chartbox { position:relative; height:300px; } .chartbox.tall { height:340px; }
+.pulse { animation:pulse 1.4s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.55; } }
+h1 { font-size:22px; margin:8px 0 12px; } h2 { font-size:18px; margin:0 0 8px; } h3 { font-size:15px; margin:16px 0 6px; }
+a { color:var(--accent); }
+.card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px; margin:0 0 16px; }
+.muted { color:var(--muted); } .small { font-size:13px; }
+.badge { display:inline-block; font-size:12px; padding:1px 8px; border-radius:10px; background:var(--accent); color:#fff; margin-left:6px; }
+.scroll { overflow-x:auto; }
+table { border-collapse:collapse; width:100%; font-size:13px; font-variant-numeric:tabular-nums; }
+th, td { padding:4px 8px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+th:first-child, td:first-child, td.left, th.left { text-align:left; }
+td.expr { white-space:normal; word-break:break-word; text-align:left; font-family:ui-monospace, Consolas, monospace; font-size:12px; min-width:220px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; }
+details { margin:8px 0; } summary { cursor:pointer; color:var(--accent); }
+code { font-family:ui-monospace, Consolas, monospace; font-size:12px; word-break:break-word; }
+form.pick { display:flex; flex-wrap:wrap; gap:8px; align-items:end; margin:8px 0; }
+form.pick label { display:flex; flex-direction:column; font-size:13px; color:var(--muted); }
+select, button { font:inherit; padding:4px 8px; }
+.bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; } .bar > i { display:block; height:100%; width:0; background:var(--accent); transition:width .6s ease; }
+.cores { display:grid; grid-template-columns:repeat(auto-fill, minmax(90px, 1fr)); gap:8px; }
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand">Alpha Farm</div>
+  <a class="nav {% if active == 'planted' %}on{% endif %}" href="/planted">Bài cài tín hiệu</a>
+  <a class="nav {% if active == 'system' %}on{% endif %}" href="/system">Tài nguyên máy</a>
+  <div id="strip">
+    <div class="row"><span>CPU</span><b id="s-cpu">–</b></div><div class="bar" id="s-cpu-bar"><i></i></div>
+    <div class="row"><span>RAM</span><b id="s-ram">–</b></div><div class="bar" id="s-ram-bar"><i></i></div>
+    <div class="row"><span>GPU</span><b id="s-gpu">–</b></div><div class="bar" id="s-gpu-bar"><i></i></div>
+  </div>
+</aside>
+<main>
+{% block content %}{% endblock %}
+</main>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+function text(id, value) { var el = document.getElementById(id); if (el) { el.textContent = value; } }
+function pct(v) { return v === null || v === undefined ? '–' : Math.round(v) + '%'; }
+function gb(mb) { return (mb / 1024).toFixed(1); }
+function bar(id, value) { var el = document.getElementById(id); if (el) { el.firstElementChild.style.width = Math.min(100, Math.max(0, value)) + '%'; } }
+function render(d) {
+  text('s-cpu', pct(d.cpu_percent)); bar('s-cpu-bar', d.cpu_percent);
+  text('s-ram', pct(d.ram.percent)); bar('s-ram-bar', d.ram.percent);
+  text('s-gpu', d.gpu ? pct(d.gpu.util_percent) + ' · ' + gb(d.gpu.vram_used_mb) + '/' + gb(d.gpu.vram_total_mb) + ' GB' : 'không đọc được');
+  if (d.gpu) { bar('s-gpu-bar', d.gpu.util_percent); }
+  text('cpu-total', pct(d.cpu_percent)); bar('cpu-total-bar', d.cpu_percent);
+  text('ram-text', pct(d.ram.percent) + ' (' + gb(d.ram.used_mb) + ' / ' + gb(d.ram.total_mb) + ' GB)'); bar('ram-bar', d.ram.percent);
+  if (d.gpu) {
+    text('gpu-text', pct(d.gpu.util_percent)); bar('gpu-bar', d.gpu.util_percent);
+    text('vram-text', gb(d.gpu.vram_used_mb) + ' / ' + gb(d.gpu.vram_total_mb) + ' GB'); bar('vram-bar', 100 * d.gpu.vram_used_mb / d.gpu.vram_total_mb);
+  } else {
+    text('gpu-text', 'không đọc được' + (d.gpu_error ? ' (' + d.gpu_error + ')' : '')); text('vram-text', 'không đọc được');
+  }
+  text('disk-text', d.disk.free_gb.toFixed(1) + ' GB trống / ' + d.disk.total_gb.toFixed(1) + ' GB (' + d.disk.path + ')'); bar('disk-bar', d.disk.percent);
+  var cores = document.getElementById('cores');
+  if (cores) {
+    cores.textContent = '';
+    d.cpu_per_core.forEach(function (v, i) {
+      var cell = document.createElement('div');
+      var label = document.createElement('div'); label.className = 'small muted'; label.textContent = 'nhân ' + i + ': ' + pct(v);
+      var track = document.createElement('div'); track.className = 'bar';
+      var fill = document.createElement('i'); fill.style.width = Math.min(100, v) + '%'; track.appendChild(fill);
+      cell.appendChild(label); cell.appendChild(track); cores.appendChild(cell);
+    });
+  }
+}
+function poll() {
+  fetch('/api/system', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(render)
+    .catch(function () { text('s-cpu', 'lỗi'); });
+}
+poll(); setInterval(poll, 5000);
+var COLORS = ['#2a6fdb', '#e8833a', '#2a9d6f', '#8a4fc7', '#c0392b', '#7f8c8d', '#c2a000', '#17a2b8'];
+function xyChart(canvasId, series, xTitle, yTitle, withStd) {
+  var el = document.getElementById(canvasId); if (!el || typeof Chart === 'undefined') { return; }
+  var datasets = [];
+  series.forEach(function (s, i) {
+    var c = COLORS[i % COLORS.length];
+    datasets.push({ label: s.label, data: s.points.map(function (p) { return { x: p[0], y: p[1] }; }), borderColor: c, backgroundColor: c, tension: 0.2 });
+    if (withStd) {
+      [1, -1].forEach(function (sign) {
+        datasets.push({ label: s.label + (sign > 0 ? ' +σ' : ' −σ'), borderColor: c, borderDash: [4, 4], borderWidth: 1, pointRadius: 0,
+          data: s.points.map(function (p) { return { x: p[0], y: p[1] === null ? null : p[1] + sign * (p[2] || 0) }; }) });
+      });
+    }
+  });
+  new Chart(el, { type: 'line', data: { datasets: datasets }, options: { maintainAspectRatio: false, parsing: false,
+    scales: { x: { type: 'linear', title: { display: true, text: xTitle } }, y: { title: { display: true, text: yTitle } } },
+    plugins: { legend: { labels: { filter: function (item) { return !/[σ]$/.test(item.text); } } } } } });
+}
+var markerPlugin = { id: 'markers', afterDatasetsDraw: function (chart, args, opts) {
+  var m = (chart.options.plugins.markers || {}).list || []; var ctx = chart.ctx; var area = chart.chartArea;
+  m.forEach(function (mk, i) {
+    var x = chart.scales.x.getPixelForValue(mk.index); ctx.save(); ctx.strokeStyle = i ? '#2a9d6f' : '#c0392b'; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(x, area.top); ctx.lineTo(x, area.bottom); ctx.stroke(); ctx.fillStyle = ctx.strokeStyle;
+    ctx.fillText(mk.label, Math.min(x + 4, area.right - 110), area.top + 12 + 12 * i); ctx.restore(); });
+} };
+function timeChart(canvasId, data) {
+  var el = document.getElementById(canvasId); if (!el || typeof Chart === 'undefined') { return; }
+  new Chart(el, { type: 'line', plugins: [markerPlugin], data: { labels: data.labels, datasets: data.series.map(function (s, i) {
+      return { label: s.label, data: s.values, borderColor: COLORS[[5, 1, 0][i % 3]], borderWidth: 1.2, pointRadius: 0 }; }) },
+    options: { maintainAspectRatio: false, animation: { duration: 700 }, interaction: { mode: 'index', intersect: false },
+      scales: { x: { ticks: { maxTicksLimit: 8 } } }, plugins: { markers: { list: data.markers } } } });
+}
+</script>
+</body>
+</html>

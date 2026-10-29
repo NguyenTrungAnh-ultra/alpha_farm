@@ -4,7 +4,7 @@ Bản hiện hành. Đổi ý thì sửa đúng chỗ, kèm một dòng lý do +
 Nguồn: yêu cầu người dùng 2026-10-28 ("web chạy local, SQLite làm DB; chọn bắt đầu từ bước nào, đang chạy bước nào, bước đó xong bao nhiêu alpha").
 Đổi 2026-10-28: bỏ Cloudflare, dùng Tailscale (người dùng: chỉ mình họ xem, đã có Tailscale; Cloudflare cần thuê tên miền).
 
-Trạng thái: ✅ W1 xong 2026-10-28 (test `tests/test_progress_hooks.py`, 12 ca); W2–W6 chờ việc 3 có kết quả.
+Trạng thái: ✅ W1 xong 2026-10-28 (test `tests/test_progress_hooks.py`, 12 ca); ✅ W3a xong 2026-10-29 (`main.py web`, test `tests/test_web.py`, 11 ca); W2, W3–W6 còn lại.
 
 ## 1. Mục tiêu
 
@@ -126,6 +126,7 @@ Web có nút khởi chạy tính toán trên máy này, nên chỉ được mở
 | Giai đoạn | Việc | Xong khi |
 |---|---|---|
 | W0 | Chốt mục 9 | ROADMAP ghi quyết định |
+| ✅ W3a | Web chỉ xem, đọc thẳng tệp kết quả (chưa có DB): trang bài cài tín hiệu (mục 10), trang 8 tài nguyên máy | mở `http://127.0.0.1:8000`, thấy bảng + hình của `results/planted*/`, thấy tiến độ lượt `search` đang chạy và CPU / RAM / GPU |
 | W1 | Móc tiến độ / dừng / danh sách blueprint / đếm −10 vào lõi (mục 4, điểm 1–4; điểm 5 làm ở W2 cùng bảng `run`) | test mục 4 xanh, CLI ra cùng kết quả |
 | W2 | Schema SQLite + bộ ghi + runner chạy được từ dòng lệnh | một lượt `mcts` thật ghi đủ bảng, đo được tốc độ chậm đi bao nhiêu |
 | W3 | Web chỉ xem: trang 1, 3, 5, 8 | xem được lượt đang chạy trên `127.0.0.1` |
@@ -134,6 +135,20 @@ Web có nút khởi chạy tính toán trên máy này, nên chỉ được mở
 | W6 | Trang 6, 7 theo tiến độ luận văn | mỗi thí nghiệm có trang khi có code |
 
 Code giao cho agent `coder` từng giai đoạn, kiểm xong mới sang giai đoạn sau.
+
+## 10. W3a — xem bài cài tín hiệu (làm trước W2)
+
+Đổi 2026-10-29: người dùng muốn làm web ngay vì "nói chuyện không thế này thực sự cực khó tưởng tượng"; bài cài tín hiệu chạy bằng `main.py planted` và ghi CSV, không qua runner / DB, nên trang xem nó đọc thẳng tệp. W2 (DB + runner) làm sau, không bỏ.
+
+- **Nguồn dữ liệu:** mỗi thư mục `results/planted*/` có `segments.json` (nếu thiếu: cách chia lần 2), `oracle.csv`, `runs.csv`, `summary.csv`, `calibration.json`, `search.log`. Web chỉ đọc, không ghi gì vào `results/`.
+- **Trang "Bài cài tín hiệu":**
+  - Danh sách các thư mục, mỗi thư mục: cách chia đoạn, reward mode, số lượt xong / dự kiến (đang chạy thì hiện tiến độ từ `runs.csv` + `search.log`).
+  - Bảng theo độ mạnh: IC đo được, tìm lại đúng / gần (x/5), Sharpe ngoài mẫu trung bình ± độ lệch; bảng theo từng seed (công thức gần A nhất, tương quan, hạng học, hạng kiểm định, top-5).
+  - Hình so các thư mục: tỷ lệ tìm lại gần theo IC; Sharpe ngoài mẫu theo IC; reward của đáp án (oracle) theo IC.
+- **Trang "Một bộ dữ liệu" (chọn thư mục × độ mạnh × seed):** dựng lại dữ liệu bằng `build_planted_data` (vài giây) và vẽ: giá thật vs giá placebo vs giá đã cài; tín hiệu A theo thời gian kèm ranh giới học / kiểm định / đánh giá; đường vốn của chính A và của top-5 đã chọn trên đoạn đánh giá. Mục đích: thấy tận mắt "cài tín hiệu" làm gì với giá.
+- **Trang "Tài nguyên máy" (trang 8):** CPU tổng và từng nhân, RAM, GPU % và VRAM (`nvidia-smi`), ổ đĩa; tự cập nhật mỗi 5 giây; không đọc được GPU thì hiện "không đọc được".
+- **Kỹ thuật:** FastAPI + Jinja2, nghe `127.0.0.1:8000`. Hình vẽ phía server bằng matplotlib (đã có trong môi trường) thành SVG, không tải thư viện JS từ mạng; phần tự cập nhật dùng JavaScript thuần gọi API JSON. Thêm `fastapi`, `uvicorn`, `jinja2`, `psutil` vào `requirements.in`.
+- **Ràng buộc:** web không đổi phép tính; dựng lại dữ liệu dùng đúng hàm của bài test.
 
 ## 9. Câu chờ người dùng quyết
 

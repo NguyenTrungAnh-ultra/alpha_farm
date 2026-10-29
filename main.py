@@ -291,6 +291,9 @@ def main():
     from strategy_workflows.RunPlantedSignal import add_planted_parser
     add_planted_parser(subparsers)
 
+    parser_web = subparsers.add_parser("web", help="Read-only dashboard on 127.0.0.1")
+    parser_web.add_argument("--port", type=int, default=8000, help="Port (host is always 127.0.0.1)")
+
     args = parser.parse_args()
     
     if len(sys.argv) == 1:
@@ -316,6 +319,9 @@ def main():
         cmd_full(args)
     elif args.command == "planted":
         cmd_planted(args)
+    elif args.command == "web":
+        from web.server import serve
+        serve(args.port)
 
 if __name__ == "__main__":
     main()

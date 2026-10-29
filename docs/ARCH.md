@@ -13,6 +13,7 @@ Tự tìm tín hiệu có hướng (Long / Short / Flat) cho hợp đồng tươ
 |---|---|
 | `core_engine/` | `AlphaPrimitives.py` (9 toán tử `ts_*`), `BacktestEngine.py` (`AlphaBacktestEngine`, `load_data`), `AlphaEngine.py` (`AlphaDataProxy`, `AlphaStrategy`, lớp bọc `AlphaEngine`), `CalculateMetrics.py` (chỉ số), `GenerateReport.py` (bọc lại `compute_metrics`, đổi tên khoá) |
 | `strategy_workflows/` | `GenerateStrategies.py`, `SemanticCompiler.py`, `MCTSDimensions.py`, `MCTSEngine.py`, `RunMCTS.py`, `HMMValidation.py`, `PortfolioManager.py`, `PlantedSignal.py`, `RunPlantedSignal.py` |
+| `web/` | Web chỉ xem (FastAPI + Jinja2, biểu đồ Chart.js nạp từ CDN): trang bài cài tín hiệu đọc `results/planted*/`, trang tài nguyên máy. Chạy `.venv/Scripts/python.exe main.py web [--port 8000]` hoặc `-m web`; chỉ nghe `127.0.0.1`, không ghi vào `results/`. Kế hoạch: `docs/WEB_DASHBOARD.md` |
 | `llm_clients/` | `OllamaClient.py` (qwen3.5 chạy máy, cùng hàm `extract_json`); dự án chỉ dùng LLM local |
 | `utilities/` | `AppConfig.py` (cấu hình tập trung), `Prompts.py` (prompt LLM) |
 | `data/` | `DNSE_VN30F_{1m,3m,5m,10m,15m,30m,1H}.csv` (13/08/2018 → 31/12/2025); `MCdata/synthetic/{tf}_{khoá}.pkl` (cache đường giá HMM, mỗi tệp một khung + một bộ dữ liệu); `MCdata/synthetic_data.pkl` (cache cũ ~13 GB, không có siêu dữ liệu nên không còn được nạp) |

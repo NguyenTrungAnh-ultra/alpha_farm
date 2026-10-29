@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Tài nguyên máy{% endblock %}
+{% block content %}
+<h1>Tài nguyên máy</h1>
+<p class="muted small">Tự cập nhật mỗi 5 giây.</p>
+<div class="grid">
+  <div class="card"><h2>CPU</h2><div id="cpu-total">–</div><div class="bar" id="cpu-total-bar"><i></i></div></div>
+  <div class="card"><h2>RAM</h2><div id="ram-text">–</div><div class="bar" id="ram-bar"><i></i></div></div>
+  <div class="card"><h2>GPU</h2><div id="gpu-text">–</div><div class="bar" id="gpu-bar"><i></i></div></div>
+  <div class="card"><h2>VRAM</h2><div id="vram-text">–</div><div class="bar" id="vram-bar"><i></i></div></div>
+  <div class="card"><h2>Ổ đĩa của dự án</h2><div id="disk-text">–</div><div class="bar" id="disk-bar"><i></i></div></div>
+</div>
+<div class="card"><h2>CPU theo từng nhân</h2><div class="cores" id="cores"></div></div>
+{% endblock %}
