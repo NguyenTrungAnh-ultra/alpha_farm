@@ -134,7 +134,19 @@ Người dùng chọn hướng "thêm dữ liệu" (2026-10-29) để kiểm gi�
   - So với dự đoán chốt trước: ủng hộ một nửa. IC 0.1 tăng 3/5 → 5/5 (ngưỡng phát hiện tụt xuống giữa 0.05 và 0.1); IC 0.05 không tăng (1/5), thấp nhất trong khoảng dự đoán 1–3/5.
   - Ở IC 0.05, công thức gần A (|Spearman| ≥ 0.7) chỉ có trong ≤ 100 ứng viên ở 1/5 seed (lần 2: 2/5) ⇒ chặng nghẽn vẫn là đoạn học. IC đo được trên đoạn tìm của 5 seed chỉ 0.021–0.063.
   - Placebo tốt hơn hẳn: top-5 ở IC 0 lỗ ngoài mẫu ít hơn (−0.30 so với −2.17).
-  - Lần 3 đổi cả độ dài dữ liệu lẫn reward nên chưa tách được phần nào do dữ liệu; muốn tách cần chạy lần 2 bằng `sharpe` (chưa chạy).
+  - Lần 3 đổi cả độ dài dữ liệu lẫn reward nên chưa tách được phần nào do dữ liệu; muốn tách cần chạy lần 2 bằng `sharpe`.
+- **Tách tác động (2026-10-29, người dùng cho chạy): lần 2 bằng `sharpe`** (cùng cách chia, A, blueprint, seed như lần 2; 20 lượt, mỗi lượt ≈ 1.820–2.040 s; `results/planted_run2_sharpe/`). Tìm lại gần / Sharpe ngoài mẫu:
+
+  | IC | lần 2 soft (dữ liệu ngắn) | lần 2 sharpe (dữ liệu ngắn) | lần 3 sharpe (dữ liệu dài) |
+  |---|---|---|---|
+  | 0 | 0/5 / −2.17 | **2/5** / −0.49 | 0/5 / −0.30 |
+  | 0.02 | 0/5 / 0.12 | 1/5 / 0.40 | 0/5 / −0.33 |
+  | 0.05 | 1/5 / −0.65 | 1/5 / −0.49 | 1/5 / −0.05 |
+  | 0.1 | 3/5 / 0.74 | 3/5 / −0.23 | **5/5** / 1.13 |
+
+  - Đổi reward (cột 1 → 2): không tăng tỷ lệ tìm lại ở IC 0.05 / 0.1; ở IC 0 báo "tìm thấy" 2/5 (⛔ tiêu chí IC 0 trượt với dữ liệu ngắn). Seed 4 ở IC 0: placebo tình cờ có IC của A = 0.051, nên công thức gần A thắng là bắt đúng một quan hệ có thật trong bộ đó, không phải bịa.
+  - Thêm dữ liệu (cột 2 → 3): IC 0.1 3/5 → 5/5, IC 0 2/5 → 0/5 ⇒ phần cải thiện của lần 3 chủ yếu do dữ liệu, không do reward. IC 0.05 không đổi ở cả ba cấu hình.
+  - Lưu ý: 5 seed mỗi ô; chênh 3/5 vs 5/5 chưa có ý nghĩa thống kê (ước của Claude, chưa kiểm định). Sharpe ngoài mẫu lần 2 chỉ trên 6 tháng nên rất nhiễu.
 
 ## 4. Chạy
 
