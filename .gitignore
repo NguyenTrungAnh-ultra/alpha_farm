@@ -43,3 +43,6 @@ docs/proposal/Sample_Thesis_Tex_format_2026/desktop.ini
 !docs/proposal/thesis_proposal/logo.png
 !docs/proposal/thesis_proposal/figures/walk_forward.png
 docs/proposal/thesis_proposal/*.pdf
+
+# Obsidian vault settings
+docs/.obsidian/

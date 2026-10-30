@@ -4,17 +4,9 @@ Hệ thống tự tìm **tín hiệu giao dịch có hướng** (Long / Short / 
 
 Dự án là phần thực nghiệm của luận văn cử nhân. Câu hỏi nghiên cứu không phải "có làm được không" mà là **cỗ máy có tìm ra thứ gì hơn ngẫu nhiên không** — xem `docs/proposal/thesis_proposal/Thesis_Proposal.pdf`.
 
-> ⛔ **Trạng thái:** pipeline toán tử `ts_*` hiện chưa chạy hết (đứt ở 4 chỗ nối, MCTS không ra ứng viên). Chi tiết và thứ tự sửa: `docs/ROADMAP.md`.
-
 ## Tài liệu
 
-| Tệp | Dùng để |
-|---|---|
-| `docs/ARCH.md` | Kiến trúc đúng như code hiện tại, kèm chỗ đang hỏng |
-| `docs/ROADMAP.md` | Kế hoạch hiện hành, việc kế tiếp, câu chờ quyết, nợ |
-| `docs/proposal/thesis_proposal/` | Proposal luận văn (LaTeX + PDF) |
-| `docs/references/` | Bài báo tham khảo |
-| `docs/archive/` | Tài liệu cũ thời XNOQuant, chỉ để tra cứu |
+Bắt đầu từ `docs/START_HERE.md` (cổng của vault `docs/`, mở được bằng Obsidian): kế hoạch `docs/PLAN.md`, sổ quyết định `docs/DECISIONS.md`, kết quả `docs/RESULTS.md`, thiết kế `docs/design/`, nhật ký `docs/log/`.
 
 ## Cài đặt
 

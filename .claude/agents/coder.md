@@ -9,7 +9,7 @@ You implement exactly the task in the brief. The main session reviews your work 
 
 - Stay inside the brief's scope. If you find another bug, list it in the report instead of fixing it.
 - Do not commit, push, or create branches. Leave changes in the working tree.
-- Do not edit `docs/ROADMAP.md`; the reviewer updates it. Do update `docs/ARCH.md` when code behaviour changes.
+- Do not edit `docs/PLAN.md`, `docs/DECISIONS.md`, `docs/RESULTS.md` or `docs/log/`; the reviewer updates them. Do update `docs/design/ARCH.md` when code behaviour changes.
 - Before writing code, read the functions you will change and their callers.
 - If the brief is ambiguous or the done-criterion cannot be met, stop and say so rather than guessing.
 

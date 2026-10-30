@@ -1,3 +1,5 @@
+> Nhật ký: bản chụp nguyên văn ngày 2026-10-30, trước khi tách tài liệu thành kế hoạch / quyết định / thiết kế / kết quả. Không sửa; bản hiện hành ở [START_HERE](../START_HERE.md).
+
 # Thiết kế — Bài cài tín hiệu (việc 3, kiểm soát dương RQ2)
 
 Bản hiện hành. Đổi ý thì sửa đúng chỗ, kèm một dòng lý do + ngày.

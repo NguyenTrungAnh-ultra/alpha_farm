@@ -6,7 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Alpha Farm discovers **directional trading signals** (long/short/flat) for the VN30 index futures contract VN30F1M. An LLM proposes the structure of a strategy, MCTS searches for the complete formula, and the formula is scored by a futures backtest; an HMM bootstrap only describes the risk of selected strategies (it rejects nothing). The project also serves as a bachelor's thesis, so methodological correctness matters as much as code. README, logs and most comments are in Vietnamese.
 
-Current plan, status and open decisions: `docs/ROADMAP.md` (Vietnamese). Update it when a task finishes or the user decides something.
+Docs are a vault (Vietnamese) entered from `docs/START_HERE.md`:
+- `docs/PLAN.md`: one line per task, plus open questions and debts.
+- `docs/DECISIONS.md`: one line per decision.
+- `docs/RESULTS.md`: the numbers the thesis uses.
+- `docs/design/`: methods as they are today.
+- `docs/log/`: history.
+
+When a task finishes or the user decides something, update the matching file in the same turn. New files get a link from `START_HERE.md` or a parent file.
 
 Code changes go to the `coder` agent (`.claude/agents/coder.md`, Sonnet, medium effort). The main session writes the brief, then reviews the diff and re-runs the tests before reporting done.
 
@@ -37,11 +44,11 @@ As of 2026-10-29, the suite in `.venv` gives 183 passed and 1 failed. The failur
 
 ## Pipeline gotchas
 
-Stages (generate → MCTS → scoring → HMM validation → portfolio) are described in `docs/ARCH.md`.
+Stages (generate → MCTS → scoring → HMM validation → portfolio) are described in `docs/design/ARCH.md`.
 
 - `RunMCTS` moves idea files to `results/ideas/processed/` even on error, so failures are easy to miss.
 - MCTS selection is UCT on **max** reward, not mean.
-- The portfolio has no acceptance criteria. Reward modes are `REWARD_MODES` in AppConfig ("gated", "soft", "sharpe"). The user froze "sharpe" for all thesis runs on 2026-10-29 (`docs/ROADMAP.md` section 3), but the `REWARD_MODE` default is still "gated"; pass the mode explicitly.
+- The portfolio has no acceptance criteria. Reward modes are `REWARD_MODES` in AppConfig ("gated", "soft", "sharpe"). The user froze "sharpe" for all thesis runs (`docs/DECISIONS.md`), but the `REWARD_MODE` default is still "gated"; pass the mode explicitly.
 - HMM synthetic paths are cached per (timeframe, data fingerprint) in `data/MCdata/synthetic/`. The legacy `data/MCdata/synthetic_data.pkl` (~13 GB) is never read; until `--retrain-hmm` builds keyed files, `main.py mcts` skips the HMM step with a message.
 
 ## Core engine conventions
@@ -73,4 +80,4 @@ Other leftovers from the refactor:
 
 - Build and template notes for the proposal: `docs/proposal/CLAUDE.md`.
 - Bibliography entries were verified against publisher or arXiv pages. Do not add unverified citations.
-- `docs/ARCH.md` describes the architecture as the code is today (Vietnamese); update it in the same change when code behaviour changes. `docs/archive/` is history (XNOQuant era): never treat it as current.
+- `docs/design/ARCH.md` describes the architecture as the code is today (Vietnamese); update it in the same change when code behaviour changes. `docs/archive/` is history (XNOQuant era): never treat it as current.

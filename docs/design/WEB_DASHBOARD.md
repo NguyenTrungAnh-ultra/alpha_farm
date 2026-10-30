@@ -1,10 +1,6 @@
-# Kế hoạch — Web điều khiển và theo dõi (chưa làm)
+# Web điều khiển và theo dõi
 
-Bản hiện hành. Đổi ý thì sửa đúng chỗ, kèm một dòng lý do + ngày.
-Nguồn: yêu cầu người dùng 2026-10-28 ("web chạy local, SQLite làm DB; chọn bắt đầu từ bước nào, đang chạy bước nào, bước đó xong bao nhiêu alpha").
-Đổi 2026-10-28: bỏ Cloudflare, dùng Tailscale (người dùng: chỉ mình họ xem, đã có Tailscale; Cloudflare cần thuê tên miền).
-
-Trạng thái: ✅ W1 xong 2026-10-28 (test `tests/test_progress_hooks.py`, 12 ca); ✅ W3a xong 2026-10-29 (`main.py web`, test `tests/test_web.py`, 11 ca); W2, W3–W6 còn lại.
+Thiết kế như đang dùng. Trạng thái: [PLAN](../PLAN.md) việc 14. Quyết định: [DECISIONS](../DECISIONS.md#web). Bản trước khi tách: [log/2026-10_WEB_DASHBOARD](../log/2026-10_WEB_DASHBOARD.md).
 
 ## 1. Mục tiêu
 
@@ -36,11 +32,11 @@ tailscale serve (trên máy này)
 - Một server FastAPI phục vụ cả giao diện lẫn API.
 - **[đề xuất]** Giao diện render phía server (Jinja2 + HTMX), biểu đồ bằng uPlot hoặc Chart.js nạp sẵn trong `web/static/`. Không cần Node / bước build; cập nhật trực tiếp bằng Server-Sent Events (hoặc hỏi lại mỗi 2 giây nếu SSE gặp lỗi).
 - **Runner là tiến trình riêng**, web chỉ tạo bản ghi lượt chạy rồi khởi động runner. Khởi động lại web không giết lượt đang chạy. Mỗi lúc chỉ một lượt chạy (MCTS đã dùng hết CPU với 7 khung).
-- Thư viện thêm vào `requirements.in`: `fastapi`, `uvicorn`, `jinja2`, `psutil` (CPU / RAM). GPU đọc bằng `nvidia-smi --query-gpu=... --format=csv` (máy có RTX 5060 8 GB, Ollama chạy trên đó), không thêm thư viện. Tailscale đã cài sẵn trên máy (người dùng xác nhận 2026-10-28).
+- Thư viện thêm vào `requirements.in`: `fastapi`, `uvicorn`, `jinja2`, `psutil` (CPU / RAM). GPU đọc bằng `nvidia-smi --query-gpu=... --format=csv` (máy có RTX 5060 8 GB, Ollama chạy trên đó), không thêm thư viện.
 
 ## 3. Các bước pipeline mà web hiển thị
 
-Đọc từ code hiện tại (`main.py`, `RunMCTS.process_timeframe`, `MCTSEngine.run_search_from_blueprint`) và kế hoạch (`docs/ROADMAP.md`, `docs/PLANTED_SIGNAL.md`, proposal):
+Đọc từ code hiện tại (`main.py`, `RunMCTS.process_timeframe`, `MCTSEngine.run_search_from_blueprint`), [PLAN](../PLAN.md), [PLANTED_SIGNAL](PLANTED_SIGNAL.md) và proposal:
 
 | Bước | Đơn vị việc | "Xong bao nhiêu" đo bằng | Có trong code |
 |---|---|---|---|
@@ -60,7 +56,7 @@ tailscale serve (trên máy này)
 - Từ bước 4–5: chọn lại / kiểm định lại từ ứng viên đã lưu của một lượt cũ (ví dụ đổi top-1 thành top-5 mà không tìm lại).
 - **Chạy tiếp lượt dở:** bỏ qua các việc đã xong; việc MCTS đang dở thì chạy lại từ đầu việc đó (không lưu được cây MCTS giữa chừng).
 
-**Loại thí nghiệm** (chọn khi khởi chạy, mở dần theo ROADMAP): pipeline thường (có ngay) → bài cài tín hiệu (việc 3) → walk-forward 11 cửa sổ × 7 cấu hình × 5 seed → placebo K = 19 → SPA / DSR.
+**Loại thí nghiệm** (chọn khi khởi chạy, mở dần theo [PLAN](../PLAN.md)): pipeline thường (có ngay) → bài cài tín hiệu (việc 3) → walk-forward 11 cửa sổ × 7 cấu hình × 5 seed → placebo K = 19 → SPA / DSR.
 
 ## 4. Thay đổi cần trong lõi (trước khi có web)
 
@@ -69,7 +65,7 @@ Hiện tiến độ chỉ có `print()`, và đầu vào là thư mục `results
 1. **Callback tiến độ, không bắt buộc:** `run_search_from_blueprint(..., on_progress=None, should_stop=None)`. Gọi mỗi khoảng ~2 giây (không phải mỗi vòng) với: vòng hiện tại, reward tốt nhất, số lần chấm, số lỗi, số bị −10. `None` thì như hôm nay, nên CLI và test không đổi.
 2. **Dừng nhẹ nhàng:** `should_stop()` được hỏi cùng nhịp đó; trả True thì thoát vòng lặp, ghi lý do dừng là "người dùng dừng".
 3. **Đầu vào blueprint là danh sách**, không phải thư mục: `process_timeframe` nhận danh sách blueprint. CLI vẫn đọc thư mục rồi truyền danh sách vào, nên hành vi CLI giữ nguyên; runner của web lấy từ DB và không chuyển tệp.
-4. **Ghi số bị −10 và lý do** (Calmar < 1.1 hay < 15 lệnh) vào `MCTSEngine` — cũng chính là số đo mà `docs/PLANTED_SIGNAL.md` mục 5 cần.
+4. **Ghi số bị −10 và lý do** (Calmar < 1.1 hay < 15 lệnh) vào `MCTSEngine` — cũng là số đo bài cài tín hiệu cần.
 5. Mỗi lượt chạy lưu ảnh chụp cấu hình (`AppConfig` liên quan, tham số, seed, commit git, dấu vân tay dữ liệu) để tái lập trong luận văn.
 
 Test bắt buộc: cùng seed, có và không có callback ra cùng leaderboard; `should_stop` trả True thì dừng trong một nhịp; CLI đọc thư mục vẫn cho cùng kết quả như trước khi tách.
@@ -109,7 +105,7 @@ Dữ liệu cũ (`results/portfolio_summary.json`, chiến lược thế hệ đ
 5. **Ứng viên và alpha** — bảng lọc theo khung / template / reward; chi tiết: công thức, tham số, chỉ số đoạn tìm và đoạn đánh giá, đường vốn so với mua-và-giữ, vị thế, kết quả HMM từng tầng, code xuất ra.
 6. **Thí nghiệm luận văn** (mở khi từng phần có code) — bài cài tín hiệu: bảng độ mạnh × tỷ lệ tìm lại + điểm "đáp án"; walk-forward: 11 cửa sổ × 7 cấu hình; placebo: biểu đồ phân bố 19 lần so với kết quả thật; SPA / DSR.
 7. **Dữ liệu và hệ thống** — tệp dữ liệu từng khung, khoảng ngày, số ngày thiếu (nợ 126 ngày ở khung phút), cache HMM có / chưa, Ollama có đang chạy, mô hình nào có.
-8. **Tài nguyên máy** (người dùng yêu cầu 2026-10-28) — CPU tổng và theo từng nhân, RAM, GPU % và VRAM, đồ thị 1 giờ gần nhất; ổ đĩa còn trống (cache HMM có thể tới hàng GB). Ô nhỏ CPU / RAM / GPU hiện cả ở trang Tổng quan, và đồ thị tài nguyên nằm trong trang Chi tiết lượt chạy theo khoảng thời gian của lượt đó. Không có GPU / `nvidia-smi` lỗi thì hiện "không đọc được", không làm hỏng trang.
+8. **Tài nguyên máy** — CPU tổng và theo từng nhân, RAM, GPU % và VRAM, đồ thị 1 giờ gần nhất; ổ đĩa còn trống (cache HMM có thể tới hàng GB). Ô nhỏ CPU / RAM / GPU hiện cả ở trang Tổng quan, và đồ thị tài nguyên nằm trong trang Chi tiết lượt chạy theo khoảng thời gian của lượt đó. Không có GPU / `nvidia-smi` lỗi thì hiện "không đọc được", không làm hỏng trang.
 
 Giao diện phải dùng được trên điện thoại (chủ yếu để xem).
 
@@ -125,9 +121,8 @@ Web có nút khởi chạy tính toán trên máy này, nên chỉ được mở
 
 | Giai đoạn | Việc | Xong khi |
 |---|---|---|
-| W0 | Chốt mục 9 | ROADMAP ghi quyết định |
-| ✅ W3a | Web chỉ xem, đọc thẳng tệp kết quả (chưa có DB): trang bài cài tín hiệu (mục 10), trang 8 tài nguyên máy | mở `http://127.0.0.1:8000`, thấy bảng + hình của `results/planted*/`, thấy tiến độ lượt `search` đang chạy và CPU / RAM / GPU |
-| W1 | Móc tiến độ / dừng / danh sách blueprint / đếm −10 vào lõi (mục 4, điểm 1–4; điểm 5 làm ở W2 cùng bảng `run`) | test mục 4 xanh, CLI ra cùng kết quả |
+| W3a ✅ | Web chỉ xem, đọc thẳng tệp kết quả (chưa có DB): trang bài cài tín hiệu (mục 10), trang 8 tài nguyên máy | mở `http://127.0.0.1:8000`, thấy bảng + hình của `results/planted*/`, thấy tiến độ lượt `search` đang chạy và CPU / RAM / GPU |
+| W1 ✅ | Móc tiến độ / dừng / danh sách blueprint / đếm −10 vào lõi (mục 4, điểm 1–4; điểm 5 làm ở W2 cùng bảng `run`) | test mục 4 xanh, CLI ra cùng kết quả |
 | W2 | Schema SQLite + bộ ghi + runner chạy được từ dòng lệnh | một lượt `mcts` thật ghi đủ bảng, đo được tốc độ chậm đi bao nhiêu |
 | W3 | Web chỉ xem: trang 1, 3, 5, 8 | xem được lượt đang chạy trên `127.0.0.1` |
 | W4 | Khởi chạy / dừng / chạy tiếp: trang 2, 4 | khởi chạy từ bước 3 với bộ đã đóng băng, dừng giữa chừng, chạy tiếp |
@@ -138,7 +133,7 @@ Code giao cho agent `coder` từng giai đoạn, kiểm xong mới sang giai đo
 
 ## 10. W3a — xem bài cài tín hiệu (làm trước W2)
 
-Đổi 2026-10-29: người dùng muốn làm web ngay vì "nói chuyện không thế này thực sự cực khó tưởng tượng"; bài cài tín hiệu chạy bằng `main.py planted` và ghi CSV, không qua runner / DB, nên trang xem nó đọc thẳng tệp. W2 (DB + runner) làm sau, không bỏ.
+Bài cài tín hiệu chạy bằng `main.py planted` và ghi CSV, không qua runner / DB, nên trang xem nó đọc thẳng tệp.
 
 - **Nguồn dữ liệu:** mỗi thư mục `results/planted*/` có `segments.json` (nếu thiếu: cách chia lần 2), `oracle.csv`, `runs.csv`, `summary.csv`, `calibration.json`, `search.log`. Web chỉ đọc, không ghi gì vào `results/`.
 - **Trang "Bài cài tín hiệu":**
@@ -149,10 +144,3 @@ Code giao cho agent `coder` từng giai đoạn, kiểm xong mới sang giai đo
 - **Trang "Tài nguyên máy" (trang 8):** CPU tổng và từng nhân, RAM, GPU % và VRAM (`nvidia-smi`), ổ đĩa; tự cập nhật mỗi 5 giây; không đọc được GPU thì hiện "không đọc được".
 - **Kỹ thuật:** FastAPI + Jinja2, nghe `127.0.0.1:8000`. Hình vẽ phía server bằng matplotlib (đã có trong môi trường) thành SVG, không tải thư viện JS từ mạng; phần tự cập nhật dùng JavaScript thuần gọi API JSON. Thêm `fastapi`, `uvicorn`, `jinja2`, `psutil` vào `requirements.in`.
 - **Ràng buộc:** web không đổi phép tính; dựng lại dữ liệu dùng đúng hàm của bài test.
-
-## 9. Câu chờ người dùng quyết
-
-- ✅ **Thứ tự so với luận văn:** W1 làm ngay cùng việc 3 (có ích cho cả hai); W2–W5 sau khi việc 3 có kết quả, để web không ăn thời gian của RQ (người dùng chốt 2026-10-28).
-- ✅ **Cách mở từ xa:** Tailscale, không Cloudflare, không tên miền (người dùng chốt 2026-10-28).
-- ✅ **Khởi chạy từ xa:** từ thiết bị trong tailnet được cả xem, khởi chạy và dừng (người dùng chốt 2026-10-28).
-- ✅ **Không nhập dữ liệu cũ** vào DB (mục 5) (người dùng chốt 2026-10-28).
