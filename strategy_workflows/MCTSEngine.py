@@ -14,6 +14,7 @@ import logging
 from collections import Counter
 import pandas as pd
 import numpy as np
+from scipy.stats import spearmanr
 from typing import List, Dict, Any, Optional, Callable
 
 from core_engine.AlphaEngine import AlphaStrategy, AlphaDataProxy
@@ -52,6 +53,12 @@ FIELD_EXPRESSIONS = {
 }
 
 NODE_WITH_VALUE_SLOT = ('window', 'z_score', 'threshold_upper', 'threshold_lower')
+
+
+def _sample_std(values: np.ndarray) -> float:
+    """Sample standard deviation (ddof=1) with the arithmetic of `pandas.Series.std`, so a constant input gives exactly the same 0 test."""
+    mean = values.sum(dtype=np.float64) / len(values)
+    return np.sqrt(((mean - values) ** 2).sum(dtype=np.float64) / (len(values) - 1))
 
 
 def needs_window(node: ASTNode) -> bool:
@@ -523,6 +530,21 @@ class MCTSEngine:
 
     def compute_rank_ic(self, alpha_series: pd.Series, close_series: pd.Series) -> float:
         fwd_returns = close_series.pct_change(1).shift(-1)
+        if (alpha_series.index.equals(fwd_returns.index) and alpha_series.dtype == np.float64
+                and fwd_returns.dtype == np.float64):
+            # Same index and dtype: the arrays below are exactly what the pandas path hands to scipy,
+            # so the result is identical without the DataFrame / Series.corr overhead.
+            a = alpha_series.to_numpy()
+            b = fwd_returns.to_numpy()
+            keep = ~(np.isnan(a) | np.isnan(b))
+            if not keep.all():
+                a = a[keep]
+                b = b[keep]
+            if len(a) < 20:
+                return 0.0
+            if _sample_std(a) == 0.0 or _sample_std(b) == 0.0:
+                return 0.0
+            return spearmanr(a, b)[0]
         valid = pd.DataFrame({'alpha': alpha_series, 'fwd_ret': fwd_returns}).dropna()
         if len(valid) < 20:
             return 0.0

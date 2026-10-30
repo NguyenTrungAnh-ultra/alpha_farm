@@ -34,7 +34,7 @@ Phương pháp: [design/PLANTED_SIGNAL](design/PLANTED_SIGNAL.md). Tệp: `resul
 
 ## Tốc độ
 
-Một lượt chấm MCTS trên đoạn học cửa sổ 1: 19,7 ms (máy không tải). Một lượt bài cài tín hiệu cửa sổ 1 (20 blueprint × 5.000 vòng, 5 lượt song song): 1.236–1.283 s.
+Một lượt chấm MCTS trên đoạn học cửa sổ 1 (3 blueprint × 400 vòng, 1.196 lượt chấm): 9,8 ms. Thời gian: backtest ≈ 48%, `compute_metrics` ≈ 14%, IC xếp hạng ≈ 10%, tính công thức ≈ 13%. Kết quả giống hệt bản trước khi tăng tốc (200 backtest, 200 IC, bảng xếp hạng MCTS có seed). Một lượt bài cài tín hiệu cửa sổ 1 (20 blueprint × 5.000 vòng, 5 lượt song song): 1.236–1.283 s.
 
 ## Dữ liệu
 

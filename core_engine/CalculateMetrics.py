@@ -46,21 +46,21 @@ def compute_metrics(result: BacktestResult) -> dict:
         wins = [p for p in pnls if p > 0]
         losses = [p for p in pnls if p <= 0]
 
-        # Win/Loss dưới dạng % equity tại thời điểm trade
-        pnl_pcts = []
-        running_eq = initial
-        for t in trades:
-            pct = t.net_pnl / running_eq * 100 if running_eq != 0 else 0
-            pnl_pcts.append(pct)
-            running_eq += t.net_pnl
+        # Win/Loss as % of the equity before each trade. cumsum adds left to right, so the running equity
+        # equals the sequential `running_eq += net_pnl` bit for bit.
+        pnl_arr = np.asarray(pnls, dtype=np.float64)
+        running_eq = np.cumsum(np.concatenate(([initial], pnl_arr)))[:-1]
+        nonzero = running_eq != 0
+        with np.errstate(divide='ignore', invalid='ignore'):
+            pnl_pcts = np.where(nonzero, pnl_arr / running_eq * 100, 0.0)
 
-        win_pcts = [p for p in pnl_pcts if p > 0]
-        loss_pcts = [p for p in pnl_pcts if p <= 0]
+        win_pcts = pnl_pcts[pnl_pcts > 0]
+        loss_pcts = pnl_pcts[pnl_pcts <= 0]
 
-        largest_win = max(win_pcts) if win_pcts else 0.0
-        largest_loss = min(loss_pcts) if loss_pcts else 0.0
-        avg_win = np.mean(win_pcts) if win_pcts else 0.0
-        avg_loss = np.mean(loss_pcts) if loss_pcts else 0.0
+        largest_win = win_pcts.max() if len(win_pcts) else 0.0
+        largest_loss = loss_pcts.min() if len(loss_pcts) else 0.0
+        avg_win = np.mean(win_pcts) if len(win_pcts) else 0.0
+        avg_loss = np.mean(loss_pcts) if len(loss_pcts) else 0.0
     else:
         pnls = []
         wins = []
@@ -82,19 +82,23 @@ def compute_metrics(result: BacktestResult) -> dict:
     # Initial Capital display (XNO trừ phí mở lệnh đầu tiên)
     displayed_initial = initial - result.first_trade_open_fee
 
-    # Resample equity to daily frequency (last bar of each trading day)
-    daily_equity = equity.resample('D').last().dropna()
-    
-    # Calculate daily PnL changes
-    daily_pnl_change = daily_equity.diff().fillna(0.0)
-    
-    # FIX: CalculateMetrics flaw
-    # Since position sizing is fixed relative to initial capital, taking percentage 
-    # change of the growing equity curve artificially shrinks risk metrics. 
-    # All rolling and standard risk metrics must be calculated using constant returns.
+    # Last equity of each calendar day (a selection, so no arithmetic differs from a resample). The index
+    # is sorted, so a day ends where the next bar's day differs.
+    equity_values = equity.to_numpy()
+    if equity.index.is_monotonic_increasing:
+        days = equity.index.normalize().asi8
+        is_day_end = np.empty(len(days), dtype=bool)
+        is_day_end[:-1] = days[1:] != days[:-1]
+        is_day_end[-1:] = True
+        daily_equity = equity_values[is_day_end]
+    else:
+        daily_equity = equity.resample('D').last().dropna().to_numpy()
+
+    # Constant returns: position sizing is fixed from the initial capital, so the percentage change of the
+    # growing equity curve would shrink risk metrics. All risk metrics use daily PnL / initial capital.
+    daily_pnl_change = np.zeros(len(daily_equity), dtype=np.float64)
+    daily_pnl_change[1:] = daily_equity[1:] - daily_equity[:-1]
     daily_returns_const = daily_pnl_change / result.initial_capital
-    
-    # Unified constant returns for all metrics
     daily_returns_rolling = daily_returns_const
 
     # === PERFORMANCE METRICS ===
@@ -136,9 +140,10 @@ def compute_metrics(result: BacktestResult) -> dict:
         sortino = 0.0
 
     # Max Drawdown (calculated on the daily equity series)
-    rolling_max = daily_equity.cummax()
+    rolling_max = np.maximum.accumulate(daily_equity)
     drawdown = (daily_equity - rolling_max) / rolling_max
-    max_drawdown = drawdown.min() * 100
+    min_drawdown = drawdown.min() if len(drawdown) else np.float64('nan')
+    max_drawdown = min_drawdown * 100
 
     # Calmar Ratio
     calmar = cagr / abs(max_drawdown / 100) if max_drawdown != 0 else 0.0
@@ -156,7 +161,7 @@ def compute_metrics(result: BacktestResult) -> dict:
 
     # Recovery Factor (total net profit divided by absolute max drawdown cash value)
     if max_drawdown != 0:
-        max_dd_abs = abs(drawdown.min()) * result.initial_capital
+        max_dd_abs = abs(min_drawdown) * result.initial_capital
         net_profit = net_equity - result.initial_capital
         recovery_factor = net_profit / max_dd_abs if max_dd_abs > 0 else 0.0
     else:

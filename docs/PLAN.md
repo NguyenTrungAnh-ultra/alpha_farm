@@ -12,7 +12,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 | 3 | Nối pipeline `ts_*`, tách dữ liệu khỏi engine, quy đổi theo năm | ✅ 2026-10-28 | `main.py mcts` thật chưa chạy (cần `--retrain-hmm` một lần) | [ARCH](design/ARCH.md) |
 | 4 | Bộ 20 blueprint đóng băng | ✅ 2026-10-29 | `results/blueprint_sets/20261029_212813/` | [WALK_FORWARD](design/WALK_FORWARD.md#bộ-blueprint), [RESULTS](RESULTS.md#bộ-blueprint) |
 | 5 | Bài cài tín hiệu ở cách chia cửa sổ 1 | ✅ 2026-10-30 | ngưỡng phát hiện ≈ IC 0.1; đã so cả vị thế | [PLANTED_SIGNAL](design/PLANTED_SIGNAL.md), [RESULTS](RESULTS.md#bài-cài-tín-hiệu) |
-| 6 | Tăng tốc backtest | ✅ 2026-10-30 | ≈ 2,2×, kết quả giống hệt | [RESULTS](RESULTS.md#tốc-độ) |
+| 6 | Tăng tốc lượt chấm MCTS | ✅ 2026-10-30 | hai lượt: backtest ≈ 2,2×, rồi chỉ số + IC: 17,3 → 9,8 ms; kết quả giống hệt | [RESULTS](RESULTS.md#tốc-độ) |
 | 7 | Walk-forward LLM + MCTS | 🔧 | code xong (`main.py walkforward placebo\|freeze\|real\|summary`); chưa chạy bước nào | [WALK_FORWARD](design/WALK_FORWARD.md) |
 | 8 | Placebo walk-forward (RQ2) | ⏸️ chờ người dùng cho chạy | 19 × 7 = 133 lượt | [WALK_FORWARD](design/WALK_FORWARD.md#placebo) |
 | 9 | Cấu hình so sánh (RQ1): MCTS không LLM, LLM không tìm, tìm ngẫu nhiên, TSMOM | ⏸️ chờ duyệt | chưa code | [WALK_FORWARD](design/WALK_FORWARD.md#cấu-hình-so-sánh) |
