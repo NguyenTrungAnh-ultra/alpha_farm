@@ -109,6 +109,57 @@ class BacktestResult:
     first_trade_open_fee: float = 0.0
 
 
+_ROLLOVER_CACHE_MAX = 8
+_rollover_cache: dict = {}
+
+
+def _compute_rollover_mask(index: pd.DatetimeIndex) -> np.ndarray:
+    """True on the last bar of each contract-expiry day (third Thursday of the month)."""
+    dates = pd.Series(index.date)
+    weekdays = pd.Series(index.weekday)
+    is_thursday = weekdays == 3
+    thursdays_df = pd.DataFrame({'date': dates, 'is_thursday': is_thursday, 'year': index.year, 'month': index.month})
+    thursdays_only = thursdays_df[thursdays_df['is_thursday']]
+
+    expiration_dates = []
+    for (y, m), group in thursdays_only.groupby(['year', 'month']):
+        unique_dates = group['date'].unique()
+        if len(unique_dates) >= 3:
+            expiration_dates.append(unique_dates[2])
+
+    is_expiration_day = dates.isin(expiration_dates)
+    is_rollover_bar = np.zeros(len(index), dtype=bool)
+
+    if is_expiration_day.any():
+        is_exp_np = is_expiration_day.to_numpy()
+        date_diff = np.zeros_like(is_exp_np, dtype=bool)
+        date_diff[:-1] = dates.iloc[:-1].values != dates.iloc[1:].values
+        date_diff[-1] = True
+        is_rollover_bar = is_exp_np & date_diff
+    return is_rollover_bar
+
+
+def _rollover_mask(index: pd.DatetimeIndex) -> np.ndarray:
+    """
+    Rollover mask of `index`, cached because MCTS backtests the same index thousands of times.
+    The cache key (length, first, last, dtype incl. unit and tz) only selects a slot; a hit is used only if the stored
+    int64 timestamps equal the index element-wise, so a different index sharing endpoints can never
+    receive another index's mask. The returned array is read-only.
+    """
+    values = index.asi8
+    n = len(values)
+    key = (n, int(values[0]) if n else 0, int(values[-1]) if n else 0, str(index.dtype))
+    hit = _rollover_cache.get(key)
+    if hit is not None and np.array_equal(hit[0], values):
+        return hit[1]
+    mask = _compute_rollover_mask(index)
+    mask.setflags(write=False)
+    if len(_rollover_cache) >= _ROLLOVER_CACHE_MAX and key not in _rollover_cache:
+        _rollover_cache.clear()
+    _rollover_cache[key] = (values.copy(), mask)
+    return mask
+
+
 class AlphaBacktestEngine:
     """
     Engine backtest mô phỏng chính xác XNOQuant.
@@ -301,29 +352,8 @@ class AlphaBacktestEngine:
         
 
         # --- Vectorized Rollover Penalty (Applied after Margin Call checking) ---
-        # Tìm các điểm đáo hạn (Thứ Năm lần thứ 3 của tháng)
-        dates = pd.Series(df.index.date)
-        weekdays = pd.Series(df.index.weekday)
-        is_thursday = weekdays == 3
-        thursdays_df = pd.DataFrame({'date': dates, 'is_thursday': is_thursday, 'year': df.index.year, 'month': df.index.month})
-        thursdays_only = thursdays_df[thursdays_df['is_thursday']]
-        
-        expiration_dates = []
-        for (y, m), group in thursdays_only.groupby(['year', 'month']):
-            unique_dates = group['date'].unique()
-            if len(unique_dates) >= 3:
-                expiration_dates.append(unique_dates[2])
-                
-        is_expiration_day = dates.isin(expiration_dates)
-        is_rollover_bar = np.zeros_like(close, dtype=bool)
-        
-        if is_expiration_day.any():
-            is_exp_np = is_expiration_day.to_numpy()
-            date_diff = np.zeros_like(is_exp_np, dtype=bool)
-            date_diff[:-1] = dates.iloc[:-1].values != dates.iloc[1:].values
-            date_diff[-1] = True 
-            is_rollover_bar = is_exp_np & date_diff
-            
+        is_rollover_bar = _rollover_mask(index)
+
         rollover_penalty = (ROLLOVER_PENALTY_POINTS * MULTIPLIER) + (2 * self.fee_per_contract)
         fee_bar[is_rollover_bar] += contracts[is_rollover_bar] * rollover_penalty
         
@@ -352,6 +382,10 @@ class AlphaBacktestEngine:
         accum_fee = 0.0
         accum_realized = 0.0
         
+        # Box all timestamps in one bulk call: per-element `index[i]` costs microseconds each.
+        trade_times = dict(zip(trade_indices.tolist(), index[trade_indices]))
+        current_entry_time = None
+
         for i in trade_indices:
             c = contracts[i]
             d = direction[i]
@@ -376,7 +410,7 @@ class AlphaBacktestEngine:
                     
                     trades.append(TradeRecord(
                         entry_bar=current_entry_bar, exit_bar=i,
-                        entry_time=index[current_entry_bar], exit_time=index[i],
+                        entry_time=current_entry_time, exit_time=trade_times[int(i)],
                         direction=current_dir, position_size=1.0,
                         entry_price=current_entry_price, exit_price=p,
                         contracts=int(current_contracts_held),
@@ -390,6 +424,7 @@ class AlphaBacktestEngine:
                         current_contracts_held = c
                         current_entry_price = p
                         current_entry_bar = i
+                        current_entry_time = trade_times[int(i)]
                         accum_fee = c * self.fee_per_contract # Opening fee
                         accum_realized = 0.0
                     else:
@@ -419,6 +454,7 @@ class AlphaBacktestEngine:
                     current_contracts_held = c
                     current_entry_price = p
                     current_entry_bar = i
+                    current_entry_time = trade_times[int(i)]
                     accum_fee = fee_paid
                     accum_realized = 0.0
 

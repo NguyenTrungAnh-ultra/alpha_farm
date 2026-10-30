@@ -77,6 +77,8 @@ Lần 3 bài cài tín hiệu: ≈ 3.600 s / lượt với 4.831 bar học, 10 l
 | MCTS không LLM, tìm ngẫu nhiên | 2 × 35 = 70 | ≈ 8 giờ |
 | Placebo | 19 × 7 = 133 | ≈ 14 giờ |
 
+- ✅ Tăng tốc backtest (2026-10-30, người dùng chốt): 300 lượt chấm MCTS trên đoạn học cửa sổ 1 từ 42,6 ms xuống 19,7 ms mỗi lượt (≈ 2,2×; lần đo đầu của Claude là 59 ms lúc 10 tiến trình đang chạy). Kết quả giống hệt bản cũ (200 backtest, 200 phép tính IC, bảng xếp hạng MCTS 2 blueprint × 300 vòng so bằng nhau tuyệt đối), nên số của bài cài tín hiệu cửa sổ 1 vẫn dùng được. Bảng ước thời gian ở trên chưa đo lại.
+
 ## 8. Code [đề xuất]
 
 - `strategy_workflows/WalkForward.py` + `main.py walkforward <bước>`; dùng lại `rank_leaderboard`, `distinct_expressions`, `combine_positions`, `Segments` (chuyển các hàm dùng chung ra khỏi `RunPlantedSignal.py` nếu cần).
