@@ -167,6 +167,12 @@ Thiết lập (2026-10-30, `results/planted_window1/`): học 2018-08-13 → 202
 - IC 0 seed 5: một công thức trùng A đứng hạng 87 dù không cài gì; A chỉ là một công thức trong không gian tìm, và trong placebo đó nó tình cờ không tệ.
 - Lượt chấm lỗi (−10) ≈ 7% mỗi lượt (`Input array/series must be 1D, got shape ()`, biểu thức toàn hằng; nợ ở ROADMAP mục 4).
 - **Chưa tách được nguyên nhân tụt ở IC 0.1.** So với lần 3, lần này đổi cùng lúc: độ dài dữ liệu, ngữ pháp (lan chiều), công thức A, bộ blueprint. Suy đoán của Claude (chưa đo): A mới là tín hiệu hình dạng nến (`high − close`), tự tương quan thấp hơn A cũ (`ts_max − ts_mean` của giá), nên cùng IC thì Sharpe của tín hiệu và độ tách khỏi nhiễu khác; 5 seed mỗi ô nên 1/5 với 3/5 chưa chắc khác nhau thật. Chờ người dùng quyết có đo tách hay không.
+- **Đo tách (2026-10-30, người dùng cho làm (a) rồi (b)):**
+  - (a) Chọn top-5 theo hạng đoạn học thay vì đoạn kiểm định (tính lại từ `runs.csv`, chỉ xét ứng viên gần A nhất của mỗi lượt): IC 0.1 vẫn 1/5 (seed 5, hạng học 1); IC 0.05 thành 1/5 tìm lại đúng (seed 5: A hạng học 2, hạng kiểm định 23). ⇒ Bước chọn trên đoạn kiểm định không gây ra phần tụt; ở IC 0.1 ứng viên gần A (tương quan ≥ 0.74) có ở 4/5 seed nhưng hạng học 30 / 54 / 72 — nghẽn ở reward trên đoạn học.
+  - Điểm `sharpe` của chính A trên đoạn học ở IC 0.1 (oracle): trung bình 0.39 (0.30–0.61); công thức tốt nhất MCTS tìm được 0.58–0.65. Lần 3 (A cũ): 0.49.
+  - Số lệnh của A trên đoạn tìm (oracle): **≈ 2.730 lệnh / ≈ 4.830 bar** ở mọi độ mạnh (đổi chiều gần mỗi 2 bar); A cũ ở lần 3: 1.060–1.750 lệnh / ≈ 6.700 bar. ⇒ A mới quay vòng gấp ≈ 3 lần, phí ăn phần lớn lợi thế, nên cùng IC mà reward thấp hơn. Số lệnh là số đo thật; tác động của nó lên tỷ lệ tìm lại thì (b) cho thấy không đáng kể.
+  - (b) ✅ Thêm seed 6–10 ở IC 0.1 (ghi chung `runs.csv`, log `search_extra.log`; mỗi lượt 1.236–1.283 s): **tìm lại gần 5/5**, tìm lại đúng 0/5. Hạng học của ứng viên gần A 27 / 1 / 14 / 76 / 11 → hạng kiểm định 3 / 5 / 16 / 4 / 7 (bước kiểm định kéo lên). Sharpe ngoài mẫu −2.25 / −2.36 / 0.12 / −0.72 / 3.15.
+  - **Gộp 10 seed ở IC 0.1: tìm lại gần 6/10, tìm lại đúng 1/10, Sharpe ngoài mẫu −0.10 ± 1.82.** ⇒ 1/5 của seed 1–5 phần lớn là nhiễu do ít seed; 6/10 không khác được lần 2 (3/5) hay lần 3 (5/5). Kết luận "nghẽn do phí của A mới" ở trên không được dữ liệu ủng hộ. Sharpe ngoài mẫu 6 tháng rất nhiễu: tìm lại gần mà vẫn −2.3.
 
 ## 4. Chạy
 
