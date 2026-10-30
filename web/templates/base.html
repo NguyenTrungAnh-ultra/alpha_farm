@@ -22,7 +22,10 @@ figure, .tablebox { margin:0 0 20px; }
 figcaption, caption { font-size:13px; color:var(--text); text-align:left; margin:6px 0; caption-side:top; }
 caption b, figcaption b { font-weight:700; }
 .reading { color:var(--muted); }
-.pending { border-left:4px solid var(--warn); }
+.pending { border-left:4px solid var(--warn); } .primary { border-left:4px solid var(--accent); }
+.role { display:inline-block; font-size:11px; padding:0 7px; border-radius:9px; border:1px solid var(--line); margin-left:6px; vertical-align:middle; font-weight:600; }
+.role-chính { background:var(--accent); color:#fff; border-color:var(--accent); } .role-phụ { color:var(--muted); } .role-chẩn-đoán { color:var(--warn); border-color:var(--warn); }
+th[title] { cursor:help; text-decoration:underline dotted; } ul.metrics { padding-left:20px; }
 #strip { margin-top:auto; font-size:12px; color:var(--muted); display:grid; gap:6px; }
 #strip .row { display:flex; justify-content:space-between; } #strip .row b { color:var(--text); font-weight:600; }
 main { flex:1; min-width:0; max-width:1150px; margin:0 auto; padding:20px; animation:fadein .35s ease; }
@@ -129,13 +132,14 @@ function intervalChart(canvasId, points, xTitle, yTitle) {
       x: { type: 'linear', title: { display: true, text: xTitle } },
       y: { min: 0, max: 1, title: { display: true, text: yTitle } } } } });
 }
-// points: [{x, y}] drawn as dots; `line` is a horizontal reference value.
+// points: [{x, y, top5}] drawn as dots, split in two colours by top5; `line` is a horizontal reference value.
 function dotChart(canvasId, points, line, xTitle, yTitle, lineLabel) {
   var el = document.getElementById(canvasId); if (!el || typeof Chart === 'undefined') { return; }
   var xs = points.map(function (p) { return p.x; });
   var lo = Math.min.apply(null, xs.concat([0])), hi = Math.max.apply(null, xs.concat([0.1]));
   new Chart(el, { type: 'scatter', data: { datasets: [
-      { label: 'một seed', data: points, backgroundColor: COLORS[0], pointRadius: 5 },
+      { label: 'ứng viên nằm trong top-5', data: points.filter(function (p) { return p.top5; }), backgroundColor: COLORS[1], pointRadius: 6 },
+      { label: 'ứng viên không vào top-5', data: points.filter(function (p) { return !p.top5; }), backgroundColor: COLORS[0], pointRadius: 5 },
       { label: lineLabel, type: 'line', data: [{ x: lo, y: line }, { x: hi, y: line }], borderColor: COLORS[4],
         borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0 }] },
     options: { maintainAspectRatio: false, parsing: false, scales: {

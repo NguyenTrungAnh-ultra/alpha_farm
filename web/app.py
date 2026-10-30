@@ -135,7 +135,7 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
                 'blueprint_set': method.blueprint_summary(app.state.results_root) is not None}
 
     def render(request: Request, name: str, active: str, **context) -> HTMLResponse:
-        return templates.TemplateResponse(request, name, {'active': active, 'cap': thesis.ITEM_BY_KEY, **context})
+        return templates.TemplateResponse(request, name, {'active': active, 'cap': thesis.ITEM_BY_KEY, 'metric': thesis.METRICS, **context})
 
     @app.get('/', response_class=HTMLResponse)
     def overview(request: Request):
@@ -170,6 +170,8 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
         return render(
             request, 'planted.html', 'planted', t=thesis, rows=rows, seed_rows=seed_rows, positions=positions,
             formula_expr=planted.read_formula_expr(folder()), chart=chart,
+            primary=thesis.METRICS[thesis.PLANTED_PRIMARY], primary_value=thesis.primary_value_planted(rows),
+            metric_rows=thesis.metric_rows(thesis.PLANTED_METRICS),
             near_definition=thesis.NEAR_DEFINITION.format(threshold=threshold),
             readings={'table': thesis.reading_table(rows), 'near': thesis.reading_near(rows),
                       'corr': thesis.reading_corr(seed_rows, threshold),
@@ -195,7 +197,9 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
 
     def add_pending_page(key: str) -> None:
         def pending_page(request: Request):
-            return render(request, 'pending.html', key, page=thesis.PENDING_CHAPTERS[key],
+            page = thesis.PENDING_CHAPTERS[key]
+            return render(request, 'pending.html', key, page=page, primary=thesis.METRICS[page['primary']],
+                          primary_value=thesis.MISSING, metric_rows=thesis.metric_rows(page['metrics']),
                           items=[i for i in thesis.ITEMS if i['chapter'] == '/results/' + key])
         pending_page.__name__ = f'{key}_page'
         app.get('/results/' + key, response_class=HTMLResponse)(pending_page)

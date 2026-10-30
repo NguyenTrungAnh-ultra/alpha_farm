@@ -302,3 +302,58 @@ def test_method_page_draws_walkforward_timeline(tmp_path):
     first = WINDOWS[0]
     assert f'{first.search_start} → {first.train_end}' in svg and f'{first.eval_start} → {first.eval_end}' in svg
     assert 'Hình 3.2' in html and 'Bảng 3.1' in html
+
+
+def test_glossary_covers_every_metric_column_shown():
+    import re
+    from pathlib import Path
+    templates = Path(web_app.__file__).parent / 'templates'
+    used = set()
+    for path in templates.glob('*.html'):
+        used |= set(re.findall(r'metric\.(\w+)\.measures', path.read_text(encoding='utf-8')))
+    assert used and used <= set(thesis.METRICS)
+    for entry in thesis.METRICS.values():
+        assert entry['name'] and entry['measures'] and entry['reading'] and entry['role'] in thesis.ROLE_HELP
+    for chapter in thesis.PENDING_CHAPTERS.values():
+        assert chapter['primary'] in thesis.METRICS and set(chapter['metrics']) <= set(thesis.METRICS)
+    assert set(thesis.PLANTED_METRICS) <= set(thesis.METRICS)
+
+
+@pytest.mark.parametrize('url', ['/results/planted', '/results/placebo', '/results/rq1', '/results/walkforward'])
+def test_chapter_pages_open_with_primary_metric_box(client, url):
+    text = client.get(url).text
+    assert 'Chỉ số chính' in text and 'Giá trị hiện tại' in text and 'Chỉ số dùng trong chương này' in text
+    assert text.index('Chỉ số chính') < text.index('Chỉ số dùng trong chương này')
+
+
+def test_planted_primary_value_and_roles(client):
+    text = client.get('/results/planted').text
+    assert 'IC 0.05: 2/3' in text  # primary value from the data
+    assert 'role-chính' in text and 'role-chẩn-đoán' in text and 'title="' in text
+    rows = {r['label']: r for r in thesis.progress_rows({'planted_runs': True})}
+    assert rows['Bảng 4.1']['role'] == 'chính' and rows['Hình 4.2']['role'] == 'chẩn đoán'
+    missing = TestClient(web_app.create_app('nowhere-results')).get('/results/planted').text
+    assert 'Giá trị hiện tại' in missing and 'chưa có' in missing
+
+
+def test_closest_candidate_reading_counts_top5(results):
+    # fake data: closest_corr >= 0.7 at (0.05,1) 0.9, (0.05,2) 0.8, (0.05,3 rerun) 0.95; all closest_val_rank = 24
+    seed_rows = web_planted.seed_table(web_planted.read_runs(str(results / FOLDER)))
+    reading = thesis.reading_corr(seed_rows, 0.7)
+    assert 'chạm tới A' in reading and 'tìm thấy' not in reading
+    assert '3/6 seed; trong đó 0 nằm trong top-5' in reading
+    seed_rows[4]['closest_val_rank'] = 2.0  # a reached candidate that is among the chosen top-5
+    assert 'trong đó 1 nằm trong top-5' in thesis.reading_corr(seed_rows, 0.7)
+    points = web_planted.closest_points(seed_rows)
+    assert sum(p['top5'] for p in points) == 1
+
+
+@pytest.mark.parametrize('url', ['/results/planted', '/results/placebo', '/results/rq1', '/results/walkforward'])
+def test_metric_list_rendered_once(client, url):
+    assert client.get(url).text.count('Chỉ số dùng trong chương này') == 1
+
+
+def test_glossary_states_near_threshold_and_placebo_tag():
+    from strategy_workflows.PlantedSignal import NEAR_CORRELATION
+    assert f'{NEAR_CORRELATION:g}' in thesis.METRICS['near']['measures']
+    assert thesis.ITEM_BY_KEY['placebo_dist']['role'] == 'chính'

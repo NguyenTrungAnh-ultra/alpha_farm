@@ -1,7 +1,9 @@
 {% extends "base.html" %}
+{% from "_macros.html" import badge, primary_box, metric_list %}
 {% block title %}Bài cài tín hiệu{% endblock %}
 {% block content %}
 <h1>{{ t.PLANTED_TITLE }}</h1>
+{{ primary_box(primary, primary_value) }}
 
 <div class="card">
   <p><b>{{ t.PLANTED_QUESTION }}</b></p>
@@ -15,9 +17,9 @@
 <div class="tablebox scroll">
 {% if rows %}
 <table>
-  <caption><b>{{ cap.planted_table.label }} — {{ cap.planted_table.title }}.</b> {{ t.PLANTED_TABLE_RQ }}
+  <caption><b>{{ cap.planted_table.label }} — {{ cap.planted_table.title }}.</b>{{ badge(cap.planted_table.role) }} {{ t.PLANTED_TABLE_RQ }}
     <span class="reading">{{ readings.table }}</span></caption>
-  <tr><th>IC mục tiêu</th><th>Số seed</th><th>IC đo được (đoạn tìm)</th><th>IC đo được (đoạn đánh giá)</th><th>Tìm lại gần</th><th>Tìm lại đúng</th><th>Sharpe ngoài mẫu (TB ± độ lệch)</th></tr>
+  <tr><th title="{{ metric.target_ic.measures }}">IC mục tiêu</th><th>Số seed</th><th title="{{ metric.ic.measures }}">IC đo được (đoạn tìm)</th><th title="{{ metric.ic.measures }}">IC đo được (đoạn đánh giá)</th><th title="{{ metric.near.measures }}">Tìm lại gần</th><th title="{{ metric.exact.measures }}">Tìm lại đúng</th><th title="{{ metric.oos_sharpe_6m.measures }}">Sharpe ngoài mẫu (TB ± độ lệch)</th></tr>
   {% for r in rows %}
   <tr><td>{{ '%g' | format(r.strength) }}</td><td>{{ r.n_runs }}</td><td>{{ r.ic_search | fmt(3) }}</td><td>{{ r.ic_eval | fmt(3) }}</td>
     <td>{{ r.near_count }}/{{ r.n_runs }}</td><td>{{ r.exact_count }}/{{ r.n_runs }}</td>
@@ -25,42 +27,42 @@
   {% endfor %}
 </table>
 {% else %}
-<p><b>{{ cap.planted_table.label }} — {{ cap.planted_table.title }}.</b> chưa có. {{ t.PLANTED_MISSING }}</p>
+<p><b>{{ cap.planted_table.label }} — {{ cap.planted_table.title }}.</b>{{ badge(cap.planted_table.role) }} chưa có. {{ t.PLANTED_MISSING }}</p>
 {% endif %}
 </div>
 
 <figure>
   {% if rows %}<div class="chartbox"><canvas id="c-near"></canvas></div>{% endif %}
-  <figcaption><b>{{ cap.planted_near.label }} — {{ cap.planted_near.title }}.</b> {{ t.PLANTED_NEAR_RQ }} Đường nét đứt là khoảng tin cậy Wilson 95%.
+  <figcaption><b>{{ cap.planted_near.label }} — {{ cap.planted_near.title }}.</b>{{ badge(cap.planted_near.role) }} {{ t.PLANTED_NEAR_RQ }} Đường nét đứt là khoảng tin cậy Wilson 95%.
     {% if rows %}<span class="reading">{{ readings.near }}</span>{% else %}chưa có{% endif %}</figcaption>
 </figure>
 
 <figure>
   {% if seed_rows %}<div class="chartbox"><canvas id="c-corr"></canvas></div>{% endif %}
-  <figcaption><b>{{ cap.planted_corr.label }} — {{ cap.planted_corr.title }}.</b> {{ t.PLANTED_CORR_RQ }}
+  <figcaption><b>{{ cap.planted_corr.label }} — {{ cap.planted_corr.title }}.</b>{{ badge(cap.planted_corr.role) }} {{ t.PLANTED_CORR_RQ }}
     {% if seed_rows %}<span class="reading">{{ readings.corr }}</span>{% else %}chưa có{% endif %}</figcaption>
 </figure>
 
 <div class="tablebox scroll">
 {% if positions %}
 <table>
-  <caption><b>{{ cap.planted_positions.label }} — {{ cap.planted_positions.title }}.</b> {{ t.PLANTED_POSITIONS_RQ }} <span class="reading">{{ readings.positions }}</span></caption>
-  <tr><th>IC mục tiêu</th><th>Số seed</th><th>Trung bình</th><th>Nhỏ nhất</th><th>Lớn nhất</th></tr>
+  <caption><b>{{ cap.planted_positions.label }} — {{ cap.planted_positions.title }}.</b>{{ badge(cap.planted_positions.role) }} {{ t.PLANTED_POSITIONS_RQ }} <span class="reading">{{ readings.positions }}</span></caption>
+  <tr><th title="{{ metric.target_ic.measures }}">IC mục tiêu</th><th>Số seed</th><th title="{{ metric.pos_corr.measures }}">Trung bình</th><th>Nhỏ nhất</th><th>Lớn nhất</th></tr>
   {% for r in positions %}
   <tr><td>{{ '%g' | format(r.strength) }}{% if r.strength == 0 %} (nhiễu){% endif %}</td><td>{{ r.n }}</td><td>{{ r.mean | fmt(3) }}</td><td>{{ r.min | fmt(3) }}</td><td>{{ r.max | fmt(3) }}</td></tr>
   {% endfor %}
 </table>
 {% else %}
-<p><b>{{ cap.planted_positions.label }} — {{ cap.planted_positions.title }}.</b> chưa có</p>
+<p><b>{{ cap.planted_positions.label }} — {{ cap.planted_positions.title }}.</b>{{ badge(cap.planted_positions.role) }} chưa có</p>
 {% endif %}
 </div>
 
 <div class="tablebox scroll">
 {% if seed_rows %}
 <table>
-  <caption><b>{{ cap.planted_seeds.label }} — {{ cap.planted_seeds.title }}.</b> {{ t.PLANTED_SEEDS_RQ }}</caption>
-  <tr><th>IC mục tiêu</th><th>Seed</th><th>Tương quan cao nhất trong top-5</th><th>Gần</th><th>Đúng</th><th>Sharpe ngoài mẫu</th>
-    <th class="left">Ứng viên gần A nhất (mọi ứng viên)</th><th>Tương quan</th><th>Hạng kiểm định</th></tr>
+  <caption><b>{{ cap.planted_seeds.label }} — {{ cap.planted_seeds.title }}.</b>{{ badge(cap.planted_seeds.role) }} {{ t.PLANTED_SEEDS_RQ }}</caption>
+  <tr><th title="{{ metric.target_ic.measures }}">IC mục tiêu</th><th>Seed</th><th title="{{ metric.top5_corr.measures }}">Tương quan cao nhất trong top-5</th><th title="{{ metric.near.measures }}">Gần</th><th title="{{ metric.exact.measures }}">Đúng</th><th title="{{ metric.oos_sharpe_6m.measures }}">Sharpe ngoài mẫu</th>
+    <th class="left">Ứng viên gần A nhất (mọi ứng viên)</th><th title="{{ metric.closest_corr.measures }}">Tương quan</th><th title="{{ metric.val_rank.measures }}">Hạng kiểm định</th></tr>
   {% for r in seed_rows %}
   <tr><td>{{ '%g' | format(r.strength) }}</td><td>{{ r.seed }}</td><td>{{ r.best_corr | fmt(3) }}</td>
     <td>{{ 'có' if r.near else '–' }}</td><td>{{ 'có' if r.exact else '–' }}</td><td>{{ r.oos_sharpe | fmt(2) }}</td>
@@ -68,10 +70,11 @@
   {% endfor %}
 </table>
 {% else %}
-<p><b>{{ cap.planted_seeds.label }} — {{ cap.planted_seeds.title }}.</b> chưa có</p>
+<p><b>{{ cap.planted_seeds.label }} — {{ cap.planted_seeds.title }}.</b>{{ badge(cap.planted_seeds.role) }} chưa có</p>
 {% endif %}
 </div>
 
+{{ metric_list(metric_rows) }}
 <p><a href="/results/planted/illustration">{{ t.ILLUSTRATION_LINK }}</a></p>
 
 <script type="application/json" id="chart-data">{{ chart | tojson }}</script>

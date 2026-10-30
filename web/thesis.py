@@ -3,12 +3,14 @@ All prose of the thesis web pages: chapter list and statuses, intros, captions, 
 descriptions and the sentences that read a result. Templates only render what is defined here.
 
 Sentences that quote numbers are built by functions from the computed result, never typed in.
-Item fields: key, label (numbered caption prefix), title, chapter (path), rq, needs (availability
+Item fields: key, role (chính / phụ / chẩn đoán; absent when the item shows no metric), label (numbered caption prefix), title, chapter (path), rq, needs (availability
 key that makes the item "done"; None = no result yet).
 """
 
 import math
 from typing import Dict, List, Optional
+
+from strategy_workflows.PlantedSignal import NEAR_CORRELATION
 
 STATUS_LABELS = {'done': 'Xong', 'progress': 'Đang làm', 'none': 'Chưa có kết quả'}
 STATUS_MARKS = {'done': '✅', 'progress': '🔧', 'none': '–'}
@@ -37,23 +39,23 @@ ITEMS: List[Dict] = [
      'status': 'done'},
     {'key': 'blueprints', 'label': 'Bảng 3.1', 'title': 'Bộ blueprint đã đóng băng', 'chapter': '/method',
      'rq': None, 'needs': 'blueprint_set'},
-    {'key': 'planted_table', 'label': 'Bảng 4.1', 'title': 'Tìm lại tín hiệu cài sẵn theo IC mục tiêu',
+    {'key': 'planted_table', 'role': 'chính', 'label': 'Bảng 4.1', 'title': 'Tìm lại tín hiệu cài sẵn theo IC mục tiêu',
      'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'planted_runs'},
-    {'key': 'planted_near', 'label': 'Hình 4.1', 'title': 'Tỷ lệ tìm lại gần theo IC mục tiêu',
+    {'key': 'planted_near', 'role': 'chính', 'label': 'Hình 4.1', 'title': 'Tỷ lệ tìm lại gần theo IC mục tiêu',
      'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'planted_runs'},
-    {'key': 'planted_corr', 'label': 'Hình 4.2', 'title': 'Tương quan của ứng viên gần A nhất theo IC mục tiêu',
+    {'key': 'planted_corr', 'role': 'chẩn đoán', 'label': 'Hình 4.2', 'title': 'Ứng viên gần A nhất: MCTS có chạm tới A không',
      'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'planted_runs'},
-    {'key': 'planted_positions', 'label': 'Bảng 4.2', 'title': 'Tương quan vị thế tốt nhất với A',
+    {'key': 'planted_positions', 'role': 'phụ', 'label': 'Bảng 4.2', 'title': 'Tương quan vị thế tốt nhất với A',
      'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'positions'},
-    {'key': 'planted_seeds', 'label': 'Bảng 4.3', 'title': 'Kết quả từng seed',
+    {'key': 'planted_seeds', 'role': 'phụ', 'label': 'Bảng 4.3', 'title': 'Kết quả từng seed',
      'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'planted_runs'},
-    {'key': 'placebo_dist', 'label': 'Hình 4.3', 'title': 'Sharpe ngoài mẫu của 19 bộ placebo so với lần chạy thật',
+    {'key': 'placebo_dist', 'role': 'chính', 'label': 'Hình 4.3', 'title': 'Sharpe ngoài mẫu của 19 bộ placebo so với lần chạy thật',
      'chapter': '/results/placebo', 'rq': 'RQ2', 'needs': None},
-    {'key': 'rq1_table', 'label': 'Bảng 4.4', 'title': 'Sharpe ngoài mẫu của các cấu hình so sánh',
+    {'key': 'rq1_table', 'role': 'chính', 'label': 'Bảng 4.4', 'title': 'Sharpe ngoài mẫu của các cấu hình so sánh',
      'chapter': '/results/rq1', 'rq': 'RQ1', 'needs': None},
-    {'key': 'wf_table', 'label': 'Bảng 4.5', 'title': 'Sharpe ngoài mẫu theo cửa sổ walk-forward',
+    {'key': 'wf_table', 'role': 'phụ', 'label': 'Bảng 4.5', 'title': 'Sharpe ngoài mẫu theo cửa sổ walk-forward',
      'chapter': '/results/walkforward', 'rq': 'RQ1, RQ2', 'needs': None},
-    {'key': 'wf_curve', 'label': 'Hình 4.4', 'title': 'Chuỗi lợi suất ngoài mẫu nối 7 cửa sổ',
+    {'key': 'wf_curve', 'role': 'chính', 'label': 'Hình 4.4', 'title': 'Chuỗi lợi suất ngoài mẫu nối 7 cửa sổ',
      'chapter': '/results/walkforward', 'rq': 'RQ1, RQ2', 'needs': None},
 ]
 
@@ -96,8 +98,9 @@ NEAR_DEFINITION = ('Tìm lại gần: có ít nhất một công thức trong to
                    'cấu trúc, cùng trường dữ liệu và cùng hướng với A, các cửa sổ lệch không quá một bước.')
 PLANTED_TABLE_RQ = 'Trả lời RQ2: quy trình có tìm lại được tín hiệu cài sẵn khi IC mục tiêu tăng dần không.'
 PLANTED_NEAR_RQ = 'Trả lời RQ2: ngưỡng IC mà quy trình bắt đầu phát hiện được tín hiệu.'
-PLANTED_CORR_RQ = ('Trả lời RQ2: trong mọi ứng viên đã xếp hạng, cái gần A nhất ở từng seed giống A đến đâu '
-                   '(tương quan hạng tuyệt đối), kể cả khi không nằm trong top-5; vạch ngang là ngưỡng tìm lại gần.')
+PLANTED_CORR_RQ = ('Chẩn đoán cho RQ2: trong mọi ứng viên MCTS đã xếp hạng, cái gần A nhất ở từng seed giống A đến đâu '
+                   '(tương quan hạng tuyệt đối). Chấm cam là ứng viên đó nằm trong top-5 được chọn (hạng kiểm định từ 1 '
+                   'đến 5), chấm xanh là không; vạch ngang là ngưỡng tìm lại gần.')
 PLANTED_POSITIONS_RQ = ('Trả lời RQ2: vị thế tốt nhất trong top-5 giống vị thế của A đến đâu; IC 0 cho mức tương quan '
                         'do ngẫu nhiên.')
 PLANTED_SEEDS_RQ = ('Chi tiết từng lượt chạy của Bảng 4.1 (RQ2). Các cột từ "Tương quan cao nhất trong top-5" đến '
@@ -115,8 +118,9 @@ PENDING_CHAPTERS: Dict[str, Dict] = {
         'answers': 'Hệ thống có tốt hơn chính nó chạy trên dữ liệu placebo, nơi không có gì để tìm không.',
         'will_show': ['Hình 4.3: phân bố Sharpe ngoài mẫu của 19 bộ placebo so với lần chạy thật, kèm p = tỷ lệ bộ '
                       'placebo có Sharpe không thấp hơn lần chạy thật.'],
-        'condition': 'Chạy lại toàn bộ walk-forward trên 19 bộ dữ liệu xáo (bước placebo) sau khi đóng băng cấu hình; '
-                     'chưa chạy.',
+        'primary': 'placebo_p', 'metrics': ['placebo_p', 'placebo_dist'],
+        'condition': 'Chưa chạy walk-forward trên 19 bộ placebo. p cần cả các lần chạy placebo lẫn lần chạy thật duy nhất '
+                     'sau khi đóng băng cấu hình.',
     },
     'rq1': {
         'title': 'Kết quả: vai trò của LLM (RQ1)',
@@ -124,6 +128,7 @@ PENDING_CHAPTERS: Dict[str, Dict] = {
         'answers': 'LLM + MCTS có cho bộ alpha tốt hơn ngoài mẫu so với MCTS không LLM, LLM không tìm, và tìm ngẫu nhiên không.',
         'will_show': ['Bảng 4.4: Sharpe ngoài mẫu (trung bình ± độ lệch theo seed) của từng cấu hình cùng ngân sách '
                       '100.000 lần đánh giá mỗi cửa sổ.'],
+        'primary': 'wf_sharpe', 'metrics': ['wf_sharpe', 'ic_rq1', 'calmar', 'turnover'],
         'condition': 'Cần mã cho các cấu hình so sánh (MCTS không LLM, LLM không tìm, tìm ngẫu nhiên): chưa viết. '
                      'Sau đó cần chạy thật sau khi đóng băng.',
     },
@@ -134,10 +139,105 @@ PENDING_CHAPTERS: Dict[str, Dict] = {
                    'dùng cho cả so sánh RQ1 và so với placebo ở RQ2.',
         'will_show': ['Bảng 4.5: Sharpe ngoài mẫu theo cửa sổ và seed.',
                       'Hình 4.4: chuỗi lợi suất ngoài mẫu nối 7 cửa sổ.'],
+        'primary': 'wf_sharpe', 'metrics': ['wf_sharpe', 'window_sharpe', 'max_drawdown'],
         'condition': 'Cần đóng băng cấu hình (bộ blueprint, reward, bảng cửa sổ, ngân sách, seed) rồi chạy dữ liệu thật '
                      'đúng một lần; chưa làm.',
     },
 }
+
+
+PLANTED_PRIMARY = 'near'
+PLANTED_METRICS = ['target_ic', 'ic', 'near', 'exact', 'oos_sharpe_6m', 'pos_corr', 'top5_corr', 'closest_corr',
+                   'val_rank']
+PRIMARY_BOX_TITLE = 'Chỉ số chính'
+METRIC_LIST_TITLE = 'Chỉ số dùng trong chương này'
+ROLE_HELP = {'chính': 'trả lời trực tiếp câu hỏi của chương',
+             'phụ': 'bổ sung, không dùng để kết luận một mình',
+             'chẩn đoán': 'giải thích vì sao, không phải kết quả'}
+
+# One glossary for every page. Keys must not clash with dict method names (items, keys, values).
+METRICS: Dict[str, Dict[str, str]] = {
+    'target_ic': {'name': 'IC mục tiêu',
+                  'measures': 'Mức tương quan hạng giữa tín hiệu A và lợi suất nến sau mà ta chủ động cài vào dữ liệu.',
+                  'reading': 'Càng cao thì tín hiệu càng dễ thấy; 0 nghĩa là không cài gì (placebo).',
+                  'role': 'phụ'},
+    'ic': {'name': 'IC đo được',
+           'measures': 'Tương quan hạng (Spearman) thực đo giữa A và lợi suất nến sau trên đoạn tìm hoặc đoạn đánh giá, '
+                       'trung bình theo seed.',
+           'reading': 'Gần IC mục tiêu thì việc cài tín hiệu đúng như thiết kế; chênh là nhiễu mẫu.',
+           'role': 'phụ'},
+    'near': {'name': 'Tìm lại gần',
+             'measures': 'Số seed mà top-5 được chọn có ít nhất một công thức với alpha tương quan hạng tuyệt đối '
+                         f'với A từ {NEAR_CORRELATION:g} trở lên.',
+             'reading': 'Là tỷ lệ k/n theo IC. Tỷ lệ ở IC 0 là mức "tìm lại" do ngẫu nhiên; IC cao hơn tách khỏi đó '
+                        'thì quy trình phát hiện được tín hiệu.',
+             'role': 'chính'},
+    'exact': {'name': 'Tìm lại đúng',
+              'measures': 'Số seed mà top-5 có công thức cùng cấu trúc, trường dữ liệu và hướng với A (cửa sổ lệch '
+                          'tối đa một bước).',
+              'reading': 'Chặt hơn tìm lại gần; thường thấp vì nhiều công thức khác cấu trúc vẫn tương quan cao với A.',
+              'role': 'phụ'},
+    'pos_corr': {'name': 'Tương quan vị thế với A',
+                 'measures': 'Tương quan giữa vị thế giao dịch của công thức tốt nhất trong top-5 và vị thế của A.',
+                 'reading': 'So với mức nhiễu ở IC 0: chỉ cao hơn hẳn mức đó mới có nghĩa là vị thế giống A.',
+                 'role': 'phụ'},
+    'top5_corr': {'name': 'Tương quan cao nhất trong top-5',
+                  'measures': 'Tương quan hạng tuyệt đối với A của công thức giống A nhất trong 5 công thức được chọn.',
+                  'reading': f'Từ {NEAR_CORRELATION:g} trở lên thì seed đó được tính là tìm lại gần.',
+                  'role': 'phụ'},
+    'oos_sharpe_6m': {'name': 'Sharpe ngoài mẫu 6 tháng',
+                      'measures': 'Sharpe năm hoá của top-5 gộp trên 6 tháng đánh giá của bài cài tín hiệu.',
+                      'reading': 'Rất nhiễu vì chỉ 6 tháng; chỉ xem xu hướng theo IC, không dùng để kết luận.',
+                      'role': 'phụ'},
+    'closest_corr': {'name': 'Tương quan của ứng viên gần A nhất',
+                     'measures': 'Tương quan hạng tuyệt đối với A của ứng viên giống A nhất trong mọi ứng viên MCTS '
+                                 'đã xếp hạng, kể cả khi nó không vào top-5.',
+                     'reading': 'Đo MCTS có chạm tới A không, chưa nói bước chọn có giữ nó lại không.',
+                     'role': 'chẩn đoán'},
+    'val_rank': {'name': 'Hạng kiểm định',
+                 'measures': 'Thứ hạng của ứng viên gần A nhất theo reward trên đoạn kiểm định.',
+                 'reading': 'Từ 1 đến 5 nghĩa là nó nằm trong top-5 được chọn; lớn hơn nghĩa là bị bước chọn bỏ lỡ.',
+                 'role': 'chẩn đoán'},
+    'placebo_p': {'name': 'p-value placebo',
+                  'measures': 'Tỷ lệ bộ placebo (dữ liệu xáo, không có gì để tìm) có Sharpe ngoài mẫu không thấp hơn '
+                              'lần chạy thật.',
+                  'reading': 'Càng nhỏ càng khó là may mắn; với 19 bộ, giá trị nhỏ nhất có thể là 0.05.',
+                  'role': 'chính'},
+    'placebo_dist': {'name': 'Phân bố Sharpe placebo',
+                     'measures': 'Sharpe ngoài mẫu của từng bộ trong 19 bộ placebo.',
+                     'reading': 'Cho thấy hệ thống tự tạo ra Sharpe cỡ nào khi không có tín hiệu; lần chạy thật phải '
+                                'nằm ngoài vùng này.',
+                     'role': 'phụ'},
+    'wf_sharpe': {'name': 'Sharpe năm ngoài mẫu',
+                  'measures': 'Sharpe hằng năm hoá của chuỗi lợi suất ngày ngoài mẫu 2022-07 → 2025-12 nối từ 7 cửa sổ.',
+                  'reading': 'Chỉ số chính của luận văn; lớn hơn là tốt hơn, so giữa cấu hình hoặc với placebo.',
+                  'role': 'chính'},
+    'window_sharpe': {'name': 'Sharpe từng cửa sổ',
+                      'measures': 'Sharpe năm hoá riêng của 6 tháng đánh giá mỗi cửa sổ.',
+                      'reading': 'Cho thấy kết quả đều hay chỉ nhờ một cửa sổ; mỗi giá trị rất nhiễu.',
+                      'role': 'phụ'},
+    'max_drawdown': {'name': 'Sụt giảm lớn nhất',
+                     'measures': 'Mức giảm lớn nhất của vốn từ đỉnh xuống đáy trong chuỗi ngoài mẫu.',
+                     'reading': 'Cho biết rủi ro chịu đựng để có Sharpe đó; nhỏ hơn là tốt hơn.',
+                     'role': 'phụ'},
+    'ic_rq1': {'name': 'IC của bộ alpha',
+               'measures': 'Tương quan hạng giữa tín hiệu của bộ alpha và lợi suất nến sau, ngoài mẫu.',
+               'reading': 'Chỉ số phụ cho thấy sức dự báo, bổ sung cho Sharpe.',
+               'role': 'phụ'},
+    'calmar': {'name': 'Calmar',
+               'measures': 'Lợi suất hằng năm chia cho sụt giảm lớn nhất.',
+               'reading': 'Cao hơn là sinh lời tốt hơn so với rủi ro sụt giảm.',
+               'role': 'phụ'},
+    'turnover': {'name': 'Vòng quay',
+                 'measures': 'Mức thay đổi vị thế trung bình, tức độ giao dịch nhiều.',
+                 'reading': 'Cao nghĩa là chịu nhiều phí; giúp giải thích vì sao Sharpe chênh nhau.',
+                 'role': 'phụ'},
+}
+
+
+def metric_rows(keys: List[str]) -> List[Dict]:
+    """Glossary rows (name, what it measures, how to read, role) for a chapter's list of metrics."""
+    return [dict(METRICS[k], key=k) for k in keys]
 
 
 def chapter_status(chapter: Dict, availability: Dict[str, bool]) -> str:
@@ -157,13 +257,13 @@ def progress_rows(availability: Dict[str, bool]) -> List[Dict]:
     rows = []
     for chapter in CHAPTERS:
         status = chapter_status(chapter, availability)
-        rows.append({'kind': 'chapter', 'label': f"Chương {chapter['number']}", 'title': chapter['title'],
+        rows.append({'kind': 'chapter', 'role': '', 'label': f"Chương {chapter['number']}", 'title': chapter['title'],
                      'path': chapter['path'], 'rq': '', 'status': status, 'status_label': STATUS_LABELS[status],
                      'mark': STATUS_MARKS[status]})
         for item in ITEMS:
             if item['chapter'] == chapter['path']:
                 item_state = item_status(item, availability)
-                rows.append({'kind': 'item', 'label': item['label'], 'title': item['title'],
+                rows.append({'kind': 'item', 'role': item.get('role', ''), 'label': item['label'], 'title': item['title'],
                              'path': chapter['path'], 'rq': item['rq'] or '', 'status': item_state,
                              'status_label': STATUS_LABELS[item_state], 'mark': STATUS_MARKS[item_state]})
     return rows
@@ -209,16 +309,28 @@ def reading_near(rows: List[Dict]) -> str:
 
 
 def reading_corr(seed_rows: List[Dict], threshold: float) -> str:
+    """How many seeds MCTS reached A (closest correlation >= threshold) and how many of those are in the top-5."""
     if not seed_rows:
         return ''
-    by_strength: Dict[float, List[float]] = {}
+
+    def reached(r):
+        v = r.get('closest_corr')
+        return v is not None and v == v and float(v) >= threshold
+
+    def in_top5(r):
+        v = r.get('closest_val_rank')
+        return v is not None and v == v and float(v) <= 5
+
+    by_strength: Dict[float, List[Dict]] = {}
     for r in seed_rows:
-        value = r.get('closest_corr')
-        if value is not None and value == value:
-            by_strength.setdefault(float(r['strength']), []).append(float(value))
-    parts = [f"IC {_ic(s)}: lớn nhất {_fmt(max(v))}, {sum(x >= threshold for x in v)}/{len(v)} seed từ {threshold:.1f} trở lên"
-             for s, v in sorted(by_strength.items())]
-    return 'Đọc: ' + '; '.join(parts) + '.'
+        by_strength.setdefault(float(r['strength']), []).append(r)
+    parts = []
+    for strength, rs in sorted(by_strength.items()):
+        hit = [r for r in rs if reached(r)]
+        parts.append(f"IC {_ic(strength)}: {len(hit)}/{len(rs)} seed, {sum(in_top5(r) for r in hit)} nằm trong top-5")
+    return (f"Đọc: MCTS đã chạm tới A (tương quan từ {threshold:.1f} trở lên) ở "
+            f"{sum(reached(r) for r in seed_rows)}/{len(seed_rows)} seed; trong đó "
+            f"{sum(reached(r) and in_top5(r) for r in seed_rows)} nằm trong top-5. Theo IC: " + '; '.join(parts) + '.')
 
 
 def reading_positions(rows: List[Dict]) -> str:
@@ -229,3 +341,11 @@ def reading_positions(rows: List[Dict]) -> str:
     parts = [f"IC {_ic(r['strength'])}: trung bình {_fmt(r['mean'])}" for r in others]
     noise = f"Mức nhiễu (IC 0) cao nhất là {_fmt(base['max'])}. " if base else ''
     return f"Đọc: {noise}{'; '.join(parts)}."
+
+
+def primary_value_planted(rows: List[Dict]) -> str:
+    """Current value of the planted chapter's primary metric: near recovery k/n and its Wilson interval per IC."""
+    if not rows:
+        return MISSING
+    return '; '.join(f"IC {_ic(r['strength'])}: {r['near_count']}/{r['n_runs']} "
+                     f"(95%: {_fmt(r['near_low'])} đến {_fmt(r['near_high'])})" for r in rows)

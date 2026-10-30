@@ -169,6 +169,20 @@ Web đọc như chính bài luận: mỗi trang là một chương, mỗi bảng
 6. Bảng từng seed (gọn): IC · seed · công thức gần A nhất · tương quan · tìm lại gần / đúng · Sharpe ngoài mẫu.
 7. Liên kết tới trang minh hoạ một bộ dữ liệu (giữ trang hiện có, đổi tiêu đề thành "Minh hoạ: cài tín hiệu làm gì với giá", bỏ chọn thư mục).
 
+**Vai trò của chỉ số** (người dùng yêu cầu 2026-10-30):
+- Mỗi trang chương mở bằng ô **"Chỉ số chính"**: tên chỉ số trả lời trực tiếp câu hỏi của chương, nó đo gì, đọc thế nào, giá trị hiện tại (hoặc "chưa có").
+- Mỗi bảng / hình mang một nhãn vai trò: **chính** (trả lời câu hỏi), **phụ** (bổ sung, không dùng để kết luận một mình), **chẩn đoán** (giải thích vì sao, không phải kết quả).
+- Mỗi chỉ số có một định nghĩa ngắn "đo gì" (hiện khi rê chuột lên tiêu đề cột, và trong danh sách chỉ số cuối trang). Định nghĩa nằm một chỗ trong module nội dung, mọi trang dùng chung.
+
+| Chương | Chỉ số chính | Phụ | Chẩn đoán |
+|---|---|---|---|
+| RQ2 — bài cài tín hiệu | tỷ lệ tìm lại gần theo IC (Bảng 4.1, Hình 4.1) | tìm lại đúng; tương quan vị thế top-5 với A; Sharpe ngoài mẫu 6 tháng (rất nhiễu, không dùng để kết luận) | ứng viên gần A nhất trong mọi ứng viên (đo MCTS có chạm tới A không) |
+| RQ2 — placebo | p-value: tỷ lệ bộ placebo có Sharpe ngoài mẫu ≥ lần thật | phân bố Sharpe 19 bộ placebo | — |
+| RQ1 | Sharpe năm của chuỗi ngoài mẫu từng cấu hình | IC, Calmar, vòng quay | — |
+| Chuỗi ngoài mẫu | Sharpe năm của chuỗi 2022-07 → 2025-12 | Sharpe từng cửa sổ, sụt giảm lớn nhất | — |
+
+Hình "ứng viên gần A nhất" là chẩn đoán: tô khác màu điểm nằm trong top-5 và điểm không vào top-5; câu đọc nói "MCTS đã chạm tới A ở k/n seed", không nói "tìm thấy".
+
 **Nội dung chữ** (đoạn mở, chú thích, câu đọc kết quả, trạng thái từng chương) nằm trong một module Python của `web/` như `web/pipeline.py`; số liệu luôn tính từ tệp kết quả. Web không đọc `docs/`.
 
 **Giữ nguyên:** chỉ đọc, nghe `127.0.0.1`, không đổi phép tính; FastAPI + Jinja2, Chart.js như hiện có.

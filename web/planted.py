@@ -155,9 +155,15 @@ def present_values(runs: pd.DataFrame, column: str) -> List[float]:
 
 
 def closest_points(seed_rows: List[Dict]) -> List[Dict]:
-    """[{x: target IC, y: closest_corr}] per seed for the dot chart."""
-    return [{'x': float(r['strength']), 'y': None if pd.isna(r['closest_corr']) else float(r['closest_corr'])}
-            for r in seed_rows if 'closest_corr' in r]
+    """[{x: target IC, y: closest_corr, top5}] per seed; top5 = the closest candidate's validation rank is <= 5."""
+    points = []
+    for r in seed_rows:
+        if 'closest_corr' not in r:
+            continue
+        rank = r.get('closest_val_rank')
+        points.append({'x': float(r['strength']), 'y': None if pd.isna(r['closest_corr']) else float(r['closest_corr']),
+                       'top5': bool(rank is not None and not pd.isna(rank) and rank <= 5)})
+    return points
 
 
 def near_chart_points(rows: List[Dict]) -> List[List[Optional[float]]]:

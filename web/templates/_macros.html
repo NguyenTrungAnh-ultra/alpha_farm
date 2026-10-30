@@ -1,0 +1,18 @@
+{% macro badge(role) %}{% if role %}<span class="role role-{{ role | replace(' ', '-') }}">{{ role }}</span>{% endif %}{% endmacro %}
+
+{% macro primary_box(primary, value) %}
+<div class="card primary">
+  <div class="small muted">Chỉ số chính</div>
+  <h2 style="margin:2px 0 6px">{{ primary.name }}</h2>
+  <p style="margin:0 0 4px"><b>Đo gì:</b> {{ primary.measures }}</p>
+  <p style="margin:0 0 4px"><b>Đọc thế nào:</b> {{ primary.reading }}</p>
+  <p style="margin:0"><b>Giá trị hiện tại:</b> {{ value }}</p>
+</div>
+{% endmacro %}
+
+{% macro metric_list(rows) %}
+<h3>Chỉ số dùng trong chương này</h3>
+<ul class="metrics">
+  {% for m in rows %}<li><b>{{ m.name }}</b> — {{ m.measures }} {{ badge(m.role) }}</li>{% endfor %}
+</ul>
+{% endmacro %}

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import badge %}
 {% block title %}Tổng quan{% endblock %}
 {% block content %}
 <h1>Chương 1 — Tổng quan</h1>
@@ -14,12 +15,12 @@
 
 <div class="tablebox scroll"><table>
   <caption><b>Tiến độ luận văn.</b> Mỗi chương và mỗi bảng, hình đánh số một dòng.</caption>
-  <tr><th>Mục</th><th class="left">Nội dung</th><th>Trả lời</th><th>Trạng thái</th></tr>
+  <tr><th>Mục</th><th class="left">Nội dung</th><th>Trả lời</th><th>Vai trò</th><th>Trạng thái</th></tr>
   {% for r in rows %}
   <tr>
     <td class="left">{% if r.kind == 'chapter' %}<b>{{ r.label }}</b>{% else %}&nbsp;&nbsp;{{ r.label }}{% endif %}</td>
     <td class="left">{% if r.kind == 'chapter' %}<a href="{{ r.path }}"><b>{{ r.title }}</b></a>{% else %}<a href="{{ r.path }}">{{ r.title }}</a>{% endif %}</td>
-    <td>{{ r.rq }}</td>
+    <td>{{ r.rq }}</td><td>{{ badge(r.role) }}</td>
     <td class="left">{{ r.mark }} {{ r.status_label }}</td>
   </tr>
   {% endfor %}

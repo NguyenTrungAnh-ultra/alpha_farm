@@ -1,12 +1,16 @@
 {% extends "base.html" %}
+{% from "_macros.html" import badge, primary_box, metric_list %}
 {% block title %}{{ page.title }}{% endblock %}
 {% block content %}
 <h1>{{ page.title }}</h1>
 <p><b>Trả lời {{ page.rq }}:</b> {{ page.answers }}</p>
+{{ primary_box(primary, primary_value) }}
 <h3>Sẽ có trong chương này</h3>
 <ul>{% for line in page.will_show %}<li>{{ line }}</li>{% endfor %}</ul>
+<ul>{% for i in items %}<li>{{ i.label }} — {{ i.title }} {{ badge(i.role) }}</li>{% endfor %}</ul>
 <div class="card pending">
   <b>Chưa có kết quả.</b>
   <p class="small" style="margin-bottom:0">Điều kiện để có: {{ page.condition }}</p>
 </div>
+{{ metric_list(metric_rows) }}
 {% endblock %}
