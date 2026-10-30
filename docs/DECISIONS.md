@@ -42,6 +42,10 @@ Mỗi quyết định một dòng, bản hiện hành: đổi ý thì sửa đú
 |---|---|---|---|
 | Cửa sổ nở dần từ 2018-08-13, đánh giá 6 tháng lăn 6 tháng, 7 cửa sổ 2022-07 → 2025-12, khung 60m | 2026-10-29 | người dùng | 2 năm tìm chỉ phát hiện được IC ≥ 0.1; đánh đổi: 3,5 năm ngoài mẫu ⇒ Sharpe tối thiểu chứng minh được ≈ 1.07 thay vì 0.85 |
 | Placebo bộ k, cửa sổ w: mỗi cửa sổ hoán vị riêng, seed tất định theo (k, w) | 2026-10-30 | người dùng | |
+| Đoạn kiểm định 12 tháng ngay trước đoạn đánh giá | 2026-10-30 | người dùng (đề xuất của Claude) | bài cài tín hiệu cửa sổ 1 đã chạy với cách chia này |
+| Placebo: K = 19, mỗi bộ MCTS seed 1, bộ có Sharpe NaN không tính vào K | 2026-10-30 | người dùng (đề xuất của Claude) | K = 19 là nhỏ nhất cho p = 0.05; bỏ bộ NaN làm p thận trọng hơn |
+| Để nguyên ≈ 7% lượt chấm lỗi do biểu thức toàn hằng, ghi vào mục hạn chế | 2026-10-30 | người dùng | như nhau ở mọi cấu hình; sửa thì phải chạy lại mọi kết quả |
+| Bài cài tín hiệu: cả ba mức IC đủ 10 seed | 2026-10-30 | người dùng | đồng số seed, tránh chạy thêm chỉ ở ô có kết quả lạ |
 | Thứ tự: placebo → cấu hình so sánh → đóng băng → chạy thật một lần | 2026-10-29 | người dùng | thử đường ống trước khi chạm dữ liệu thật |
 | Tăng tốc backtest trước khi chạy tiếp; kết quả phải giống hệt bản cũ | 2026-10-30 | người dùng | |
 
