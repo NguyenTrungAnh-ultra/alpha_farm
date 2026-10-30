@@ -28,6 +28,20 @@ Phương pháp: [design/PLANTED_SIGNAL](design/PLANTED_SIGNAL.md). Tệp: `resul
 | 2018-08 → 2019-12 | 1.738 | 2/5 | 1/5 | 3/5 |
 | 2018-08 → 2022-06 | 4.831 | 0/5 | 1/5 | 5/5 |
 
+## Placebo walk-forward
+
+Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `results/walkforward/llm_mcts/` (`runs.csv` 133 dòng, `returns.csv`, `summary.csv`, dòng `mode = placebo`), log `results/walkforward/placebo.log`.
+
+**Thiết lập:** K = 19 bộ × 7 cửa sổ, MCTS seed 1, 20 blueprint × 5.000 vòng, reward `sharpe`; Sharpe năm trên chuỗi lợi suất ngày ngoài mẫu nối 7 cửa sổ (877 ngày, 2022-07 → 2025-12).
+
+- Sharpe 19 bộ placebo: trung bình 0.11, độ lệch chuẩn 0.51, trung vị 0.07, từ −0.93 đến **1.02**; 11/19 dương.
+- Trung bình không khác 0 (t ≈ 0.97); độ lệch chuẩn khớp sai số chuẩn lý thuyết của Sharpe trên 3,5 năm (≈ 1/√3,5 ≈ 0.53) ⇒ đường ống không tự sinh lợi nhuận trên dữ liệu không có tín hiệu.
+- **Mốc cho lần chạy thật:** p = 0.05 cần Sharpe thật > 1.02 (lớn hơn cả 19 bộ); Sharpe 0.48 (bộ thứ 5 từ trên xuống) cho p = 0.30.
+- Sharpe từng cửa sổ 6 tháng rất nhiễu: độ lệch chuẩn 0.93–1.63 trong mỗi cửa sổ.
+- Lỗi chấm 6.93% (biểu thức toàn hằng), 0 blueprint lỗi, 0 Sharpe NaN ⇒ K = 19 đủ.
+- Số lệnh mỗi cửa sổ 6 tháng: trung vị 343 (26–568).
+- Thời gian: 133 lượt × trung bình 1.612 s; 21:02 → 03:12 (6 giờ 10 phút, 10 lượt song song).
+
 ## Bộ blueprint
 
 `results/blueprint_sets/20261029_212813/`: prompt `anon_shapes`, temperature 0.3, `qwen3.5:4b`; 20/20 đạt cả bốn tiêu chí ngay lần sinh đầu (0 chép ví dụ, 0 trùng khung, mọi blueprint có `?` và điền được ở độ sâu 4); 24 vòng hỏi, 37 phút. Gốc: 12 `greater_than`, 7 `mult`, 1 `sub`; 17/20 có `ts_zscore` hoặc `ts_rank` (gợi ý `ts_zscore(?)` trong luật chiều làm mô hình nghiêng về dạng này). `blueprints_sha256` `9b226af1…687e`, `prompt_sha256` `83c2e32f…5719` (đủ trong `generation.json`).

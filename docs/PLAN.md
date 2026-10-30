@@ -13,12 +13,12 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 | 4 | Bộ 20 blueprint đóng băng | ✅ 2026-10-29 | `results/blueprint_sets/20261029_212813/` | [WALK_FORWARD](design/WALK_FORWARD.md#bộ-blueprint), [RESULTS](RESULTS.md#bộ-blueprint) |
 | 5 | Bài cài tín hiệu ở cách chia cửa sổ 1 | ✅ 2026-10-30 | 10 seed mỗi mức; ngưỡng phát hiện IC 0.1 (p = 0.005); còn so vị thế cho seed 6–10 ở IC 0 và 0.05 | [PLANTED_SIGNAL](design/PLANTED_SIGNAL.md), [RESULTS](RESULTS.md#bài-cài-tín-hiệu) |
 | 6 | Tăng tốc lượt chấm MCTS | ✅ 2026-10-30 | hai lượt: backtest ≈ 2,2×, rồi chỉ số + IC: 17,3 → 9,8 ms; kết quả giống hệt | [RESULTS](RESULTS.md#tốc-độ) |
-| 7 | Walk-forward LLM + MCTS | 🔧 | code xong (`main.py walkforward placebo\|freeze\|real\|summary`); chưa chạy bước nào | [WALK_FORWARD](design/WALK_FORWARD.md) |
-| 8 | Placebo walk-forward (RQ2) | 🔧 bắt đầu 2026-10-30 21:02 | 19 × 7 = 133 lượt, `results/walkforward/placebo.log` | [WALK_FORWARD](design/WALK_FORWARD.md#placebo) |
+| 7 | Walk-forward LLM + MCTS | 🔧 | code xong (`main.py walkforward placebo\|freeze\|real\|summary`); placebo đã chạy (việc 8) | [WALK_FORWARD](design/WALK_FORWARD.md) |
+| 8 | Placebo walk-forward (RQ2) | ✅ 2026-10-31 | 19 × 7 = 133 lượt, 6 giờ 10 phút; Sharpe placebo 0.11 ± 0.51, lớn nhất 1.02 ⇒ lần thật cần > 1.02 cho p = 0.05 | [WALK_FORWARD](design/WALK_FORWARD.md#placebo) |
 | 9 | Cấu hình so sánh (RQ1): MCTS không LLM, LLM không tìm, tìm ngẫu nhiên, TSMOM | ⏸️ chờ duyệt | chưa code | [WALK_FORWARD](design/WALK_FORWARD.md#cấu-hình-so-sánh) |
 | 10 | Đóng băng (`results/walkforward/frozen.json`) | ⏸️ | làm sau việc 9 (đóng băng khoá code) | [WALK_FORWARD](design/WALK_FORWARD.md#đóng-băng) |
 | 11 | Chạy thật một lần, chuỗi lợi suất ngoài mẫu 2022-07 → 2025-12 | ⏸️ | sau việc 10 | [WALK_FORWARD](design/WALK_FORWARD.md) |
-| 12 | Đo lại ước thời gian walk-forward sau tăng tốc | ⏸️ | ước cũ chưa đo lại | [WALK_FORWARD](design/WALK_FORWARD.md#thời-gian-máy) |
+| 12 | Đo lại ước thời gian walk-forward sau tăng tốc | 🔧 | placebo đo được 1.612 s/lượt (ước cũ 14 giờ ⇒ thật 6 giờ 10 phút với 10 lượt song song); các phần khác chưa ước lại | [WALK_FORWARD](design/WALK_FORWARD.md#thời-gian-máy) |
 | 13 | SPA / DSR | chưa | Tháng 4 của proposal | |
 | 14 | Web điều khiển và theo dõi | 🔧 | W1, W3b (web luận văn, 2026-10-30) xong; W2, W3–W6 còn | [WEB_DASHBOARD](design/WEB_DASHBOARD.md) |
 
