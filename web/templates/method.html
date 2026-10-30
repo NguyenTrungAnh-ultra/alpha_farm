@@ -87,13 +87,35 @@
   <p class="muted">Chọn một ô trong sơ đồ.</p>
 </div>
 
-<div class="tablebox scroll"><table>
-  <caption><b>{{ cap.windows.label }} — {{ cap.windows.title }}.</b> {{ windows_caption }}</caption>
-  <tr><th>Cửa sổ</th><th>Học từ</th><th>Học đến</th><th>Kiểm định từ</th><th>Kiểm định đến</th><th>Đánh giá từ</th><th>Đánh giá đến</th></tr>
-  {% for w in windows %}
-  <tr><td>{{ w.window }}</td><td>{{ w.search_start }}</td><td>{{ w.train_end }}</td><td>{{ w.validation_start }}</td><td>{{ w.search_end }}</td><td>{{ w.eval_start }}</td><td>{{ w.eval_end }}</td></tr>
+<figure>
+<div class="flow">
+<svg class="gantt" viewBox="0 0 {{ gantt.width }} {{ gantt.height }}" role="img" aria-label="Cửa sổ walk-forward" style="min-width:640px">
+  <rect class="oos" x="{{ gantt.oos.x }}" y="{{ gantt.plot_top }}" width="{{ gantt.oos.w }}" height="{{ gantt.plot_bottom - gantt.plot_top + 4 }}"/>
+  <text class="tick" x="{{ gantt.oos.x + 4 }}" y="{{ gantt.plot_top - 18 }}">{{ gantt.oos.label }}</text>
+  {% for t in gantt.ticks %}
+  <line class="grid" x1="{{ t.x }}" x2="{{ t.x }}" y1="{{ gantt.plot_top }}" y2="{{ gantt.plot_bottom }}"/>
+  <text class="tick" x="{{ t.x }}" y="{{ gantt.plot_bottom + 16 }}" text-anchor="middle">{{ t.label }}</text>
   {% endfor %}
-</table></div>
+  {% for r in gantt.rows %}<text class="tick" x="8" y="{{ r.y }}">CS {{ r.label }}</text>{% endfor %}
+  {% for b in gantt.bars %}<rect class="bar-{{ b.kind }}" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"><title>{{ b.tip }}</title></rect>{% endfor %}
+</svg>
+</div>
+<div class="legend" style="margin-top:8px">
+  {% for l in gantt.legend %}<span><i class="lg-{{ l.kind }}"></i>{{ l.label }}</span>{% endfor %}
+  <span><i class="lg-oos"></i>vùng ngoài mẫu</span>
+</div>
+<figcaption><b>{{ cap.windows.label }} — {{ cap.windows.title }}.</b> {{ windows_caption }}</figcaption>
+</figure>
+<style>
+.gantt .tick { fill:var(--muted); font:11px system-ui, sans-serif; }
+.gantt .grid { stroke:var(--line); stroke-dasharray:3 3; }
+.gantt .oos { fill:color-mix(in srgb, var(--accent) 20%, transparent); }
+.gantt .bar-train { fill:var(--muted); } .gantt .bar-validation { fill:var(--warn); } .gantt .bar-eval { fill:var(--accent); }
+.legend i.lg-train { background:var(--muted); border-color:var(--muted); }
+.legend i.lg-validation { background:var(--warn); border-color:var(--warn); }
+.legend i.lg-eval { background:var(--accent); border-color:var(--accent); }
+.legend i.lg-oos { background:color-mix(in srgb, var(--accent) 20%, transparent); border-color:var(--accent); }
+</style>
 
 <div class="tablebox scroll">
 {% if blueprint_set %}

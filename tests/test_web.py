@@ -291,3 +291,14 @@ def test_seed_table_separates_top5_and_all_candidates(client):
     text = client.get('/results/planted').text
     assert '0.412' in text and '0.950' in text and 'Tương quan cao nhất trong top-5' in text
     assert 'hạng kiểm định' in text.lower() or 'Hạng kiểm định' in text
+
+
+def test_method_page_draws_walkforward_timeline(tmp_path):
+    from strategy_workflows.WalkForward import WINDOWS
+    html = TestClient(web_app.create_app(tmp_path)).get('/method').text
+    svg = html[html.index('<svg class="gantt"'):html.index('</svg>', html.index('<svg class="gantt"'))]
+    for kind in ('train', 'validation', 'eval'):
+        assert svg.count(f'class="bar-{kind}"') == 7
+    first = WINDOWS[0]
+    assert f'{first.search_start} → {first.train_end}' in svg and f'{first.eval_start} → {first.eval_end}' in svg
+    assert 'Hình 3.2' in html and 'Bảng 3.1' in html

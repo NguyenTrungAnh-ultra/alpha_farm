@@ -150,7 +150,7 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
     @app.get('/method', response_class=HTMLResponse)
     def method_page(request: Request):
         return render(request, 'method.html', 'method', **pipeline.build_view(), intro=thesis.METHOD_INTRO,
-                      windows=method.window_rows(), windows_caption=thesis.WINDOWS_CAPTION,
+                      gantt=method.gantt_view(), windows_caption=thesis.WINDOWS_CAPTION,
                       blueprint_set=method.blueprint_summary(app.state.results_root),
                       blueprint_caption=thesis.BLUEPRINT_CAPTION)
 

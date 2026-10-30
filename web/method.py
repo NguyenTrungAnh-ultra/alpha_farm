@@ -64,3 +64,49 @@ def blueprint_summary(results_root: str) -> Optional[Dict]:
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return None
     return {'count': len(blueprints), 'roots': sorted(roots.items(), key=lambda kv: (-kv[1], kv[0]))}
+
+
+GANTT_WIDTH = 940
+GANTT_LEFT = 60
+GANTT_RIGHT = 20
+GANTT_TOP = 44
+GANTT_ROW = 30
+GANTT_BAR = 18
+GANTT_START = pd.Timestamp('2018-08-01')
+GANTT_END = pd.Timestamp('2026-01-01')
+SEGMENT_LABELS = {'train': 'học', 'validation': 'kiểm định', 'eval': 'đánh giá'}
+
+
+def gantt_view() -> Dict:
+    """
+    Server-side geometry of the walk-forward timeline (SVG units): one row per window, three contiguous
+    bars (train, validation, evaluation), year ticks and the out-of-sample band. Each bar carries a tooltip.
+    """
+    span = (GANTT_END - GANTT_START).days
+    plot_width = GANTT_WIDTH - GANTT_LEFT - GANTT_RIGHT
+
+    def x_of(day: pd.Timestamp) -> float:
+        return GANTT_LEFT + plot_width * (day - GANTT_START).days / span
+
+    rows = window_rows(with_bars=True)
+    bars = []
+    for i, w in enumerate(rows):
+        y = GANTT_TOP + GANTT_ROW * i + (GANTT_ROW - GANTT_BAR) / 2
+        spans = {'train': (w['search_start'], w['train_end']), 'validation': (w['validation_start'], w['search_end']),
+                 'eval': (w['eval_start'], w['eval_end'])}
+        for kind, (start, end) in spans.items():
+            x1, x2 = x_of(pd.Timestamp(start)), x_of(pd.Timestamp(end) + pd.Timedelta(days=1))
+            tip = f"Cửa sổ {w['window']}, {SEGMENT_LABELS[kind]}: {start} → {end}"
+            if w['bars']:
+                tip += f" ({w['bars'][kind]} nến)"
+            bars.append({'kind': kind, 'x': round(x1, 1), 'y': y, 'w': round(x2 - x1, 1), 'h': GANTT_BAR, 'tip': tip})
+    ticks = [{'x': round(x_of(pd.Timestamp(year=y, month=1, day=1)), 1), 'label': str(y)}
+             for y in range(GANTT_START.year + 1, GANTT_END.year + 1)]
+    first_eval, last_eval = pd.Timestamp(rows[0]['eval_start']), pd.Timestamp(rows[-1]['eval_end'])
+    height = GANTT_TOP + GANTT_ROW * len(rows) + 30
+    return {'width': GANTT_WIDTH, 'height': height, 'bars': bars, 'ticks': ticks, 'rows': [
+                {'label': w['window'], 'y': GANTT_TOP + GANTT_ROW * i + GANTT_ROW / 2 + 4} for i, w in enumerate(rows)],
+            'oos': {'x': round(x_of(first_eval), 1), 'w': round(x_of(last_eval + pd.Timedelta(days=1)) - x_of(first_eval), 1),
+                    'label': f"ngoài mẫu {first_eval:%Y-%m} → {last_eval:%Y-%m}"},
+            'plot_top': GANTT_TOP - 6, 'plot_bottom': GANTT_TOP + GANTT_ROW * len(rows),
+            'legend': [{'kind': k, 'label': v} for k, v in SEGMENT_LABELS.items()]}
