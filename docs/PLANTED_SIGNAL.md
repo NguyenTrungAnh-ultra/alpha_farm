@@ -192,6 +192,7 @@ Mỗi (độ mạnh, seed) ghi:
 - IC thực tế của tín hiệu cài trên đoạn tìm và đoạn đánh giá.
 - **Tìm lại đúng:** có alpha trong top-5 có cùng cấu trúc và trường dữ liệu với công thức cài, cửa sổ lệch không quá một nấc trong `BASE_PERIODS` đã quy đổi.
 - **Tìm lại gần:** tương quan Spearman giữa alpha tìm được và `A` trên đoạn tìm ≥ 0.7.
+  - ✅ Giữ định nghĩa này (người dùng chốt 2026-10-30): |Spearman| tính trên giá trị thô của biểu thức (trước z-score, ngưỡng, chiều của template), không trên vị thế +1/0/−1 hay lợi suất. Lý do: RQ2 hỏi có tìm ra quan hệ được cài không, không hỏi có giao dịch giống A không. Luận văn báo kèm phân bố tương quan vì mốc 0.7 là quy ước (mốc 0.8 ⇒ IC 0.1 ở cửa sổ 1 còn 4/10).
 - Sharpe ngoài mẫu của chiến lược gộp trên đoạn đánh giá.
 
 **Tiêu chí đạt [đề xuất, chốt trước khi chạy]:** ở IC 0.05, tìm lại gần ≥ 3/5 seed; ở IC 0, tìm lại gần ≤ 1/5 seed. IC 0.01 / 0.02 chỉ báo cáo, không đặt ngưỡng.
