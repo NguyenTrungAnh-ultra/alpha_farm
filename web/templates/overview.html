@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Tổng quan{% endblock %}
+{% block content %}
+<h1>Chương 1 — Tổng quan</h1>
+<div class="card">
+  <h2>{{ thesis_info.title }}</h2>
+  <p class="muted small" style="margin:0">{{ thesis_info.title_vi }}</p>
+  <p style="border-left:4px solid var(--accent); padding:6px 10px"><b>Câu hỏi chính:</b> {{ thesis_info.question }}</p>
+  <ul>
+    {% for q in thesis_info.rqs %}<li><b>{{ q.id }}. {{ q.name }}.</b> {{ q.text }}</li>{% endfor %}
+  </ul>
+  <p class="muted small">{{ intro }}</p>
+</div>
+
+<div class="tablebox scroll"><table>
+  <caption><b>Tiến độ luận văn.</b> Mỗi chương và mỗi bảng, hình đánh số một dòng.</caption>
+  <tr><th>Mục</th><th class="left">Nội dung</th><th>Trả lời</th><th>Trạng thái</th></tr>
+  {% for r in rows %}
+  <tr>
+    <td class="left">{% if r.kind == 'chapter' %}<b>{{ r.label }}</b>{% else %}&nbsp;&nbsp;{{ r.label }}{% endif %}</td>
+    <td class="left">{% if r.kind == 'chapter' %}<a href="{{ r.path }}"><b>{{ r.title }}</b></a>{% else %}<a href="{{ r.path }}">{{ r.title }}</a>{% endif %}</td>
+    <td>{{ r.rq }}</td>
+    <td class="left">{{ r.mark }} {{ r.status_label }}</td>
+  </tr>
+  {% endfor %}
+</table></div>
+{% endblock %}

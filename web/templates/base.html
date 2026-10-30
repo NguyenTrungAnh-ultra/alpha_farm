@@ -17,6 +17,12 @@ aside .brand { font-weight:700; margin:0 8px 12px; }
 aside a.nav { color:var(--muted); text-decoration:none; padding:8px 10px; border-radius:6px; transition:background .2s, color .2s; }
 aside a.nav:hover { background:var(--bg); }
 aside a.nav.on { color:#fff; background:var(--accent); }
+aside .navhead { margin:14px 10px 2px; font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+figure, .tablebox { margin:0 0 20px; }
+figcaption, caption { font-size:13px; color:var(--text); text-align:left; margin:6px 0; caption-side:top; }
+caption b, figcaption b { font-weight:700; }
+.reading { color:var(--muted); }
+.pending { border-left:4px solid var(--warn); }
 #strip { margin-top:auto; font-size:12px; color:var(--muted); display:grid; gap:6px; }
 #strip .row { display:flex; justify-content:space-between; } #strip .row b { color:var(--text); font-weight:600; }
 main { flex:1; min-width:0; max-width:1150px; margin:0 auto; padding:20px; animation:fadein .35s ease; }
@@ -54,8 +60,15 @@ select, button { font:inherit; padding:4px 8px; }
 <body>
 <aside>
   <div class="brand">Alpha Farm</div>
-  <a class="nav {% if active == 'pipeline' %}on{% endif %}" href="/pipeline">Luồng chính</a>
-  <a class="nav {% if active == 'planted' %}on{% endif %}" href="/planted">Bài cài tín hiệu</a>
+  <a class="nav {% if active == 'overview' %}on{% endif %}" href="/">Tổng quan</a>
+  <a class="nav {% if active == 'data' %}on{% endif %}" href="/data">Dữ liệu</a>
+  <a class="nav {% if active == 'method' %}on{% endif %}" href="/method">Phương pháp</a>
+  <div class="navhead">Kết quả</div>
+  <a class="nav {% if active == 'planted' %}on{% endif %}" href="/results/planted">Bài cài tín hiệu (RQ2)</a>
+  <a class="nav {% if active == 'placebo' %}on{% endif %}" href="/results/placebo">Placebo (RQ2)</a>
+  <a class="nav {% if active == 'rq1' %}on{% endif %}" href="/results/rq1">Vai trò của LLM (RQ1)</a>
+  <a class="nav {% if active == 'walkforward' %}on{% endif %}" href="/results/walkforward">Chuỗi ngoài mẫu</a>
+  <div class="navhead">Công cụ (ngoài luận văn)</div>
   <a class="nav {% if active == 'system' %}on{% endif %}" href="/system">Tài nguyên máy</a>
   <div id="strip">
     <div class="row"><span>CPU</span><b id="s-cpu">–</b></div><div class="bar" id="s-cpu-bar"><i></i></div>
@@ -104,22 +117,30 @@ function poll() {
 }
 poll(); setInterval(poll, 5000);
 var COLORS = ['#2a6fdb', '#e8833a', '#2a9d6f', '#8a4fc7', '#c0392b', '#7f8c8d', '#c2a000', '#17a2b8'];
-function xyChart(canvasId, series, xTitle, yTitle, withStd) {
+// points: [x, rate, low, high]; the interval is drawn as a dashed band.
+function intervalChart(canvasId, points, xTitle, yTitle) {
   var el = document.getElementById(canvasId); if (!el || typeof Chart === 'undefined') { return; }
-  var datasets = [];
-  series.forEach(function (s, i) {
-    var c = COLORS[i % COLORS.length];
-    datasets.push({ label: s.label, data: s.points.map(function (p) { return { x: p[0], y: p[1] }; }), borderColor: c, backgroundColor: c, tension: 0.2 });
-    if (withStd) {
-      [1, -1].forEach(function (sign) {
-        datasets.push({ label: s.label + (sign > 0 ? ' +σ' : ' −σ'), borderColor: c, borderDash: [4, 4], borderWidth: 1, pointRadius: 0,
-          data: s.points.map(function (p) { return { x: p[0], y: p[1] === null ? null : p[1] + sign * (p[2] || 0) }; }) });
-      });
-    }
-  });
-  new Chart(el, { type: 'line', data: { datasets: datasets }, options: { maintainAspectRatio: false, parsing: false,
-    scales: { x: { type: 'linear', title: { display: true, text: xTitle } }, y: { title: { display: true, text: yTitle } } },
-    plugins: { legend: { labels: { filter: function (item) { return !/[σ]$/.test(item.text); } } } } } });
+  var pick = function (i) { return points.map(function (p) { return { x: p[0], y: p[i] }; }); };
+  new Chart(el, { type: 'line', data: { datasets: [
+      { label: 'tỷ lệ tìm lại gần', data: pick(1), borderColor: COLORS[0], backgroundColor: COLORS[0], pointRadius: 5 },
+      { label: 'cận dưới Wilson 95%', data: pick(2), borderColor: COLORS[1], borderDash: [4, 4], borderWidth: 1, pointRadius: 2 },
+      { label: 'cận trên Wilson 95%', data: pick(3), borderColor: COLORS[1], borderDash: [4, 4], borderWidth: 1, pointRadius: 2 }] },
+    options: { maintainAspectRatio: false, parsing: false, scales: {
+      x: { type: 'linear', title: { display: true, text: xTitle } },
+      y: { min: 0, max: 1, title: { display: true, text: yTitle } } } } });
+}
+// points: [{x, y}] drawn as dots; `line` is a horizontal reference value.
+function dotChart(canvasId, points, line, xTitle, yTitle, lineLabel) {
+  var el = document.getElementById(canvasId); if (!el || typeof Chart === 'undefined') { return; }
+  var xs = points.map(function (p) { return p.x; });
+  var lo = Math.min.apply(null, xs.concat([0])), hi = Math.max.apply(null, xs.concat([0.1]));
+  new Chart(el, { type: 'scatter', data: { datasets: [
+      { label: 'một seed', data: points, backgroundColor: COLORS[0], pointRadius: 5 },
+      { label: lineLabel, type: 'line', data: [{ x: lo, y: line }, { x: hi, y: line }], borderColor: COLORS[4],
+        borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0 }] },
+    options: { maintainAspectRatio: false, parsing: false, scales: {
+      x: { type: 'linear', title: { display: true, text: xTitle } },
+      y: { min: 0, max: 1, title: { display: true, text: yTitle } } } } });
 }
 var markerPlugin = { id: 'markers', afterDatasetsDraw: function (chart, args, opts) {
   var m = (chart.options.plugins.markers || {}).list || []; var ctx = chart.ctx; var area = chart.chartArea;

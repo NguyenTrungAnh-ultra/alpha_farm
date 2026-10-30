@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ page.title }}{% endblock %}
+{% block content %}
+<h1>{{ page.title }}</h1>
+<p><b>Trả lời {{ page.rq }}:</b> {{ page.answers }}</p>
+<h3>Sẽ có trong chương này</h3>
+<ul>{% for line in page.will_show %}<li>{{ line }}</li>{% endfor %}</ul>
+<div class="card pending">
+  <b>Chưa có kết quả.</b>
+  <p class="small" style="margin-bottom:0">Điều kiện để có: {{ page.condition }}</p>
+</div>
+{% endblock %}

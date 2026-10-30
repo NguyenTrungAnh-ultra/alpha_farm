@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Minh hoạ{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p><a href="/results/planted">← Kết quả bài cài tín hiệu</a></p>
+{% if strengths and seeds %}
+<form class="pick" method="get">
+  <label>IC mục tiêu <select name="strength">{% for s in strengths %}<option value="{{ s }}" {% if s == strength %}selected{% endif %}>{{ '%g' | format(s) }}</option>{% endfor %}</select></label>
+  <label>Seed <select name="seed">{% for s in seeds %}<option value="{{ s }}" {% if s == seed %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
+  <button type="submit">Dựng lại</button>
+</form>
+<p class="muted small">Dựng lại vài giây một bộ dữ liệu của bài cài tín hiệu. Đoạn: tìm {{ segments.search_start }} → {{ segments.train_end }} (học), → {{ segments.search_end }} (kiểm định), → {{ segments.eval_end }} (đánh giá).</p>
+{% endif %}
+
+{% if view.message %}
+<div class="card">{{ view.message }}</div>
+{% else %}
+<div class="card">
+  <p class="small">Công thức A: <code>{{ view.formula_expr }}</code>, z-score cửa sổ {{ view.z_window }} ·
+    beta {{ view.beta | fmt(5) }} · IC tìm {{ view.ic_search | fmt(3) }} · IC đánh giá {{ view.ic_eval | fmt(3) }}</p>
+  <div class="chartbox tall"><canvas id="c-prices"></canvas></div>
+</div>
+<div class="card"><div class="chartbox"><canvas id="c-signal"></canvas></div></div>
+<div class="card">
+  <h2>Đường vốn trên đoạn đánh giá</h2>
+  {% if view.equity %}
+  <div class="chartbox"><canvas id="c-equity"></canvas></div>
+  <p class="small muted">Công thức đã cài, ngưỡng z = {{ view.equity_stats.z }}, hướng {{ view.equity_stats.direction | int }} (chọn trên đoạn tìm) ·
+    Sharpe {{ view.equity_stats.sharpe | fmt(2) }} · {{ view.equity_stats.trades }} lệnh.</p>
+  {% else %}<p class="muted">Không dựng được đường vốn: {{ view.equity_error }}</p>{% endif %}
+</div>
+{% endif %}
+{% if not view.message %}
+<script type="application/json" id="chart-data">{{ {'prices': view.prices, 'signal': view.signal, 'equity': view.equity} | tojson }}</script>
+<script>
+window.addEventListener('load', function () {
+  var d = JSON.parse(document.getElementById('chart-data').textContent);
+  timeChart('c-prices', d.prices); timeChart('c-signal', d.signal);
+  if (d.equity) { timeChart('c-equity', d.equity); }
+});
+</script>
+{% endif %}
+{% endblock %}

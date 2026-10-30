@@ -1,42 +1,46 @@
 """
-Read-only view of the planted-signal result folders (`<results>/planted*/`).
+Read-only view of the thesis planted-signal result folder (`<results>/THESIS_PLANTED_DIR`).
 
 Nothing here writes: files are opened for reading only, and missing or half-written files give empty
-results. A folder name coming from a URL is only ever matched against the folders found on disk.
+results. Only the one folder named by THESIS_PLANTED_DIR is ever read.
 """
 
 import json
+import math
 import os
-import re
-import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
-from strategy_workflows.PlantedSignal import Segments
+from strategy_workflows.PlantedSignal import NEAR_CORRELATION, Segments
 from strategy_workflows.RunPlantedSignal import RUN_KEY, summarize_runs
 
-# A search whose log/runs.csv has not been touched for this long is shown as stopped, not running.
-RUNNING_FRESH_S = 6 * 3600
-RUN_COUNT_PATTERN = re.compile(r'\[planted\] (\d+) runs')
+THESIS_PLANTED_DIR = 'planted_window1'
+FORMULA_FILE = 'planted_formula.json'
+POSITIONS_FILE = 'positions_vs_a.json'
 BOOL_COLUMNS = ('exact', 'near')
-NUMERIC_COLUMNS = ('strength', 'seed', 'ic_search', 'ic_eval', 'closest_corr', 'closest_train_rank',
-                   'closest_val_rank', 'oos_sharpe', 'elapsed_s')
-SEED_TABLE_COLUMNS = ('reward_mode', 'strength', 'seed', 'closest_expr', 'closest_corr', 'closest_train_rank',
-                      'closest_val_rank', 'exact', 'near', 'oos_sharpe')
+NUMERIC_COLUMNS = ('strength', 'seed', 'ic_search', 'ic_eval', 'closest_corr', 'closest_val_rank', 'best_corr',
+                   'oos_sharpe', 'elapsed_s')
+SEED_TABLE_COLUMNS = ('strength', 'seed', 'best_corr', 'exact', 'near', 'oos_sharpe', 'closest_expr', 'closest_corr',
+                      'closest_val_rank')
+# Position-comparison records keep these keys only.
+POSITION_KEYS = ('strength', 'seed', 'best_pos_corr', 'best_agree_active', 'closest_corr', 'a_flat_share')
 
 
-def list_dirs(root: str) -> List[str]:
-    """Names of the `planted*` folders directly under `root`, sorted."""
-    if not os.path.isdir(root):
-        return []
-    return sorted(n for n in os.listdir(root) if n.startswith('planted') and os.path.isdir(os.path.join(root, n)))
+def thesis_dir(root: str) -> str:
+    return os.path.join(root, THESIS_PLANTED_DIR)
 
 
-def resolve_dir(root: str, name: str) -> Optional[str]:
-    """Absolute folder path when `name` is exactly one of the listed folders, else None."""
-    return os.path.join(root, name) if name in list_dirs(root) else None
+def wilson_interval(successes: int, n: int, z: float = 1.96) -> Tuple[float, float]:
+    """Wilson score interval of a binomial proportion (95% by default); (nan, nan) when n == 0."""
+    if n <= 0:
+        return float('nan'), float('nan')
+    p = successes / n
+    denom = 1.0 + z * z / n
+    centre = (p + z * z / (2 * n)) / denom
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+    return max(0.0, centre - half), min(1.0, centre + half)
 
 
 def read_segments(folder: str) -> Segments:
@@ -48,13 +52,18 @@ def read_segments(folder: str) -> Segments:
         return Segments()
 
 
-def _read_csv(path: str) -> pd.DataFrame:
-    if not os.path.exists(path):
-        return pd.DataFrame()
+def read_json(path: str):
     try:
-        return pd.read_csv(path, on_bad_lines='skip')
-    except (OSError, ValueError, pd.errors.ParserError, pd.errors.EmptyDataError):
-        return pd.DataFrame()
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def read_formula_expr(folder: str) -> Optional[str]:
+    """Expression text of the planted formula; None when the file is missing or unreadable."""
+    data = read_json(os.path.join(folder, FORMULA_FILE))
+    return str(data['expression']) if isinstance(data, dict) and 'expression' in data else None
 
 
 def read_runs(folder: str) -> pd.DataFrame:
@@ -62,7 +71,13 @@ def read_runs(folder: str) -> pd.DataFrame:
     runs.csv cleaned for aggregation: numeric columns coerced, exact/near as bool, rows without a
     key or without the last column (a half-written row) dropped, RUN_KEY columns filled when absent.
     """
-    runs = _read_csv(os.path.join(folder, 'runs.csv'))
+    path = os.path.join(folder, 'runs.csv')
+    if not os.path.exists(path):
+        return pd.DataFrame()
+    try:
+        runs = pd.read_csv(path, on_bad_lines='skip')
+    except (OSError, ValueError, pd.errors.ParserError, pd.errors.EmptyDataError):
+        return pd.DataFrame()
     if runs.empty or not {'strength', 'seed'} <= set(runs.columns):
         return pd.DataFrame()
     if 'reward_mode' not in runs.columns:
@@ -81,99 +96,76 @@ def read_runs(folder: str) -> pd.DataFrame:
     return runs.reset_index(drop=True)
 
 
-def read_oracle(folder: str) -> pd.DataFrame:
-    return _read_csv(os.path.join(folder, 'oracle.csv'))
-
-
-def expected_runs(folder: str) -> Optional[int]:
-    """Total runs announced by the search ("[planted] N runs" line of search.log); None when absent."""
-    path = os.path.join(folder, 'search.log')
-    if not os.path.exists(path):
-        return None
-    try:
-        with open(path, 'rb') as f:
-            text = f.read().decode('utf-8', errors='replace')
-    except OSError:
-        return None
-    found = RUN_COUNT_PATTERN.findall(text)
-    return int(found[-1]) if found else None
-
-
-def _mtime(path: str) -> Optional[float]:
-    try:
-        return os.path.getmtime(path)
-    except OSError:
-        return None
-
-
-def folder_info(folder: str, now: Optional[float] = None) -> Dict:
-    """Overview of one folder: segments, reward modes, runs done / expected, running flag."""
-    now = time.time() if now is None else now
-    runs = read_runs(folder)
-    done = len(runs.drop_duplicates(subset=RUN_KEY, keep='last')) if not runs.empty else 0
-    modes = sorted(runs['reward_mode'].unique()) if not runs.empty else []
-    expected = expected_runs(folder)
-    expected_is_estimate = False
-    oracle = read_oracle(folder)
-    has_log = os.path.exists(os.path.join(folder, 'search.log'))
-    # Without the announcing log line, one oracle row per (strength, seed) is the best guess of the run count.
-    if expected is None and has_log and len(modes) <= 1 and not oracle.empty:
-        expected, expected_is_estimate = len(oracle), True
-    log_time = _mtime(os.path.join(folder, 'search.log'))
-    runs_time = _mtime(os.path.join(folder, 'runs.csv'))
-    summary_time = _mtime(os.path.join(folder, 'summary.csv'))
-    if expected is not None:
-        complete = done >= expected
-    else:
-        complete = summary_time is not None and runs_time is not None and summary_time >= runs_time
-    last_touch = max([t for t in (log_time, runs_time) if t is not None], default=None)
-    running = (log_time is not None and not complete and last_touch is not None
-               and now - last_touch < RUNNING_FRESH_S)
-    return {
-        'name': os.path.basename(folder), 'segments': read_segments(folder).to_dict(), 'modes': modes,
-        'done': done, 'expected': expected, 'expected_is_estimate': expected_is_estimate,
-        'running': running, 'has_runs': not runs.empty, 'has_oracle': not oracle.empty,
-    }
-
-
-def strength_table(runs: pd.DataFrame) -> pd.DataFrame:
-    """Per (reward_mode, strength) table from the same aggregation `main.py planted summary` uses."""
-    return summarize_runs(runs) if not runs.empty else pd.DataFrame()
+def strength_table(runs: pd.DataFrame) -> List[Dict]:
+    """One dict per target IC from `summarize_runs`, plus the 95% Wilson interval of the near-recovery rate."""
+    if runs.empty:
+        return []
+    rows = []
+    for row in summarize_runs(runs).sort_values('strength').to_dict('records'):
+        n, near = int(row['n_runs']), int(row['near_count'])
+        row['n_runs'], row['near_count'], row['exact_count'] = n, near, int(row['exact_count'])
+        row['near_low'], row['near_high'] = wilson_interval(near, n)
+        rows.append(row)
+    return rows
 
 
 def seed_table(runs: pd.DataFrame) -> List[Dict]:
-    """One dict per run (the last of each key), with the top expressions parsed from their JSON list."""
+    """One dict per run (the last of each key), ordered by target IC then seed."""
     if runs.empty:
         return []
-    runs = runs.drop_duplicates(subset=RUN_KEY, keep='last').sort_values(['reward_mode', 'strength', 'seed'])
+    runs = runs.drop_duplicates(subset=RUN_KEY, keep='last').sort_values(['strength', 'seed'])
     rows = []
     for _, row in runs.iterrows():
         item = {c: row[c] for c in SEED_TABLE_COLUMNS if c in runs.columns}
-        item['top_exprs'] = _json_list(row.get('top_exprs'))
+        item['seed'] = int(item['seed'])
         rows.append(item)
     return rows
 
 
-def _json_list(value) -> List[str]:
-    try:
-        parsed = json.loads(value)
-    except (TypeError, ValueError):
+def read_positions(folder: str) -> List[Dict]:
+    """Records of the position comparison with A; empty when the file is missing or malformed."""
+    data = read_json(os.path.join(folder, POSITIONS_FILE))
+    if not isinstance(data, list):
         return []
-    return [str(v) for v in parsed] if isinstance(parsed, list) else []
+    return [{k: record.get(k) for k in POSITION_KEYS} for record in data
+            if isinstance(record, dict) and {'strength', 'best_pos_corr'} <= set(record)]
 
 
-def present_values(runs: pd.DataFrame, oracle: pd.DataFrame, column: str) -> List[float]:
-    """Sorted distinct values of `column` found in runs.csv and oracle.csv."""
-    values = set()
-    for frame in (runs, oracle):
-        if not frame.empty and column in frame.columns:
-            values.update(float(v) for v in pd.to_numeric(frame[column], errors='coerce').dropna())
-    return sorted(values)
+def position_table(records: List[Dict]) -> List[Dict]:
+    """Per target IC: number of seeds and mean / min / max of the best top-5 position correlation with A."""
+    if not records:
+        return []
+    frame = pd.DataFrame(records)
+    frame['best_pos_corr'] = pd.to_numeric(frame['best_pos_corr'], errors='coerce')
+    rows = []
+    for strength, sub in frame.groupby('strength'):
+        values = sub['best_pos_corr'].dropna()
+        rows.append({'strength': float(strength), 'n': int(len(values)),
+                     'mean': float(values.mean()) if len(values) else float('nan'),
+                     'min': float(values.min()) if len(values) else float('nan'),
+                     'max': float(values.max()) if len(values) else float('nan')})
+    return sorted(rows, key=lambda r: r['strength'])
 
 
-def run_mode(runs: pd.DataFrame, strength: float, seed: int) -> str:
-    """Reward mode of the run at (strength, seed); 'soft' when that run is not in runs.csv."""
-    if runs.empty:
-        return 'soft'
-    match = runs[np.isclose(runs['strength'], strength) & (runs['seed'] == seed)]
-    return str(match['reward_mode'].iloc[-1]) if not match.empty else 'soft'
+def present_values(runs: pd.DataFrame, column: str) -> List[float]:
+    """Sorted distinct values of `column` in runs.csv."""
+    if runs.empty or column not in runs.columns:
+        return []
+    return sorted(float(v) for v in pd.to_numeric(runs[column], errors='coerce').dropna().unique())
+
+
+def closest_points(seed_rows: List[Dict]) -> List[Dict]:
+    """[{x: target IC, y: closest_corr}] per seed for the dot chart."""
+    return [{'x': float(r['strength']), 'y': None if pd.isna(r['closest_corr']) else float(r['closest_corr'])}
+            for r in seed_rows if 'closest_corr' in r]
+
+
+def near_chart_points(rows: List[Dict]) -> List[List[Optional[float]]]:
+    """[target IC, rate, low, high] per row; non-finite values become None."""
+    def clean(v):
+        return None if v is None or (isinstance(v, float) and not math.isfinite(v)) else float(v)
+    return [[clean(r['strength']), clean(r['near_rate']), clean(r['near_low']), clean(r['near_high'])] for r in rows]
+
+
+def near_threshold() -> float:
+    return NEAR_CORRELATION

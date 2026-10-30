@@ -122,6 +122,7 @@ Web có nút khởi chạy tính toán trên máy này, nên chỉ được mở
 | Giai đoạn | Việc | Xong khi |
 |---|---|---|
 | W3a ✅ | Web chỉ xem, đọc thẳng tệp kết quả (chưa có DB): trang bài cài tín hiệu (mục 10), trang 8 tài nguyên máy | mở `http://127.0.0.1:8000`, thấy bảng + hình của `results/planted*/`, thấy tiến độ lượt `search` đang chạy và CPU / RAM / GPU |
+| W3b | Web luận văn (mục 10) | mọi trang ở mục 10 mở được; trang `/results/planted` chỉ đọc `planted_window1` |
 | W1 ✅ | Móc tiến độ / dừng / danh sách blueprint / đếm −10 vào lõi (mục 4, điểm 1–4; điểm 5 làm ở W2 cùng bảng `run`) | test mục 4 xanh, CLI ra cùng kết quả |
 | W2 | Schema SQLite + bộ ghi + runner chạy được từ dòng lệnh | một lượt `mcts` thật ghi đủ bảng, đo được tốc độ chậm đi bao nhiêu |
 | W3 | Web chỉ xem: trang 1, 3, 5, 8 | xem được lượt đang chạy trên `127.0.0.1` |
@@ -131,16 +132,43 @@ Web có nút khởi chạy tính toán trên máy này, nên chỉ được mở
 
 Code giao cho agent `coder` từng giai đoạn, kiểm xong mới sang giai đoạn sau.
 
-## 10. W3a — xem bài cài tín hiệu (làm trước W2)
+## 10. Web luận văn (W3b, thay trang W3a)
 
-Bài cài tín hiệu chạy bằng `main.py planted` và ghi CSV, không qua runner / DB, nên trang xem nó đọc thẳng tệp.
+Web đọc như chính bài luận: mỗi trang là một chương, mỗi bảng / hình có số thứ tự, chú thích nói **trả lời câu hỏi nào** (RQ1 / RQ2) và một câu đọc kết quả. Chỉ hiện cấu hình đã chốt cho luận văn; ⛔ so các phương án đã thử trong quá trình làm (thư mục cũ, reward mode cũ, ngữ pháp cũ), ⛔ bảng thô nội bộ.
 
-- **Nguồn dữ liệu:** mỗi thư mục `results/planted*/` có `segments.json` (nếu thiếu: cách chia lần 2), `oracle.csv`, `runs.csv`, `summary.csv`, `calibration.json`, `search.log`. Web chỉ đọc, không ghi gì vào `results/`.
-- **Trang "Bài cài tín hiệu":**
-  - Danh sách các thư mục, mỗi thư mục: cách chia đoạn, reward mode, số lượt xong / dự kiến (đang chạy thì hiện tiến độ từ `runs.csv` + `search.log`).
-  - Bảng theo độ mạnh: IC đo được, tìm lại đúng / gần (x/5), Sharpe ngoài mẫu trung bình ± độ lệch; bảng theo từng seed (công thức gần A nhất, tương quan, hạng học, hạng kiểm định, top-5).
-  - Hình so các thư mục: tỷ lệ tìm lại gần theo IC; Sharpe ngoài mẫu theo IC; reward của đáp án (oracle) theo IC.
-- **Trang "Một bộ dữ liệu" (chọn thư mục × độ mạnh × seed):** dựng lại dữ liệu bằng `build_planted_data` (vài giây) và vẽ: giá thật vs giá placebo vs giá đã cài; tín hiệu A theo thời gian kèm ranh giới học / kiểm định / đánh giá; đường vốn của chính A và của top-5 đã chọn trên đoạn đánh giá. Mục đích: thấy tận mắt "cài tín hiệu" làm gì với giá.
-- **Trang "Tài nguyên máy" (trang 8):** CPU tổng và từng nhân, RAM, GPU % và VRAM (`nvidia-smi`), ổ đĩa; tự cập nhật mỗi 5 giây; không đọc được GPU thì hiện "không đọc được".
-- **Kỹ thuật:** FastAPI + Jinja2, nghe `127.0.0.1:8000`. Hình vẽ phía server bằng matplotlib (đã có trong môi trường) thành SVG, không tải thư viện JS từ mạng; phần tự cập nhật dùng JavaScript thuần gọi API JSON. Thêm `fastapi`, `uvicorn`, `jinja2`, `psutil` vào `requirements.in`.
-- **Ràng buộc:** web không đổi phép tính; dựng lại dữ liệu dùng đúng hàm của bài test.
+**Vấn đề của trang W3a (soát 2026-10-30):**
+- Không nói bài cài tín hiệu trả lời RQ2, không giải thích A là gì, "tìm lại gần / đúng" nghĩa là gì.
+- Liệt kê bốn thư mục (`planted`, `planted_run2_sharpe`, `planted_run3`, `planted_window1`) với reward `soft` / `sharpe` và hình so giữa chúng: đó là quá trình chọn phương án, không phải kết quả.
+- Bảng oracle thô (`reward_gated`, `z_soft`, `calmar`, seed in `1.0000` …) hiện ra trang.
+- "20 / 15 lượt": số lượt dự kiến đọc từ dòng đầu `search.log`, sai khi chạy thêm seed.
+- Chữ trạng thái nội bộ ("có search.log, chưa đủ lượt…").
+- Trang gốc `/` là bài cài tín hiệu, không có trang tổng quan tiến độ luận văn.
+- Ghi chú ô `rq2_planted` trên `/pipeline` còn nhắc "lần chạy 1–3 (ngữ pháp cũ)".
+- Kết quả so vị thế (`positions_vs_a.json`) chưa có trên web.
+- Trang "Một bộ dữ liệu" không vẽ được đường vốn top-5 vì `runs.csv` không lưu tham số template.
+
+**Cấu trúc:**
+
+| Đường dẫn | Chương | Nội dung |
+|---|---|---|
+| `/` | Tổng quan | tên đề tài, câu hỏi chính, RQ1 / RQ2; bảng tiến độ: mỗi chương / mỗi bảng-hình một dòng, trạng thái ✅ / 🔧 / chưa có |
+| `/method` | Phương pháp | sơ đồ luồng chính (trang `/pipeline` hiện có), bảng cửa sổ walk-forward, bộ blueprint đã đóng băng |
+| `/data` | Dữ liệu | VN30F1M 60m 2018-08 → 2025-12, số bar từng đoạn, ghi chú dữ liệu |
+| `/results/planted` | Kết quả — RQ2, kiểm soát dương | xem dưới |
+| `/results/placebo` | Kết quả — RQ2, kiểm soát âm | "chưa có kết quả" + điều kiện để có |
+| `/results/rq1` | Kết quả — RQ1 | như trên |
+| `/results/walkforward` | Kết quả — chuỗi ngoài mẫu | như trên |
+| `/system` | Công cụ (ngoài luận văn) | tài nguyên máy, tiến độ lượt chạy đang chạy |
+
+**Trang `/results/planted`** (nguồn duy nhất: thư mục kết quả luận văn, hằng `THESIS_PLANTED_DIR = 'planted_window1'` trong `web/`):
+1. Đoạn mở: câu hỏi (quy trình có tìm lại một tín hiệu biết trước không → RQ2), cách làm trong ba câu (xáo lợi suất, cài A với IC biết trước, chạy đúng quy trình luận văn), A viết bằng lời và bằng công thức.
+2. Bảng: IC mục tiêu · số seed · IC đo được (đoạn tìm, đoạn đánh giá) · tìm lại gần · tìm lại đúng · Sharpe ngoài mẫu. Chú thích định nghĩa "tìm lại gần / đúng".
+3. Hình: tỷ lệ tìm lại gần theo IC (kèm khoảng tin cậy 95% Wilson) → đọc ra ngưỡng phát hiện.
+4. Hình: tương quan của ứng viên gần A nhất ở mỗi seed theo IC (chấm từng seed, vạch mốc 0.7).
+5. Bảng / hình: tương quan vị thế tốt nhất trong top-5 với A, theo IC, kèm mức nhiễu (IC 0) — từ `positions_vs_a.json` nếu có.
+6. Bảng từng seed (gọn): IC · seed · công thức gần A nhất · tương quan · tìm lại gần / đúng · Sharpe ngoài mẫu.
+7. Liên kết tới trang minh hoạ một bộ dữ liệu (giữ trang hiện có, đổi tiêu đề thành "Minh hoạ: cài tín hiệu làm gì với giá", bỏ chọn thư mục).
+
+**Nội dung chữ** (đoạn mở, chú thích, câu đọc kết quả, trạng thái từng chương) nằm trong một module Python của `web/` như `web/pipeline.py`; số liệu luôn tính từ tệp kết quả. Web không đọc `docs/`.
+
+**Giữ nguyên:** chỉ đọc, nghe `127.0.0.1`, không đổi phép tính; FastAPI + Jinja2, Chart.js như hiện có.

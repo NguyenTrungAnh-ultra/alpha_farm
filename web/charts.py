@@ -4,7 +4,7 @@ NaN / inf become None, series are thinned to at most MAX_POINTS.
 """
 
 import math
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, Sequence
 
 import pandas as pd
 
@@ -18,48 +18,6 @@ def clean(value):
     if isinstance(value, float) and not math.isfinite(value):
         return None
     return value
-
-
-def _thin(series: pd.Series) -> pd.Series:
-    return series.iloc[::max(1, len(series) // MAX_POINTS)]
-
-
-def comparison_data(entries: List[Dict]) -> Dict:
-    """
-    Data for the cross-folder charts. Each entry: {'name', 'strengths': summarize_runs table (may be empty),
-    'oracle': oracle.csv frame (may be empty)}.
-    'near' / 'oos': one series per (folder, reward mode) with points [ic, near_rate] / [ic, mean, std];
-    'oracle': per folder, one line per reward column (mean over seeds per strength) as [ic, reward].
-    """
-    near, oos = [], []
-    for entry in entries:
-        table = entry['strengths']
-        if table is None or table.empty:
-            continue
-        for mode, sub in table.groupby('reward_mode'):
-            sub = sub.sort_values('ic_search')
-            label = entry['name'] if table['reward_mode'].nunique() == 1 else f"{entry['name']} · {mode}"
-            near.append({'label': label, 'points': [[clean(r.ic_search), clean(r.near_rate)] for r in sub.itertuples()]})
-            oos.append({'label': label, 'points': [[clean(r.ic_search), clean(r.oos_sharpe_mean), clean(r.oos_sharpe_std)]
-                                                  for r in sub.itertuples()]})
-    return {'near': near, 'oos': oos, 'oracle': _oracle_data(entries)}
-
-
-def _oracle_data(entries: List[Dict]) -> List[Dict]:
-    panels = []
-    for entry in entries:
-        oracle = entry['oracle']
-        if oracle is None or oracle.empty or 'strength' not in oracle.columns:
-            continue
-        columns = [c for c in oracle.columns if c.startswith('reward_') and not c.endswith('_val')]
-        if not columns:
-            continue
-        ic_col = 'ic_search' if 'ic_search' in oracle.columns else 'strength'
-        grouped = oracle.groupby('strength')[[ic_col] + columns].mean().sort_values(ic_col)
-        lines = [{'label': c, 'points': [[clean(x), clean(y)] for x, y in zip(grouped[ic_col], grouped[c])]}
-                 for c in columns]
-        panels.append({'name': entry['name'], 'lines': lines})
-    return panels
 
 
 def time_series(series: Dict[str, pd.Series], markers: Sequence[tuple] = ()) -> Dict:

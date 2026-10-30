@@ -1,113 +1,85 @@
 {% extends "base.html" %}
 {% block title %}Bài cài tín hiệu{% endblock %}
 {% block content %}
-<h1>Bài cài tín hiệu{% if only %} · {{ only }}{% endif %}</h1>
+<h1>{{ t.PLANTED_TITLE }}</h1>
 
-{% if not names %}
-<div class="card muted">Không có thư mục <code>planted*</code> nào trong thư mục kết quả.</div>
+<div class="card">
+  <p><b>{{ t.PLANTED_QUESTION }}</b></p>
+  <ol>{% for step in t.PLANTED_METHOD %}<li>{{ step }}</li>{% endfor %}</ol>
+  <p>Tín hiệu cài sẵn, gọi là A:
+    {% if formula_expr %}<code>{{ formula_expr }}</code>{% else %}{{ t.PLANTED_FORMULA_MISSING }}{% endif %}</p>
+  <p>{{ t.PLANTED_FORMULA_WORDS }}</p>
+  <p class="small muted">{{ near_definition }}</p>
+</div>
+
+<div class="tablebox scroll">
+{% if rows %}
+<table>
+  <caption><b>{{ cap.planted_table.label }} — {{ cap.planted_table.title }}.</b> {{ t.PLANTED_TABLE_RQ }}
+    <span class="reading">{{ readings.table }}</span></caption>
+  <tr><th>IC mục tiêu</th><th>Số seed</th><th>IC đo được (đoạn tìm)</th><th>IC đo được (đoạn đánh giá)</th><th>Tìm lại gần</th><th>Tìm lại đúng</th><th>Sharpe ngoài mẫu (TB ± độ lệch)</th></tr>
+  {% for r in rows %}
+  <tr><td>{{ '%g' | format(r.strength) }}</td><td>{{ r.n_runs }}</td><td>{{ r.ic_search | fmt(3) }}</td><td>{{ r.ic_eval | fmt(3) }}</td>
+    <td>{{ r.near_count }}/{{ r.n_runs }}</td><td>{{ r.exact_count }}/{{ r.n_runs }}</td>
+    <td>{{ r.oos_sharpe_mean | fmt(2) }} ± {{ r.oos_sharpe_std | fmt(2) }}</td></tr>
+  {% endfor %}
+</table>
 {% else %}
-
-<div class="card">
-  <h2>Các thư mục</h2>
-  <div class="scroll"><table>
-    <tr><th>Thư mục</th><th>Cách chia đoạn (train_end / search_end / eval_end)</th><th>Reward mode</th><th>Lượt xong / dự kiến</th></tr>
-    {% for n in names %}{% set i = views[n].info %}
-    <tr>
-      <td class="left"><a href="/planted/{{ n }}">{{ n }}</a>{% if i.running %}<span class="badge">đang chạy</span>{% endif %}</td>
-      <td class="left">{{ i.segments.train_end }} / {{ i.segments.search_end }} / {{ i.segments.eval_end }}</td>
-      <td class="left">{{ i.modes | join(', ') if i.modes else '–' }}</td>
-      <td>{{ i.done }} / {% if i.expected is none %}?{% else %}{% if i.expected_is_estimate %}~{% endif %}{{ i.expected }}{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </table></div>
-  <p class="muted small">Đang chạy: có <code>search.log</code>, chưa đủ lượt, tệp được ghi trong 6 giờ qua. Số lượt dự kiến đọc từ dòng "[planted] N runs" của log; thiếu dòng đó thì ước bằng số dòng oracle.csv (dấu ~).</p>
-</div>
-
-<div class="cards">
-{% for n in names %}{% set i = views[n].info %}
-  <div class="stat" data-folder="{{ n }}">
-    <div class="small muted">{{ n }} <span class="badge pulse" data-badge style="{% if not i.running %}display:none{% endif %}">đang chạy</span></div>
-    <div class="big"><span data-done>{{ i.done }}</span> / <span data-expected>{% if i.expected is none %}?{% else %}{{ i.expected }}{% endif %}</span> <span class="small muted">lượt</span></div>
-    <div class="bar" data-bar><i style="width:{{ (100 * i.done / i.expected) if i.expected else 0 }}%"></i></div>
-    <div class="chips">
-      {% for r in views[n].strength_rows %}<span class="chip {% if r.near_count > 0 %}hit{% endif %}" title="tìm lại gần, {{ r.reward_mode }}">IC {{ r.ic_search | fmt(3) }}: {{ r.near_count | int }}/{{ r.n_runs | int }}</span>{% endfor %}
-    </div>
-  </div>
-{% endfor %}
-</div>
-
-<div class="card">
-  <h2>So sánh các thư mục</h2>
-  <div class="grid">
-    <div><div class="chartbox"><canvas id="c-near"></canvas></div></div>
-    <div><div class="chartbox"><canvas id="c-oos"></canvas></div></div>
-  </div>
-  <h3>Reward của đáp án (oracle) theo IC</h3>
-  <div class="grid">{% for p in charts.oracle %}<div class="chartbox"><canvas id="c-oracle-{{ loop.index0 }}"></canvas></div>{% endfor %}</div>
-  {% if not charts.oracle %}<p class="muted small">Chưa có oracle.csv.</p>{% endif %}
-</div>
-
-{% for n in names %}{% set v = views[n] %}
-<div class="card" id="{{ n }}">
-  <h2>{{ n }}{% if v.info.running %}<span class="badge">đang chạy</span>{% endif %}</h2>
-  <p class="small muted">Tìm {{ v.info.segments.search_start }} → train_end {{ v.info.segments.train_end }} · kiểm định → {{ v.info.segments.search_end }} · đánh giá → {{ v.info.segments.eval_end }}
-    · <a href="/planted/{{ n }}/data">xem một bộ dữ liệu</a></p>
-
-  <h3>Theo độ mạnh</h3>
-  {% if v.strength_rows %}
-  <div class="scroll"><table>
-    <tr><th>Reward mode</th><th>Độ mạnh</th><th>IC đo được</th><th>Tìm lại đúng</th><th>Tìm lại gần</th><th>Sharpe ngoài mẫu (TB ± độ lệch)</th></tr>
-    {% for r in v.strength_rows %}
-    <tr><td class="left">{{ r.reward_mode }}</td><td>{{ r.strength | fmt(2) }}</td><td>{{ r.ic_search | fmt(3) }}</td>
-      <td>{{ r.exact_count | int }}/{{ r.n_runs | int }}</td><td>{{ r.near_count | int }}/{{ r.n_runs | int }}</td>
-      <td>{{ r.oos_sharpe_mean | fmt(2) }} ± {{ r.oos_sharpe_std | fmt(2) }}</td></tr>
-    {% endfor %}
-  </table></div>
-  {% else %}<p class="muted">Chưa có runs.csv (hoặc chưa có lượt nào xong).</p>{% endif %}
-
-  {% if v.seed_rows %}
-  <details><summary>Theo từng seed ({{ v.seed_rows | length }} lượt)</summary>
-  <div class="scroll"><table>
-    <tr><th>Mode</th><th>Độ mạnh</th><th>Seed</th><th class="left">Công thức gần A nhất</th><th>Tương quan</th><th>Hạng học</th><th>Hạng kiểm định</th><th>Đúng</th><th>Gần</th><th>Sharpe ngoài mẫu</th><th class="left">Top-5</th></tr>
-    {% for r in v.seed_rows %}
-    <tr><td class="left">{{ r.reward_mode }}</td><td>{{ r.strength | fmt(2) }}</td><td>{{ r.seed | int }}</td>
-      <td class="expr">{{ r.closest_expr }}</td><td>{{ r.closest_corr | fmt(3) }}</td>
-      <td>{{ r.closest_train_rank | fmt(0) }}</td><td>{{ r.closest_val_rank | fmt(0) }}</td>
-      <td>{{ 'có' if r.exact else '–' }}</td><td>{{ 'có' if r.near else '–' }}</td><td>{{ r.oos_sharpe | fmt(2) }}</td>
-      <td class="expr">{% for e in r.top_exprs %}{{ e }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td></tr>
-    {% endfor %}
-  </table></div></details>
-  {% endif %}
-
-  <h3>Oracle (chấm chính công thức đã cài)</h3>
-  {% if v.oracle_rows %}
-  <div class="scroll"><table>
-    <tr>{% for c in v.oracle_columns %}<th>{{ c }}</th>{% endfor %}</tr>
-    {% for r in v.oracle_rows %}<tr>{% for c in v.oracle_columns %}<td>{{ r[c] | fmt(4) }}</td>{% endfor %}</tr>{% endfor %}
-  </table></div>
-  {% else %}<p class="muted">Chưa có oracle.csv.</p>{% endif %}
-</div>
-{% endfor %}
+<p><b>{{ cap.planted_table.label }} — {{ cap.planted_table.title }}.</b> chưa có. {{ t.PLANTED_MISSING }}</p>
 {% endif %}
-<script type="application/json" id="chart-data">{{ charts | tojson }}</script>
+</div>
+
+<figure>
+  {% if rows %}<div class="chartbox"><canvas id="c-near"></canvas></div>{% endif %}
+  <figcaption><b>{{ cap.planted_near.label }} — {{ cap.planted_near.title }}.</b> {{ t.PLANTED_NEAR_RQ }} Đường nét đứt là khoảng tin cậy Wilson 95%.
+    {% if rows %}<span class="reading">{{ readings.near }}</span>{% else %}chưa có{% endif %}</figcaption>
+</figure>
+
+<figure>
+  {% if seed_rows %}<div class="chartbox"><canvas id="c-corr"></canvas></div>{% endif %}
+  <figcaption><b>{{ cap.planted_corr.label }} — {{ cap.planted_corr.title }}.</b> {{ t.PLANTED_CORR_RQ }}
+    {% if seed_rows %}<span class="reading">{{ readings.corr }}</span>{% else %}chưa có{% endif %}</figcaption>
+</figure>
+
+<div class="tablebox scroll">
+{% if positions %}
+<table>
+  <caption><b>{{ cap.planted_positions.label }} — {{ cap.planted_positions.title }}.</b> {{ t.PLANTED_POSITIONS_RQ }} <span class="reading">{{ readings.positions }}</span></caption>
+  <tr><th>IC mục tiêu</th><th>Số seed</th><th>Trung bình</th><th>Nhỏ nhất</th><th>Lớn nhất</th></tr>
+  {% for r in positions %}
+  <tr><td>{{ '%g' | format(r.strength) }}{% if r.strength == 0 %} (nhiễu){% endif %}</td><td>{{ r.n }}</td><td>{{ r.mean | fmt(3) }}</td><td>{{ r.min | fmt(3) }}</td><td>{{ r.max | fmt(3) }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p><b>{{ cap.planted_positions.label }} — {{ cap.planted_positions.title }}.</b> chưa có</p>
+{% endif %}
+</div>
+
+<div class="tablebox scroll">
+{% if seed_rows %}
+<table>
+  <caption><b>{{ cap.planted_seeds.label }} — {{ cap.planted_seeds.title }}.</b> {{ t.PLANTED_SEEDS_RQ }}</caption>
+  <tr><th>IC mục tiêu</th><th>Seed</th><th>Tương quan cao nhất trong top-5</th><th>Gần</th><th>Đúng</th><th>Sharpe ngoài mẫu</th>
+    <th class="left">Ứng viên gần A nhất (mọi ứng viên)</th><th>Tương quan</th><th>Hạng kiểm định</th></tr>
+  {% for r in seed_rows %}
+  <tr><td>{{ '%g' | format(r.strength) }}</td><td>{{ r.seed }}</td><td>{{ r.best_corr | fmt(3) }}</td>
+    <td>{{ 'có' if r.near else '–' }}</td><td>{{ 'có' if r.exact else '–' }}</td><td>{{ r.oos_sharpe | fmt(2) }}</td>
+    <td class="expr">{{ r.closest_expr }}</td><td>{{ r.closest_corr | fmt(3) }}</td><td>{{ r.closest_val_rank | fmt(0) }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p><b>{{ cap.planted_seeds.label }} — {{ cap.planted_seeds.title }}.</b> chưa có</p>
+{% endif %}
+</div>
+
+<p><a href="/results/planted/illustration">{{ t.ILLUSTRATION_LINK }}</a></p>
+
+<script type="application/json" id="chart-data">{{ chart | tojson }}</script>
 <script>
 window.addEventListener('load', function () {
-  var data = JSON.parse(document.getElementById('chart-data').textContent);
-  xyChart('c-near', data.near, 'IC đo được (đoạn tìm)', 'tỷ lệ tìm lại gần', false);
-  xyChart('c-oos', data.oos, 'IC đo được (đoạn tìm)', 'Sharpe ngoài mẫu (± σ)', true);
-  data.oracle.forEach(function (p, i) { xyChart('c-oracle-' + i, p.lines, 'IC đo được', 'reward — ' + p.name, false); });
-  function refresh() {
-    fetch('/api/planted/progress', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (list) {
-      list.forEach(function (f) {
-        var card = document.querySelector('[data-folder="' + f.name + '"]'); if (!card) { return; }
-        card.querySelector('[data-done]').textContent = f.done;
-        card.querySelector('[data-expected]').textContent = f.expected === null ? '?' : f.expected;
-        card.querySelector('[data-bar] i').style.width = (f.expected ? Math.min(100, 100 * f.done / f.expected) : 0) + '%';
-        card.querySelector('[data-badge]').style.display = f.running ? '' : 'none';
-      });
-    }).catch(function () {});
-  }
-  setInterval(refresh, 4000);
+  var d = JSON.parse(document.getElementById('chart-data').textContent);
+  intervalChart('c-near', d.near, 'IC mục tiêu', 'tỷ lệ tìm lại gần');
+  dotChart('c-corr', d.corr, d.threshold, 'IC mục tiêu', 'tương quan hạng tuyệt đối với A', 'ngưỡng ' + d.threshold);
 });
 </script>
 {% endblock %}

@@ -20,7 +20,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 | 11 | Chạy thật một lần, chuỗi lợi suất ngoài mẫu 2022-07 → 2025-12 | ⏸️ | sau việc 10 | [WALK_FORWARD](design/WALK_FORWARD.md) |
 | 12 | Đo lại ước thời gian walk-forward sau tăng tốc | ⏸️ | ước cũ chưa đo lại | [WALK_FORWARD](design/WALK_FORWARD.md#thời-gian-máy) |
 | 13 | SPA / DSR | chưa | Tháng 4 của proposal | |
-| 14 | Web điều khiển và theo dõi | 🔧 | W1, W3a xong; W2, W3–W6 còn | [WEB_DASHBOARD](design/WEB_DASHBOARD.md) |
+| 14 | Web điều khiển và theo dõi | 🔧 | W1, W3b (web luận văn, 2026-10-30) xong; W2, W3–W6 còn | [WEB_DASHBOARD](design/WEB_DASHBOARD.md) |
 
 ## Câu chưa ai trả lời
 
@@ -30,6 +30,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 - ⏸️ Đoạn kiểm định 12 tháng trong walk-forward: Claude đề xuất, code đang dùng, chưa chốt riêng.
 - ⏸️ Placebo walk-forward chạy MCTS seed 1; bộ placebo có Sharpe NaN không tính vào K: Claude đề xuất, chưa chốt.
 - ⏸️ Ngân sách placebo bằng lần thật nếu thời gian máy cho phép: Claude đề xuất.
+- ⏸️ Ngưỡng phát hiện bài cài tín hiệu: khoảng tin cậy Wilson 95% của IC 0.1 (6/10: 0.31–0.83) chưa tách khỏi IC 0 (0/5: 0–0.43), nên chưa khẳng định được "≈ IC 0.1" về thống kê. Có thêm seed 6–10 ở IC 0 (≈ 20 phút) không?
 - ⏸️ Ghi số lệnh và Sharpe sau phí của A như một dòng mô tả tín hiệu cài trong kết quả bài cài tín hiệu.
 
 ## Nợ

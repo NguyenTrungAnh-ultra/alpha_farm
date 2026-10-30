@@ -1,5 +1,5 @@
 """
-Content and layout of the main-flow diagram page (/pipeline).
+Content and layout of the main-flow diagram on the method page (/method).
 
 Editing the page = editing NODES / EDGES / GROUPS below; the template and the layout code
 read them and need no change. Node fields:
@@ -113,11 +113,10 @@ NODES: List[Dict] = [
     {'id': 'hmm', 'label': 'HMM mô tả rủi ro', 'group': 'result', 'status': 'reference', 'x': 480, 'y': 370,
      'details': ['Chỉ mô tả rủi ro của chiến lược cuối cùng (đường bootstrap), không loại gì.']},
     {'id': 'rq2_planted', 'label': 'RQ2: bài cài tín hiệu (độ nhạy)', 'group': 'compare', 'status': 'done',
-     'x': 20, 'y': 520, 'note': 'cửa sổ 1: IC 0.1 tìm lại 6/10', 'link': '/planted',
+     'x': 20, 'y': 520, 'note': 'cửa sổ 1: IC 0.1 tìm lại 6/10', 'link': '/results/planted',
      'details': [
-         'Cài công thức A vào dữ liệu placebo với IC 0 / 0.05 / 0.1 (cách chia cửa sổ 1, bộ blueprint mới, `sharpe`).',
-         'Cửa sổ 1 (`results/planted_window1/`): tìm lại gần 0/5 / 1/5 / 6/10 (IC 0.1 có 10 seed); Sharpe ngoài mẫu −0.90 / −0.67 / −0.10.',
-         'Lần chạy 1–3 (ngữ pháp cũ): khoảng 2 năm phát hiện được IC ≥ 0.1; khoảng 4 năm giữa 0.05 và 0.1.']},
+         'Cài công thức A vào dữ liệu placebo với IC 0 / 0.05 / 0.1, chia đoạn như cửa sổ 1, bộ blueprint đã đóng băng, reward `sharpe`.',
+         'Kết quả (`results/planted_window1/`): tìm lại gần 0/5 / 1/5 / 6/10 (IC 0.1 có 10 seed); Sharpe ngoài mẫu −0.90 / −0.67 / −0.10.']},
     {'id': 'rq1', 'label': 'RQ1: vai trò của LLM', 'group': 'compare', 'status': 'todo', 'x': 250, 'y': 520,
      'details': [
          'Cùng quy trình, thay ① bằng: MCTS không LLM (gốc là một `?` rỗng), LLM không tìm kiếm, và tìm ngẫu nhiên.',

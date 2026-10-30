@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Luồng chính{% endblock %}
+{% block title %}Phương pháp{% endblock %}
 {% block content %}
 <style>
 .legend { display:flex; flex-wrap:wrap; gap:14px; margin:0 0 12px; font-size:13px; }
@@ -40,9 +40,6 @@
 .rq b { color:var(--accent); }
 </style>
 <div class="card thesis">
-  <h2>{{ thesis.title }}</h2>
-  <p class="muted small" style="margin:0">{{ thesis.title_vi }}</p>
-  <p class="question"><b>Câu hỏi:</b> {{ thesis.question }}</p>
   <div class="cols">
     <div>
       <h3>Câu hỏi nghiên cứu <span class="muted small">(di chuột để thấy ô liên quan)</span></h3>
@@ -56,12 +53,13 @@
     </div>
   </div>
 </div>
-<h1>Luồng chính</h1>
-<p class="muted small">Di chuột vào một ô (hoặc chạm trên điện thoại) để xem chi tiết. Cuộn ngang trong khung nếu màn hình hẹp.</p>
+<h1>Chương 3 — Phương pháp</h1>
+<p>{{ intro }}</p>
 <div class="legend">
   {% for key, label in statuses.items() %}<span class="st-{{ key }}"><i></i>{{ label }}</span>{% endfor %}
   <span class="muted">đường nét đứt: quan hệ phụ / lặp</span>
 </div>
+<figure>
 <div class="flow">
 <svg viewBox="0 0 {{ view_width }} {{ view_height }}" role="img" aria-label="Sơ đồ luồng chính">
   <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -83,8 +81,30 @@
   {% endfor %}
 </svg>
 </div>
+<figcaption><b>{{ cap.flow.label }} — {{ cap.flow.title }}.</b> Màu ô là trạng thái làm việc; cuộn ngang trong khung nếu màn hình hẹp.</figcaption>
+</figure>
 <div class="card" id="detail" style="margin-top:14px">
   <p class="muted">Chọn một ô trong sơ đồ.</p>
+</div>
+
+<div class="tablebox scroll"><table>
+  <caption><b>{{ cap.windows.label }} — {{ cap.windows.title }}.</b> {{ windows_caption }}</caption>
+  <tr><th>Cửa sổ</th><th>Học từ</th><th>Học đến</th><th>Kiểm định từ</th><th>Kiểm định đến</th><th>Đánh giá từ</th><th>Đánh giá đến</th></tr>
+  {% for w in windows %}
+  <tr><td>{{ w.window }}</td><td>{{ w.search_start }}</td><td>{{ w.train_end }}</td><td>{{ w.validation_start }}</td><td>{{ w.search_end }}</td><td>{{ w.eval_start }}</td><td>{{ w.eval_end }}</td></tr>
+  {% endfor %}
+</table></div>
+
+<div class="tablebox scroll">
+{% if blueprint_set %}
+<table>
+  <caption><b>{{ cap.blueprints.label }} — {{ cap.blueprints.title }}.</b> {{ blueprint_caption }} Bộ có {{ blueprint_set.count }} blueprint.</caption>
+  <tr><th class="left">Gốc (toán tử ngoài cùng)</th><th>Số blueprint</th></tr>
+  {% for root, count in blueprint_set.roots %}<tr><td class="left"><code>{{ root }}</code></td><td>{{ count }}</td></tr>{% endfor %}
+</table>
+{% else %}
+<p><b>{{ cap.blueprints.label }} — {{ cap.blueprints.title }}.</b> chưa có</p>
+{% endif %}
 </div>
 <div hidden>
 {% for n in nodes %}

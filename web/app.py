@@ -1,37 +1,39 @@
 """
-FastAPI app of the read-only dashboard: planted-signal results and machine resources.
+FastAPI app of the read-only thesis web: one page per chapter, plus a machine-resources page.
 
-The app only reads `<results_root>/planted*/`; it never writes there. Pages:
-    /, /planted             all planted folders, tables and comparison charts
-    /planted/{name}         one folder
-    /planted/{name}/data    rebuilt placebo / planted data for one (strength, seed)
-    /pipeline               main-flow diagram (content in web/pipeline.py)
-    /system, /api/system    machine resources
+The app only reads the thesis result folder (planted.THESIS_PLANTED_DIR) and the frozen blueprint set
+under the results root; it never writes there. Prose lives in web/thesis.py, the diagram in web/pipeline.py.
+Pages:
+    /                               overview and progress table
+    /data                           data description
+    /method (/pipeline)             main-flow diagram, walk-forward windows, frozen blueprint set
+    /results/planted                planted-signal positive control (RQ2)
+    /results/planted/illustration   what planting does to prices
+    /results/placebo, /results/rq1, /results/walkforward   chapters without results yet
+    /system, /api/system            machine resources (tool outside the thesis)
 """
 
-import json
 import math
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
-import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from core_engine.BacktestEngine import AlphaBacktestEngine
 from core_engine.CalculateMetrics import compute_metrics
 from strategy_workflows import RunPlantedSignal as planted_run
 from strategy_workflows.MCTSEngine import MCTSEngine, _FixedPositions, describe_candidate
-from strategy_workflows.PlantedSignal import PlantedData, PlantedFormula, Segments, formula_from_dict
+from strategy_workflows.PlantedSignal import PlantedData, PlantedFormula, formula_from_dict
 from utilities.AppConfig import PROJECT_ROOT
-from web import charts, pipeline, planted
+from web import charts, method, pipeline, planted, thesis
 from web.system import read_system
 
 TEMPLATES_DIR = Path(__file__).parent / 'templates'
-FORMULA_FILE = 'planted_formula.json'
+THESIS_REWARD_MODE = 'sharpe'
 
 
 def default_results_root() -> str:
@@ -45,36 +47,6 @@ def format_number(value, digits: int = 3) -> str:
     except (TypeError, ValueError):
         return '–'
     return '–' if math.isnan(number) or math.isinf(number) else f"{number:.{digits}f}"
-
-
-def _find_formula(root: str, folder: str) -> Optional[tuple]:
-    """(formula, folder name) from the first planted folder holding planted_formula.json, this folder first."""
-    for name in [os.path.basename(folder)] + [n for n in planted.list_dirs(root) if n != os.path.basename(folder)]:
-        path = os.path.join(root, name, FORMULA_FILE)
-        if os.path.exists(path):
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    return formula_from_dict(json.load(f)), name
-            except (OSError, ValueError, KeyError):
-                continue
-    return None
-
-
-def _folder_view(root: str, name: str) -> Dict:
-    """Everything the planted page shows for one folder (tables as plain dicts)."""
-    folder = os.path.join(root, name)
-    runs = planted.read_runs(folder)
-    oracle = planted.read_oracle(folder)
-    strengths = planted.strength_table(runs)
-    return {
-        'info': planted.folder_info(folder),
-        'strengths': strengths,
-        'strength_rows': strengths.to_dict('records') if not strengths.empty else [],
-        'seed_rows': planted.seed_table(runs),
-        'oracle': oracle,
-        'oracle_columns': list(oracle.columns),
-        'oracle_rows': oracle.to_dict('records') if not oracle.empty else [],
-    }
 
 
 def _planted_equity(data: PlantedData, formula: PlantedFormula, seed: int, mode: str) -> Dict:
@@ -101,51 +73,44 @@ def _planted_equity(data: PlantedData, formula: PlantedFormula, seed: int, mode:
             'sharpe': metrics.get('sharpe_ratio'), 'trades': metrics.get('total_trades')}
 
 
-def _data_view(root: str, name: str, strength: float, seed: int) -> Dict:
-    """Context of the data page; 'message' is set instead of charts when the data cannot be rebuilt."""
-    folder = os.path.join(root, name)
+def _load_formula(folder: str) -> Optional[PlantedFormula]:
+    data = planted.read_json(os.path.join(folder, planted.FORMULA_FILE))
+    try:
+        return formula_from_dict(data) if data else None
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def _illustration_view(folder: str, strength: float, seed: int) -> Dict:
+    """Context of the illustration page; 'message' is set instead of charts when the data cannot be rebuilt."""
     segments = planted.read_segments(folder)
-    found = _find_formula(root, folder)
-    if found is None:
-        return {'message': f"Không tìm thấy {FORMULA_FILE} trong các thư mục planted*."}
-    formula, formula_dir = found
+    formula = _load_formula(folder)
+    if formula is None:
+        return {'message': 'Chưa có công thức cài sẵn trong thư mục kết quả luận văn.'}
     base = planted_run.load_base(segments)
     if strength != 0.0:
         key = planted_run.calibration_key(base, strength, formula, segments)
-        cache = {}
-        try:
-            with open(os.path.join(folder, 'calibration.json'), 'r', encoding='utf-8') as f:
-                cache = json.load(f)
-        except (OSError, ValueError):
-            pass
+        cache = planted.read_json(os.path.join(folder, 'calibration.json')) or {}
         if key not in cache:
-            return {'message': f"Độ mạnh {strength} chưa có trong calibration.json của {name} "
-                               f"(công thức lấy từ {formula_dir}); trang này không hiệu chỉnh vì việc đó ghi vào thư mục."}
+            return {'message': f"Độ mạnh {strength} chưa được hiệu chỉnh trong thư mục kết quả luận văn; "
+                               "trang này chỉ đọc nên không hiệu chỉnh thêm."}
     beta = planted_run.get_beta(base, strength, folder, formula, 1, segments)
     data = planted_run.build_planted_data(base, segments.search_end, strength, seed, beta, formula)
     placebo = data if strength == 0.0 else planted_run.build_planted_data(
         base, segments.search_end, 0.0, seed, 0.0, formula)
 
-    runs = planted.read_runs(folder)
-    mode = planted.run_mode(runs, strength, seed)
-    top_exprs: List[str] = []
-    if not runs.empty:
-        match = runs[np.isclose(runs['strength'], strength) & (runs['seed'] == seed)]
-        if not match.empty and 'top_exprs' in match.columns:
-            top_exprs = planted._json_list(match['top_exprs'].iloc[-1])
-
     boundaries = [(pd.Timestamp(segments.train_end), f"train_end {segments.train_end}"),
                   (pd.Timestamp(segments.search_end), f"search_end {segments.search_end}")]
     view = {
-        'message': None, 'formula_expr': formula.expr, 'z_window': formula.z_window, 'formula_dir': formula_dir,
-        'beta': beta, 'ic_search': data.ic_search, 'ic_eval': data.ic_eval, 'mode': mode, 'top_exprs': top_exprs,
+        'message': None, 'formula_expr': formula.expr, 'z_window': formula.z_window,
+        'beta': beta, 'ic_search': data.ic_search, 'ic_eval': data.ic_eval,
         'prices': charts.time_series({'giá thật': base['Close'], 'placebo (độ mạnh 0)': placebo.full['Close'],
                                       'giá đã cài': data.full['Close']}),
         'signal': charts.time_series({'s_t': data.signal}, boundaries),
         'equity': None, 'equity_error': None,
     }
     try:
-        equity = _planted_equity(data, formula, seed, mode)
+        equity = _planted_equity(data, formula, seed, THESIS_REWARD_MODE)
         view['equity'] = charts.time_series({'công thức đã cài (A)': equity['curve']})
         view['equity_stats'] = {k: charts.clean(equity[k]) for k in ('z', 'direction', 'sharpe', 'trades')}
     except Exception as exc:
@@ -154,82 +119,93 @@ def _data_view(root: str, name: str, strength: float, seed: int) -> Dict:
 
 
 def create_app(results_root: Optional[str] = None) -> FastAPI:
-    app = FastAPI(title='Alpha Farm dashboard', docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title='Alpha Farm thesis web', docs_url=None, redoc_url=None, openapi_url=None)
     app.state.results_root = str(results_root or default_results_root())
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters['fmt'] = format_number
     templates.env.filters['inline_code'] = pipeline.format_text
 
-    def folder_or_404(name: str) -> str:
-        if planted.resolve_dir(app.state.results_root, name) is None:
-            raise HTTPException(status_code=404, detail='Không có thư mục này.')
-        return name
+    def folder() -> str:
+        return planted.thesis_dir(app.state.results_root)
 
-    def planted_page(request: Request, only: Optional[str] = None) -> HTMLResponse:
-        root = app.state.results_root
-        names = [only] if only else planted.list_dirs(root)
-        views = {n: _folder_view(root, n) for n in names}
-        entries = [{'name': n, 'strengths': views[n]['strengths'], 'oracle': views[n]['oracle']} for n in names]
-        return templates.TemplateResponse(request, 'planted.html', {
-            'views': views, 'names': names, 'only': only,
-            'charts': charts.comparison_data(entries),
-            'active': 'planted',
-        })
+    def availability() -> Dict[str, bool]:
+        return {'planted_runs': not planted.read_runs(folder()).empty,
+                'positions': bool(planted.read_positions(folder())),
+                'data': method.data_range() is not None,
+                'blueprint_set': method.blueprint_summary(app.state.results_root) is not None}
+
+    def render(request: Request, name: str, active: str, **context) -> HTMLResponse:
+        return templates.TemplateResponse(request, name, {'active': active, 'cap': thesis.ITEM_BY_KEY, **context})
 
     @app.get('/', response_class=HTMLResponse)
-    @app.get('/planted', response_class=HTMLResponse)
-    def planted_index(request: Request):
-        return planted_page(request)
+    def overview(request: Request):
+        return render(request, 'overview.html', 'overview', thesis_info=pipeline.THESIS, intro=thesis.OVERVIEW_INTRO,
+                      rows=thesis.progress_rows(availability()))
 
-    @app.get('/planted/{name}', response_class=HTMLResponse)
-    def planted_one(request: Request, name: str):
-        return planted_page(request, folder_or_404(name))
+    @app.get('/data', response_class=HTMLResponse)
+    def data_page(request: Request):
+        return render(request, 'data.html', 'data', intro=thesis.DATA_INTRO, data_range=method.data_range(),
+                      windows=method.window_rows(with_bars=True), timeframe=method.TIMEFRAME)
 
-    @app.get('/planted/{name}/data', response_class=HTMLResponse)
-    def planted_data(request: Request, name: str, strength: Optional[float] = None, seed: Optional[int] = None):
-        folder_or_404(name)
-        folder = os.path.join(app.state.results_root, name)
-        runs, oracle = planted.read_runs(folder), planted.read_oracle(folder)
-        strengths = planted.present_values(runs, oracle, 'strength')
-        seeds = [int(s) for s in planted.present_values(runs, oracle, 'seed')]
+    @app.get('/method', response_class=HTMLResponse)
+    def method_page(request: Request):
+        return render(request, 'method.html', 'method', **pipeline.build_view(), intro=thesis.METHOD_INTRO,
+                      windows=method.window_rows(), windows_caption=thesis.WINDOWS_CAPTION,
+                      blueprint_set=method.blueprint_summary(app.state.results_root),
+                      blueprint_caption=thesis.BLUEPRINT_CAPTION)
+
+    @app.get('/pipeline')
+    def pipeline_redirect():
+        return RedirectResponse('/method')
+
+    @app.get('/results/planted', response_class=HTMLResponse)
+    def planted_page(request: Request):
+        runs = planted.read_runs(folder())
+        rows = planted.strength_table(runs)
+        seed_rows = planted.seed_table(runs)
+        positions = planted.position_table(planted.read_positions(folder()))
+        threshold = planted.near_threshold()
+        chart = {'near': planted.near_chart_points(rows), 'corr': planted.closest_points(seed_rows),
+                 'threshold': threshold}
+        return render(
+            request, 'planted.html', 'planted', t=thesis, rows=rows, seed_rows=seed_rows, positions=positions,
+            formula_expr=planted.read_formula_expr(folder()), chart=chart,
+            near_definition=thesis.NEAR_DEFINITION.format(threshold=threshold),
+            readings={'table': thesis.reading_table(rows), 'near': thesis.reading_near(rows),
+                      'corr': thesis.reading_corr(seed_rows, threshold),
+                      'positions': thesis.reading_positions(positions)})
+
+    @app.get('/results/planted/illustration', response_class=HTMLResponse)
+    def planted_illustration(request: Request, strength: Optional[float] = None, seed: Optional[int] = None):
+        runs = planted.read_runs(folder())
+        strengths = planted.present_values(runs, 'strength')
+        seeds = [int(s) for s in planted.present_values(runs, 'seed')]
+        context = {'title': thesis.ILLUSTRATION_TITLE, 'strengths': strengths, 'seeds': seeds,
+                   'strength': strength, 'seed': seed, 'segments': planted.read_segments(folder()).to_dict()}
         if not strengths or not seeds:
-            raise HTTPException(status_code=404, detail='Thư mục chưa có runs.csv / oracle.csv.')
-        if strength is None:
-            strength = strengths[0]
-        if seed is None:
-            seed = seeds[0]
+            return render(request, 'illustration.html', 'planted', view={'message': thesis.PLANTED_MISSING}, **context)
+        strength = strengths[0] if strength is None else strength
+        seed = seeds[0] if seed is None else seed
         matched = [s for s in strengths if math.isclose(s, strength, abs_tol=1e-12)]
         if not matched or seed not in seeds:
             raise HTTPException(status_code=404, detail='Độ mạnh hoặc seed không có trong kết quả.')
-        strength = matched[0]
-        view = _data_view(app.state.results_root, name, strength, seed)
-        return templates.TemplateResponse(request, 'data.html', {
-            'name': name, 'strengths': strengths, 'seeds': seeds, 'strength': strength, 'seed': seed,
-            'view': view, 'segments': planted.read_segments(folder).to_dict(), 'active': 'planted',
-        })
+        context.update(strength=matched[0], seed=seed)
+        return render(request, 'illustration.html', 'planted',
+                      view=_illustration_view(folder(), matched[0], seed), **context)
 
-    @app.get('/pipeline', response_class=HTMLResponse)
-    def pipeline_page(request: Request):
-        return templates.TemplateResponse(request, 'pipeline.html', {**pipeline.build_view(), 'active': 'pipeline'})
+    def add_pending_page(key: str) -> None:
+        def pending_page(request: Request):
+            return render(request, 'pending.html', key, page=thesis.PENDING_CHAPTERS[key],
+                          items=[i for i in thesis.ITEMS if i['chapter'] == '/results/' + key])
+        pending_page.__name__ = f'{key}_page'
+        app.get('/results/' + key, response_class=HTMLResponse)(pending_page)
+
+    for key in thesis.PENDING_CHAPTERS:
+        add_pending_page(key)
 
     @app.get('/system', response_class=HTMLResponse)
     def system_page(request: Request):
-        return templates.TemplateResponse(request, 'system.html', {'active': 'system'})
-
-    @app.get('/api/planted/progress')
-    def planted_progress():
-        """Run counts and running flag of every folder (polled by the planted page)."""
-        root = app.state.results_root
-        return [planted.folder_info(os.path.join(root, n)) for n in planted.list_dirs(root)]
-
-    @app.get('/api/planted/charts')
-    def planted_charts():
-        root = app.state.results_root
-        entries = []
-        for n in planted.list_dirs(root):
-            v = _folder_view(root, n)
-            entries.append({'name': n, 'strengths': v['strengths'], 'oracle': v['oracle']})
-        return charts.comparison_data(entries)
+        return render(request, 'system.html', 'system')
 
     @app.get('/api/system')
     def system_api():
