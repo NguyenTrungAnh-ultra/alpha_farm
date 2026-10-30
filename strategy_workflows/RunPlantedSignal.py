@@ -248,6 +248,8 @@ def step_select(args) -> None:
           f"{' (ADJUSTED from 10: not in the scaled ladders)' if info['adjusted'] else ''}")
     if info['skipped_verbatim']:
         print(f"[planted] Skipped (filled formula spelled out by a blueprint): {info['skipped_verbatim']}")
+    if info['skipped_constant']:
+        print(f"[planted] Skipped (filled formula constant on synthetic bars): {info['skipped_constant']}")
     print(f"[planted] {len(expressing)} blueprint(s) can express it: {expressing}")
     print(f"[planted] Wrote {formula_path(args.out_dir)}")
 

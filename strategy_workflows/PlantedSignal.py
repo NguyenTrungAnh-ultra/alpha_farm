@@ -87,7 +87,8 @@ NEAR_CORRELATION = 0.7
 
 # Variable names of the generated code that come from the bar shape rather than from Close.
 FORMULA_RULE = ("first blueprint in file order with >= 2 '?' slots and a NORMALIZED root; every '?' = pv_close, "
-                "every window = 10 (nearest allowed), z-score window 10; a verbatim copy of a blueprint -> next one")
+                "every window = 10 (nearest allowed), z-score window 10; a verbatim copy of a blueprint -> next one; "
+                "a constant filled formula -> next one")
 SLOT_FILL_FIELD = 'pv_close'
 TARGET_WINDOW = 10
 
@@ -589,15 +590,20 @@ def _fill_slots(node: ASTNode, period: int) -> ASTNode:
                    value=node.value, window=period if is_ts else None)
 
 
-def assert_not_degenerate(formula: PlantedFormula, bars: int = 400) -> None:
-    """Raise when A is constant on synthetic bars (e.g. close - close), which would plant nothing."""
+def is_degenerate(formula: PlantedFormula, bars: int = 400) -> bool:
+    """True when A is constant on synthetic bars (e.g. close - close), which would plant nothing."""
     rng = np.random.default_rng(0)
     close = 1000.0 * np.cumprod(1.0 + rng.normal(0.0, 0.003, bars))
     frame = pd.DataFrame({'Open': close * rng.uniform(0.998, 1.002, bars), 'High': close * rng.uniform(1.0, 1.01, bars),
                           'Low': close * rng.uniform(0.99, 1.0, bars), 'Close': close,
                           'Volume': rng.uniform(1000, 5000, bars)})
     alpha = formula.alpha_series(frame).dropna()
-    if len(alpha) == 0 or float(alpha.std()) < 1e-9 * max(1.0, float(alpha.abs().max())):
+    return len(alpha) == 0 or float(alpha.std()) < 1e-9 * max(1.0, float(alpha.abs().max()))
+
+
+def assert_not_degenerate(formula: PlantedFormula, bars: int = 400) -> None:
+    """Raise when `is_degenerate(formula)`."""
+    if is_degenerate(formula, bars):
         raise ValueError(f"Selected formula {formula.expr} is constant on synthetic bars; it cannot be planted")
 
 
@@ -606,8 +612,9 @@ def select_planted_formula(blueprints: Sequence[Dict[str, str]], engine) -> Tupl
     Derive the planted formula from the frozen blueprint set (rule: FORMULA_RULE).
 
     Returns (formula, info); info records the window values actually used and the blueprints
-    skipped because the filled formula was spelled out by one of them. Raises ValueError when no
-    blueprint qualifies: the rule is never loosened.
+    skipped because the filled formula was spelled out by one of them (`skipped_verbatim`) or is
+    constant on synthetic bars (`skipped_constant`). Raises ValueError when no blueprint
+    qualifies: the rule is never loosened.
     """
     compiler = SemanticCompiler()
     roots = [(bp['name'], compiler.compile_blueprint(bp['macro_blueprint'])) for bp in blueprints]
@@ -615,6 +622,7 @@ def select_planted_formula(blueprints: Sequence[Dict[str, str]], engine) -> Tupl
     z_window = _nearest(TARGET_WINDOW, engine.scaled_window_search)
     max_depth = getattr(engine, 'max_depth', 4)
     skipped_verbatim = []
+    skipped_constant = []
     for name, root in roots:
         body = _blueprint_body(root)
         if body is None or _count_slots(body) < 2:
@@ -624,11 +632,14 @@ def select_planted_formula(blueprints: Sequence[Dict[str, str]], engine) -> Tupl
             skipped_verbatim.append(name)
             continue
         formula = PlantedFormula(tree=tree, z_window=z_window, source=name, rule=FORMULA_RULE)
-        assert_not_degenerate(formula)
+        if is_degenerate(formula):
+            skipped_constant.append(name)
+            continue
         return formula, {'period': period, 'z_window': z_window, 'skipped_verbatim': skipped_verbatim,
+                         'skipped_constant': skipped_constant,
                          'adjusted': period != TARGET_WINDOW or z_window != TARGET_WINDOW}
     raise ValueError("No blueprint has >= 2 '?' slots under a NORMALIZED root whose filled formula is not "
-                     "already spelled out by a blueprint; the rule is not loosened")
+                     "already spelled out by a blueprint and is not constant on synthetic bars; the rule is not loosened")
 
 
 # --------------------------------------------------------------------------- recovery

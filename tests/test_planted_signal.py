@@ -491,6 +491,20 @@ def test_select_first_qualifying_wins_and_none_fails_loudly(engine_60m):
         select_planted_formula([blueprint('degenerate', 'sub(?, ?)')], engine_60m)
 
 
+def test_select_skips_constant_filled_formula(engine_60m):
+    formula, info = select_planted_formula(
+        [blueprint('flat', 'sub(?, ?)'), blueprint('next', 'add(?, ts_mean(?))')], engine_60m)
+    assert formula.source == 'next' and formula.expr == "(close + ts_mean(close, 10))"
+    assert info['skipped_constant'] == ['flat'] and info['skipped_verbatim'] == []
+
+
+def test_select_keeps_formula_with_dead_term_but_not_constant(engine_60m):
+    text = 'sub(ts_zscore(sub(pv_high, ?)), ts_zscore(sub(pv_close, ?)))'
+    assert compile_(text).name == 'normalized_template'
+    formula, info = select_planted_formula([blueprint('dead_term', text)], engine_60m)
+    assert formula.source == 'dead_term' and info['skipped_constant'] == []
+
+
 def test_select_uses_nearest_allowed_windows():
     from types import SimpleNamespace
     engine = SimpleNamespace(scaled_periods=[5, 14], scaled_window_search=[7, 12], max_depth=4)
