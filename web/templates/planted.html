@@ -19,10 +19,10 @@
 <table>
   <caption><b>{{ cap.planted_table.label }} — {{ cap.planted_table.title }}.</b>{{ badge(cap.planted_table.role) }} {{ t.PLANTED_TABLE_RQ }}
     <span class="reading">{{ readings.table }}</span></caption>
-  <tr><th title="{{ metric.target_ic.measures }}">IC mục tiêu</th><th>Số seed</th><th title="{{ metric.ic.measures }}">IC đo được (đoạn tìm)</th><th title="{{ metric.ic.measures }}">IC đo được (đoạn đánh giá)</th><th title="{{ metric.near.measures }}">Tìm lại gần</th><th title="{{ metric.exact.measures }}">Tìm lại đúng</th><th title="{{ metric.oos_sharpe_6m.measures }}">Sharpe ngoài mẫu (TB ± độ lệch)</th></tr>
+  <tr><th title="{{ metric.target_ic.measures }}">IC mục tiêu</th><th>Số seed</th><th title="{{ metric.ic.measures }}">IC đo được (đoạn tìm)</th><th title="{{ metric.ic.measures }}">IC đo được (đoạn đánh giá)</th><th title="{{ metric.near.measures }}">Tìm lại gần</th><th title="{{ metric.fisher_p.measures }}">p Fisher so với IC 0</th><th title="{{ metric.exact.measures }}">Tìm lại đúng</th><th title="{{ metric.oos_sharpe_6m.measures }}">Sharpe ngoài mẫu (TB ± độ lệch)</th></tr>
   {% for r in rows %}
   <tr><td>{{ '%g' | format(r.strength) }}</td><td>{{ r.n_runs }}</td><td>{{ r.ic_search | fmt(3) }}</td><td>{{ r.ic_eval | fmt(3) }}</td>
-    <td>{{ r.near_count }}/{{ r.n_runs }}</td><td>{{ r.exact_count }}/{{ r.n_runs }}</td>
+    <td>{{ r.near_count }}/{{ r.n_runs }}</td><td>{{ '—' if r.p_fisher is none else r.p_fisher | fmt(3) }}</td><td>{{ r.exact_count }}/{{ r.n_runs }}</td>
     <td>{{ r.oos_sharpe_mean | fmt(2) }} ± {{ r.oos_sharpe_std | fmt(2) }}</td></tr>
   {% endfor %}
 </table>

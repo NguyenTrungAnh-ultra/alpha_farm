@@ -146,6 +146,19 @@ function dotChart(canvasId, points, line, xTitle, yTitle, lineLabel) {
       x: { type: 'linear', title: { display: true, text: xTitle } },
       y: { min: 0, max: 1, title: { display: true, text: yTitle } } } } });
 }
+// points: [[set, Sharpe]] as dots; `max` and `real` (nullable) are drawn as horizontal reference lines.
+function placeboChart(canvasId, d, xTitle, yTitle) {
+  var el = document.getElementById(canvasId); if (!el || typeof Chart === 'undefined') { return; }
+  var xs = d.points.map(function (p) { return p[0]; });
+  var lo = Math.min.apply(null, xs), hi = Math.max.apply(null, xs);
+  var line = function (label, y, color) { return { label: label, type: 'line', data: [{ x: lo, y: y }, { x: hi, y: y }],
+      borderColor: color, borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0 }; };
+  var sets = [{ label: 'bộ placebo', data: d.points.map(function (p) { return { x: p[0], y: p[1] }; }),
+      backgroundColor: COLORS[0], pointRadius: 5 }, line('Sharpe placebo lớn nhất', d.max, COLORS[1])];
+  if (d.real !== null) { sets.push(line('lần chạy thật', d.real, COLORS[4])); }
+  new Chart(el, { type: 'scatter', data: { datasets: sets }, options: { maintainAspectRatio: false, parsing: false, scales: {
+    x: { type: 'linear', title: { display: true, text: xTitle } }, y: { title: { display: true, text: yTitle } } } } });
+}
 var markerPlugin = { id: 'markers', afterDatasetsDraw: function (chart, args, opts) {
   var m = (chart.options.plugins.markers || {}).list || []; var ctx = chart.ctx; var area = chart.chartArea;
   m.forEach(function (mk, i) {

@@ -155,7 +155,7 @@ Web đọc như chính bài luận: mỗi trang là một chương, mỗi bảng
 | `/method` | Phương pháp | sơ đồ luồng chính (trang `/pipeline` hiện có), bảng cửa sổ walk-forward, bộ blueprint đã đóng băng |
 | `/data` | Dữ liệu | VN30F1M 60m 2018-08 → 2025-12, số bar từng đoạn, ghi chú dữ liệu |
 | `/results/planted` | Kết quả — RQ2, kiểm soát dương | xem dưới |
-| `/results/placebo` | Kết quả — RQ2, kiểm soát âm | "chưa có kết quả" + điều kiện để có |
+| `/results/placebo` | Kết quả — RQ2, kiểm soát âm | đọc `results/walkforward/llm_mcts/summary.csv`: phân bố Sharpe của K bộ placebo (chấm từng bộ, vạch Sharpe placebo lớn nhất), bảng từng bộ, câu đọc nói Sharpe thật phải vượt Sharpe placebo lớn nhất để p = 1/(K+1). p = (1 + số bộ có Sharpe ≥ thật) / (K + 1), tính từ dữ liệu; chưa có dòng `real` thì p hiện "chưa có, chờ lần chạy thật" |
 | `/results/rq1` | Kết quả — RQ1 | như trên |
 | `/results/walkforward` | Kết quả — chuỗi ngoài mẫu | như trên |
 | `/system` | Công cụ (ngoài luận văn) | tài nguyên máy, tiến độ lượt chạy đang chạy |
@@ -163,7 +163,7 @@ Web đọc như chính bài luận: mỗi trang là một chương, mỗi bảng
 **Trang `/results/planted`** (nguồn duy nhất: thư mục kết quả luận văn, hằng `THESIS_PLANTED_DIR = 'planted_window1'` trong `web/`):
 1. Đoạn mở: câu hỏi (quy trình có tìm lại một tín hiệu biết trước không → RQ2), cách làm trong ba câu (xáo lợi suất, cài A với IC biết trước, chạy đúng quy trình luận văn), A viết bằng lời và bằng công thức.
 2. Bảng: IC mục tiêu · số seed · IC đo được (đoạn tìm, đoạn đánh giá) · tìm lại gần · tìm lại đúng · Sharpe ngoài mẫu. Chú thích định nghĩa "tìm lại gần / đúng".
-3. Hình: tỷ lệ tìm lại gần theo IC (kèm khoảng tin cậy 95% Wilson) → đọc ra ngưỡng phát hiện.
+3. Hình: tỷ lệ tìm lại gần theo IC (khoảng tin cậy 95% Wilson vẽ làm thanh sai số). Ngưỡng phát hiện = mức IC > 0 thấp nhất có p < 0.05 trong kiểm định chính xác Fisher một phía (`scipy.stats.fisher_exact`, alternative `greater`) so tỷ lệ tìm lại gần với IC 0; p có cột riêng ở Bảng 4.1 (IC 0 hiện "—"), ngưỡng và p hiện trong ô "Chỉ số chính" và câu đọc. Không mức nào đạt thì trang nói chưa xác định được ngưỡng.
 4. Hình: tương quan của ứng viên gần A nhất ở mỗi seed theo IC (chấm từng seed, vạch mốc 0.7).
 5. Bảng / hình: tương quan vị thế tốt nhất trong top-5 với A, theo IC, kèm mức nhiễu (IC 0) — từ `positions_vs_a.json` nếu có.
 6. Bảng từng seed (gọn): IC · seed · công thức gần A nhất · tương quan · tìm lại gần / đúng · Sharpe ngoài mẫu.

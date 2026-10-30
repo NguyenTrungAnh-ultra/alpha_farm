@@ -18,13 +18,15 @@ STATUS_MARKS = {'done': '✅', 'progress': '🔧', 'none': '–'}
 NEAR_LABEL = 'tìm lại gần'
 EXACT_LABEL = 'tìm lại đúng'
 
+PLACEBO_TITLE = 'Kết quả: placebo (RQ2, kiểm soát âm)'
+
 CHAPTERS: List[Dict] = [
     {'number': 1, 'title': 'Tổng quan', 'path': '/', 'status': 'done'},
     {'number': 2, 'title': 'Dữ liệu', 'path': '/data', 'status': 'done'},
     {'number': 3, 'title': 'Phương pháp', 'path': '/method', 'status': 'progress'},
     {'number': 4.1, 'title': 'Kết quả: bài cài tín hiệu (RQ2, kiểm soát dương)', 'path': '/results/planted',
      'needs': 'planted_runs'},
-    {'number': 4.2, 'title': 'Kết quả: placebo (RQ2, kiểm soát âm)', 'path': '/results/placebo', 'status': 'none'},
+    {'number': 4.2, 'title': PLACEBO_TITLE, 'path': '/results/placebo', 'needs': 'placebo_runs'},
     {'number': 4.3, 'title': 'Kết quả: vai trò của LLM (RQ1)', 'path': '/results/rq1', 'status': 'none'},
     {'number': 4.4, 'title': 'Kết quả: chuỗi ngoài mẫu (walk-forward)', 'path': '/results/walkforward',
      'status': 'none'},
@@ -50,7 +52,7 @@ ITEMS: List[Dict] = [
     {'key': 'planted_seeds', 'role': 'phụ', 'label': 'Bảng 4.3', 'title': 'Kết quả từng seed',
      'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'planted_runs'},
     {'key': 'placebo_dist', 'role': 'chính', 'label': 'Hình 4.3', 'title': 'Sharpe ngoài mẫu của 19 bộ placebo so với lần chạy thật',
-     'chapter': '/results/placebo', 'rq': 'RQ2', 'needs': None},
+     'chapter': '/results/placebo', 'rq': 'RQ2', 'needs': 'placebo_runs'},
     {'key': 'rq1_table', 'role': 'chính', 'label': 'Bảng 4.4', 'title': 'Sharpe ngoài mẫu của các cấu hình so sánh',
      'chapter': '/results/rq1', 'rq': 'RQ1', 'needs': None},
     {'key': 'wf_table', 'role': 'phụ', 'label': 'Bảng 4.5', 'title': 'Sharpe ngoài mẫu theo cửa sổ walk-forward',
@@ -111,17 +113,17 @@ PLANTED_MISSING = 'Chưa có kết quả bài cài tín hiệu (thiếu runs.csv
 ILLUSTRATION_TITLE = 'Minh hoạ: cài tín hiệu làm gì với giá'
 ILLUSTRATION_LINK = 'Xem minh hoạ một bộ dữ liệu: giá thật, giá placebo, giá đã cài và tín hiệu'
 
+PLACEBO_QUESTION = ('Câu hỏi: hệ thống có tốt hơn chính nó chạy trên dữ liệu placebo, nơi không có gì để tìm không? '
+                    'Đây là kiểm soát âm của RQ2.')
+PLACEBO_METHOD = ('Mỗi bộ placebo xáo thứ tự lợi suất của dữ liệu rồi chạy đúng quy trình walk-forward luận văn '
+                  '(7 cửa sổ, một seed MCTS). Sharpe của bộ là Sharpe năm của chuỗi lợi suất ngày ngoài mẫu nối từ '
+                  'các cửa sổ.')
+PLACEBO_DIST_RQ = ('Trả lời RQ2: hệ thống tự tạo ra Sharpe ngoài mẫu cỡ nào khi không có tín hiệu. Mỗi chấm là một bộ '
+                   'placebo; vạch ngang là Sharpe placebo lớn nhất.')
+PLACEBO_MISSING = 'Chưa có kết quả placebo (thiếu summary.csv trong thư mục walk-forward).'
+PLACEBO_P_PENDING = 'chưa có, chờ lần chạy thật'
+
 PENDING_CHAPTERS: Dict[str, Dict] = {
-    'placebo': {
-        'title': 'Kết quả: placebo (RQ2, kiểm soát âm)',
-        'rq': 'RQ2',
-        'answers': 'Hệ thống có tốt hơn chính nó chạy trên dữ liệu placebo, nơi không có gì để tìm không.',
-        'will_show': ['Hình 4.3: phân bố Sharpe ngoài mẫu của 19 bộ placebo so với lần chạy thật, kèm p = tỷ lệ bộ '
-                      'placebo có Sharpe không thấp hơn lần chạy thật.'],
-        'primary': 'placebo_p', 'metrics': ['placebo_p', 'placebo_dist'],
-        'condition': 'Chưa chạy walk-forward trên 19 bộ placebo. p cần cả các lần chạy placebo lẫn lần chạy thật duy nhất '
-                     'sau khi đóng băng cấu hình.',
-    },
     'rq1': {
         'title': 'Kết quả: vai trò của LLM (RQ1)',
         'rq': 'RQ1',
@@ -146,8 +148,10 @@ PENDING_CHAPTERS: Dict[str, Dict] = {
 }
 
 
+PLACEBO_PRIMARY = 'placebo_p'
+PLACEBO_METRICS = ['placebo_p', 'placebo_dist']
 PLANTED_PRIMARY = 'near'
-PLANTED_METRICS = ['target_ic', 'ic', 'near', 'exact', 'oos_sharpe_6m', 'pos_corr', 'top5_corr', 'closest_corr',
+PLANTED_METRICS = ['target_ic', 'ic', 'near', 'fisher_p', 'exact', 'oos_sharpe_6m', 'pos_corr', 'top5_corr', 'closest_corr',
                    'val_rank']
 PRIMARY_BOX_TITLE = 'Chỉ số chính'
 METRIC_LIST_TITLE = 'Chỉ số dùng trong chương này'
@@ -166,11 +170,17 @@ METRICS: Dict[str, Dict[str, str]] = {
                        'trung bình theo seed.',
            'reading': 'Gần IC mục tiêu thì việc cài tín hiệu đúng như thiết kế; chênh là nhiễu mẫu.',
            'role': 'phụ'},
+    'fisher_p': {'name': 'p Fisher so với IC 0',
+                 'measures': 'Xác suất thấy ít nhất chừng ấy lần tìm lại gần nếu mức IC đó không khác gì IC 0 '
+                             '(kiểm định chính xác Fisher một phía, so tỷ lệ tìm lại gần với IC 0).',
+                 'reading': 'Nhỏ hơn 0.05 thì coi là khác IC 0; ngưỡng phát hiện là mức IC thấp nhất đạt điều đó. '
+                            'Mỗi mức chỉ có 10 seed nên kiểm định có ít sức.',
+                 'role': 'phụ'},
     'near': {'name': 'Tìm lại gần',
              'measures': 'Số seed mà top-5 được chọn có ít nhất một công thức với alpha tương quan hạng tuyệt đối '
                          f'với A từ {NEAR_CORRELATION:g} trở lên.',
-             'reading': 'Là tỷ lệ k/n theo IC. Tỷ lệ ở IC 0 là mức "tìm lại" do ngẫu nhiên; IC cao hơn tách khỏi đó '
-                        'thì quy trình phát hiện được tín hiệu.',
+             'reading': 'Là tỷ lệ k/n theo IC. Tỷ lệ ở IC 0 là mức "tìm lại" do ngẫu nhiên; mức IC thấp nhất có p Fisher '
+                        'nhỏ hơn 0.05 so với IC 0 là ngưỡng phát hiện.',
              'role': 'chính'},
     'exact': {'name': 'Tìm lại đúng',
               'measures': 'Số seed mà top-5 có công thức cùng cấu trúc, trường dữ liệu và hướng với A (cửa sổ lệch '
@@ -201,7 +211,8 @@ METRICS: Dict[str, Dict[str, str]] = {
     'placebo_p': {'name': 'p-value placebo',
                   'measures': 'Tỷ lệ bộ placebo (dữ liệu xáo, không có gì để tìm) có Sharpe ngoài mẫu không thấp hơn '
                               'lần chạy thật.',
-                  'reading': 'Càng nhỏ càng khó là may mắn; với 19 bộ, giá trị nhỏ nhất có thể là 0.05.',
+                  'reading': 'Càng nhỏ càng khó là may mắn; với K bộ placebo, giá trị nhỏ nhất có thể là 1/(K+1), '
+                             'tức 0.05 với 19 bộ, và chỉ đạt khi Sharpe thật vượt mọi bộ placebo.',
                   'role': 'chính'},
     'placebo_dist': {'name': 'Phân bố Sharpe placebo',
                      'measures': 'Sharpe ngoài mẫu của từng bộ trong 19 bộ placebo.',
@@ -290,22 +301,41 @@ def reading_table(rows: List[Dict]) -> str:
     return f"Đọc: tìm lại gần theo IC là {'; '.join(parts)}; {tail}"
 
 
-def reading_near(rows: List[Dict]) -> str:
-    """Lowest target IC whose Wilson lower bound clears the upper bound of the IC 0 row."""
+FISHER_ALPHA = 0.05
+
+
+def detection_threshold(rows: List[Dict]) -> Optional[Dict]:
+    """Row of the lowest target IC > 0 whose one-sided Fisher p against IC 0 is below FISHER_ALPHA; None if none."""
+    return next((r for r in rows if r['strength'] > 0 and r.get('p_fisher') is not None
+                 and math.isfinite(r['p_fisher']) and r['p_fisher'] < FISHER_ALPHA), None)
+
+
+def _p(value) -> str:
+    return '–' if value is None or not math.isfinite(value) else f"{value:.3f}"
+
+
+def threshold_text(rows: List[Dict]) -> str:
+    """'Ngưỡng phát hiện: IC x (p = y)', or the sentence saying no level passes / there is no IC 0 to compare."""
     if not rows:
         return ''
-    base = next((r for r in rows if r['strength'] == 0.0), None)
+    if not any(r['strength'] == 0.0 for r in rows):
+        return 'Không có mức IC 0 để so nên chưa xác định được ngưỡng phát hiện'
+    hit = detection_threshold(rows)
+    if hit is None:
+        return f"Chưa có mức IC nào có p < {FISHER_ALPHA:g}, nên chưa xác định được ngưỡng phát hiện"
+    return f"Ngưỡng phát hiện: IC {_ic(hit['strength'])} (p = {_p(hit['p_fisher'])})"
+
+
+def reading_near(rows: List[Dict]) -> str:
+    """Rate at the highest IC, then the detection threshold decided by the one-sided Fisher test against IC 0."""
+    if not rows:
+        return ''
     last = rows[-1]
-    interval = f"IC {_ic(last['strength'])}: {_fmt(last['near_rate'])} (khoảng tin cậy {_fmt(last['near_low'])} đến {_fmt(last['near_high'])})"
-    if base is None:
-        return f"Đọc: {interval}; không có mức IC 0 để so."
-    clear = [r for r in rows if r['strength'] > 0 and r['near_low'] > base['near_high']]
-    if clear:
-        threshold = f"Mức IC thấp nhất tách khỏi IC 0 theo khoảng tin cậy là {_ic(clear[0]['strength'])}."
-    else:
-        threshold = ('Chưa có mức IC nào có cận dưới khoảng tin cậy vượt cận trên của IC 0, '
-                     'nên chưa xác định được ngưỡng phát hiện.')
-    return f"Đọc: {interval}. {threshold}"
+    interval = (f"IC {_ic(last['strength'])}: {_fmt(last['near_rate'])} "
+                f"(khoảng tin cậy Wilson {_fmt(last['near_low'])} đến {_fmt(last['near_high'])})")
+    tests = '; '.join(f"IC {_ic(r['strength'])}: p = {_p(r['p_fisher'])}" for r in rows if r['strength'] > 0)
+    tests = f" Kiểm định Fisher một phía so với IC 0 ({tests})." if tests else ''
+    return f"Đọc: {interval}.{tests} {threshold_text(rows)}."
 
 
 def reading_corr(seed_rows: List[Dict], threshold: float) -> str:
@@ -344,8 +374,33 @@ def reading_positions(rows: List[Dict]) -> str:
 
 
 def primary_value_planted(rows: List[Dict]) -> str:
-    """Current value of the planted chapter's primary metric: near recovery k/n and its Wilson interval per IC."""
+    """Current value of the planted chapter's primary metric: near recovery k/n per IC, then the detection threshold."""
     if not rows:
         return MISSING
-    return '; '.join(f"IC {_ic(r['strength'])}: {r['near_count']}/{r['n_runs']} "
-                     f"(95%: {_fmt(r['near_low'])} đến {_fmt(r['near_high'])})" for r in rows)
+    counts = '; '.join(f"IC {_ic(r['strength'])}: {r['near_count']}/{r['n_runs']}" for r in rows)
+    return f"{counts}. {threshold_text(rows)}"
+
+
+def placebo_p_text(view: Optional[Dict]) -> str:
+    """p = (1 + #placebo sets with Sharpe >= real) / (K + 1); pending text while there is no real run."""
+    if view is None:
+        return MISSING
+    return PLACEBO_P_PENDING if view['p'] is None else f"{view['p']:.3f}"
+
+
+def primary_value_placebo(view: Optional[Dict]) -> str:
+    if view is None:
+        return MISSING
+    return f"p = {placebo_p_text(view)}"
+
+
+def reading_placebo(view: Optional[Dict]) -> str:
+    """Placebo Sharpe distribution and what the real run must beat for the smallest p."""
+    if view is None:
+        return ''
+    text = (f"Đọc: {view['k']} bộ placebo có Sharpe trung bình {_fmt(view['mean'])}, độ lệch chuẩn {_fmt(view['sd'])}, "
+            f"nhỏ nhất {_fmt(view['min'])}, lớn nhất {_fmt(view['max'])}. Muốn p = {view['min_p']:.2f} "
+            f"(nhỏ nhất có thể với {view['k']} bộ), Sharpe lần chạy thật phải lớn hơn {_fmt(view['max'])}.")
+    if view['real'] is None:
+        return text + ' Lần chạy thật chưa có nên p chưa tính được.'
+    return text + f" Sharpe lần chạy thật là {_fmt(view['real'])}, p = {view['p']:.3f}."

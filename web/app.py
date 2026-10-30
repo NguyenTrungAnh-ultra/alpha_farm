@@ -9,7 +9,8 @@ Pages:
     /method (/pipeline)             main-flow diagram, walk-forward windows, frozen blueprint set
     /results/planted                planted-signal positive control (RQ2)
     /results/planted/illustration   what planting does to prices
-    /results/placebo, /results/rq1, /results/walkforward   chapters without results yet
+    /results/placebo                placebo walk-forward (RQ2, negative control)
+    /results/rq1, /results/walkforward   chapters without results yet
     /system, /api/system            machine resources (tool outside the thesis)
 """
 
@@ -29,7 +30,7 @@ from strategy_workflows import RunPlantedSignal as planted_run
 from strategy_workflows.MCTSEngine import MCTSEngine, _FixedPositions, describe_candidate
 from strategy_workflows.PlantedSignal import PlantedData, PlantedFormula, formula_from_dict
 from utilities.AppConfig import PROJECT_ROOT
-from web import charts, method, pipeline, planted, thesis
+from web import charts, method, pipeline, placebo, planted, thesis
 from web.system import read_system
 
 TEMPLATES_DIR = Path(__file__).parent / 'templates'
@@ -128,8 +129,12 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
     def folder() -> str:
         return planted.thesis_dir(app.state.results_root)
 
+    def placebo_view() -> Optional[Dict]:
+        return placebo.placebo_view(placebo.read_summary(placebo.walkforward_dir(app.state.results_root)))
+
     def availability() -> Dict[str, bool]:
-        return {'planted_runs': not planted.read_runs(folder()).empty,
+        return {'placebo_runs': placebo_view() is not None,
+                'planted_runs': not planted.read_runs(folder()).empty,
                 'positions': bool(planted.read_positions(folder())),
                 'data': method.data_range() is not None,
                 'blueprint_set': method.blueprint_summary(app.state.results_root) is not None}
@@ -194,6 +199,15 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
         context.update(strength=matched[0], seed=seed)
         return render(request, 'illustration.html', 'planted',
                       view=_illustration_view(folder(), matched[0], seed), **context)
+
+    @app.get('/results/placebo', response_class=HTMLResponse)
+    def placebo_page(request: Request):
+        view = placebo_view()
+        return render(
+            request, 'placebo.html', 'placebo', t=thesis, view=view, chart=placebo.chart_points(view) if view else None,
+            primary=thesis.METRICS[thesis.PLACEBO_PRIMARY], primary_value=thesis.primary_value_placebo(view),
+            metric_rows=thesis.metric_rows(thesis.PLACEBO_METRICS), reading=thesis.reading_placebo(view),
+            p_text=thesis.placebo_p_text(view))
 
     def add_pending_page(key: str) -> None:
         def pending_page(request: Request):

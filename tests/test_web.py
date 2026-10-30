@@ -357,3 +357,80 @@ def test_glossary_states_near_threshold_and_placebo_tag():
     from strategy_workflows.PlantedSignal import NEAR_CORRELATION
     assert f'{NEAR_CORRELATION:g}' in thesis.METRICS['near']['measures']
     assert thesis.ITEM_BY_KEY['placebo_dist']['role'] == 'chính'
+
+
+def fixture_planted_rows():
+    """Near recovery 0/10, 2/10, 6/10 at IC 0, 0.05, 0.1."""
+    rows = []
+    for strength, near_count in ((0.0, 0), (0.05, 2), (0.1, 6)):
+        rows += [run_row('sharpe', strength, seed, False, seed <= near_count, 0.0) for seed in range(1, 11)]
+    return rows
+
+
+def test_fisher_p_values_against_ic_zero(tmp_path):
+    write_folder(tmp_path, FOLDER, fixture_planted_rows())
+    rows = web_planted.strength_table(web_planted.read_runs(str(tmp_path / FOLDER)))
+    p = {r['strength']: r['p_fisher'] for r in rows}
+    assert p[0.0] is None
+    assert p[0.05] == pytest.approx(0.2368, abs=1e-4)
+    assert p[0.1] == pytest.approx(0.0054, abs=1e-4)
+
+
+def test_detection_threshold_is_lowest_level_below_alpha(tmp_path):
+    write_folder(tmp_path, FOLDER, fixture_planted_rows())
+    rows = web_planted.strength_table(web_planted.read_runs(str(tmp_path / FOLDER)))
+    assert thesis.detection_threshold(rows)['strength'] == 0.1
+    assert thesis.threshold_text(rows) == 'Ngưỡng phát hiện: IC 0.1 (p = 0.005)'
+    text = TestClient(web_app.create_app(str(tmp_path))).get('/results/planted').text
+    assert 'Ngưỡng phát hiện: IC 0.1 (p = 0.005)' in text and 'p Fisher so với IC 0' in text
+    assert 'cận dưới khoảng tin cậy' not in text
+    rows[2]['p_fisher'] = 0.2  # no level passes
+    assert thesis.detection_threshold(rows) is None
+    assert 'chưa xác định được ngưỡng phát hiện' in thesis.threshold_text(rows)
+    rows[1]['p_fisher'] = 0.03  # the lowest passing level wins even when a higher one passes too
+    rows[2]['p_fisher'] = 0.001
+    assert thesis.detection_threshold(rows)['strength'] == 0.05
+
+
+def test_threshold_without_ic_zero_row(tmp_path):
+    write_folder(tmp_path, FOLDER, [r for r in fixture_planted_rows() if r['strength'] > 0])
+    rows = web_planted.strength_table(web_planted.read_runs(str(tmp_path / FOLDER)))
+    assert thesis.detection_threshold(rows) is None
+    assert 'Không có mức IC 0' in thesis.threshold_text(rows)
+
+
+def write_walkforward(root, with_real=False):
+    folder = root / 'walkforward' / 'llm_mcts'
+    folder.mkdir(parents=True)
+    sharpes = [-0.5, 0.0, 0.2, 1.0]
+    rows = [{'mode': 'placebo', 'placebo_set': i + 1, 'n_days': 877, 'n_windows': 7, 'sharpe': v, 'p_value': np.nan}
+            for i, v in enumerate(sharpes)]
+    if with_real:
+        rows.append({'mode': 'real', 'placebo_set': 0, 'n_days': 877, 'n_windows': 7, 'sharpe': 0.5, 'p_value': np.nan})
+    pd.DataFrame(rows).to_csv(folder / 'summary.csv', index=False)
+
+
+def test_placebo_page_shows_distribution_and_pending_p(tmp_path):
+    write_walkforward(tmp_path)
+    text = TestClient(web_app.create_app(str(tmp_path))).get('/results/placebo').text
+    assert 'chờ lần chạy thật' in text and 'nan' not in text.lower().replace('nhận', '')
+    assert 'lớn nhất 1.00' in text and 'phải lớn hơn 1.00' in text and 'p = 0.20' in text  # 1 / (K + 1), K = 4
+    assert text.count('<tr><td>') == 4
+
+
+def test_placebo_p_counts_sets_at_least_as_good_as_real(tmp_path):
+    write_walkforward(tmp_path, with_real=True)
+    view = web_app.placebo.placebo_view(web_app.placebo.read_summary(str(tmp_path / 'walkforward' / 'llm_mcts')))
+    assert view['p'] == pytest.approx(2 / 5)  # real 0.5: only the 1.0 set is at least as good
+    assert view['mean'] == pytest.approx(0.175) and view['max'] == 1.0
+    assert 'p = 0.400' in thesis.reading_placebo(view)
+
+
+def test_placebo_p_counts_a_tie_as_at_least_as_good():
+    summary = pd.DataFrame({'mode': ['placebo', 'placebo', 'real'], 'placebo_set': [1, 2, 0], 'sharpe': [0.5, 0.1, 0.5]})
+    assert web_app.placebo.placebo_view(summary)['p'] == pytest.approx(2 / 3)
+
+
+def test_placebo_page_without_files_says_missing(tmp_path):
+    text = TestClient(web_app.create_app(str(tmp_path))).get('/results/placebo').text
+    assert 'chưa có' in text and 'Giá trị hiện tại' in text

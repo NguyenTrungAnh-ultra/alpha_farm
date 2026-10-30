@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from scipy.stats import fisher_exact
 
 from strategy_workflows.PlantedSignal import NEAR_CORRELATION, Segments
 from strategy_workflows.RunPlantedSignal import RUN_KEY, summarize_runs
@@ -41,6 +42,13 @@ def wilson_interval(successes: int, n: int, z: float = 1.96) -> Tuple[float, flo
     centre = (p + z * z / (2 * n)) / denom
     half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
     return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def fisher_p_greater(near: int, n: int, base_near: int, base_n: int) -> float:
+    """One-sided Fisher exact p: chance of at least `near` of `n` near recoveries if the level's rate equalled the base rate."""
+    if n <= 0 or base_n <= 0:
+        return float('nan')
+    return float(fisher_exact([[near, n - near], [base_near, base_n - base_near]], alternative='greater')[1])
 
 
 def read_segments(folder: str) -> Segments:
@@ -97,7 +105,10 @@ def read_runs(folder: str) -> pd.DataFrame:
 
 
 def strength_table(runs: pd.DataFrame) -> List[Dict]:
-    """One dict per target IC from `summarize_runs`, plus the 95% Wilson interval of the near-recovery rate."""
+    """
+    One dict per target IC from `summarize_runs`, plus the 95% Wilson interval of the near-recovery rate and
+    `p_fisher`: one-sided Fisher p against the IC 0 row (None for IC 0 itself, NaN when there is no IC 0 row).
+    """
     if runs.empty:
         return []
     rows = []
@@ -106,6 +117,14 @@ def strength_table(runs: pd.DataFrame) -> List[Dict]:
         row['n_runs'], row['near_count'], row['exact_count'] = n, near, int(row['exact_count'])
         row['near_low'], row['near_high'] = wilson_interval(near, n)
         rows.append(row)
+    base = next((r for r in rows if r['strength'] == 0.0), None)
+    for row in rows:
+        if row['strength'] == 0.0:
+            row['p_fisher'] = None
+        elif base is None:
+            row['p_fisher'] = float('nan')
+        else:
+            row['p_fisher'] = fisher_p_greater(row['near_count'], row['n_runs'], base['near_count'], base['n_runs'])
     return rows
 
 

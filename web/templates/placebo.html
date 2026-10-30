@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge, primary_box, metric_list %}
+{% block title %}Placebo{% endblock %}
+{% block content %}
+<h1>{{ t.PLACEBO_TITLE }}</h1>
+{{ primary_box(primary, primary_value) }}
+
+<div class="card">
+  <p><b>{{ t.PLACEBO_QUESTION }}</b></p>
+  <p>{{ t.PLACEBO_METHOD }}</p>
+</div>
+
+<figure>
+  {% if view %}<div class="chartbox"><canvas id="c-placebo"></canvas></div>{% endif %}
+  <figcaption><b>{{ cap.placebo_dist.label }} — {{ cap.placebo_dist.title }}.</b>{{ badge(cap.placebo_dist.role) }} {{ t.PLACEBO_DIST_RQ }}
+    {% if view %}<span class="reading">{{ reading }}</span>{% else %}chưa có. {{ t.PLACEBO_MISSING }}{% endif %}</figcaption>
+</figure>
+
+{% if view %}
+<div class="tablebox scroll">
+<table>
+  <caption><b>p-value placebo:</b> {{ p_text }}</caption>
+  <tr><th>Bộ placebo</th><th>Số cửa sổ</th><th>Số ngày</th><th title="{{ metric.placebo_dist.measures }}">Sharpe ngoài mẫu</th></tr>
+  {% for s in view.sets %}
+  <tr><td>{{ s.set }}</td><td>{{ s.n_windows if s.n_windows is not none else '–' }}</td><td>{{ s.n_days if s.n_days is not none else '–' }}</td><td>{{ s.sharpe | fmt(2) }}</td></tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
+
+{{ metric_list(metric_rows) }}
+
+<script type="application/json" id="chart-data">{{ chart | tojson }}</script>
+<script>
+window.addEventListener('load', function () {
+  var d = JSON.parse(document.getElementById('chart-data').textContent);
+  if (d) { placeboChart('c-placebo', d, 'bộ placebo', 'Sharpe năm ngoài mẫu'); }
+});
+</script>
+{% endblock %}
