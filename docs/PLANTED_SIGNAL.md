@@ -148,6 +148,26 @@ Người dùng chọn hướng "thêm dữ liệu" (2026-10-29) để kiểm gi�
   - Thêm dữ liệu (cột 2 → 3): IC 0.1 3/5 → 5/5, IC 0 2/5 → 0/5 ⇒ phần cải thiện của lần 3 chủ yếu do dữ liệu, không do reward. IC 0.05 không đổi ở cả ba cấu hình.
   - Lưu ý: 5 seed mỗi ô; chênh 3/5 vs 5/5 chưa có ý nghĩa thống kê (ước của Claude, chưa kiểm định). Sharpe ngoài mẫu lần 2 chỉ trên 6 tháng nên rất nhiễu.
 
+## 11. Cách chia cửa sổ 1 walk-forward (số luận văn dùng)
+
+Thiết lập (2026-10-30, `results/planted_window1/`): học 2018-08-13 → 2021-06-30 (3.583 bar), kiểm định 2021-07 → 2022-06, đánh giá 2022-07 → 2022-12; ngữ pháp có lan chiều (`c0e83a0`); bộ 20 blueprint mới (`results/blueprint_sets/20261029_212813/`); reward `sharpe`; 20 blueprint × 5.000 vòng; IC 0 / 0.05 / 0.1 × seed 1–5 = 15 lượt, mỗi lượt 2.370–3.340 s (≈ 2 giờ trên 10 tiến trình).
+
+- **A:** `ts_zscore(ts_zscore(high − close, 10) − ts_zscore(close − close, 10), 10)`, NORMALIZED, từ OrderFlowSkewnessSignal; bỏ SkewnessKineticEnergySignal vì điền ra hằng (điều khoản mục 3). Thực chất A = z-score của `ts_zscore(high − close, 10)`. 1/20 blueprint biểu diễn được.
+- **Chấm đáp án (`oracle.csv`, 54 s):** IC đo đoạn tìm trung bình −0.002 / 0.044 / 0.098.
+
+| IC mục tiêu | IC đo đoạn tìm | IC đo đoạn đánh giá | tìm lại đúng | tìm lại gần | Sharpe ngoài mẫu |
+|---|---|---|---|---|---|
+| 0 | −0.003 | −0.025 | 0/5 | 0/5 | −0.90 ± 0.46 |
+| 0.05 | 0.048 | 0.021 | 0/5 | 1/5 | −0.67 ± 1.52 |
+| 0.1 | 0.098 | 0.068 | 1/5 | 1/5 | +0.21 ± 1.47 |
+
+- IC 0: 0/5 tìm nhầm. IC 0.05: 1/5 (như mọi lần trước). **IC 0.1: chỉ 1/5**, thấp hơn hẳn lần 3 (5/5, 4.831 bar) và lần 2 (3/5, 1.738 bar), dù số bar học nằm giữa hai lần đó.
+- Ở IC 0.1, công thức trùng A (|Spearman| = 1.0) **có** trong ≤ 100 ứng viên ở 2/5 seed: seed 5 đứng hạng 1 cả học lẫn kiểm định (tìm lại đúng); seed 3 hạng học 54 → hạng kiểm định 24, không vào top-5. Seed 1 có ứng viên tương quan 0.80 (hạng học 30 → kiểm định 48). ⇒ Lần này nghẽn ở cả đoạn học lẫn bước chọn trên đoạn kiểm định.
+- Seed 5 ở IC 0.1 tìm lại đúng A nhưng Sharpe ngoài mẫu −1.94: IC của A trên 6 tháng đánh giá chỉ 0.081 và nhiễu 6 tháng lớn.
+- IC 0 seed 5: một công thức trùng A đứng hạng 87 dù không cài gì; A chỉ là một công thức trong không gian tìm, và trong placebo đó nó tình cờ không tệ.
+- Lượt chấm lỗi (−10) ≈ 7% mỗi lượt (`Input array/series must be 1D, got shape ()`, biểu thức toàn hằng; nợ ở ROADMAP mục 4).
+- **Chưa tách được nguyên nhân tụt ở IC 0.1.** So với lần 3, lần này đổi cùng lúc: độ dài dữ liệu, ngữ pháp (lan chiều), công thức A, bộ blueprint. Suy đoán của Claude (chưa đo): A mới là tín hiệu hình dạng nến (`high − close`), tự tương quan thấp hơn A cũ (`ts_max − ts_mean` của giá), nên cùng IC thì Sharpe của tín hiệu và độ tách khỏi nhiễu khác; 5 seed mỗi ô nên 1/5 với 3/5 chưa chắc khác nhau thật. Chờ người dùng quyết có đo tách hay không.
+
 ## 4. Chạy
 
 - MCTS trên đoạn tìm, rồi gộp top-5 trọng số đều, giao dịch trên đoạn đánh giá. Đây là đúng đơn vị đánh giá của proposal.
