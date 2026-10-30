@@ -18,7 +18,7 @@ Phương pháp: [design/PLANTED_SIGNAL](design/PLANTED_SIGNAL.md). Tệp: `resul
 
 - **Ngưỡng phát hiện: IC 0.1** (6/10 so với 0/10 ở IC 0, p = 0.005); IC 0.05 chưa tách khỏi nhiễu (2/10, p = 0.24); IC 0 không tìm nhầm lần nào.
 - Tương quan của công thức gần A nhất trong top-5 ở 6 lượt tìm lại gần (IC 0.1, seed 5–10): 1.00 / 0.97 / 0.97 / 0.74 / 0.97 / 0.77. Mốc 0.8 thay cho 0.7 ⇒ 4/10. Phần lớn là cùng tín hiệu `high − close` cộng hai cửa sổ 5 và 10; "tìm lại đúng" thấp vì MCTS điền một số hạng có nghĩa vào chỗ số hạng chết của A.
-- **Vị thế** (chỉ seed 1–5 ở IC 0 và 0.05, seed 1–10 ở IC 0.1; seed mới chưa đo; tương quan vị thế tốt nhất trong top-5 với vị thế của A trên đoạn tìm): IC 0 từ −0.09 đến 0.13 (trung bình 0.03); 6 lượt tìm lại gần ở IC 0.1: 0.72 / 0.25 / 0.66 / 0.04 / 0.46 / 0.52. Lấy mức nhiễu lớn nhất 0.13 làm mốc (đặt sau khi xem số, chỉ để tham khảo) ⇒ 0/5 / 2/5 / 6/10. Vị thế giống ít hơn giá trị thô vì ngưỡng z khác nhau: A ở ngưỡng z tốt nhất đứng ngoài 87–98% số bar.
+- **Vị thế** (10 seed mỗi mức; tương quan vị thế tốt nhất trong top-5 với vị thế của A trên đoạn tìm): IC 0 từ −0.09 đến 0.13 (trung bình 0.04); IC 0.05 trung bình 0.16; IC 0.1 trung bình 0.30, ở 6 lượt tìm lại gần: 0.72 / 0.25 / 0.66 / 0.04 / 0.46 / 0.52. Lấy mức nhiễu lớn nhất 0.13 làm mốc (đặt sau khi xem 5 seed đầu, chỉ để tham khảo) ⇒ 0/10 / 4/10 / 6/10. Vị thế giống ít hơn giá trị thô vì ngưỡng z khác nhau: A ở ngưỡng z tốt nhất đứng ngoài 87–98% số bar.
 - Sharpe ngoài mẫu 6 tháng rất nhiễu: có lượt tìm lại gần mà vẫn −2.3.
 
 **Độ nhạy theo độ dài đoạn học** (ngữ pháp cũ, A khác: `ts_zscore(ts_max(close, 10) − ts_mean(close, 10), 10)`, `sharpe`, 5 seed; chỉ để so xu hướng):
