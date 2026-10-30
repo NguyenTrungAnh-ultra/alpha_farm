@@ -10,15 +10,15 @@ Phương pháp: [design/PLANTED_SIGNAL](design/PLANTED_SIGNAL.md). Tệp: `resul
 
 **A:** `ts_zscore(ts_zscore(high − close, 10) − ts_zscore(close − close, 10), 10)`, NORMALIZED, từ blueprint OrderFlowSkewnessSignal; số hạng thứ hai là hằng nên A thực chất là z-score của `ts_zscore(high − close, 10)`. 1/20 blueprint biểu diễn được A.
 
-| IC mục tiêu | Số seed | IC đo đoạn tìm | IC đo đoạn đánh giá | Tìm lại gần | Tìm lại đúng | Sharpe ngoài mẫu (6 tháng) |
-|---|---|---|---|---|---|---|
-| 0 | 5 | −0.003 | −0.025 | 0/5 | 0/5 | −0.90 ± 0.46 |
-| 0.05 | 5 | 0.048 | 0.021 | 1/5 | 0/5 | −0.67 ± 1.52 |
-| 0.1 | 10 | 0.099 | 0.081 | **6/10** | 1/10 | −0.10 ± 1.82 |
+| IC mục tiêu | Số seed | IC đo đoạn tìm | IC đo đoạn đánh giá | Tìm lại gần | Tìm lại đúng | p so với IC 0 (Fisher một phía) | Sharpe ngoài mẫu (6 tháng) |
+|---|---|---|---|---|---|---|---|
+| 0 | 10 | −0.002 | −0.011 | 0/10 | 0/10 | — | −0.85 ± 1.00 |
+| 0.05 | 10 | 0.049 | 0.035 | 2/10 | 0/10 | 0.24 | −0.45 ± 1.69 |
+| 0.1 | 10 | 0.099 | 0.081 | **6/10** | 1/10 | **0.005** | −0.10 ± 1.82 |
 
-- **Ngưỡng phát hiện ≈ IC 0.1** với lượng dữ liệu này; IC 0 không tìm nhầm lần nào.
+- **Ngưỡng phát hiện: IC 0.1** (6/10 so với 0/10 ở IC 0, p = 0.005); IC 0.05 chưa tách khỏi nhiễu (2/10, p = 0.24); IC 0 không tìm nhầm lần nào.
 - Tương quan của công thức gần A nhất trong top-5 ở 6 lượt tìm lại gần (IC 0.1, seed 5–10): 1.00 / 0.97 / 0.97 / 0.74 / 0.97 / 0.77. Mốc 0.8 thay cho 0.7 ⇒ 4/10. Phần lớn là cùng tín hiệu `high − close` cộng hai cửa sổ 5 và 10; "tìm lại đúng" thấp vì MCTS điền một số hạng có nghĩa vào chỗ số hạng chết của A.
-- **Vị thế** (tương quan vị thế tốt nhất trong top-5 với vị thế của A trên đoạn tìm): IC 0 từ −0.09 đến 0.13 (trung bình 0.03); 6 lượt tìm lại gần ở IC 0.1: 0.72 / 0.25 / 0.66 / 0.04 / 0.46 / 0.52. Lấy mức nhiễu lớn nhất 0.13 làm mốc (đặt sau khi xem số, chỉ để tham khảo) ⇒ 0/5 / 2/5 / 6/10. Vị thế giống ít hơn giá trị thô vì ngưỡng z khác nhau: A ở ngưỡng z tốt nhất đứng ngoài 87–98% số bar.
+- **Vị thế** (chỉ seed 1–5 ở IC 0 và 0.05, seed 1–10 ở IC 0.1; seed mới chưa đo; tương quan vị thế tốt nhất trong top-5 với vị thế của A trên đoạn tìm): IC 0 từ −0.09 đến 0.13 (trung bình 0.03); 6 lượt tìm lại gần ở IC 0.1: 0.72 / 0.25 / 0.66 / 0.04 / 0.46 / 0.52. Lấy mức nhiễu lớn nhất 0.13 làm mốc (đặt sau khi xem số, chỉ để tham khảo) ⇒ 0/5 / 2/5 / 6/10. Vị thế giống ít hơn giá trị thô vì ngưỡng z khác nhau: A ở ngưỡng z tốt nhất đứng ngoài 87–98% số bar.
 - Sharpe ngoài mẫu 6 tháng rất nhiễu: có lượt tìm lại gần mà vẫn −2.3.
 
 **Độ nhạy theo độ dài đoạn học** (ngữ pháp cũ, A khác: `ts_zscore(ts_max(close, 10) − ts_mean(close, 10), 10)`, `sharpe`, 5 seed; chỉ để so xu hướng):
