@@ -83,6 +83,9 @@ Lần 3 bài cài tín hiệu: ≈ 3.600 s / lượt với 4.831 bar học, 10 l
 - Kết quả: `results/walkforward/<cấu hình>/runs.csv` (mỗi cửa sổ × seed một dòng, có tham số template của top-5) và `returns.csv` (lợi suất ngày ngoài mẫu).
 - Thứ tự: (1) LLM + MCTS trên **placebo** trước để thử đường ống mà chưa chạm dữ liệu thật; (2) các cấu hình so sánh; (3) đóng băng; (4) chạy thật một lần.
 - Web: thêm trang walk-forward sau khi có `runs.csv`.
+- ✅ Code bước (1) xong (2026-10-30, `strategy_workflows/WalkForward.py`, `main.py walkforward placebo|freeze|real|summary`, mô tả ở `docs/ARCH.md` mục 3.5): chỉ cấu hình LLM + MCTS. Chưa chạy placebo trên dữ liệu thật, chưa chạy `freeze` hay `real`. Cấu hình so sánh (mục 4) chưa code vì chưa duyệt. Số bar học cửa sổ 2–7: 4.231 → 7.319; kiểm định 1.239–1.249; đánh giá 595–650.
+- **[đề xuất]** Mỗi lượt placebo chạy MCTS với seed 1. Bộ placebo nào không giao dịch (Sharpe NaN) thì không tính vào K, nên p-value lớn hơn một chút (phía thận trọng). Claude chọn, chưa ai chốt.
+- ✅ Placebo bộ k, cửa sổ w: mỗi cửa sổ hoán vị riêng (seed tất định theo (k, w), không trùng seed 1–5 hay 1001–1020), không dùng một bản hoán vị chung cho cả lịch sử (Claude đề xuất, người dùng chốt 2026-10-30).
 
 ## 9. Ngoài phạm vi lần này
 

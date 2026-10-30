@@ -108,6 +108,19 @@ Kiểm soát dương: cài một công thức biết trước vào dữ liệu p
   5. `summary`: gộp `runs.csv` (chạy lại cùng khoá thì lấy dòng cuối) thành `summary.csv` theo (chế độ, độ mạnh) và in đạt/trượt tiêu chí chỉ cho IC 0.05 (gần ≥ 3/5) và IC 0 (gần ≤ 1/5); các độ mạnh khác chỉ có trong bảng.
 - Test: `tests/test_planted_signal.py`.
 
+### 3.5 Walk-forward LLM + MCTS (`WalkForward.py`, `main.py walkforward <bước>`)
+
+Thiết kế ở `docs/WALK_FORWARD.md`; chỉ cấu hình LLM + MCTS đã có code (các cấu hình so sánh chưa).
+
+- Bảng cửa sổ `WINDOWS` (hàm `build_windows`): 7 `Segments`, học nở dần từ 2018-08-13, kiểm định 12 tháng ngay trước đoạn đánh giá, đánh giá 6 tháng (2022-07 → 2025-12). Khung 60m. Số bar học / kiểm định / đánh giá: cửa sổ 1 là 3.583 / 1.248 / 645, cửa sổ 7 là 7.319 / 1.243 / 650.
+- Mỗi lượt (`run_window`, cửa sổ × seed × chế độ × bộ placebo): `MCTSEngine(reward_mode='sharpe')` trên đoạn học, chạy từng blueprint (mặc định 20 × 5.000 vòng); sau đó dùng lại `rank_leaderboard` (tối đa `MAX_RANKED` biểu thức khác nhau chấm lại trên kiểm định, lấy `TOP_K` = 5) và `candidate_positions` / `combine_positions` của bài cài tín hiệu; vị thế trọng số đều giao dịch trên đoạn đánh giá bằng `AlphaBacktestEngine`, lịch sử chỉ báo lấy từ khung liên tục. Không có ứng viên ⇒ đứng ngoài (lợi suất 0).
+- Lợi suất ngày (`daily_returns`): vốn cuối mỗi ngày lịch trừ ngày trước, chia vốn ban đầu, như `compute_metrics` nhưng giữ cả ngày đầu của đoạn (so với vốn ban đầu) để nối 7 đoạn không mất ngày. Sharpe = trung bình / độ lệch chuẩn (ddof 0) × √252.
+- Placebo (`placebo_frame`): hoán vị bản ghi bar (lợi suất, Volume, hình dạng trong bar) riêng trong từng đoạn học / kiểm định / đánh giá của cửa sổ đó bằng `permute_returns`, dựng lại giá liên tục. Seed hoán vị = `100000 + 100·k + w` (k = bộ placebo từ 1, w = cửa sổ 1–99) nên không bao giờ trùng seed 1–5 của lần thật hay 1001–1020 của hiệu chỉnh bài cài tín hiệu; seed MCTS của placebo là 1.
+- Ra `results/walkforward/<cấu hình>/` (mặc định `llm_mcts`, đổi bằng `--config` / `--results-root`): `runs.csv` (mỗi cửa sổ × seed × bộ placebo một dòng, khoá `mode, placebo_set, window, seed`, có top-5 dạng JSON gồm biểu thức, tham số template, chiều, reward học / kiểm định; `eval_sharpe`; `evaluations` / `failed` / `top_errors` từ `MCTSEngine.error_summary()` để thấy lỗi chấm −10), `returns.csv` (lợi suất ngày đoạn đánh giá, dạng dọc), `summary.csv`. Ghi nối từng lượt khi xong (tiến trình cha); chạy lại thì bỏ qua khoá đã có trong `runs.csv` (`returns.csv` ghi trước, `runs.csv` sau; trùng do sập giữa chừng được loại ở `summary`).
+- Các bước: `placebo [--sets 19] [--windows ...]` (không cần `frozen.json`); `freeze` ghi `results/walkforward/frozen.json`: reward + `REWARD_WEIGHTS`, bảng cửa sổ, đường dẫn + sha256 tệp blueprint, số blueprint, vòng, seed, khung, `MAX_RANKED`, `TOP_K`, `MCTS_MAX_DEPTH`, commit git, sha256 dữ liệu (cùng cách băm với `HMMValidation.fingerprint_data` nhưng chép lại để không cần `hmmlearn`); `real` từ chối chạy khi thiếu `frozen.json`, khi bất kỳ trường nào khác cấu hình hiện tại (hash blueprint tính lại), hoặc khi mã (`main.py`, `core_engine`, `strategy_workflows`, `utilities`) khác commit đã đóng băng (`git diff` commit đó với cây làm việc, nên commit thêm `frozen.json` hay tài liệu thì không sao, sửa mã thì chặn); `summary`.
+- `summary`: nối lợi suất ngày của 7 cửa sổ (thật: trung bình 5 seed theo ngày; placebo: từng bộ), Sharpe năm của từng chuỗi, p = (1 + số bộ placebo có Sharpe ≥ lần thật) / (K + 1), hoà tính là ≥, bộ placebo Sharpe NaN (chuỗi phẳng) không tính vào K.
+- Test: `tests/test_walk_forward.py`.
+
 ## 4. Backtest (`core_engine/BacktestEngine.py`)
 
 - Tín hiệu bar t khớp ở bar t+1 (`shift(1)`); đã kiểm: không nhìn trước tương lai.

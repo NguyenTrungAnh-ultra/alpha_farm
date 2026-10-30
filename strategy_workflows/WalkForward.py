@@ -1,0 +1,531 @@
+"""
+WalkForward
+===========
+Walk-forward test of the LLM + MCTS configuration on real 60m data: for each of 7 windows the
+search sees only data before the window (train), the top candidates are re-ranked on the 12 months
+before the evaluation segment (validation), and the top-5 trade the next 6 months (evaluation).
+The concatenated daily evaluation returns are the out-of-sample series.
+
+Steps (`main.py walkforward <step>`):
+    placebo   run the pipeline on K return-permuted copies of the data (no frozen config needed)
+    freeze    write frozen.json from the current configuration
+    real      run on the real data; refuses unless frozen.json equals the current configuration
+    summary   annualised Sharpe of the concatenated evaluation returns per mode and the placebo p-value
+
+Per-window pipeline (same functions as the planted-signal runner): MCTS on the train segment with
+reward mode `sharpe`, the distinct leaderboard expressions (at most MAX_RANKED) re-scored on
+validation, top-5 by validation reward, equal-weight positions traded on the evaluation segment
+with the indicator history taken from the continuous frame.
+
+Placebo seeds: the permutation seed of placebo set k (1-based) in window w (1..99) is
+`PLACEBO_SEED_BASE + 100 * k + w`, i.e. at least 100101. Real runs use MCTS seeds 1-5 and the
+planted calibration uses 1001-1020, so the ranges never meet. A placebo run uses MCTS seed 1.
+"""
+
+import argparse
+import hashlib
+import json
+import multiprocessing
+import os
+import subprocess
+import sys
+import time
+import warnings
+from collections import Counter
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional, Sequence
+
+import numpy as np
+import pandas as pd
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from core_engine.BacktestEngine import AlphaBacktestEngine, load_data
+from strategy_workflows.MCTSEngine import MCTSEngine, _FixedPositions
+from strategy_workflows.PlantedSignal import (
+    TOP_K, Segments, build_ohlcv_from_returns, combine_positions, permute_returns, split_bars,
+)
+from strategy_workflows.RunPlantedSignal import (
+    MAX_RANKED, TIMEFRAME, candidate_positions, load_blueprints, quiet, rank_leaderboard,
+)
+from strategy_workflows.SemanticCompiler import SemanticCompiler
+from utilities.AppConfig import MCTS_MAX_DEPTH, REWARD_WEIGHTS
+
+REWARD_MODE = 'sharpe'
+DEFAULT_CONFIG = 'llm_mcts'
+DEFAULT_BLUEPRINTS = os.path.join(PROJECT_ROOT, 'results', 'blueprint_sets', '20261029_212813', 'blueprints.json')
+DEFAULT_RESULTS_ROOT = os.path.join(PROJECT_ROOT, 'results', 'walkforward')
+DEFAULT_ITERATIONS = 5000
+DEFAULT_BLUEPRINT_COUNT = 20
+DEFAULT_SEEDS = [1, 2, 3, 4, 5]
+DEFAULT_PLACEBO_SETS = 19
+PLACEBO_MCTS_SEED = 1
+PLACEBO_SEED_BASE = 100000
+FIRST_EVAL_START = '2022-07-01'
+N_WINDOWS = 7
+VALIDATION_MONTHS = 12
+EVAL_MONTHS = 6
+TRADING_DAYS_PER_YEAR = 252
+# Tracked code whose difference from the frozen commit invalidates a frozen configuration.
+CODE_PATHS = ['main.py', 'core_engine', 'strategy_workflows', 'utilities']
+
+RUN_KEY = ['mode', 'placebo_set', 'window', 'seed']
+RUN_FIELDS = RUN_KEY + [
+    'data_seed', 'iterations', 'n_blueprints', 'blueprint_errors', 'evaluations', 'failed', 'top_errors',
+    'n_ranked', 'n_top', 'train_best_reward', 'top', 'top_train_rewards', 'top_val_rewards', 'eval_sharpe',
+    'eval_trades', 'elapsed_s',
+]
+RETURN_FIELDS = ['date', 'window', 'seed', 'mode', 'placebo_set', 'return']
+
+
+# --------------------------------------------------------------------------- windows
+
+
+def build_windows(first_eval_start: str = FIRST_EVAL_START, n_windows: int = N_WINDOWS,
+                  search_start: str = '2018-08-13') -> List[Segments]:
+    """
+    Expanding train from `search_start`; validation = the 12 months before each evaluation segment;
+    evaluation = 6 months, shifting by 6 months per window. Boundaries are whole calendar days.
+    """
+    one_day = pd.Timedelta(days=1)
+    windows = []
+    for i in range(n_windows):
+        eval_start = pd.Timestamp(first_eval_start) + pd.DateOffset(months=EVAL_MONTHS * i)
+        validation_start = eval_start - pd.DateOffset(months=VALIDATION_MONTHS)
+        eval_end = eval_start + pd.DateOffset(months=EVAL_MONTHS) - one_day
+        windows.append(Segments(search_start=search_start,
+                                train_end=(validation_start - one_day).strftime('%Y-%m-%d'),
+                                search_end=(eval_start - one_day).strftime('%Y-%m-%d'),
+                                eval_end=eval_end.strftime('%Y-%m-%d')))
+    return windows
+
+
+WINDOWS = build_windows()
+
+
+def load_full_frame(windows: Sequence[Segments] = WINDOWS) -> pd.DataFrame:
+    """Real 60m OHLCV from the first train start to the last evaluation end."""
+    return load_data(TIMEFRAME, start=windows[0].search_start, end=windows[-1].eval_end)
+
+
+# --------------------------------------------------------------------------- placebo
+
+
+def placebo_seed(set_index: int, window: int) -> int:
+    """Permutation seed of placebo set `set_index` (>= 1) in window `window` (1..99); see module doc."""
+    if set_index < 1 or not 1 <= window <= 99:
+        raise ValueError(f"placebo set must be >= 1 and window in 1..99, got {set_index}, {window}")
+    return PLACEBO_SEED_BASE + 100 * set_index + window
+
+
+def permute_segments(bars: pd.DataFrame, n_train: int, n_search: int, seed: int) -> pd.DataFrame:
+    """
+    Shuffle whole bar records (return, Volume, shape) inside train, validation and evaluation
+    separately, one generator per call. The first bar keeps its placeholder return.
+    """
+    rng = np.random.default_rng(seed)
+    parts = [
+        permute_returns(bars.iloc[:n_train], rng, keep_first=True),
+        permute_returns(bars.iloc[n_train:n_search], rng),
+        permute_returns(bars.iloc[n_search:], rng),
+    ]
+    return pd.concat(parts)
+
+
+def placebo_frame(full: pd.DataFrame, segments: Segments, seed: int) -> pd.DataFrame:
+    """OHLCV rebuilt from per-segment permuted bar returns; continuous across the segment boundaries."""
+    n_train = len(full.loc[:segments.train_end])
+    n_search = len(full.loc[:segments.search_end])
+    perm = permute_segments(split_bars(full), n_train, n_search, seed)
+    return build_ohlcv_from_returns(perm, perm['ret'].to_numpy(), float(full['Close'].iloc[0]))
+
+
+# --------------------------------------------------------------------------- evaluation
+
+
+def daily_returns(result) -> pd.Series:
+    """
+    Daily return on initial capital: last equity of each calendar day, differenced (the first day
+    against the initial capital). Same convention as `compute_metrics`, except that the first day's
+    P&L is kept so that concatenated segments lose no day.
+    """
+    daily = result.equity_curve.dropna().resample('D').last().dropna()
+    previous = pd.concat([pd.Series([result.initial_capital]), daily.iloc[:-1].reset_index(drop=True)],
+                         ignore_index=True)
+    return pd.Series((daily.to_numpy() - previous.to_numpy()) / result.initial_capital, index=daily.index)
+
+
+def annualised_sharpe(returns: pd.Series) -> float:
+    """mean / std (ddof 0) * sqrt(252) of daily returns, as in `compute_metrics`; NaN when flat or empty."""
+    values = pd.Series(returns).dropna()
+    if len(values) < 2 or values.std(ddof=0) == 0:
+        return float('nan')
+    return float(values.mean() / values.std(ddof=0) * np.sqrt(TRADING_DAYS_PER_YEAR))
+
+
+def trade_top(candidates: List[dict], full: pd.DataFrame, evaluation_index: pd.Index) -> Dict:
+    """Equal-weight top-k positions (history from the whole frame) traded on the evaluation bars."""
+    frame = full.copy()
+    frame['Volume'] = frame['Volume'].fillna(0.0)
+    evaluation = frame.loc[evaluation_index]
+    if not candidates:
+        days = evaluation.index.normalize().unique()
+        return {'returns': pd.Series(0.0, index=days), 'trades': 0}
+    combined = combine_positions([candidate_positions(c, frame) for c in candidates])
+    result = AlphaBacktestEngine().run(_FixedPositions(combined.loc[evaluation.index]), evaluation)
+    return {'returns': daily_returns(result), 'trades': int(result.total_trades)}
+
+
+def describe_top(candidates: List[dict], val_rewards: List[float]) -> str:
+    return json.dumps([
+        {'expr': c['expr'], 'template': c['template'], 'window': c['window'], 'z_score': c['z_score'],
+         'threshold_upper': c['threshold_upper'], 'threshold_lower': c['threshold_lower'],
+         'direction': c['direction'], 'train_reward': c['reward'], 'val_reward': v}
+        for c, v in zip(candidates, val_rewards)
+    ])
+
+
+def run_window(task: Dict) -> Dict:
+    """
+    One (window, seed, mode, placebo set). `task['frame']` is the continuous real frame from
+    search_start to eval_end. Returns {'row': ..., 'returns': daily evaluation returns}.
+    """
+    warnings.filterwarnings('ignore')
+    started = time.time()
+    segments: Segments = task['segments']
+    full = task['frame']
+    data_seed = task.get('data_seed', 0)
+    if task['mode'] == 'placebo':
+        full = placebo_frame(full, segments, data_seed)
+    search = full.loc[:segments.search_end]
+    with quiet():
+        engine = MCTSEngine(timeframe=TIMEFRAME, max_depth=MCTS_MAX_DEPTH, global_position_matrix=None,
+                            seed=task['seed'], data=full.loc[:segments.train_end], reward_mode=REWARD_MODE)
+        compiler = SemanticCompiler()
+        blueprint_errors = 0
+        for bp in task['blueprints']:
+            try:
+                engine.run_search_from_blueprint(compiler.compile_blueprint(bp['macro_blueprint']),
+                                                 n_iterations=task['iterations'])
+            except Exception as exc:
+                blueprint_errors += 1
+                print(f"blueprint {bp['name']} failed: {exc}")
+        summary = engine.error_summary()
+        picked = rank_leaderboard(engine, search, segments, TOP_K)
+        top = [picked['ranked'][i] for i in picked['chosen']]
+        top_val = [picked['val_rewards'][i] for i in picked['chosen']]
+        traded = trade_top(top, full, full.loc[segments.eval_start:segments.eval_end].index)
+    returns = traded['returns']
+    row = {
+        'mode': task['mode'], 'placebo_set': task.get('placebo_set', 0), 'window': task['window'],
+        'seed': task['seed'], 'data_seed': data_seed, 'iterations': task['iterations'],
+        'n_blueprints': len(task['blueprints']), 'blueprint_errors': blueprint_errors,
+        'evaluations': summary['evaluations'], 'failed': summary['failed_evaluations'],
+        'top_errors': json.dumps(summary['top_errors']),
+        'n_ranked': len(picked['ranked']), 'n_top': len(top),
+        'train_best_reward': picked['ranked'][0]['reward'] if picked['ranked'] else float('nan'),
+        'top': describe_top(top, top_val),
+        'top_train_rewards': json.dumps([c['reward'] for c in top]), 'top_val_rewards': json.dumps(top_val),
+        'eval_sharpe': annualised_sharpe(returns), 'eval_trades': traded['trades'],
+        'elapsed_s': time.time() - started,
+    }
+    return {'row': row, 'returns': returns}
+
+
+# --------------------------------------------------------------------------- output and resume
+
+
+def append_rows(path: str, rows: List[Dict], fields: List[str]) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    pd.DataFrame(rows, columns=fields).to_csv(path, mode='a', header=not os.path.exists(path), index=False)
+
+
+def append_run(out_dir: str, window: int, outcome: Dict) -> None:
+    """
+    Append the daily returns first and the runs.csv row last: the row is the commit marker for
+    resume, so a crash in between re-runs the task and the duplicate returns are dropped in `summary`.
+    """
+    row, returns = outcome['row'], outcome['returns']
+    frame = pd.DataFrame({
+        'date': returns.index.strftime('%Y-%m-%d'), 'window': window, 'seed': row['seed'], 'mode': row['mode'],
+        'placebo_set': row['placebo_set'], 'return': returns.to_numpy(),
+    }, columns=RETURN_FIELDS)
+    append_rows(os.path.join(out_dir, 'returns.csv'), frame.to_dict('records'), RETURN_FIELDS)
+    append_rows(os.path.join(out_dir, 'runs.csv'), [row], RUN_FIELDS)
+
+
+def completed_keys(out_dir: str) -> set:
+    path = os.path.join(out_dir, 'runs.csv')
+    if not os.path.exists(path):
+        return set()
+    runs = pd.read_csv(path, usecols=RUN_KEY)
+    return {(m, int(k), int(w), int(s)) for m, k, w, s in runs[RUN_KEY].itertuples(index=False)}
+
+
+def build_tasks(mode: str, windows: Sequence[Segments], seeds: Sequence[int], blueprints: List[Dict],
+                iterations: int, frame: pd.DataFrame, placebo_sets: int = 0,
+                window_numbers: Optional[Sequence[int]] = None) -> List[Dict]:
+    """Tasks for `mode`; `window_numbers` (1-based) restricts to some windows of `windows`."""
+    numbers = list(window_numbers) if window_numbers else list(range(1, len(windows) + 1))
+    tasks = []
+    if mode == 'real':
+        combos = [(0, w, s) for w in numbers for s in seeds]
+    else:
+        combos = [(k, w, PLACEBO_MCTS_SEED) for k in range(1, placebo_sets + 1) for w in numbers]
+    for k, w, seed in combos:
+        segments = windows[w - 1]
+        tasks.append({
+            'mode': mode, 'placebo_set': k, 'window': w, 'seed': seed, 'segments': segments,
+            'data_seed': placebo_seed(k, w) if mode == 'placebo' else 0,
+            'iterations': iterations, 'blueprints': blueprints,
+            'frame': frame.loc[segments.search_start:segments.eval_end],
+        })
+    return tasks
+
+
+def execute(tasks: List[Dict], out_dir: str, workers: int,
+            runner: Callable[[Dict], Dict] = run_window) -> int:
+    """Run the tasks not yet in runs.csv, appending each result as it finishes. Returns the number run."""
+    done = completed_keys(out_dir)
+    pending = [t for t in tasks if (t['mode'], t['placebo_set'], t['window'], t['seed']) not in done]
+    print(f"[walkforward] {len(pending)} to run, {len(tasks) - len(pending)} already in runs.csv, {workers} worker(s)")
+
+    def finish(task: Dict, outcome: Dict) -> None:
+        append_run(out_dir, task['window'], outcome)
+        row = outcome['row']
+        print(f"[walkforward] {row['mode']} set={row['placebo_set']} window={row['window']} seed={row['seed']} "
+              f"done in {row['elapsed_s']:.1f}s | failed={row['failed']}/{row['evaluations']} "
+              f"eval_sharpe={row['eval_sharpe']:.2f}")
+
+    if workers <= 1 or len(pending) <= 1:
+        for task in pending:
+            finish(task, runner(task))
+        return len(pending)
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(runner, t): t for t in pending}
+        for future in as_completed(futures):
+            task = futures[future]
+            try:
+                finish(task, future.result())
+            except Exception as exc:
+                print(f"[walkforward] {task['mode']} set={task['placebo_set']} window={task['window']} "
+                      f"seed={task['seed']} failed: {exc}")
+    return len(pending)
+
+
+# --------------------------------------------------------------------------- freeze
+
+
+def file_sha256(path: str) -> str:
+    with open(path, 'rb') as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+def data_fingerprint(frame: pd.DataFrame) -> str:
+    """sha256 of the index and OHLCV values (same recipe as `HMMValidation.fingerprint_data`, which
+    cannot be imported where hmmlearn is missing)."""
+    h = hashlib.sha256()
+    h.update(frame.index.asi8.tobytes())
+    for col in ('Open', 'High', 'Low', 'Close', 'Volume'):
+        h.update(np.ascontiguousarray(frame[col].to_numpy(dtype='float64')).tobytes())
+    return h.hexdigest()
+
+
+def relative_path(path: str) -> str:
+    """Path relative to the project root when inside it (portable across checkouts), posix separators."""
+    absolute = os.path.abspath(path)
+    try:
+        inside = os.path.commonpath([absolute, PROJECT_ROOT]) == PROJECT_ROOT
+    except ValueError:
+        inside = False
+    return (os.path.relpath(absolute, PROJECT_ROOT) if inside else absolute).replace(os.sep, '/')
+
+
+def current_commit() -> str:
+    return subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=PROJECT_ROOT, capture_output=True, text=True,
+                          check=True).stdout.strip()
+
+
+def changed_code_files(commit: str) -> List[str]:
+    """Tracked code files whose content differs between `commit` and the working tree."""
+    out = subprocess.run(['git', 'diff', '--name-only', commit, '--'] + CODE_PATHS, cwd=PROJECT_ROOT,
+                         capture_output=True, text=True, check=True).stdout
+    return [line for line in out.splitlines() if line.strip()]
+
+
+def current_config(blueprint_path: str, n_blueprints: int, iterations: int, seeds: Sequence[int],
+                   data_sha256: str, windows: Sequence[Segments] = WINDOWS) -> Dict:
+    """Everything a frozen configuration pins, except the git commit."""
+    blueprints = load_blueprints(blueprint_path)[:n_blueprints]
+    return {
+        'reward_mode': REWARD_MODE, 'reward_weights': dict(REWARD_WEIGHTS),
+        'windows': [w.to_dict() for w in windows],
+        'blueprints_path': relative_path(blueprint_path), 'blueprints_sha256': file_sha256(blueprint_path),
+        'n_blueprints': len(blueprints), 'iterations': int(iterations), 'seeds': [int(s) for s in seeds],
+        'timeframe': TIMEFRAME, 'max_ranked': MAX_RANKED, 'top_k': TOP_K, 'mcts_max_depth': MCTS_MAX_DEPTH,
+        'data_sha256': data_sha256,
+    }
+
+
+def verify_frozen(frozen: Dict, current: Dict, changed_files: Callable[[str], List[str]] = changed_code_files
+                  ) -> List[str]:
+    """
+    Reasons the current configuration differs from `frozen` (empty list = identical). Every field of
+    `current` must be equal (JSON round-trip), and no tracked code file (CODE_PATHS) may differ
+    between the frozen commit and the working tree: commits made after freezing (e.g. frozen.json
+    itself) are fine, edits to code are not, committed or not.
+    """
+    problems = []
+    for key, value in current.items():
+        if key not in frozen:
+            problems.append(f"{key}: missing in frozen.json")
+        elif json.loads(json.dumps(value)) != frozen[key]:
+            problems.append(f"{key}: frozen {frozen[key]!r} != current {value!r}")
+    extra = sorted(set(frozen) - set(current) - {'git_commit'})
+    problems.extend(f"{key}: not part of the current configuration" for key in extra)
+    commit = frozen.get('git_commit')
+    if not commit:
+        problems.append('git_commit: missing in frozen.json')
+    else:
+        changed = changed_files(commit)
+        if changed:
+            problems.append(f"code changed since frozen commit {commit[:10]}: {', '.join(changed[:10])}")
+    return problems
+
+
+def frozen_path(results_root: str) -> str:
+    return os.path.join(results_root, 'frozen.json')
+
+
+# --------------------------------------------------------------------------- summary
+
+
+def summarize(returns: pd.DataFrame) -> pd.DataFrame:
+    """
+    Sharpe of the concatenated evaluation returns: real = average over seeds per day, placebo =
+    each set separately. p-value on the real row = (1 + placebo Sharpes >= real) / (K + 1), ties
+    count as >=, NaN placebo Sharpes are not counted in K.
+    """
+    returns = returns.drop_duplicates(subset=['date', 'window', 'seed', 'mode', 'placebo_set'], keep='last')
+    rows = []
+    real_sharpe = float('nan')
+    real = returns[returns['mode'] == 'real']
+    if not real.empty:
+        series = real.groupby('date')['return'].mean().sort_index()
+        real_sharpe = annualised_sharpe(series)
+        rows.append({'mode': 'real', 'placebo_set': 0, 'n_days': len(series),
+                     'n_windows': int(real['window'].nunique()), 'sharpe': real_sharpe})
+    placebo = returns[returns['mode'] == 'placebo']
+    for k, part in placebo.groupby('placebo_set'):
+        series = part.groupby('date')['return'].mean().sort_index()
+        rows.append({'mode': 'placebo', 'placebo_set': int(k), 'n_days': len(series),
+                     'n_windows': int(part['window'].nunique()), 'sharpe': annualised_sharpe(series)})
+    frame = pd.DataFrame(rows, columns=['mode', 'placebo_set', 'n_days', 'n_windows', 'sharpe'])
+    frame['p_value'] = np.nan
+    if not real.empty and not np.isnan(real_sharpe):
+        sharpes = frame.loc[frame['mode'] == 'placebo', 'sharpe'].dropna()
+        frame.loc[frame['mode'] == 'real', 'p_value'] = (1 + int((sharpes >= real_sharpe).sum())) / (len(sharpes) + 1)
+    return frame
+
+
+# --------------------------------------------------------------------------- steps
+
+
+def out_dir_of(args) -> str:
+    return os.path.join(args.results_root, args.config)
+
+
+def worker_count(args) -> int:
+    return args.workers if args.workers else max(1, multiprocessing.cpu_count() - 2)
+
+
+def step_placebo(args) -> None:
+    blueprints = load_blueprints(args.blueprints)[:args.n_blueprints]
+    frame = load_full_frame()
+    tasks = build_tasks('placebo', WINDOWS, [PLACEBO_MCTS_SEED], blueprints, args.iterations, frame,
+                        placebo_sets=args.sets, window_numbers=args.windows)
+    execute(tasks, out_dir_of(args), worker_count(args))
+
+
+def config_from_args(args, frame: pd.DataFrame) -> Dict:
+    return current_config(args.blueprints, args.n_blueprints, args.iterations, args.seeds, data_fingerprint(frame))
+
+
+def step_freeze(args) -> None:
+    frame = load_full_frame()
+    record = {**config_from_args(args, frame), 'git_commit': current_commit()}
+    path = frozen_path(args.results_root)
+    os.makedirs(args.results_root, exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(record, f, indent=2)
+    print(f"[walkforward] Wrote {path}; commit it before running the real step")
+
+
+def step_real(args) -> None:
+    path = frozen_path(args.results_root)
+    if not os.path.exists(path):
+        raise SystemExit(f"[walkforward] {path} not found; run the freeze step first.")
+    with open(path, 'r', encoding='utf-8') as f:
+        frozen = json.load(f)
+    frame = load_full_frame()
+    problems = verify_frozen(frozen, config_from_args(args, frame))
+    if problems:
+        raise SystemExit("[walkforward] The current configuration differs from frozen.json:\n  "
+                         + '\n  '.join(problems))
+    blueprints = load_blueprints(args.blueprints)[:args.n_blueprints]
+    tasks = build_tasks('real', WINDOWS, args.seeds, blueprints, args.iterations, frame)
+    execute(tasks, out_dir_of(args), worker_count(args))
+
+
+def step_summary(args) -> None:
+    path = os.path.join(out_dir_of(args), 'returns.csv')
+    if not os.path.exists(path):
+        print(f"[walkforward] {path} not found; run the placebo or real step first.")
+        return
+    summary = summarize(pd.read_csv(path))
+    out = os.path.join(out_dir_of(args), 'summary.csv')
+    summary.to_csv(out, index=False)
+    with pd.option_context('display.width', 200, 'display.max_columns', None):
+        print(summary.round(4).to_string(index=False))
+    print(f"[walkforward] Wrote {out}")
+
+
+# --------------------------------------------------------------------------- CLI
+
+
+def add_walkforward_parser(subparsers) -> None:
+    parser = subparsers.add_parser('walkforward', help='Walk-forward test (LLM + MCTS)')
+    steps = parser.add_subparsers(dest='step', required=True)
+
+    def common(p, run_options=True):
+        p.add_argument('--config', default=DEFAULT_CONFIG, help='Configuration name (folder under the results root)')
+        p.add_argument('--results-root', default=DEFAULT_RESULTS_ROOT)
+        if run_options:
+            p.add_argument('--blueprints', default=DEFAULT_BLUEPRINTS)
+            p.add_argument('--n-blueprints', type=int, default=DEFAULT_BLUEPRINT_COUNT,
+                           help='Use the first N blueprints of the file')
+            p.add_argument('--iterations', type=int, default=DEFAULT_ITERATIONS)
+            p.add_argument('--workers', type=int, default=0, help='Worker processes (default: cpu_count - 2)')
+
+    p = steps.add_parser('placebo', help='Run on permuted-return copies of the data')
+    common(p)
+    p.add_argument('--sets', type=int, default=DEFAULT_PLACEBO_SETS, help='Number of placebo sets K')
+    p.add_argument('--windows', type=int, nargs='+', default=None, help='Window numbers 1-7 (default: all)')
+
+    p = steps.add_parser('freeze', help='Write frozen.json from the current configuration')
+    common(p)
+    p.add_argument('--seeds', type=int, nargs='+', default=DEFAULT_SEEDS)
+
+    p = steps.add_parser('real', help='Run on real data; needs a matching frozen.json')
+    common(p)
+    p.add_argument('--seeds', type=int, nargs='+', default=DEFAULT_SEEDS)
+
+    p = steps.add_parser('summary', help='Sharpe of the concatenated evaluation returns and the placebo p-value')
+    common(p, run_options=False)
+
+
+def run_walkforward(args) -> None:
+    {'placebo': step_placebo, 'freeze': step_freeze, 'real': step_real, 'summary': step_summary}[args.step](args)
