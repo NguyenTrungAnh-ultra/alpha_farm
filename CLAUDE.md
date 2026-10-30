@@ -1,83 +1,50 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Alpha Farm discovers directional signals (long/short/flat) for VN30F1M futures: an LLM proposes a strategy skeleton (blueprint), MCTS fills it in, a futures backtest scores it; the HMM bootstrap only describes risk (rejects nothing). It is a bachelor's thesis, so methodology matters as much as code. Docs, logs and most comments are Vietnamese.
 
-## What this is
-
-Alpha Farm discovers **directional trading signals** (long/short/flat) for the VN30 index futures contract VN30F1M. An LLM proposes the structure of a strategy, MCTS searches for the complete formula, and the formula is scored by a futures backtest; an HMM bootstrap only describes the risk of selected strategies (it rejects nothing). The project also serves as a bachelor's thesis, so methodological correctness matters as much as code. README, logs and most comments are in Vietnamese.
-
-Docs are a vault (Vietnamese) entered from `docs/START_HERE.md`:
-- `docs/PLAN.md`: one line per task, plus open questions and debts.
-- `docs/DECISIONS.md`: one line per decision.
-- `docs/RESULTS.md`: the numbers the thesis uses.
-- `docs/design/`: methods as they are today.
-- `docs/log/`: history.
-
-When a task finishes or the user decides something, update the matching file in the same turn. New files get a link from `START_HERE.md` or a parent file.
-
-Code changes go to the `coder` agent (`.claude/agents/coder.md`, Sonnet, medium effort). The main session writes the brief, then reviews the diff and re-runs the tests before reporting done.
+## Workflow
+- Docs vault, MOC `docs/START_HERE.md`: `PLAN.md` (backlog, open questions, debts), `DECISIONS.md` (decision log), `RESULTS.md` (numbers the thesis uses), `design/` (living docs), `log/` (journal). `docs/archive/` is XNOQuant-era history, never current.
+- `docs/design/ARCH.md` describes the code as it is today: update it in the same change as any behaviour change. Update the matching doc in the same turn a task finishes or the user decides.
+- Code goes to the `coder` agent (`.claude/agents/coder.md`); the main session writes the brief, reviews the diff and re-runs the tests before reporting.
 
 ## Environment
-
-- Use the **`.venv`** interpreter (Python 3.12, managed with `uv`). It is synced to `requirements.txt`, compiled from `requirements.in`. Add a dependency to `requirements.in`, recompile, then `uv pip sync`; never `uv pip install` ad hoc, since the next sync removes it.
-- The `venv/` directory is empty.
-- System Python 3.14 has no `hmmlearn` wheel. On 3.14, `tests/test_hmm_validation.py` is silently skipped and `HMMValidation` cannot be imported.
-- The only LLM provider is local Ollama; models come from `Modelfile` (qwen3.5). Do not add cloud LLM clients or credential files.
+- Use `.venv` (Python 3.12, `uv`), synced to `requirements.txt` compiled from `requirements.in`: add deps to `.in`, recompile, `uv pip sync`; never ad-hoc `uv pip install`. `venv/` is empty.
+- System Python 3.14 has no `hmmlearn` wheel: `tests/test_hmm_validation.py` skips silently and `HMMValidation` cannot be imported there.
+- Only LLM provider: local Ollama (`Modelfile`, qwen3.5). No cloud LLM clients or credential files.
 
 ## Commands
-
 ```bash
-.venv/Scripts/python.exe main.py                       # interactive menu
-.venv/Scripts/python.exe main.py generate --n_strategies 20 --model ollama-local   # LLM -> blueprints
-.venv/Scripts/python.exe main.py mcts --iterations 50000 --patience 5000 [--retrain-hmm]
-.venv/Scripts/python.exe main.py full ...              # generate then mcts
-
-.venv/Scripts/python.exe -m pytest                     # all tests (pytest.ini: testpaths=tests, pythonpath=.)
-.venv/Scripts/python.exe -m pytest tests/test_alpha_primitives.py::test_all_primitives_pandas_equivalence
-.venv/Scripts/python.exe -m pytest -m "not slow"       # markers: slow, core, hardware (--strict-markers)
-.venv/Scripts/python.exe benchmark_primitives.py       # AlphaPrimitives vs pandas: speed + equivalence
+.venv/Scripts/python.exe main.py [generate|mcts|full|planted|walkforward|web] ...   # no args: menu
+.venv/Scripts/python.exe -m pytest -m "not slow"    # markers: slow, core, hardware (--strict-markers)
+.venv/Scripts/python.exe benchmark_primitives.py    # AlphaPrimitives vs pandas: speed + equivalence
 ```
+- `--model`: `ollama-local`, `ollama-9b`.
+- Baseline 2026-10-30 (`-m "not slow"`): 287 passed, 1 failed (`test_core_engine.py::test_alpha_data_proxy`, an `is` check on a copied Series).
 
-`--model` accepts: `ollama-local`, `ollama-9b`.
+## Engine conventions
+- Thresholds and contract specs live in `utilities/AppConfig.py`: reward weights, multiplier 100,000 VND/point, fee 6,000 VND/contract/side, margin 28.5% / maintenance 20%, `BACKTEST_START/END`.
+- `load_data(tf, start=BACKTEST_START, end=BACKTEST_END)` reads `data/DNSE_VN30F_{tf}.csv` (2018-08 → 2025-12); `'60m'` maps to the `1H` file. Planted and walk-forward pass their own bounds.
+- Periods are defined at 10m (`BASELINE_TF_MINUTES`) and scaled per timeframe (`BASE_PERIODS`, `BASE_WINDOW_SEARCH`).
+- `AlphaBacktestEngine.run(strategy, df)`:
+  - expects a `pd.Series` of target positions, since it calls `.shift(1)`; a signal at t fills at t+1;
+  - contract count is fixed from initial capital and the first price;
+  - a margin call flattens and freezes equity.
+- Annualise only through `CalculateMetrics.compute_metrics`:
+  - CAGR on calendar time (/365.25);
+  - Sharpe, Sortino and vol on daily returns × √252;
+  - never count trading days, because the 1m–30m files miss 126 sessions in 2023–2024.
+- `MCTSEngine(data=...)`, `precompute_hmm_synthetic_data({tf: df})` and `process_timeframe(tf, data, ...)` use only the frame they are given; only the no-`data` defaults call `load_data`.
 
-As of 2026-10-29, the suite in `.venv` gives 183 passed and 1 failed. The failure is `test_core_engine.py::test_alpha_data_proxy`, an identity check (`is`) on a copied Series.
+## Gotchas
+- `REWARD_MODES` are "gated", "soft" and "sharpe". Thesis runs use "sharpe", but the default is "gated": pass the mode explicitly.
+- MCTS selection is UCT on **max** reward. Evaluation errors score −10, so read `MCTSEngine.error_summary()` after a run instead of trusting the leaderboard.
+- `RunMCTS` moves idea files to `results/ideas/processed/` even on error.
+- HMM paths are cached per (timeframe, data fingerprint) in `data/MCdata/synthetic/`.
+  - The legacy `synthetic_data.pkl` (~13 GB) is never read.
+  - Without `--retrain-hmm`, `main.py mcts` skips the HMM step.
+  - `main.py mcts` has not run since the XNOQuant decoupling (`c6b1f03`).
+- There is no `ts_delay` or `ts_delta`. `UNIMPLEMENTED_OPERATORS` (`crossed*`, `rising`, `falling`, `between`) are never proposed, and a blueprint using one is rejected.
+- First-generation (TA-Lib) artifacts can be restored with `git checkout cfeb770 -- results/pushed`. `results/portfolio_summary.json` and `3tier_results.csv` hold only those.
 
-## Pipeline gotchas
-
-Stages (generate → MCTS → scoring → HMM validation → portfolio) are described in `docs/design/ARCH.md`.
-
-- `RunMCTS` moves idea files to `results/ideas/processed/` even on error, so failures are easy to miss.
-- MCTS selection is UCT on **max** reward, not mean.
-- The portfolio has no acceptance criteria. Reward modes are `REWARD_MODES` in AppConfig ("gated", "soft", "sharpe"). The user froze "sharpe" for all thesis runs (`docs/DECISIONS.md`), but the `REWARD_MODE` default is still "gated"; pass the mode explicitly.
-- HMM synthetic paths are cached per (timeframe, data fingerprint) in `data/MCdata/synthetic/`. The legacy `data/MCdata/synthetic_data.pkl` (~13 GB) is never read; until `--retrain-hmm` builds keyed files, `main.py mcts` skips the HMM step with a message.
-
-## Core engine conventions
-
-- **All thresholds and contract specs live in `utilities/AppConfig.py`**: reward weights, tier thresholds, multiplier 100,000 VND/point, fee 6,000 VND/contract/side, margin 28.5% / maintenance 20%, `BACKTEST_START/END`.
-- **Data:** `load_data(tf)` reads `data/DNSE_VN30F_{tf}.csv` filtered to `BACKTEST_START..BACKTEST_END`. `'60m'` maps to the `1H` file. Data run 2018-08 to 2025-12, but only 2020–2024 is used, so there is no out-of-sample split yet.
-- **Window scaling:** periods are defined at 10m (`BASELINE_TF_MINUTES`) and scaled per timeframe (`BASE_PERIODS`, `BASE_WINDOW_SEARCH`).
-- **`AlphaBacktestEngine.run(strategy, df)`:**
-  - Calls `strategy.run_algorithm(df)` and expects a **`pd.Series`** of target positions, because it calls `.shift(1)`.
-  - A signal at bar t executes at bar t+1.
-  - Contract count is fixed from initial capital and the first price.
-  - A margin call flattens all positions and freezes equity.
-- **Annualisation:** everything goes through `CalculateMetrics.compute_metrics`. CAGR uses elapsed calendar time (/365.25 days); Sharpe/Sortino/vol use daily returns with sqrt(252). Never count trading days for years: the 1m–30m files miss 126 sessions in 2023–2024 that the 1H file has.
-- **Data injection:** `MCTSEngine(data=...)`, `precompute_hmm_synthetic_data({tf: df})` and `process_timeframe(tf, data, ...)` use only the frame they are given; only `run_mcts_pipeline` / no-`data` defaults call `load_data`.
-
-## Known state after the XNOQuant decoupling (commit `c6b1f03`)
-
-The project was originally built for the XNOQuant competition sandbox (`XnoEngine` with TA-Lib `self.feat`/`self.op`, `RestrictedSeries`, Playwright submission). The pipeline now runs end to end on `ts_*` blueprints (`tests/test_mcts_pipeline.py`). Still open:
-
-- No lag/delta operators (`ts_delay`, `ts_delta`). Operators in `UNIMPLEMENTED_OPERATORS` (`crossed*`, `rising`, `falling`, `between`) are never proposed, and a blueprint using one is rejected.
-- Evaluation errors still score −10. Check `MCTSEngine.error_summary()` after a run instead of trusting the leaderboard.
-- `main.py mcts` / `process_timeframe` (which need the HMM cache) have not been run since the rewire.
-
-Other leftovers from the refactor:
-- First-generation (TA-Lib) strategy artifacts were removed from `results/pushed/` in that commit. Recover them with `git checkout cfeb770 -- results/pushed`.
-- `results/portfolio_summary.json` and `3tier_results.csv` contain only first-generation strategies.
-
-## Thesis documents
-
-- Build and template notes for the proposal: `docs/proposal/CLAUDE.md`.
-- Bibliography entries were verified against publisher or arXiv pages. Do not add unverified citations.
-- `docs/design/ARCH.md` describes the architecture as the code is today (Vietnamese); update it in the same change when code behaviour changes. `docs/archive/` is history (XNOQuant era): never treat it as current.
+## Thesis
+- Proposal build notes: `docs/proposal/CLAUDE.md`. Bibliography entries are verified against publisher or arXiv pages; add no unverified citation.
