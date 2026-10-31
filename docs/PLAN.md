@@ -43,6 +43,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 - Dữ liệu khung phút thiếu 126 ngày (2023-03-22 → 2024-03-14) so với tệp 1H; kiểm tệp gốc trước khi chạy RQ trên khung phút.
 - Template BOOLEAN luôn có vị thế (bar NaN và False thành short); RATIO 60–80 / 20–40 làm gốc `ts_zscore` gần như luôn short.
 - `generate_strategy_code` mới test với NORMALIZED; `generate_descriptive_name` còn tìm `self.feat.*`.
+- `test_walk_forward.py::test_run_window_is_reproducible_and_seed_of_the_llm_follows_the_run` đỏ một lần trong cả bộ test (2026-10-31), chạy riêng 5/5 xanh; chưa rõ nguyên nhân. Nghi phụ thuộc thứ tự test; cần tìm trước khi đóng băng vì nó canh tính tất định.
 - `test_hardware_concurrency.py` gọi `run_mcts_pipeline` thật nên ghi thêm vào `results/mcts_stats.json` (thay đổi này không commit).
 - `results/portfolio_summary.json`, `3tier_results.csv` tính theo công thức cũ, chỉ có chiến lược thế hệ đầu; `results/pushed/` khôi phục bằng `git checkout cfeb770 -- results/pushed`.
 - Ảnh chữ ký và PDF đã ký trong `proposal/` chỉ nằm trên máy (`.gitignore`).
