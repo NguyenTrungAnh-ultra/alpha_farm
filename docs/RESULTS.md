@@ -57,11 +57,11 @@ Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `r
 
 ## Không gian tìm kiếm
 
-Đếm số công thức hợp lệ về chiều (5 cửa sổ mỗi toán tử `ts_*` ở 60m, 4 trường giá + khối lượng, 7 hằng ngoài toán tử cuộn; chưa nhân tham số template: 5 ngưỡng z hoặc 5 × 5 ngưỡng RATIO), `MCTS_MAX_DEPTH = 4`, gốc số nằm dưới nút template nên còn 3 tầng toán tử, gốc BOOLEAN có đủ 4 tầng:
+Đếm bằng `strategy_workflows/GrammarSize.py`: số công thức hợp lệ về chiều ở 60m (4 cửa sổ mỗi toán tử `ts_*` = `scaled_periods` {2, 3, 5, 10}; 4 trường giá + khối lượng; 7 hằng ngoài toán tử cuộn; chưa nhân tham số template), `MCTS_MAX_DEPTH = 4`, gốc số nằm dưới nút template nên còn 3 tầng toán tử, gốc BOOLEAN có đủ 4 tầng:
 
-- Cả ngữ pháp từ một ô `?`: ≈ 1.9 × 10⁴¹ (độ sâu 3: 3.1 × 10²⁰; độ sâu 2: 1.2 × 10¹⁰).
-- 20 blueprint `20261029_212813` cộng lại: ≈ 4.6 × 10¹⁴ (≈ 2.4 × 10⁻²⁷ cả ngữ pháp). Từng blueprint: 400 → 3.2 × 10¹⁴; 6/20 dưới 2 × 10⁴, 10/20 dưới 10⁸.
-- Blueprint chứa A của bài cài tín hiệu cửa sổ 1, `sub(ts_zscore(sub(pv_high, ?)), ts_zscore(sub(pv_close, ?)))`, chỉ có 400 cách điền (trước tham số template) với 5.000 vòng MCTS ⇒ gần như duyệt hết; ngưỡng phát hiện IC 0.1 vì thế đo khả năng **xếp hạng** công thức đúng lên top-5 (đoạn học → kiểm định) nhiều hơn khả năng **tìm** ra nó.
+- Cả ngữ pháp từ một ô `?`: ≈ 1.9 × 10⁴¹ (độ sâu 3: 3.1 × 10²⁰; độ sâu 2: 1.2 × 10¹⁰). Gốc BOOLEAN chiếm gần hết (cây `and_` / `or_` của các phép so lá, không có cửa sổ).
+- 20 blueprint `20261029_212813` cộng lại: ≈ 1.4 × 10¹⁴ (≈ 10⁻²⁷ cả ngữ pháp). Từng blueprint: 256 → 1.0 × 10¹⁴; 8/20 dưới 2 × 10⁴, 13/20 dưới 10⁸.
+- Blueprint chứa A của bài cài tín hiệu cửa sổ 1 (OrderFlowSkewnessSignal, `sub(ts_zscore(sub(pv_high, ?)), ts_zscore(sub(pv_close, ?)))`) chỉ có 256 cách điền (trước tham số template) với 5.000 vòng MCTS ⇒ gần như duyệt hết; ngưỡng phát hiện IC 0.1 vì thế đo khả năng **xếp hạng** công thức đúng lên top-5 (đoạn học → kiểm định) nhiều hơn khả năng **tìm** ra nó.
 
 ## Tốc độ
 

@@ -4,7 +4,7 @@ Phương pháp như sẽ làm (đã code, chưa chạy). Quyết định: [DECIS
 
 ## Câu hỏi
 
-- **RQ1 (chính):** cùng giới hạn độ dài công thức, LLM đưa MCTS tới tín hiệu đúng sớm hơn hay chặn đường tới nó? Blueprint thu vùng tìm kiếm từ ≈ 1.9 × 10⁴¹ xuống ≈ 4.6 × 10¹⁴ công thức ([RESULTS](../RESULTS.md#không-gian-tìm-kiếm)); "sớm hơn" chỉ đúng khi tín hiệu nằm trong vùng đó. Ba câu con:
+- **RQ1 (chính):** cùng giới hạn độ dài công thức, LLM đưa MCTS tới tín hiệu đúng sớm hơn hay chặn đường tới nó? Blueprint thu vùng tìm kiếm từ ≈ 1.9 × 10⁴¹ xuống ≈ 1.4 × 10¹⁴ công thức ([RESULTS](../RESULTS.md#không-gian-tìm-kiếm)); "sớm hơn" chỉ đúng khi tín hiệu nằm trong vùng đó. Ba câu con:
   - **(a) Sinh một lần:** tới A sớm hơn MCTS không LLM, hay bị chặn khi A nằm ngoài vùng blueprint? Đo ở mốc 50.000 lượt chấm (hết giai đoạn A, trước phản hồi).
   - **(b) Phản hồi:** khi bị chặn, sau khi thấy điểm đoạn học LLM có viết được blueprint mới chứa A (hoặc gần A) không? Đo ở 100.000.
   - **(c) Chi phí:** "sớm hơn" tính theo lượt chấm và theo thời gian thật (LLM tính cả).
@@ -45,7 +45,7 @@ Mỗi lượt (một cửa sổ walk-forward hoặc một lượt bài cài tín
 - Cách chia cửa sổ 1, 10 seed mỗi ô, IC 0 / 0.05 / 0.1; IC 0 không cài gì nên dùng chung cho mọi A.
 - **Bốn A:** 2 kinh điển, 2 lạ, kích thước khớp nhau; cách chọn ở [Quy tắc chốt trước khi chạy](#quy-tắc-chốt-trước-khi-chạy).
   - Mọi A phải biểu diễn được ở độ sâu 4 và không trùng nguyên văn blueprint nào.
-  - Với mỗi A ghi trước khi chạy: A có nằm trong vùng của bộ blueprint ban đầu không (blueprint nào điền ra được A), và số cách điền của blueprint nhỏ nhất chứa A (độ khó tìm trong vùng). Blueprint chứa A cũ chỉ có 400 cách điền ⇒ gần như duyệt hết; A mới nên nằm ở chỗ tìm thật sự khó.
+  - Với mỗi A ghi trước khi chạy: A có nằm trong vùng của bộ blueprint ban đầu không (blueprint nào điền ra được A), và số cách điền của blueprint nhỏ nhất chứa A (độ khó tìm trong vùng). Blueprint chứa A cũ chỉ có 256 cách điền ⇒ gần như duyệt hết; A mới nên nằm ở chỗ tìm thật sự khó.
 - **Thước đo chính:** tỉ lệ tìm lại gần (|Spearman| ≥ 0.7 trong top-5) theo cấu hình × A × IC tại các mốc 10.000 / 25.000 / 50.000 / 75.000 / 100.000 lượt chấm (chụp bảng xếp hạng trong cùng lượt, không chạy thêm); so LLM + MCTS với MCTS không LLM bằng Fisher ở cùng ô và cùng mốc. **Phụ:** số lượt chấm và thời gian thật tới lần đầu chạm A; blueprint phản hồi có chứa A không; độ phủ toán tử của blueprint mới.
 - Đọc theo A trong / ngoài vùng blueprint ban đầu:
 
