@@ -284,7 +284,7 @@ def test_formulas_step_refuses_to_overwrite_without_force(tmp_path, monkeypatch)
     args = parser.parse_args(['rq1', 'formulas', '--out-dir', str(tmp_path)])
     rq.run_rq1(args)
     stored = json.loads((tmp_path / 'planted_formulas.json').read_text(encoding='utf-8'))
-    assert list(stored) == ['A1', 'A2', 'A3', 'A4'] and stored['A1']['sign'] == -1.0
+    assert list(stored) == ['A1', 'A2', 'A3', 'A4'] and 'sign' not in stored['A1']
     with pytest.raises(SystemExit, match='exists'):
         rq.run_rq1(args)
     args.force = True

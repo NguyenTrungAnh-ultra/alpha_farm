@@ -57,7 +57,7 @@ def formula_of(tree, sign=1.0, z=10):
 
 def test_a1_and_a2_are_the_classical_formulas_with_the_chosen_signs():
     a = pf.classical_formulas()
-    assert a['A1'].expr == 'ts_zscore(close, 10)' and a['A1'].sign == -1.0 and a['A1'].z_window == 10
+    assert a['A1'].expr == 'ts_corr(close, volume, 10)' and a['A1'].sign == 1.0 and a['A1'].z_window == 10
     assert a['A2'].expr == 'ts_mean((close - open_), 10)' and a['A2'].sign == 1.0
     engine = MCTSEngine(timeframe='60m', data=pd.DataFrame(
         {'Open': [1.0], 'High': [1.0], 'Low': [1.0], 'Close': [1.0], 'Volume': [1.0]},
@@ -206,7 +206,7 @@ def test_a_formula_without_a_rolling_operator_is_rejected(stationary_frame):
 
 def test_a_formula_with_the_tree_shape_of_a1_or_a2_is_rejected_and_other_shapes_are_not(stationary_frame):
     references = pf.classical_formulas()
-    like_a1 = formula_of(node('ts_zscore', 3, [node('pv_volume')]))
+    like_a1 = formula_of(node('ts_corr', 3, [node('pv_open'), node('pv_low')]))
     like_a2 = formula_of(node('ts_mean', 7, [node('sub', None, [node('pv_high'), node('pv_low')])]))
     for formula in (like_a1, like_a2):
         assert pf.rejection_reason(formula, stationary_frame, references) == 'same tree shape as A1 or A2'
@@ -251,14 +251,14 @@ def test_constant_formulas_are_rejected():
 
 def test_formulas_correlated_with_a1_or_a2_are_rejected(frame):
     references = pf.classical_formulas()
-    # ts_zscore(close, 5) tracks ts_zscore(close, 10); the mean of (close - open) over 9 bars tracks A2
-    like_a1 = formula_of(node('ts_zscore', 5, [node('pv_close')]))
+    # ts_corr(close, volume, 9) tracks ts_corr(close, volume, 10); the mean of (close - open) over 9 bars tracks A2
+    like_a1 = formula_of(node('ts_corr', 9, [node('pv_close'), node('pv_volume')]))
     like_a2 = formula_of(node('ts_mean', 9, [node('sub', None, [node('pv_close'), node('pv_open')])]))
     assert spearman_abs(like_a1.alpha_series(frame), references['A1'].alpha_series(frame)) >= 0.7
     assert spearman_abs(like_a2.alpha_series(frame), references['A2'].alpha_series(frame)) >= 0.7
     assert 'A1' in pf.rejection_reason(like_a1, frame, references)
     assert 'A2' in pf.rejection_reason(like_a2, frame, references)
-    unrelated = formula_of(node('ts_corr', 5, [node('pv_volume'), node('pv_low')]))
+    unrelated = formula_of(node('ts_mean', 5, [node('pv_volume')]))
     assert spearman_abs(unrelated.alpha_series(frame), references['A1'].alpha_series(frame)) < 0.7
     assert pf.rejection_reason(unrelated, frame, references) is None
 
@@ -289,7 +289,7 @@ def test_formulas_file_roundtrip(frame, crowd, monkeypatch):
     data = json.loads(json.dumps(pf.formulas_to_dict(selected)))
     back = pf.formulas_from_dict(data)
     assert {k: v.expr for k, v in back.items()} == {k: v[0].expr for k, v in selected.items()}
-    assert back['A1'].sign == -1.0 and data['A3']['selection']['kind'] == 'random'
+    assert back['A1'].sign == 1.0 and data['A3']['selection']['kind'] == 'random'
 
 
 # --- region of the blueprint set -------------------------------------------

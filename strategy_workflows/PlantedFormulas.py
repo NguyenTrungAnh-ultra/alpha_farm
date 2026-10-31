@@ -3,7 +3,7 @@ PlantedFormulas
 ===============
 The four formulas A1..A4 planted for the RQ1 comparison, and how each relates to the blueprint set.
 
-    A1  ts_zscore(pv_close, 10), planted with a negative sign (mean reversion)      1 operator
+    A1  ts_corr(pv_close, pv_volume, 10), planted with sign +1 (price-volume correlation)   1 operator
     A2  ts_mean(sub(pv_close, pv_open), 10), intraday momentum                        2 operators
     A3  random formula with exactly 1 operator, seed 1
     A4  random formula with exactly 2 operators, seed 2
@@ -77,8 +77,8 @@ def _node(name: str, window: Optional[int] = None, children: Sequence[ASTNode] =
 
 
 def classical_formulas() -> Dict[str, PlantedFormula]:
-    a1 = PlantedFormula(tree=_node('ts_zscore', TARGET_WINDOW, [_node('pv_close')]), z_window=Z_WINDOW,
-                        source='A1', rule='classical mean reversion, planted with sign -1', sign=-1.0)
+    a1 = PlantedFormula(tree=_node('ts_corr', TARGET_WINDOW, [_node('pv_close'), _node('pv_volume')]),
+                        z_window=Z_WINDOW, source='A1', rule='classical price-volume correlation')
     a2 = PlantedFormula(tree=_node('ts_mean', TARGET_WINDOW, [_node('sub', None, [_node('pv_close'), _node('pv_open')])]),
                         z_window=Z_WINDOW, source='A2', rule='classical intraday momentum')
     return {'A1': a1, 'A2': a2}
