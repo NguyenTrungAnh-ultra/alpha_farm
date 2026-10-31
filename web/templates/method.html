@@ -120,12 +120,48 @@
 <div class="tablebox scroll">
 {% if blueprint_set %}
 <table>
-  <caption><b>{{ cap.blueprints.label }} — {{ cap.blueprints.title }}.</b> {{ blueprint_caption }} Bộ có {{ blueprint_set.count }} blueprint.</caption>
-  <tr><th class="left">Gốc (toán tử ngoài cùng)</th><th>Số blueprint</th></tr>
-  {% for root, count in blueprint_set.roots %}<tr><td class="left"><code>{{ root }}</code></td><td>{{ count }}</td></tr>{% endfor %}
+  <caption><b>{{ cap.blueprints.label }} — {{ cap.blueprints.title }}.</b> {{ t.BLUEPRINT_CAPTION | inline_code }}
+    <span class="reading">{{ blueprint_reading | inline_code }}</span></caption>
+  <tr><th>#</th><th class="left">Tên</th><th class="left">Khung công thức</th><th>Số cách điền</th></tr>
+  {% for b in blueprint_set.blueprints %}
+  <tr><td>{{ loop.index }}</td><td class="left">{{ b.name }}</td><td class="expr">{{ b.macro_blueprint }}</td><td>{{ (b.completions | num) if b.completions is not none else 'không biên dịch được' }}</td></tr>
+  {% endfor %}
 </table>
 {% else %}
 <p><b>{{ cap.blueprints.label }} — {{ cap.blueprints.title }}.</b> chưa có</p>
+{% endif %}
+</div>
+
+<div class="tablebox scroll">
+<table>
+  <caption><b>{{ cap.configs.label }} — {{ cap.configs.title }}.</b> {{ t.CONFIGS_CAPTION }}</caption>
+  <tr><th class="left">Cấu hình</th><th class="left">Mã</th><th class="left">Cách sinh ứng viên</th></tr>
+  {% for c in config_rows %}
+  <tr><td class="left">{{ c.name }}</td><td class="left"><code>{{ c.key }}</code></td><td class="expr">{{ c.how | inline_code }}</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<div class="tablebox scroll">
+<table>
+  <caption><b>{{ cap.feedback.label }} — {{ cap.feedback.title }}.</b> {{ t.FEEDBACK_CAPTION }}</caption>
+  <tr><th class="left">Bước</th><th class="left">Nội dung</th></tr>
+  {% for step in feedback_steps %}
+  <tr><td class="left">{{ step.stage }}</td><td class="expr">{{ step.text }}</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<div class="tablebox scroll">
+{% if blueprint_set %}
+<table>
+  <caption><b>{{ cap.space.label }} — {{ cap.space.title }}.</b> {{ t.SPACE_CAPTION }} <span class="reading">{{ space_reading }}</span></caption>
+  <tr><th class="left">Không gian</th><th>Số công thức</th></tr>
+  <tr><td class="left">Toàn ngữ pháp (một ô <code>?</code> gốc)</td><td>{{ sci(blueprint_set.grammar_size) }}</td></tr>
+  <tr><td class="left">Bộ blueprint đóng băng ({{ blueprint_set.count }} blueprint)</td><td>{{ sci(blueprint_set.set_size) }}</td></tr>
+</table>
+{% else %}
+<p><b>{{ cap.space.label }} — {{ cap.space.title }}.</b> chưa có</p>
 {% endif %}
 </div>
 <div hidden>

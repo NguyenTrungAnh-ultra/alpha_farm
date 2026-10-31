@@ -5,6 +5,7 @@
 <p><a href="/results/planted">← Kết quả bài cài tín hiệu</a></p>
 {% if strengths and seeds %}
 <form class="pick" method="get">
+  <label>Tín hiệu A <select name="a">{% for n in names %}<option value="{{ n }}" {% if n == a %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
   <label>IC mục tiêu <select name="strength">{% for s in strengths %}<option value="{{ s }}" {% if s == strength %}selected{% endif %}>{{ '%g' | format(s) }}</option>{% endfor %}</select></label>
   <label>Seed <select name="seed">{% for s in seeds %}<option value="{{ s }}" {% if s == seed %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></label>
   <button type="submit">Dựng lại</button>
@@ -16,7 +17,7 @@
 <div class="card">{{ view.message }}</div>
 {% else %}
 <div class="card">
-  <p class="small">Công thức A: <code>{{ view.formula_expr }}</code>, z-score cửa sổ {{ view.z_window }} ·
+  <p class="small">Tín hiệu {{ a }}: <code>{{ view.formula_expr }}</code>, z-score cửa sổ {{ view.z_window }} ·
     beta {{ view.beta | fmt(5) }} · IC tìm {{ view.ic_search | fmt(3) }} · IC đánh giá {{ view.ic_eval | fmt(3) }}</p>
   <div class="chartbox tall"><canvas id="c-prices"></canvas></div>
 </div>

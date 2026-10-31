@@ -129,3 +129,29 @@ def test_compare_step_writes_comparison_csv_for_every_folder_with_real_returns(t
     (tmp_path / "llm_mcts" / "returns.csv").unlink()
     wf.step_compare(type("A", (), {"results_root": str(tmp_path)})())
     assert not (tmp_path / "comparison.csv").exists() and "no comparison" in capsys.readouterr().out
+
+
+def test_wilson_interval_known_values():
+    low, high = st.wilson_interval(6, 10)
+    assert low == pytest.approx(0.3127, abs=1e-3) and high == pytest.approx(0.8318, abs=1e-3)
+    low, high = st.wilson_interval(0, 5)
+    assert low == 0.0 and high == pytest.approx(0.4345, abs=1e-3)
+    assert all(np.isnan(v) for v in st.wilson_interval(0, 0))
+
+
+def test_fisher_p_greater_is_one_sided_and_nan_for_an_empty_group():
+    assert st.fisher_p_greater(2, 10, 0, 10) == pytest.approx(0.2368, abs=1e-4)
+    assert st.fisher_p_greater(6, 10, 0, 10) == pytest.approx(0.0054, abs=1e-4)
+    assert st.fisher_p_greater(0, 10, 6, 10) > 0.99               # fewer than the base: not "greater"
+    assert np.isnan(st.fisher_p_greater(1, 0, 0, 10)) and np.isnan(st.fisher_p_greater(1, 10, 0, 0))
+
+
+def test_detection_threshold_is_the_lowest_level_below_alpha():
+    def rows(*pairs):
+        return [{'strength': s, 'p_fisher': p} for s, p in pairs]
+    assert st.detection_threshold(rows((0.0, None), (0.05, 0.24), (0.1, 0.005)))['strength'] == 0.1
+    assert st.detection_threshold(rows((0.0, None), (0.05, 0.03), (0.1, 0.001)))['strength'] == 0.05
+    assert st.detection_threshold(rows((0.0, None), (0.05, 0.24), (0.1, 0.2))) is None
+    assert st.detection_threshold(rows((0.0, None), (0.05, float('nan')), (0.1, 0.05))) is None   # p must be below alpha
+    assert st.detection_threshold(rows((0.1, 0.001))) ['strength'] == 0.1
+    assert st.detection_threshold([]) is None

@@ -11,23 +11,38 @@ import math
 from typing import Dict, List, Optional
 
 from strategy_workflows.PlantedSignal import NEAR_CORRELATION
+from strategy_workflows.RunRQ1 import DETECTION_BUDGET, DETECTION_CONFIG, IC_LEVELS, PRIMARY_BUDGETS, PRIMARY_IC
+from strategy_workflows.SearchConfigs import BudgetPlan
+from strategy_workflows.Statistics import FISHER_ALPHA
+from utilities.AppConfig import MCTS_MAX_DEPTH
+
+def num(n) -> str:
+    """Integer with '.' as the thousands separator (Vietnamese convention)."""
+    return f"{int(n):,}".replace(',', '.')
+
+
+CONFIG_LABELS = {'llm_mcts': 'LLM + MCTS', 'mcts_only': 'MCTS không LLM', 'random': 'Tìm ngẫu nhiên',
+                 'llm_only': 'LLM không tìm', 'buy_hold': 'Mua và giữ', 'tsmom': 'TSMOM'}
+
+
+def config_label(key: str) -> str:
+    return CONFIG_LABELS.get(key, key)
+
 
 STATUS_LABELS = {'done': 'Xong', 'progress': 'Đang làm', 'none': 'Chưa có kết quả'}
 STATUS_MARKS = {'done': '✅', 'progress': '🔧', 'none': '–'}
 
-NEAR_LABEL = 'tìm lại gần'
-EXACT_LABEL = 'tìm lại đúng'
-
 PLACEBO_TITLE = 'Kết quả: placebo (RQ2, kiểm soát âm)'
+PLANTED_TITLE = 'Kết quả: bài cài tín hiệu (RQ2, kiểm soát dương)'
+RQ1_TITLE = 'Kết quả: vai trò của LLM (RQ1)'
 
 CHAPTERS: List[Dict] = [
     {'number': 1, 'title': 'Tổng quan', 'path': '/', 'status': 'done'},
     {'number': 2, 'title': 'Dữ liệu', 'path': '/data', 'status': 'done'},
     {'number': 3, 'title': 'Phương pháp', 'path': '/method', 'status': 'progress'},
-    {'number': 4.1, 'title': 'Kết quả: bài cài tín hiệu (RQ2, kiểm soát dương)', 'path': '/results/planted',
-     'needs': 'planted_runs'},
+    {'number': 4.1, 'title': PLANTED_TITLE, 'path': '/results/planted', 'needs': 'planted_detection'},
     {'number': 4.2, 'title': PLACEBO_TITLE, 'path': '/results/placebo', 'needs': 'placebo_runs'},
-    {'number': 4.3, 'title': 'Kết quả: vai trò của LLM (RQ1)', 'path': '/results/rq1', 'status': 'none'},
+    {'number': 4.3, 'title': RQ1_TITLE, 'path': '/results/rq1', 'needs': 'rq1_primary'},
     {'number': 4.4, 'title': 'Kết quả: chuỗi ngoài mẫu (walk-forward)', 'path': '/results/walkforward',
      'status': 'none'},
 ]
@@ -39,23 +54,38 @@ ITEMS: List[Dict] = [
      'status': 'done'},
     {'key': 'windows', 'label': 'Hình 3.2', 'title': 'Cửa sổ walk-forward', 'chapter': '/method', 'rq': None,
      'status': 'done'},
-    {'key': 'blueprints', 'label': 'Bảng 3.1', 'title': 'Bộ blueprint đã đóng băng', 'chapter': '/method',
+    {'key': 'blueprints', 'label': 'Bảng 3.1', 'title': 'Bộ blueprint đã đóng băng cho RQ1', 'chapter': '/method',
      'rq': None, 'needs': 'blueprint_set'},
-    {'key': 'planted_table', 'role': 'chính', 'label': 'Bảng 4.1', 'title': 'Tìm lại tín hiệu cài sẵn theo IC mục tiêu',
-     'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'planted_runs'},
-    {'key': 'planted_near', 'role': 'chính', 'label': 'Hình 4.1', 'title': 'Tỷ lệ tìm lại gần theo IC mục tiêu',
-     'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'planted_runs'},
-    {'key': 'planted_corr', 'role': 'chẩn đoán', 'label': 'Hình 4.2', 'title': 'Ứng viên gần A nhất: MCTS có chạm tới A không',
-     'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'planted_runs'},
-    {'key': 'planted_positions', 'role': 'phụ', 'label': 'Bảng 4.2', 'title': 'Tương quan vị thế tốt nhất với A',
-     'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'positions'},
-    {'key': 'planted_seeds', 'role': 'phụ', 'label': 'Bảng 4.3', 'title': 'Kết quả từng seed',
-     'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'planted_runs'},
-    {'key': 'placebo_dist', 'role': 'chính', 'label': 'Hình 4.3', 'title': 'Sharpe ngoài mẫu của 19 bộ placebo so với lần chạy thật',
+    {'key': 'configs', 'label': 'Bảng 3.2', 'title': 'Các cấu hình so sánh', 'chapter': '/method', 'rq': None,
+     'status': 'done'},
+    {'key': 'feedback', 'label': 'Bảng 3.3', 'title': 'Vòng phản hồi và các mốc ngân sách', 'chapter': '/method',
+     'rq': None, 'status': 'done'},
+    {'key': 'space', 'label': 'Bảng 3.4', 'title': 'Kích thước không gian tìm kiếm', 'chapter': '/method',
+     'rq': None, 'needs': 'blueprint_set'},
+    {'key': 'planted_signals', 'label': 'Bảng 4.1', 'title': 'Bốn tín hiệu cài sẵn A', 'chapter': '/results/planted',
+     'rq': 'RQ2', 'needs': 'planted_formulas'},
+    {'key': 'planted_threshold', 'role': 'chính', 'label': 'Bảng 4.2', 'title': 'Ngưỡng phát hiện theo A',
+     'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'planted_detection'},
+    {'key': 'planted_table', 'role': 'phụ', 'label': 'Bảng 4.3', 'title': 'Tỷ lệ tìm lại gần theo A và IC mục tiêu',
+     'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'planted_summary'},
+    {'key': 'planted_near', 'role': 'phụ', 'label': 'Hình 4.1', 'title': 'Tỷ lệ tìm lại gần theo IC mục tiêu, từng A',
+     'chapter': '/results/planted', 'rq': 'RQ2', 'needs': 'planted_summary'},
+    {'key': 'placebo_dist', 'role': 'chính', 'label': 'Hình 4.2', 'title': 'Sharpe ngoài mẫu của các bộ placebo so với lần chạy thật',
      'chapter': '/results/placebo', 'rq': 'RQ2', 'needs': 'placebo_runs'},
-    {'key': 'rq1_table', 'role': 'chính', 'label': 'Bảng 4.4', 'title': 'Sharpe ngoài mẫu của các cấu hình so sánh',
-     'chapter': '/results/rq1', 'rq': 'RQ1', 'needs': None},
-    {'key': 'wf_table', 'role': 'phụ', 'label': 'Bảng 4.5', 'title': 'Sharpe ngoài mẫu theo cửa sổ walk-forward',
+    {'key': 'rq1_primary', 'role': 'chính', 'label': 'Bảng 4.4',
+     'title': 'LLM + MCTS so với MCTS không LLM: bốn phép Fisher hai phía chỉnh Holm', 'chapter': '/results/rq1',
+     'rq': 'RQ1', 'needs': 'rq1_primary'},
+    {'key': 'rq1_budget', 'role': 'phụ', 'label': 'Hình 4.3', 'title': 'Tỷ lệ tìm lại gần theo ngân sách, từng A',
+     'chapter': '/results/rq1', 'rq': 'RQ1', 'needs': 'rq1_summary'},
+    {'key': 'rq1_coverage', 'role': 'chẩn đoán', 'label': 'Bảng 4.5',
+     'title': 'A nằm trong hay ngoài vùng của bộ blueprint ban đầu', 'chapter': '/results/rq1', 'rq': 'RQ1',
+     'needs': 'coverage'},
+    {'key': 'rq1_touch', 'role': 'phụ', 'label': 'Bảng 4.6', 'title': 'Lần đầu chạm A: số vòng và thời gian',
+     'chapter': '/results/rq1', 'rq': 'RQ1', 'needs': 'rq1_touch'},
+    {'key': 'rq1_walkforward', 'role': 'phụ', 'label': 'Bảng 4.7',
+     'title': 'Sharpe ngoài mẫu walk-forward của các cấu hình (mô tả)', 'chapter': '/results/rq1', 'rq': 'RQ1',
+     'needs': 'wf_comparison'},
+    {'key': 'wf_table', 'role': 'phụ', 'label': 'Bảng 4.8', 'title': 'Sharpe ngoài mẫu theo cửa sổ walk-forward',
      'chapter': '/results/walkforward', 'rq': 'RQ1, RQ2', 'needs': None},
     {'key': 'wf_curve', 'role': 'chính', 'label': 'Hình 4.4', 'title': 'Chuỗi lợi suất ngoài mẫu nối 7 cửa sổ',
      'chapter': '/results/walkforward', 'rq': 'RQ1, RQ2', 'needs': None},
@@ -76,70 +106,103 @@ METHOD_INTRO = ('Sơ đồ dưới là quy trình được đánh giá. Đối t
 WINDOWS_CAPTION = ('Cửa sổ walk-forward nở dần: đoạn học bắt đầu cố định, đoạn kiểm định là 12 tháng trước đoạn đánh giá, '
                    'đoạn đánh giá dài 6 tháng và dịch 6 tháng mỗi cửa sổ.')
 
-BLUEPRINT_CAPTION = ('Bộ blueprint do LLM sinh và được đóng băng cho mọi cấu hình. Gốc là toán tử ngoài cùng của '
-                     'khung công thức.')
+BLUEPRINT_CAPTION = ('Bộ blueprint do LLM sinh một lần và được đóng băng cho mọi cấu hình có LLM. Mỗi blueprint là một khung '
+                     'công thức có ô `?`; "số cách điền" là số công thức hợp thứ nguyên MCTS có thể dựng từ nó '
+                     f'(độ sâu tối đa {MCTS_MAX_DEPTH}).')
+CONFIGS_CAPTION = ('Các cấu hình tiêu cùng một ngân sách đánh giá và kết thúc bằng cùng phép chọn top-5 trên đoạn kiểm định, '
+                   'nên khác biệt chỉ nằm ở cách sinh ứng viên.')
+FEEDBACK_CAPTION = 'Một lượt của LLM + MCTS (một cửa sổ walk-forward hoặc một lượt bài cài tín hiệu).'
+SPACE_CAPTION = ('Blueprint thu vùng tìm kiếm: "sớm hơn" chỉ đúng khi tín hiệu nằm trong vùng đó. Số tính bằng cách đếm chính xác '
+                 'theo luật của MCTS, không đếm tham số khuôn.')
 
-PLANTED_TITLE = 'Kết quả: bài cài tín hiệu (RQ2, kiểm soát dương)'
+CONFIG_ROWS: List[Dict[str, str]] = [
+    {'name': 'LLM + MCTS có phản hồi', 'key': 'llm_mcts',
+     'how': 'LLM viết bộ blueprint ban đầu (đóng băng); MCTS điền các ô `?`; sau giai đoạn A, LLM xem các biểu thức tốt '
+            'nhất trên đoạn học và viết blueprint mới cho giai đoạn B.'},
+    {'name': 'MCTS không LLM', 'key': 'mcts_only',
+     'how': 'MCTS bắt đầu từ một ô `?` trần dưới mỗi khuôn NORMALIZED, BOOLEAN, RATIO; ngân sách chia đều ba phần.'},
+    {'name': 'Tìm ngẫu nhiên', 'key': 'random',
+     'how': 'Công thức hợp thứ nguyên sinh ngẫu nhiên theo kích thước (ramped half-and-half), cùng số mẫu với ngân sách.'},
+    {'name': 'LLM không tìm', 'key': 'llm_only',
+     'how': 'LLM viết một lần một bộ công thức hoàn chỉnh rồi đóng băng; mỗi cửa sổ chỉ chấm chúng trên lưới tham số khuôn. '
+            'Chỉ chạy walk-forward thật, một seed.'},
+    {'name': 'Mua và giữ, TSMOM', 'key': 'buy_hold, tsmom',
+     'how': 'Hai tham chiếu không tìm: luôn long; dấu lợi suất quá khứ với độ dài chọn theo Sharpe kiểm định. '
+            'Chỉ chạy walk-forward thật, một seed.'},
+]
+
 PLANTED_QUESTION = ('Câu hỏi: nếu trong dữ liệu có một tín hiệu biết trước, quy trình có tìm lại được nó không? '
                     'Đây là kiểm soát dương của RQ2.')
 PLANTED_METHOD = [
     'Xáo thứ tự lợi suất từng nến trong mỗi đoạn dữ liệu thật để xoá mọi cấu trúc có sẵn, giữ khối lượng và hình dạng '
     'trong nến.',
     'Cài vào lợi suất kế tiếp một phần tỷ lệ với tín hiệu A, hiệu chỉnh sao cho IC (tương quan hạng của A với lợi suất '
-    'nến sau) đạt một mức mục tiêu biết trước: 0, 0.05 hoặc 0.1.',
-    'Chạy đúng quy trình luận văn (LLM sinh blueprint, MCTS, chọn top-5 trên đoạn kiểm định) trên dữ liệu đã cài, '
-    'rồi xem top-5 có chứa A hay không.',
+    'nến sau) đạt một mức mục tiêu biết trước: 0 (không cài gì), ' + ' hoặc '.join(f'{x:g}' for x in IC_LEVELS) + '.',
+    'Chạy đúng quy trình luận văn (LLM sinh blueprint, MCTS có vòng phản hồi, chọn top-5 trên đoạn kiểm định) trên dữ liệu '
+    'đã cài, rồi xem top-5 có chứa một công thức giống A hay không.',
 ]
-PLANTED_FORMULA_WORDS = (
-    'A so sánh mức đóng cửa với đỉnh của chính nến đó: z-score cửa sổ 10 của (high − close). Vế thứ hai của công thức '
-    'là z-score của (close − close), tức hằng số 0, nên không đóng góp. Tín hiệu s_t là z-score cửa sổ 10 của biểu thức '
-    'này, và lợi suất nến kế tiếp được cộng thêm một phần tỷ lệ thuận với s_t.')
-PLANTED_FORMULA_MISSING = 'Chưa có tệp công thức cài sẵn.'
-NEAR_DEFINITION = ('Tìm lại gần: có ít nhất một công thức trong top-5 mà giá trị alpha trên đoạn tìm có tương quan '
-                   'hạng tuyệt đối với A từ {threshold:.1f} trở lên. Tìm lại đúng: một công thức trong top-5 có cùng '
-                   'cấu trúc, cùng trường dữ liệu và cùng hướng với A, các cửa sổ lệch không quá một bước.')
-PLANTED_TABLE_RQ = 'Trả lời RQ2: quy trình có tìm lại được tín hiệu cài sẵn khi IC mục tiêu tăng dần không.'
-PLANTED_NEAR_RQ = 'Trả lời RQ2: ngưỡng IC mà quy trình bắt đầu phát hiện được tín hiệu.'
-PLANTED_CORR_RQ = ('Chẩn đoán cho RQ2: trong mọi ứng viên MCTS đã xếp hạng, cái gần A nhất ở từng seed giống A đến đâu '
-                   '(tương quan hạng tuyệt đối). Chấm cam là ứng viên đó nằm trong top-5 được chọn (hạng kiểm định từ 1 '
-                   'đến 5), chấm xanh là không; vạch ngang là ngưỡng tìm lại gần.')
-PLANTED_POSITIONS_RQ = ('Trả lời RQ2: vị thế tốt nhất trong top-5 giống vị thế của A đến đâu; IC 0 cho mức tương quan '
-                        'do ngẫu nhiên.')
-PLANTED_SEEDS_RQ = ('Chi tiết từng lượt chạy của Bảng 4.1 (RQ2). Các cột từ "Tương quan cao nhất trong top-5" đến '
-                    '"Sharpe ngoài mẫu" nói về top-5 được chọn; ba cột cuối nói về ứng viên gần A nhất trong mọi ứng '
-                    'viên đã xếp hạng, có thể không nằm trong top-5 (hạng kiểm định cho biết nó đứng thứ mấy).')
+PLANTED_SIGNALS_RQ = ('Mô tả cho RQ2: bốn tín hiệu mà quy trình được yêu cầu tìm lại. Hai tín hiệu kinh điển là công thức '
+                      'quen thuộc; hai tín hiệu lạ do máy sinh ngẫu nhiên với số toán tử cho trước, sau khi loại những công thức '
+                      'không dừng, quá đông hoặc trùng dạng với hai tín hiệu kinh điển.')
+PLANTED_THRESHOLD_RQ = ('Trả lời RQ2: với từng A, mức IC thấp nhất mà quy trình LLM + MCTS tìm lại gần A nhiều hơn khi không '
+                        'cài gì (kiểm định Fisher một phía so với IC 0).')
+PLANTED_TABLE_RQ = ('Bổ sung cho RQ2: số seed tìm lại gần trên số seed của LLM + MCTS, theo A và IC mục tiêu, kèm khoảng tin '
+                    'cậy Wilson 95% và p Fisher một phía so với IC 0. Không dùng một mình để kết luận.')
+PLANTED_NEAR_RQ = ('Bổ sung cho RQ2: cùng số liệu với Bảng 4.3, mỗi ô là một A. Đường nét đứt là khoảng tin cậy Wilson 95%.')
+PLANTED_PENDING = ('chưa có. Cần chạy `main.py rq1 search` rồi `main.py rq1 summary` để có kết quả bài cài tín hiệu của '
+                   'RQ1.')
+PLANTED_FORMULAS_PENDING = 'chưa có. Cần `main.py rq1 formulas` (tệp planted_formulas.json).'
 MISSING = 'chưa có'
-PLANTED_MISSING = 'Chưa có kết quả bài cài tín hiệu (thiếu runs.csv trong thư mục kết quả luận văn).'
 ILLUSTRATION_TITLE = 'Minh hoạ: cài tín hiệu làm gì với giá'
 ILLUSTRATION_LINK = 'Xem minh hoạ một bộ dữ liệu: giá thật, giá placebo, giá đã cài và tín hiệu'
+PLANTED_ILLUSTRATION_MISSING = 'Chưa có kết quả bài cài tín hiệu (thiếu runs.csv trong thư mục kết quả luận văn).'
 
 PLACEBO_QUESTION = ('Câu hỏi: hệ thống có tốt hơn chính nó chạy trên dữ liệu placebo, nơi không có gì để tìm không? '
                     'Đây là kiểm soát âm của RQ2.')
-PLACEBO_METHOD = ('Mỗi bộ placebo xáo thứ tự lợi suất của dữ liệu rồi chạy đúng quy trình walk-forward luận văn '
-                  '(7 cửa sổ, một seed MCTS). Sharpe của bộ là Sharpe năm của chuỗi lợi suất ngày ngoài mẫu nối từ '
-                  'các cửa sổ.')
+PLACEBO_METHOD = ('Mỗi bộ placebo xáo thứ tự lợi suất của dữ liệu rồi chạy đúng hệ thống luận văn (LLM + MCTS có vòng phản '
+                  'hồi) theo quy trình walk-forward (7 cửa sổ, một seed MCTS). Sharpe của bộ là Sharpe năm của chuỗi lợi '
+                  'suất ngày ngoài mẫu nối từ các cửa sổ.')
 PLACEBO_DIST_RQ = ('Trả lời RQ2: hệ thống tự tạo ra Sharpe ngoài mẫu cỡ nào khi không có tín hiệu. Mỗi chấm là một bộ '
                    'placebo; vạch ngang là Sharpe placebo lớn nhất.')
-PLACEBO_MISSING = 'Chưa có kết quả placebo (thiếu summary.csv trong thư mục walk-forward).'
+PLACEBO_MISSING = ('Chưa có kết quả placebo (thiếu summary.csv trong thư mục walk-forward của hệ thống LLM + MCTS có '
+                   'vòng phản hồi; cần `main.py walkforward placebo` rồi `summary`).')
 PLACEBO_P_PENDING = 'chưa có, chờ lần chạy thật'
 
+RQ1_QUESTION = ('Câu hỏi: cùng giới hạn độ dài công thức, LLM đưa MCTS tới tín hiệu đúng sớm hơn hay chặn đường tới nó? '
+                'Đo trên bài cài tín hiệu, nơi đáp án biết trước.')
+RQ1_DESIGN = [
+    'Bốn tín hiệu A (Bảng 4.1) được cài vào dữ liệu xáo ở từng mức IC mục tiêu; mỗi cấu hình chạy nhiều seed cho mỗi A; '
+    'IC 0 không cài gì nên một lượt được chấm với cả bốn A.',
+    f'Mỗi lượt ghi lại top-5 tại các mốc ngân sách; mốc {num(BudgetPlan().phase_a)} là hết giai đoạn A, trước phản hồi của '
+    'LLM. Tìm lại gần nghĩa là top-5 có công thức với |Spearman| ≥ ' + f'{NEAR_CORRELATION:g}' + ' với A.',
+    f"Phép so chính duy nhất: LLM + MCTS với MCTS không LLM ở IC {PRIMARY_IC:g}, gộp theo loại A (kinh điển, lạ), tại "
+    f"{' và '.join(f'{num(b)}' for b in PRIMARY_BUDGETS)}: bốn kiểm định Fisher hai phía (LLM có thể chặn đường), chỉnh Holm. "
+    'Mọi ô khác chỉ mô tả, không đọc p.',
+]
+RQ1_PRIMARY_RQ = ('Trả lời RQ1: LLM + MCTS có tìm lại gần A khác MCTS không LLM không (hai phía), tại hai mốc ngân sách, chia '
+                  'theo loại A. Phép so chính duy nhất; p đã chỉnh Holm cho cả bốn phép.')
+RQ1_BUDGET_RQ = ('Bổ sung cho RQ1: tỷ lệ tìm lại gần theo ngân sách ở IC {ic:g}, mỗi ô là một A, mỗi đường là một cấu hình, '
+                 'dải là khoảng tin cậy Wilson 95%. Đường dọc đánh dấu mốc {mark}: hết giai đoạn A, trước phản hồi.')
+RQ1_COVERAGE_RQ = ('Chẩn đoán cho RQ1: giải thích vì sao LLM + MCTS có thể không tới A ở mốc trước phản hồi. A ngoài vùng '
+                   'của bộ blueprint ban đầu thì chỉ vòng phản hồi mới mở được đường tới nó.')
+RQ1_TOUCH_RQ = ('Bổ sung cho RQ1: số vòng MCTS và thời gian thật (tính cả LLM) tới lần đầu bảng xếp hạng có công thức với '
+                '|Spearman| ≥ ' + f'{NEAR_CORRELATION:g}' + ' với A, trung vị chỉ qua các lượt đã chạm; cột "đã chạm" cho '
+                'biết bao nhiêu lượt đã chạm.')
+RQ1_WALKFORWARD_RQ = ('Bổ sung cho RQ1 (mô tả): Sharpe năm ngoài mẫu của từng cấu hình trong lần chạy thật walk-forward, '
+                      'và chênh lệch với LLM + MCTS trên các ngày chung, có khoảng tin cậy bootstrap khối dừng cặp đôi. '
+                      'Không có p; chỉ phân biệt được chênh lớn.')
+RQ1_PENDING = 'chưa có. Cần `main.py rq1 search` rồi `main.py rq1 summary`.'
+RQ1_COVERAGE_PENDING = 'chưa có. Cần `main.py rq1 coverage`.'
+RQ1_WALKFORWARD_PENDING = 'chưa có. Cần `main.py walkforward real` rồi `main.py walkforward summary` (cho comparison.csv).'
+RQ1_PRIMARY_PENDING = 'chưa có. Cần `main.py rq1 search` rồi `main.py rq1 summary` (cho primary_tests.csv).'
+
 PENDING_CHAPTERS: Dict[str, Dict] = {
-    'rq1': {
-        'title': 'Kết quả: vai trò của LLM (RQ1)',
-        'rq': 'RQ1',
-        'answers': 'LLM + MCTS có cho bộ alpha tốt hơn ngoài mẫu so với MCTS không LLM, LLM không tìm, và tìm ngẫu nhiên không.',
-        'will_show': ['Bảng 4.4: Sharpe ngoài mẫu (trung bình ± độ lệch theo seed) của từng cấu hình cùng ngân sách '
-                      '100.000 lần đánh giá mỗi cửa sổ.'],
-        'primary': 'wf_sharpe', 'metrics': ['wf_sharpe', 'ic_rq1', 'calmar', 'turnover'],
-        'condition': 'Cần mã cho các cấu hình so sánh (MCTS không LLM, LLM không tìm, tìm ngẫu nhiên): chưa viết. '
-                     'Sau đó cần chạy thật sau khi đóng băng.',
-    },
     'walkforward': {
         'title': 'Kết quả: chuỗi ngoài mẫu (walk-forward)',
         'rq': 'RQ1, RQ2',
         'answers': 'Chỉ số chính của luận văn: Sharpe năm của chuỗi lợi suất ngày ngoài mẫu 2022-07 → 2025-12, '
                    'dùng cho cả so sánh RQ1 và so với placebo ở RQ2.',
-        'will_show': ['Bảng 4.5: Sharpe ngoài mẫu theo cửa sổ và seed.',
+        'will_show': ['Bảng 4.8: Sharpe ngoài mẫu theo cửa sổ và seed.',
                       'Hình 4.4: chuỗi lợi suất ngoài mẫu nối 7 cửa sổ.'],
         'primary': 'wf_sharpe', 'metrics': ['wf_sharpe', 'window_sharpe', 'max_drawdown'],
         'condition': 'Cần đóng băng cấu hình (bộ blueprint, reward, bảng cửa sổ, ngân sách, seed) rồi chạy dữ liệu thật '
@@ -147,12 +210,13 @@ PENDING_CHAPTERS: Dict[str, Dict] = {
     },
 }
 
-
 PLACEBO_PRIMARY = 'placebo_p'
 PLACEBO_METRICS = ['placebo_p', 'placebo_dist']
-PLANTED_PRIMARY = 'near'
-PLANTED_METRICS = ['target_ic', 'ic', 'near', 'fisher_p', 'exact', 'oos_sharpe_6m', 'pos_corr', 'top5_corr', 'closest_corr',
-                   'val_rank']
+PLANTED_PRIMARY = 'detection_threshold'
+PLANTED_METRICS = ['detection_threshold', 'target_ic', 'near', 'fisher_p', 'crowding', 'adf_p']
+RQ1_PRIMARY = 'holm_p'
+RQ1_METRICS = ['holm_p', 'near', 'in_region', 'completions', 'first_touch', 'wf_sharpe', 'wf_diff', 'rho']
+RQ1_ROLE_OVERRIDES = {'wf_sharpe': 'phụ'}
 PRIMARY_BOX_TITLE = 'Chỉ số chính'
 METRIC_LIST_TITLE = 'Chỉ số dùng trong chương này'
 ROLE_HELP = {'chính': 'trả lời trực tiếp câu hỏi của chương',
@@ -165,49 +229,56 @@ METRICS: Dict[str, Dict[str, str]] = {
                   'measures': 'Mức tương quan hạng giữa tín hiệu A và lợi suất nến sau mà ta chủ động cài vào dữ liệu.',
                   'reading': 'Càng cao thì tín hiệu càng dễ thấy; 0 nghĩa là không cài gì (placebo).',
                   'role': 'phụ'},
-    'ic': {'name': 'IC đo được',
-           'measures': 'Tương quan hạng (Spearman) thực đo giữa A và lợi suất nến sau trên đoạn tìm hoặc đoạn đánh giá, '
-                       'trung bình theo seed.',
-           'reading': 'Gần IC mục tiêu thì việc cài tín hiệu đúng như thiết kế; chênh là nhiễu mẫu.',
-           'role': 'phụ'},
+    'detection_threshold': {
+        'name': 'Ngưỡng phát hiện',
+        'measures': f'Mức IC > 0 thấp nhất mà tỷ lệ tìm lại gần của {config_label(DETECTION_CONFIG)} ở ngân sách {num(DETECTION_BUDGET)} '
+                    f'cao hơn ở IC 0 với p < {FISHER_ALPHA:g} (kiểm định chính xác Fisher một phía), tính riêng từng A.',
+        'reading': 'Thấp hơn là nhạy hơn. "Chưa xác định" nghĩa là không mức IC nào đạt; mỗi mức chỉ có vài chục seed nên '
+                   'kiểm định có ít sức, và điều đó không có nghĩa là quy trình không phát hiện được.',
+        'role': 'chính'},
     'fisher_p': {'name': 'p Fisher so với IC 0',
                  'measures': 'Xác suất thấy ít nhất chừng ấy lần tìm lại gần nếu mức IC đó không khác gì IC 0 '
                              '(kiểm định chính xác Fisher một phía, so tỷ lệ tìm lại gần với IC 0).',
-                 'reading': 'Nhỏ hơn 0.05 thì coi là khác IC 0; ngưỡng phát hiện là mức IC thấp nhất đạt điều đó. '
-                            'Mỗi mức chỉ có 10 seed nên kiểm định có ít sức.',
+                 'reading': f'Nhỏ hơn {FISHER_ALPHA:g} thì coi là khác IC 0; ngưỡng phát hiện là mức IC thấp nhất đạt điều đó.',
                  'role': 'phụ'},
     'near': {'name': 'Tìm lại gần',
              'measures': 'Số seed mà top-5 được chọn có ít nhất một công thức với alpha tương quan hạng tuyệt đối '
-                         f'với A từ {NEAR_CORRELATION:g} trở lên.',
-             'reading': 'Là tỷ lệ k/n theo IC. Tỷ lệ ở IC 0 là mức "tìm lại" do ngẫu nhiên; mức IC thấp nhất có p Fisher '
-                        'nhỏ hơn 0.05 so với IC 0 là ngưỡng phát hiện.',
-             'role': 'chính'},
-    'exact': {'name': 'Tìm lại đúng',
-              'measures': 'Số seed mà top-5 có công thức cùng cấu trúc, trường dữ liệu và hướng với A (cửa sổ lệch '
-                          'tối đa một bước).',
-              'reading': 'Chặt hơn tìm lại gần; thường thấp vì nhiều công thức khác cấu trúc vẫn tương quan cao với A.',
-              'role': 'phụ'},
-    'pos_corr': {'name': 'Tương quan vị thế với A',
-                 'measures': 'Tương quan giữa vị thế giao dịch của công thức tốt nhất trong top-5 và vị thế của A.',
-                 'reading': 'So với mức nhiễu ở IC 0: chỉ cao hơn hẳn mức đó mới có nghĩa là vị thế giống A.',
-                 'role': 'phụ'},
-    'top5_corr': {'name': 'Tương quan cao nhất trong top-5',
-                  'measures': 'Tương quan hạng tuyệt đối với A của công thức giống A nhất trong 5 công thức được chọn.',
-                  'reading': f'Từ {NEAR_CORRELATION:g} trở lên thì seed đó được tính là tìm lại gần.',
-                  'role': 'phụ'},
-    'oos_sharpe_6m': {'name': 'Sharpe ngoài mẫu 6 tháng',
-                      'measures': 'Sharpe năm hoá của top-5 gộp trên 6 tháng đánh giá của bài cài tín hiệu.',
-                      'reading': 'Rất nhiễu vì chỉ 6 tháng; chỉ xem xu hướng theo IC, không dùng để kết luận.',
-                      'role': 'phụ'},
-    'closest_corr': {'name': 'Tương quan của ứng viên gần A nhất',
-                     'measures': 'Tương quan hạng tuyệt đối với A của ứng viên giống A nhất trong mọi ứng viên MCTS '
-                                 'đã xếp hạng, kể cả khi nó không vào top-5.',
-                     'reading': 'Đo MCTS có chạm tới A không, chưa nói bước chọn có giữ nó lại không.',
-                     'role': 'chẩn đoán'},
-    'val_rank': {'name': 'Hạng kiểm định',
-                 'measures': 'Thứ hạng của ứng viên gần A nhất theo reward trên đoạn kiểm định.',
-                 'reading': 'Từ 1 đến 5 nghĩa là nó nằm trong top-5 được chọn; lớn hơn nghĩa là bị bước chọn bỏ lỡ.',
+                         f'với A từ {NEAR_CORRELATION:g} trở lên, tại một mốc ngân sách.',
+             'reading': 'Là tỷ lệ k/n theo IC và A. Tỷ lệ ở IC 0 là mức "tìm lại" do ngẫu nhiên.',
+             'role': 'phụ'},
+    'crowding': {'name': 'Độ đông của A',
+                 'measures': 'Tỷ lệ công thức ngẫu nhiên hợp lệ (mẫu 10.000 công thức) có tương quan hạng tuyệt đối với A '
+                             f'từ {NEAR_CORRELATION:g} trở lên trên đoạn tìm.',
+                 'reading': 'Nhỏ nghĩa là tìm lại gần khó xảy ra do tình cờ. Luật chọn A loại những A có tỷ lệ này từ 1% '
+                            'trở lên.',
                  'role': 'chẩn đoán'},
+    'adf_p': {'name': 'p của kiểm định ADF',
+              'measures': 'p-value kiểm định nghiệm đơn vị (Augmented Dickey-Fuller) của giá trị A trên đoạn tìm.',
+              'reading': 'Nhỏ hơn 0.05 là chuỗi dừng. Luật chọn A loại những A không dừng, vì tương quan hạng của chuỗi '
+                         'không dừng dễ cho kết quả giả.',
+              'role': 'chẩn đoán'},
+    'holm_p': {'name': 'p Fisher hai phía, chỉnh Holm',
+               'measures': f'So tỷ lệ tìm lại gần của LLM + MCTS với MCTS không LLM ở IC {PRIMARY_IC:g}, gộp theo loại A '
+                           '(kinh điển, lạ) và theo ngân sách (' + ', '.join(f'{num(b)}' for b in PRIMARY_BUDGETS) + '): bốn '
+                           'kiểm định chính xác Fisher hai phía, chỉnh Holm cho cả họ bốn phép.',
+               'reading': f'Nhỏ hơn {FISHER_ALPHA:g} thì hai cấu hình khác nhau (hai phía, vì LLM có thể chặn đường). '
+                          'Cỡ mẫu nhỏ nên chỉ phân biệt được chênh lớn.',
+               'role': 'chính'},
+    'in_region': {'name': 'A trong vùng blueprint ban đầu',
+                  'measures': f'Có ít nhất một blueprint của bộ đóng băng điền ra được đúng A (độ sâu tối đa {MCTS_MAX_DEPTH}).',
+                  'reading': 'Ngoài vùng thì trước vòng phản hồi LLM + MCTS không thể tới A; chỉ phản hồi mới mở đường.',
+                  'role': 'chẩn đoán'},
+    'completions': {'name': 'Số cách điền của blueprint nhỏ nhất chứa A',
+                    'measures': 'Số công thức hợp thứ nguyên mà blueprint nhỏ nhất trong các blueprint điền ra được A có '
+                                'thể dựng.',
+                    'reading': 'Càng nhỏ thì A càng dễ tìm trong vùng của nó; càng lớn thì tìm trong vùng vẫn khó.',
+                    'role': 'chẩn đoán'},
+    'first_touch': {'name': 'Lần đầu chạm A',
+                    'measures': 'Số vòng MCTS và thời gian thật (tính cả thời gian LLM) tới lần đầu bảng xếp hạng có công '
+                                f'thức với tương quan hạng tuyệt đối với A từ {NEAR_CORRELATION:g} trở lên.',
+                    'reading': 'Trung vị chỉ qua các lượt đã chạm; đọc kèm số lượt chạm trên số lượt. Độ phân giải bằng một '
+                               'đoạn MCTS.',
+                    'role': 'phụ'},
     'placebo_p': {'name': 'p-value placebo',
                   'measures': 'Tỷ lệ bộ placebo (dữ liệu xáo, không có gì để tìm) có Sharpe ngoài mẫu không thấp hơn '
                               'lần chạy thật.',
@@ -215,7 +286,7 @@ METRICS: Dict[str, Dict[str, str]] = {
                              'tức 0.05 với 19 bộ, và chỉ đạt khi Sharpe thật vượt mọi bộ placebo.',
                   'role': 'chính'},
     'placebo_dist': {'name': 'Phân bố Sharpe placebo',
-                     'measures': 'Sharpe ngoài mẫu của từng bộ trong 19 bộ placebo.',
+                     'measures': 'Sharpe ngoài mẫu của từng bộ placebo.',
                      'reading': 'Cho thấy hệ thống tự tạo ra Sharpe cỡ nào khi không có tín hiệu; lần chạy thật phải '
                                 'nằm ngoài vùng này.',
                      'role': 'phụ'},
@@ -223,6 +294,15 @@ METRICS: Dict[str, Dict[str, str]] = {
                   'measures': 'Sharpe hằng năm hoá của chuỗi lợi suất ngày ngoài mẫu 2022-07 → 2025-12 nối từ 7 cửa sổ.',
                   'reading': 'Chỉ số chính của luận văn; lớn hơn là tốt hơn, so giữa cấu hình hoặc với placebo.',
                   'role': 'chính'},
+    'wf_diff': {'name': 'Chênh Sharpe so với LLM + MCTS',
+                'measures': 'Sharpe năm của LLM + MCTS trừ Sharpe năm của cấu hình, trên các ngày chung, kèm khoảng tin '
+                            'cậy 95% theo bootstrap khối dừng cặp đôi.',
+                'reading': 'Dương: LLM + MCTS cao hơn. Khoảng chứa 0 thì dữ liệu không phân biệt được hai cấu hình.',
+                'role': 'phụ'},
+    'rho': {'name': 'Tương quan lợi suất ngày',
+            'measures': 'Tương quan Pearson giữa lợi suất ngày của cấu hình và của LLM + MCTS.',
+            'reading': 'Cao nghĩa là hai chuỗi di chuyển cùng nhau, nên chênh Sharpe giữa chúng có khoảng tin cậy hẹp hơn.',
+            'role': 'phụ'},
     'window_sharpe': {'name': 'Sharpe từng cửa sổ',
                       'measures': 'Sharpe năm hoá riêng của 6 tháng đánh giá mỗi cửa sổ.',
                       'reading': 'Cho thấy kết quả đều hay chỉ nhờ một cửa sổ; mỗi giá trị rất nhiễu.',
@@ -231,24 +311,12 @@ METRICS: Dict[str, Dict[str, str]] = {
                      'measures': 'Mức giảm lớn nhất của vốn từ đỉnh xuống đáy trong chuỗi ngoài mẫu.',
                      'reading': 'Cho biết rủi ro chịu đựng để có Sharpe đó; nhỏ hơn là tốt hơn.',
                      'role': 'phụ'},
-    'ic_rq1': {'name': 'IC của bộ alpha',
-               'measures': 'Tương quan hạng giữa tín hiệu của bộ alpha và lợi suất nến sau, ngoài mẫu.',
-               'reading': 'Chỉ số phụ cho thấy sức dự báo, bổ sung cho Sharpe.',
-               'role': 'phụ'},
-    'calmar': {'name': 'Calmar',
-               'measures': 'Lợi suất hằng năm chia cho sụt giảm lớn nhất.',
-               'reading': 'Cao hơn là sinh lời tốt hơn so với rủi ro sụt giảm.',
-               'role': 'phụ'},
-    'turnover': {'name': 'Vòng quay',
-                 'measures': 'Mức thay đổi vị thế trung bình, tức độ giao dịch nhiều.',
-                 'reading': 'Cao nghĩa là chịu nhiều phí; giúp giải thích vì sao Sharpe chênh nhau.',
-                 'role': 'phụ'},
 }
 
 
-def metric_rows(keys: List[str]) -> List[Dict]:
-    """Glossary rows (name, what it measures, how to read, role) for a chapter's list of metrics."""
-    return [dict(METRICS[k], key=k) for k in keys]
+def metric_rows(keys: List[str], roles: Optional[Dict[str, str]] = None) -> List[Dict]:
+    """Glossary rows (name, what it measures, how to read, role) for a chapter's list of metrics; `roles` overrides a role."""
+    return [dict(METRICS[k], key=k, **({'role': roles[k]} if roles and k in roles else {})) for k in keys]
 
 
 def chapter_status(chapter: Dict, availability: Dict[str, bool]) -> str:
@@ -280,6 +348,55 @@ def progress_rows(availability: Dict[str, bool]) -> List[Dict]:
     return rows
 
 
+# --------------------------------------------------------------------------- method chapter
+
+_SUPERSCRIPT = str.maketrans('-0123456789', '⁻⁰¹²³⁴⁵⁶⁷⁸⁹')
+
+
+def sci(n: int) -> str:
+    """A positive integer as 'm × 10ⁿ' with two significant digits."""
+    mantissa, exponent = f"{n:.1e}".split('e')
+    return f"{mantissa} × 10{str(int(exponent)).translate(_SUPERSCRIPT)}"
+
+
+def feedback_steps(plan: BudgetPlan, n_blueprints: Optional[int]) -> List[Dict[str, str]]:
+    """The stages of one LLM + MCTS run with their budgets, taken from the budget plan."""
+    phase_b = plan.total - plan.phase_a
+    first = f"{n_blueprints} blueprint" if n_blueprints else 'Các blueprint'
+    each = f", mỗi blueprint {num(plan.phase_a // n_blueprints)} vòng" if n_blueprints else ''
+    return [
+        {'stage': 'Giai đoạn A',
+         'text': f"{first} đóng băng chia đều {num(plan.phase_a)} vòng MCTS{each}, trên đoạn học."},
+        {'stage': 'Phản hồi',
+         'text': f"Lấy {plan.feedback_expressions} biểu thức khác nhau tốt nhất theo reward đoạn học; đưa LLM biểu thức, reward "
+                 'và IC đoạn học (không đoạn kiểm định hay đánh giá, không tên thị trường). LLM viết '
+                 f"{plan.feedback_blueprints} blueprint mới trong một yêu cầu, cùng luật hợp lệ với bộ ban đầu."},
+        {'stage': 'Giai đoạn B', 'text': f"{plan.feedback_blueprints} blueprint mới chia đều {num(phase_b)} vòng còn lại."},
+        {'stage': 'Mốc ngân sách',
+         'text': 'Bảng xếp hạng được chụp tại ' + ', '.join(f"{num(c)}" for c in plan.checkpoints)
+                 + f" vòng, không chạy thêm. Mốc {num(plan.phase_a)} nằm trước phản hồi."},
+        {'stage': 'Chọn top-5',
+         'text': 'Các biểu thức tốt nhất của cả hai giai đoạn được chấm lại trên đoạn kiểm định, lấy top-5; cùng phép chọn '
+                 'với mọi cấu hình.'},
+    ]
+
+
+def reading_blueprints(summary: Dict) -> str:
+    """Operator coverage and size of the frozen set."""
+    missing = ', '.join(f"`{op}`" for op in summary['operators_missing'])
+    tail = f"; còn thiếu {missing}" if summary['operators_missing'] else ''
+    smallest = min((b['completions'] for b in summary['blueprints'] if b['completions']), default=None)
+    small = f" Blueprint nhỏ nhất có {num(smallest)} cách điền." if smallest else ''
+    return (f"Đọc: {summary['count']} blueprint dùng {summary['operators_used']}/{summary['operators_total']} toán tử đã cài"
+            f"{tail}. Tổng số cách điền của bộ là {sci(summary['set_size'])}.{small}")
+
+
+def reading_space(summary: Dict) -> str:
+    set_size, grammar = summary['set_size'], summary['grammar_size']
+    return (f"Đọc: cả ngữ pháp có {sci(grammar)} công thức, bộ blueprint thu vùng tìm kiếm còn {sci(set_size)}, "
+            f"nhỏ hơn {sci(round(grammar / set_size))} lần." if set_size else '')
+
+
 # --------------------------------------------------------------------------- readings of results
 
 
@@ -291,94 +408,158 @@ def _ic(value: float) -> str:
     return f"{value:g}"
 
 
-def reading_table(rows: List[Dict]) -> str:
-    if not rows:
-        return ''
-    parts = [f"IC {_ic(r['strength'])}: {r['near_count']}/{r['n_runs']}" for r in rows]
-    hit = [r for r in rows if r['near_count'] > 0]
-    tail = (f"seed đầu tiên tìm lại gần xuất hiện ở IC {_ic(hit[0]['strength'])}." if hit
-            else 'chưa seed nào tìm lại gần.')
-    return f"Đọc: tìm lại gần theo IC là {'; '.join(parts)}; {tail}"
-
-
-FISHER_ALPHA = 0.05
-
-
-def detection_threshold(rows: List[Dict]) -> Optional[Dict]:
-    """Row of the lowest target IC > 0 whose one-sided Fisher p against IC 0 is below FISHER_ALPHA; None if none."""
-    return next((r for r in rows if r['strength'] > 0 and r.get('p_fisher') is not None
-                 and math.isfinite(r['p_fisher']) and r['p_fisher'] < FISHER_ALPHA), None)
-
-
 def _p(value) -> str:
     return '–' if value is None or not math.isfinite(value) else f"{value:.3f}"
 
 
-def threshold_text(rows: List[Dict]) -> str:
-    """'Ngưỡng phát hiện: IC x (p = y)', or the sentence saying no level passes / there is no IC 0 to compare."""
+def reading_signals(rows: List[Dict]) -> str:
+    """How many of the A are classical or odd, and the largest crowding share and ADF p."""
     if not rows:
         return ''
-    if not any(r['strength'] == 0.0 for r in rows):
-        return 'Không có mức IC 0 để so nên chưa xác định được ngưỡng phát hiện'
-    hit = detection_threshold(rows)
-    if hit is None:
-        return f"Chưa có mức IC nào có p < {FISHER_ALPHA:g}, nên chưa xác định được ngưỡng phát hiện"
-    return f"Ngưỡng phát hiện: IC {_ic(hit['strength'])} (p = {_p(hit['p_fisher'])})"
+    classical = [r['name'] for r in rows if r['kind'] == 'classical']
+    odd = [r['name'] for r in rows if r['kind'] != 'classical']
+    crowded = [r for r in rows if r['crowding_share'] is not None]
+    adf = [r for r in rows if r['adf_p'] is not None]
+    parts = [f"{len(classical)} tín hiệu kinh điển ({', '.join(classical)}) và {len(odd)} tín hiệu lạ ({', '.join(odd)})"]
+    if crowded:
+        top = max(crowded, key=lambda r: r['crowding_share'])
+        parts.append(f"độ đông cao nhất là {100 * top['crowding_share']:.2f}% ({top['name']})")
+    if adf:
+        top = max(adf, key=lambda r: r['adf_p'])
+        parts.append(f"p ADF lớn nhất là {top['adf_p']:.2g} ({top['name']})")
+    return 'Đọc: ' + '; '.join(parts) + '.'
 
 
-def reading_near(rows: List[Dict]) -> str:
-    """Rate at the highest IC, then the detection threshold decided by the one-sided Fisher test against IC 0."""
+def _threshold_phrase(r: Dict) -> str:
+    if r['threshold_ic'] is None:
+        return f"{r['a']}: chưa xác định"
+    return f"{r['a']}: IC {_ic(r['threshold_ic'])} (p = {_p(r['p_fisher'])})"
+
+
+def primary_value_planted(detection: List[Dict]) -> str:
+    """Current value of the planted chapter's primary metric: the threshold of every A."""
+    if not detection:
+        return MISSING
+    return '; '.join(_threshold_phrase(r) for r in detection)
+
+
+def reading_detection(detection: List[Dict]) -> str:
+    if not detection:
+        return ''
+    found = [r for r in detection if r['threshold_ic'] is not None]
+    head = f"Đọc: {len(found)}/{len(detection)} tín hiệu có ngưỡng phát hiện ({config_label(detection[0]['config'])}, ngân sách {num(detection[0]['budget'])}). "
+    detail = '; '.join(f"{_threshold_phrase(r)}, số seed tìm lại gần {r['rates']}" if r['rates'] else _threshold_phrase(r)
+                       for r in detection)
+    tail = ('' if found else ' Không A nào đạt p < ' + f'{FISHER_ALPHA:g}' + ' ở mức IC nào, nên chưa xác định được ngưỡng phát hiện.')
+    return head + detail + '.' + tail
+
+
+def reading_near_table(rows: List[Dict]) -> str:
+    """Near recovery at the highest IC of each A, with its Wilson interval."""
     if not rows:
         return ''
-    last = rows[-1]
-    interval = (f"IC {_ic(last['strength'])}: {_fmt(last['near_rate'])} "
-                f"(khoảng tin cậy Wilson {_fmt(last['near_low'])} đến {_fmt(last['near_high'])})")
-    tests = '; '.join(f"IC {_ic(r['strength'])}: p = {_p(r['p_fisher'])}" for r in rows if r['strength'] > 0)
-    tests = f" Kiểm định Fisher một phía so với IC 0 ({tests})." if tests else ''
-    return f"Đọc: {interval}.{tests} {threshold_text(rows)}."
+    last: Dict[str, Dict] = {}
+    for r in rows:
+        if r['a'] not in last or r['ic'] > last[r['a']]['ic']:
+            last[r['a']] = r
+    parts = [f"{a} ở IC {_ic(r['ic'])}: {r['near_count']}/{r['n_runs']} (Wilson {_fmt(r['low'])} đến {_fmt(r['high'])})"
+             for a, r in sorted(last.items())]
+    return 'Đọc: ' + '; '.join(parts) + '.'
 
 
-def reading_corr(seed_rows: List[Dict], threshold: float) -> str:
-    """How many seeds MCTS reached A (closest correlation >= threshold) and how many of those are in the top-5."""
-    if not seed_rows:
-        return ''
-
-    def reached(r):
-        v = r.get('closest_corr')
-        return v is not None and v == v and float(v) >= threshold
-
-    def in_top5(r):
-        v = r.get('closest_val_rank')
-        return v is not None and v == v and float(v) <= 5
-
-    by_strength: Dict[float, List[Dict]] = {}
-    for r in seed_rows:
-        by_strength.setdefault(float(r['strength']), []).append(r)
-    parts = []
-    for strength, rs in sorted(by_strength.items()):
-        hit = [r for r in rs if reached(r)]
-        parts.append(f"IC {_ic(strength)}: {len(hit)}/{len(rs)} seed, {sum(in_top5(r) for r in hit)} nằm trong top-5")
-    return (f"Đọc: MCTS đã chạm tới A (tương quan từ {threshold:.1f} trở lên) ở "
-            f"{sum(reached(r) for r in seed_rows)}/{len(seed_rows)} seed; trong đó "
-            f"{sum(reached(r) and in_top5(r) for r in seed_rows)} nằm trong top-5. Theo IC: " + '; '.join(parts) + '.')
+def _significant(row: Dict) -> bool:
+    return row['p_holm'] is not None and row['p_holm'] < FISHER_ALPHA
 
 
-def reading_positions(rows: List[Dict]) -> str:
-    if not rows:
-        return ''
-    base = next((r for r in rows if r['strength'] == 0.0), None)
-    others = [r for r in rows if r['strength'] != 0.0]
-    parts = [f"IC {_ic(r['strength'])}: trung bình {_fmt(r['mean'])}" for r in others]
-    noise = f"Mức nhiễu (IC 0) cao nhất là {_fmt(base['max'])}. " if base else ''
-    return f"Đọc: {noise}{'; '.join(parts)}."
+def _a_type_vi(name: str) -> str:
+    return {'classical': 'A kinh điển', 'odd': 'A lạ'}.get(name, name)
 
 
-def primary_value_planted(rows: List[Dict]) -> str:
-    """Current value of the planted chapter's primary metric: near recovery k/n per IC, then the detection threshold."""
+def primary_value_rq1(rows: List[Dict]) -> str:
     if not rows:
         return MISSING
-    counts = '; '.join(f"IC {_ic(r['strength'])}: {r['near_count']}/{r['n_runs']}" for r in rows)
-    return f"{counts}. {threshold_text(rows)}"
+    return '; '.join(f"{_a_type_vi(r['a_type'])} ở {num(r['budget'])}: p Holm = {_p(r['p_holm'])}" for r in rows)
+
+
+def reading_primary(rows: List[Dict]) -> str:
+    """The four tests in words, how many pass after Holm, and which configuration was higher where one did."""
+    if not rows:
+        return ''
+    cells = '; '.join(f"{_a_type_vi(r['a_type'])} ở {num(r['budget'])}: LLM + MCTS {r['near_llm_mcts']}/{r['n_llm_mcts']} so với "
+                      f"MCTS không LLM {r['near_mcts_only']}/{r['n_mcts_only']}, p = {_p(r['p_two_sided'])}, "
+                      f"p Holm = {_p(r['p_holm'])}" for r in rows)
+    passed = [r for r in rows if _significant(r)]
+    if not passed:
+        verdict = (f"Không phép nào có p Holm < {FISHER_ALPHA:g}: dữ liệu không phân biệt được LLM + MCTS với MCTS không LLM "
+                   'ở các ô này.')
+    else:
+        def direction(r):
+            a = r['near_llm_mcts'] / r['n_llm_mcts']
+            b = r['near_mcts_only'] / r['n_mcts_only']
+            return 'cao hơn' if a > b else 'thấp hơn'
+        verdict = (f"{len(passed)}/{len(rows)} phép có p Holm < {FISHER_ALPHA:g}: "
+                   + '; '.join(f"{_a_type_vi(r['a_type'])} ở {num(r['budget'])}, LLM + MCTS {direction(r)}" for r in passed) + '.')
+    return f"Đọc: {cells}. {verdict}"
+
+
+def reading_budget(series: Dict, ic: float, mark: int) -> str:
+    """Near rate of each configuration at the phase-A mark and at the last budget, per A."""
+    if not series:
+        return ''
+    parts = []
+    for a, configs in series.items():
+        cells = []
+        for config, points in configs.items():
+            by_budget = {int(p[0]): p[1] for p in points}
+            last = max(by_budget)
+            at_mark = by_budget.get(mark)
+            cells.append(f"{config_label(config)} {_fmt(at_mark)} → {_fmt(by_budget[last])}")
+        parts.append(f"{a}: " + ', '.join(cells))
+    return f"Đọc: tỷ lệ tìm lại gần ở IC {_ic(ic)}, từ mốc {num(mark)} tới mốc cuối, theo A: " + '; '.join(parts) + '.'
+
+
+def reading_coverage(rows: List[Dict]) -> str:
+    if not rows:
+        return ''
+    inside = [r for r in rows if r['in_region']]
+    outside = [r['a'] for r in rows if not r['in_region']]
+    parts = [f"{len(inside)}/{len(rows)} A nằm trong vùng của bộ blueprint ban đầu"]
+    for r in inside:
+        parts.append(f"{r['a']} qua {', '.join(f'`{b}`' for b in r['expressing'])}, blueprint nhỏ nhất có "
+                     f"{num(r['completions'])} cách điền")
+    if outside:
+        parts.append(f"{', '.join(outside)} nằm ngoài vùng")
+    return 'Đọc: ' + '; '.join(parts) + '.'
+
+
+def reading_touch(rows: List[Dict]) -> str:
+    """For each A at the highest IC: runs that touched it and the median iterations per configuration."""
+    if not rows:
+        return ''
+    top = max(r['ic'] for r in rows)
+    parts = []
+    for a in sorted({r['a'] for r in rows}):
+        cells = [f"{config_label(r['config'])} chạm {r['n_touched']}/{r['n_runs']}"
+                 + (f", trung vị {num(round(r['median_iterations']))} vòng" if r['median_iterations'] is not None else '')
+                 for r in rows if r['a'] == a and r['ic'] == top]
+        if cells:
+            parts.append(f"{a}: " + '; '.join(cells))
+    return f"Đọc: ở IC {_ic(top)}, " + ' | '.join(parts) + '.'
+
+
+def reading_walkforward(rows: List[Dict]) -> str:
+    """Sharpe difference per configuration and whether its interval contains 0."""
+    if not rows:
+        return ''
+    parts = []
+    for r in rows:
+        if r['ci_low'] is None or r['ci_high'] is None:
+            parts.append(f"{config_label(r['config'])}: chênh {_fmt(r['difference'])}")
+            continue
+        verdict = 'khoảng chứa 0' if r['ci_low'] <= 0 <= r['ci_high'] else 'khoảng không chứa 0'
+        parts.append(f"{config_label(r['config'])}: chênh {_fmt(r['difference'])} ({_fmt(r['ci_low'])} đến {_fmt(r['ci_high'])}, {verdict}, "
+                     f"ρ = {_fmt(r['rho'])})")
+    return 'Đọc: Sharpe(LLM + MCTS) trừ Sharpe(cấu hình), ' + '; '.join(parts) + '.'
 
 
 def placebo_p_text(view: Optional[Dict]) -> str:
@@ -404,3 +585,16 @@ def reading_placebo(view: Optional[Dict]) -> str:
     if view['real'] is None:
         return text + ' Lần chạy thật chưa có nên p chưa tính được.'
     return text + f" Sharpe lần chạy thật là {_fmt(view['real'])}, p = {view['p']:.3f}."
+
+
+def reading_near_figure(rows: List[Dict]) -> str:
+    """Per A: near recovery at IC 0 and at the highest IC."""
+    if not rows:
+        return ''
+    parts = []
+    for a in sorted({r['a'] for r in rows}):
+        mine = sorted((r for r in rows if r['a'] == a), key=lambda r: r['ic'])
+        first, last = mine[0], mine[-1]
+        parts.append(f"{a}: {first['near_count']}/{first['n_runs']} ở IC {_ic(first['ic'])} → "
+                     f"{last['near_count']}/{last['n_runs']} ở IC {_ic(last['ic'])}")
+    return 'Đọc: ' + '; '.join(parts) + '.'

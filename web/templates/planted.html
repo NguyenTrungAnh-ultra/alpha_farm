@@ -8,71 +8,64 @@
 <div class="card">
   <p><b>{{ t.PLANTED_QUESTION }}</b></p>
   <ol>{% for step in t.PLANTED_METHOD %}<li>{{ step }}</li>{% endfor %}</ol>
-  <p>Tín hiệu cài sẵn, gọi là A:
-    {% if formula_expr %}<code>{{ formula_expr }}</code>{% else %}{{ t.PLANTED_FORMULA_MISSING }}{% endif %}</p>
-  <p>{{ t.PLANTED_FORMULA_WORDS }}</p>
   <p class="small muted">{{ near_definition }}</p>
+</div>
+
+<div class="tablebox scroll">
+{% if formulas %}
+<table>
+  <caption><b>{{ cap.planted_signals.label }} — {{ cap.planted_signals.title }}.</b> {{ t.PLANTED_SIGNALS_RQ }}
+    <span class="reading">{{ readings.signals }}</span></caption>
+  <tr><th>A</th><th class="left">Loại</th><th>Số toán tử</th><th class="left">Biểu thức</th><th title="{{ metric.crowding.measures }}">Độ đông</th><th title="{{ metric.adf_p.measures }}">p ADF</th></tr>
+  {% for f in formulas %}
+  <tr><td>{{ f.name }}</td><td class="left">{{ a_kinds.get(f.kind, f.kind or '–') }}</td><td>{{ f.n_operators }}</td>
+    <td class="expr">{{ f.expression }}</td>
+    <td>{{ '–' if f.crowding_share is none else '%.2f%%' | format(100 * f.crowding_share) }}</td>
+    <td>{{ '–' if f.adf_p is none else '%.2g' | format(f.adf_p) }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p><b>{{ cap.planted_signals.label }} — {{ cap.planted_signals.title }}.</b> {{ t.PLANTED_FORMULAS_PENDING }}</p>
+{% endif %}
+</div>
+
+<div class="tablebox scroll">
+{% if detection %}
+<table>
+  <caption><b>{{ cap.planted_threshold.label }} — {{ cap.planted_threshold.title }}.</b>{{ badge(cap.planted_threshold.role) }} {{ t.PLANTED_THRESHOLD_RQ }}
+    <span class="reading">{{ readings.detection }}</span></caption>
+  <tr><th>A</th><th title="{{ metric.detection_threshold.measures }}">Ngưỡng phát hiện (IC)</th><th title="{{ metric.fisher_p.measures }}">p Fisher tại ngưỡng</th><th class="left" title="{{ metric.near.measures }}">Tìm lại gần theo IC</th></tr>
+  {% for r in detection %}
+  <tr><td>{{ r.a }}</td><td>{{ '%g' | format(r.threshold_ic) if r.threshold_ic is not none else 'chưa xác định' }}</td>
+    <td>{{ r.p_fisher | fmt(3) }}</td><td class="left">{{ r.rates }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p><b>{{ cap.planted_threshold.label }} — {{ cap.planted_threshold.title }}.</b>{{ badge(cap.planted_threshold.role) }} {{ t.PLANTED_PENDING }}</p>
+{% endif %}
 </div>
 
 <div class="tablebox scroll">
 {% if rows %}
 <table>
-  <caption><b>{{ cap.planted_table.label }} — {{ cap.planted_table.title }}.</b>{{ badge(cap.planted_table.role) }} {{ t.PLANTED_TABLE_RQ }}
+  <caption><b>{{ cap.planted_table.label }} — {{ cap.planted_table.title }} ({{ config | config_label }}, ngân sách {{ (budget | num) }}).</b>{{ badge(cap.planted_table.role) }} {{ t.PLANTED_TABLE_RQ }}
     <span class="reading">{{ readings.table }}</span></caption>
-  <tr><th title="{{ metric.target_ic.measures }}">IC mục tiêu</th><th>Số seed</th><th title="{{ metric.ic.measures }}">IC đo được (đoạn tìm)</th><th title="{{ metric.ic.measures }}">IC đo được (đoạn đánh giá)</th><th title="{{ metric.near.measures }}">Tìm lại gần</th><th title="{{ metric.fisher_p.measures }}">p Fisher so với IC 0</th><th title="{{ metric.exact.measures }}">Tìm lại đúng</th><th title="{{ metric.oos_sharpe_6m.measures }}">Sharpe ngoài mẫu (TB ± độ lệch)</th></tr>
+  <tr><th>A</th><th title="{{ metric.target_ic.measures }}">IC mục tiêu</th><th title="{{ metric.near.measures }}">Tìm lại gần</th><th>Tỷ lệ</th><th>Wilson 95%</th><th title="{{ metric.fisher_p.measures }}">p Fisher so với IC 0</th></tr>
   {% for r in rows %}
-  <tr><td>{{ '%g' | format(r.strength) }}</td><td>{{ r.n_runs }}</td><td>{{ r.ic_search | fmt(3) }}</td><td>{{ r.ic_eval | fmt(3) }}</td>
-    <td>{{ r.near_count }}/{{ r.n_runs }}</td><td>{{ '—' if r.p_fisher is none else r.p_fisher | fmt(3) }}</td><td>{{ r.exact_count }}/{{ r.n_runs }}</td>
-    <td>{{ r.oos_sharpe_mean | fmt(2) }} ± {{ r.oos_sharpe_std | fmt(2) }}</td></tr>
+  <tr><td>{{ r.a }}</td><td>{{ '%g' | format(r.ic) }}</td><td>{{ r.near_count }}/{{ r.n_runs }}</td><td>{{ r.rate | fmt(2) }}</td>
+    <td>{{ r.low | fmt(2) }} – {{ r.high | fmt(2) }}</td><td>{{ '—' if r.p_fisher is none else r.p_fisher | fmt(3) }}</td></tr>
   {% endfor %}
 </table>
 {% else %}
-<p><b>{{ cap.planted_table.label }} — {{ cap.planted_table.title }}.</b>{{ badge(cap.planted_table.role) }} chưa có. {{ t.PLANTED_MISSING }}</p>
+<p><b>{{ cap.planted_table.label }} — {{ cap.planted_table.title }}.</b>{{ badge(cap.planted_table.role) }} {{ t.PLANTED_PENDING }}</p>
 {% endif %}
 </div>
 
 <figure>
-  {% if rows %}<div class="chartbox"><canvas id="c-near"></canvas></div>{% endif %}
-  <figcaption><b>{{ cap.planted_near.label }} — {{ cap.planted_near.title }}.</b>{{ badge(cap.planted_near.role) }} {{ t.PLANTED_NEAR_RQ }} Đường nét đứt là khoảng tin cậy Wilson 95%.
-    {% if rows %}<span class="reading">{{ readings.near }}</span>{% else %}chưa có{% endif %}</figcaption>
+  {% if rows %}<div class="panels">{% for name in chart %}<div class="chartbox"><canvas id="c-near-{{ name }}"></canvas></div>{% endfor %}</div>{% endif %}
+  <figcaption><b>{{ cap.planted_near.label }} — {{ cap.planted_near.title }}.</b>{{ badge(cap.planted_near.role) }} {{ t.PLANTED_NEAR_RQ }}
+    {% if rows %}<span class="reading">{{ readings.figure }}</span>{% else %}{{ t.PLANTED_PENDING }}{% endif %}</figcaption>
 </figure>
-
-<figure>
-  {% if seed_rows %}<div class="chartbox"><canvas id="c-corr"></canvas></div>{% endif %}
-  <figcaption><b>{{ cap.planted_corr.label }} — {{ cap.planted_corr.title }}.</b>{{ badge(cap.planted_corr.role) }} {{ t.PLANTED_CORR_RQ }}
-    {% if seed_rows %}<span class="reading">{{ readings.corr }}</span>{% else %}chưa có{% endif %}</figcaption>
-</figure>
-
-<div class="tablebox scroll">
-{% if positions %}
-<table>
-  <caption><b>{{ cap.planted_positions.label }} — {{ cap.planted_positions.title }}.</b>{{ badge(cap.planted_positions.role) }} {{ t.PLANTED_POSITIONS_RQ }} <span class="reading">{{ readings.positions }}</span></caption>
-  <tr><th title="{{ metric.target_ic.measures }}">IC mục tiêu</th><th>Số seed</th><th title="{{ metric.pos_corr.measures }}">Trung bình</th><th>Nhỏ nhất</th><th>Lớn nhất</th></tr>
-  {% for r in positions %}
-  <tr><td>{{ '%g' | format(r.strength) }}{% if r.strength == 0 %} (nhiễu){% endif %}</td><td>{{ r.n }}</td><td>{{ r.mean | fmt(3) }}</td><td>{{ r.min | fmt(3) }}</td><td>{{ r.max | fmt(3) }}</td></tr>
-  {% endfor %}
-</table>
-{% else %}
-<p><b>{{ cap.planted_positions.label }} — {{ cap.planted_positions.title }}.</b>{{ badge(cap.planted_positions.role) }} chưa có</p>
-{% endif %}
-</div>
-
-<div class="tablebox scroll">
-{% if seed_rows %}
-<table>
-  <caption><b>{{ cap.planted_seeds.label }} — {{ cap.planted_seeds.title }}.</b>{{ badge(cap.planted_seeds.role) }} {{ t.PLANTED_SEEDS_RQ }}</caption>
-  <tr><th title="{{ metric.target_ic.measures }}">IC mục tiêu</th><th>Seed</th><th title="{{ metric.top5_corr.measures }}">Tương quan cao nhất trong top-5</th><th title="{{ metric.near.measures }}">Gần</th><th title="{{ metric.exact.measures }}">Đúng</th><th title="{{ metric.oos_sharpe_6m.measures }}">Sharpe ngoài mẫu</th>
-    <th class="left">Ứng viên gần A nhất (mọi ứng viên)</th><th title="{{ metric.closest_corr.measures }}">Tương quan</th><th title="{{ metric.val_rank.measures }}">Hạng kiểm định</th></tr>
-  {% for r in seed_rows %}
-  <tr><td>{{ '%g' | format(r.strength) }}</td><td>{{ r.seed }}</td><td>{{ r.best_corr | fmt(3) }}</td>
-    <td>{{ 'có' if r.near else '–' }}</td><td>{{ 'có' if r.exact else '–' }}</td><td>{{ r.oos_sharpe | fmt(2) }}</td>
-    <td class="expr">{{ r.closest_expr }}</td><td>{{ r.closest_corr | fmt(3) }}</td><td>{{ r.closest_val_rank | fmt(0) }}</td></tr>
-  {% endfor %}
-</table>
-{% else %}
-<p><b>{{ cap.planted_seeds.label }} — {{ cap.planted_seeds.title }}.</b>{{ badge(cap.planted_seeds.role) }} chưa có</p>
-{% endif %}
-</div>
 
 {{ metric_list(metric_rows) }}
 <p><a href="/results/planted/illustration">{{ t.ILLUSTRATION_LINK }}</a></p>
@@ -81,8 +74,9 @@
 <script>
 window.addEventListener('load', function () {
   var d = JSON.parse(document.getElementById('chart-data').textContent);
-  intervalChart('c-near', d.near, 'IC mục tiêu', 'tỷ lệ tìm lại gần');
-  dotChart('c-corr', d.corr, d.threshold, 'IC mục tiêu', 'tương quan hạng tuyệt đối với A', 'ngưỡng ' + d.threshold);
+  Object.keys(d).forEach(function (name) {
+    intervalChart('c-near-' + name, d[name], 'IC mục tiêu (' + name + ')', 'tỷ lệ tìm lại gần');
+  });
 });
 </script>
 {% endblock %}

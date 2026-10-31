@@ -1,5 +1,5 @@
 """
-Read-only view of the thesis planted-signal result folder (`<results>/THESIS_PLANTED_DIR`).
+Read-only view of the planted-signal result folder of the RQ1 system (`<results>/THESIS_PLANTED_DIR`).
 
 Nothing here writes: files are opened for reading only, and missing or half-written files give empty
 results. Only the one folder named by THESIS_PLANTED_DIR is ever read.
@@ -8,47 +8,42 @@ results. Only the one folder named by THESIS_PLANTED_DIR is ever read.
 import json
 import math
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-import numpy as np
 import pandas as pd
-from scipy.stats import fisher_exact
 
-from strategy_workflows.PlantedSignal import NEAR_CORRELATION, Segments
-from strategy_workflows.RunPlantedSignal import RUN_KEY, summarize_runs
+from strategy_workflows.PlantedSignal import Segments
+from strategy_workflows.RunRQ1 import DETECTION_BUDGET, DETECTION_CONFIG
+from strategy_workflows.Statistics import fisher_p_greater, wilson_interval
 
-THESIS_PLANTED_DIR = 'planted_window1'
-FORMULA_FILE = 'planted_formula.json'
-POSITIONS_FILE = 'positions_vs_a.json'
-BOOL_COLUMNS = ('exact', 'near')
-NUMERIC_COLUMNS = ('strength', 'seed', 'ic_search', 'ic_eval', 'closest_corr', 'closest_val_rank', 'best_corr',
-                   'oos_sharpe', 'elapsed_s')
-SEED_TABLE_COLUMNS = ('strength', 'seed', 'best_corr', 'exact', 'near', 'oos_sharpe', 'closest_expr', 'closest_corr',
-                      'closest_val_rank')
-# Position-comparison records keep these keys only.
-POSITION_KEYS = ('strength', 'seed', 'best_pos_corr', 'best_agree_active', 'closest_corr', 'a_flat_share')
+THESIS_PLANTED_DIR = 'planted_rq1'
+FORMULAS_FILE = 'planted_formulas.json'
+DETECTION_FILE = 'detection_thresholds.csv'
+SUMMARY_FILE = 'summary.csv'
+RUNS_FILE = 'runs.csv'
+A_NAMES = ('A1', 'A2', 'A3', 'A4')
+A_KINDS = {'classical': 'kinh điển', 'random': 'lạ (sinh ngẫu nhiên)'}
 
 
 def thesis_dir(root: str) -> str:
     return os.path.join(root, THESIS_PLANTED_DIR)
 
 
-def wilson_interval(successes: int, n: int, z: float = 1.96) -> Tuple[float, float]:
-    """Wilson score interval of a binomial proportion (95% by default); (nan, nan) when n == 0."""
-    if n <= 0:
-        return float('nan'), float('nan')
-    p = successes / n
-    denom = 1.0 + z * z / n
-    centre = (p + z * z / (2 * n)) / denom
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
-    return max(0.0, centre - half), min(1.0, centre + half)
+def read_json(path: str):
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
 
 
-def fisher_p_greater(near: int, n: int, base_near: int, base_n: int) -> float:
-    """One-sided Fisher exact p: chance of at least `near` of `n` near recoveries if the level's rate equalled the base rate."""
-    if n <= 0 or base_n <= 0:
-        return float('nan')
-    return float(fisher_exact([[near, n - near], [base_near, base_n - base_near]], alternative='greater')[1])
+def read_table(path: str, required: tuple = ()) -> pd.DataFrame:
+    """A CSV as written by the RQ1 steps; an empty frame when it is missing, unreadable, empty or lacks `required`."""
+    try:
+        frame = pd.read_csv(path, on_bad_lines='skip')
+    except (OSError, ValueError, pd.errors.ParserError, pd.errors.EmptyDataError):
+        return pd.DataFrame()
+    return frame if not frame.empty and set(required) <= set(frame.columns) else pd.DataFrame()
 
 
 def read_segments(folder: str) -> Segments:
@@ -60,110 +55,98 @@ def read_segments(folder: str) -> Segments:
         return Segments()
 
 
-def read_json(path: str):
+def _count_operators(node) -> int:
+    """Operators in a stored formula tree: nodes with children."""
+    if not isinstance(node, dict):
+        return 0
+    children = node.get('children') or []
+    return (1 if children else 0) + sum(_count_operators(c) for c in children)
+
+
+def _number(value) -> Optional[float]:
     try:
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (OSError, ValueError):
+        number = float(value)
+    except (TypeError, ValueError):
         return None
+    return number if math.isfinite(number) else None
 
 
-def read_formula_expr(folder: str) -> Optional[str]:
-    """Expression text of the planted formula; None when the file is missing or unreadable."""
-    data = read_json(os.path.join(folder, FORMULA_FILE))
-    return str(data['expression']) if isinstance(data, dict) and 'expression' in data else None
+def read_formulas(folder: str) -> List[Dict]:
+    """The planted signals A: name, expression, type, operator count, ADF p and crowding share; empty when missing."""
+    data = read_json(os.path.join(folder, FORMULAS_FILE))
+    if not isinstance(data, dict):
+        return []
+    rows = []
+    for name in sorted(data):
+        item = data[name]
+        if not isinstance(item, dict) or 'expression' not in item:
+            continue
+        selection = item.get('selection') if isinstance(item.get('selection'), dict) else {}
+        rows.append({'name': name, 'expression': str(item['expression']), 'kind': selection.get('kind'),
+                     'n_operators': _count_operators(item.get('tree')), 'z_window': item.get('z_window'),
+                     'adf_p': _number(selection.get('adf_p')), 'crowding_share': _number(selection.get('crowding_share'))})
+    return rows
+
+
+def read_detection(folder: str) -> List[Dict]:
+    """
+    Detection thresholds of the primary configuration per A (detection_thresholds.csv): `threshold_ic` and
+    `p_fisher` are None when no level passed, `rates` is the text of near counts per IC.
+    """
+    frame = read_table(os.path.join(folder, DETECTION_FILE), ('a', 'config', 'budget', 'threshold_ic', 'p_fisher'))
+    rows = []
+    for record in frame.to_dict('records'):
+        rows.append({'a': str(record['a']), 'config': record['config'], 'budget': int(record['budget']),
+                     'threshold_ic': _number(record['threshold_ic']), 'p_fisher': _number(record['p_fisher']),
+                     'rates': str(record.get('rates', '')) if pd.notna(record.get('rates')) else ''})
+    return sorted(rows, key=lambda r: r['a'])
+
+
+SUMMARY_COLUMNS = ('config', 'ic', 'a', 'budget', 'n_runs', 'near_count')
+
+
+def read_summary(folder: str) -> pd.DataFrame:
+    """summary.csv with numeric counts; rows without a count dropped; empty frame when unreadable."""
+    frame = read_table(os.path.join(folder, SUMMARY_FILE), SUMMARY_COLUMNS)
+    if frame.empty:
+        return frame
+    for column in ('ic', 'budget', 'n_runs', 'near_count'):
+        frame[column] = pd.to_numeric(frame[column], errors='coerce')
+    return frame.dropna(subset=['ic', 'budget', 'n_runs', 'near_count']).reset_index(drop=True)
+
+
+def with_wilson(near: int, n: int) -> Dict:
+    """Near-recovery count, rate and the 95% Wilson interval."""
+    low, high = wilson_interval(near, n)
+    return {'near_count': near, 'n_runs': n, 'rate': near / n if n else float('nan'), 'low': low, 'high': high}
+
+
+def near_rows(summary: pd.DataFrame, config: str = DETECTION_CONFIG, budget: int = DETECTION_BUDGET) -> List[Dict]:
+    """Per (A, target IC) of one configuration at one budget: near counts with Wilson intervals, ordered A then IC."""
+    if summary.empty:
+        return []
+    part = summary[(summary['config'] == config) & (summary['budget'] == budget)].sort_values(['a', 'ic'])
+    return [dict(with_wilson(int(r.near_count), int(r.n_runs)), a=str(r.a), ic=float(r.ic)) for r in part.itertuples()]
+
+
+def near_chart(rows: List[Dict]) -> Dict[str, List[List[Optional[float]]]]:
+    """{A: [[IC, rate, low, high]]}; non-finite values become None."""
+    def clean(v):
+        return None if v is None or not math.isfinite(v) else float(v)
+    chart: Dict[str, List[List[Optional[float]]]] = {}
+    for r in rows:
+        chart.setdefault(r['a'], []).append([clean(r['ic']), clean(r['rate']), clean(r['low']), clean(r['high'])])
+    return chart
 
 
 def read_runs(folder: str) -> pd.DataFrame:
-    """
-    runs.csv cleaned for aggregation: numeric columns coerced, exact/near as bool, rows without a
-    key or without the last column (a half-written row) dropped, RUN_KEY columns filled when absent.
-    """
-    path = os.path.join(folder, 'runs.csv')
-    if not os.path.exists(path):
-        return pd.DataFrame()
-    try:
-        runs = pd.read_csv(path, on_bad_lines='skip')
-    except (OSError, ValueError, pd.errors.ParserError, pd.errors.EmptyDataError):
-        return pd.DataFrame()
-    if runs.empty or not {'strength', 'seed'} <= set(runs.columns):
-        return pd.DataFrame()
-    if 'reward_mode' not in runs.columns:
-        runs['reward_mode'] = '?'
-    if 'iterations' not in runs.columns:
-        runs['iterations'] = np.nan
-    for column in NUMERIC_COLUMNS:
-        if column in runs.columns:
-            runs[column] = pd.to_numeric(runs[column], errors='coerce')
-    for column in BOOL_COLUMNS:
-        if column in runs.columns:
-            runs[column] = runs[column].map(lambda v: str(v).strip().lower() == 'true')
-    runs = runs.dropna(subset=['strength', 'seed', 'reward_mode'])
-    if 'elapsed_s' in runs.columns:
-        runs = runs.dropna(subset=['elapsed_s'])
-    return runs.reset_index(drop=True)
-
-
-def strength_table(runs: pd.DataFrame) -> List[Dict]:
-    """
-    One dict per target IC from `summarize_runs`, plus the 95% Wilson interval of the near-recovery rate and
-    `p_fisher`: one-sided Fisher p against the IC 0 row (None for IC 0 itself, NaN when there is no IC 0 row).
-    """
-    if runs.empty:
-        return []
-    rows = []
-    for row in summarize_runs(runs).sort_values('strength').to_dict('records'):
-        n, near = int(row['n_runs']), int(row['near_count'])
-        row['n_runs'], row['near_count'], row['exact_count'] = n, near, int(row['exact_count'])
-        row['near_low'], row['near_high'] = wilson_interval(near, n)
-        rows.append(row)
-    base = next((r for r in rows if r['strength'] == 0.0), None)
-    for row in rows:
-        if row['strength'] == 0.0:
-            row['p_fisher'] = None
-        elif base is None:
-            row['p_fisher'] = float('nan')
-        else:
-            row['p_fisher'] = fisher_p_greater(row['near_count'], row['n_runs'], base['near_count'], base['n_runs'])
-    return rows
-
-
-def seed_table(runs: pd.DataFrame) -> List[Dict]:
-    """One dict per run (the last of each key), ordered by target IC then seed."""
-    if runs.empty:
-        return []
-    runs = runs.drop_duplicates(subset=RUN_KEY, keep='last').sort_values(['strength', 'seed'])
-    rows = []
-    for _, row in runs.iterrows():
-        item = {c: row[c] for c in SEED_TABLE_COLUMNS if c in runs.columns}
-        item['seed'] = int(item['seed'])
-        rows.append(item)
-    return rows
-
-
-def read_positions(folder: str) -> List[Dict]:
-    """Records of the position comparison with A; empty when the file is missing or malformed."""
-    data = read_json(os.path.join(folder, POSITIONS_FILE))
-    if not isinstance(data, list):
-        return []
-    return [{k: record.get(k) for k in POSITION_KEYS} for record in data
-            if isinstance(record, dict) and {'strength', 'best_pos_corr'} <= set(record)]
-
-
-def position_table(records: List[Dict]) -> List[Dict]:
-    """Per target IC: number of seeds and mean / min / max of the best top-5 position correlation with A."""
-    if not records:
-        return []
-    frame = pd.DataFrame(records)
-    frame['best_pos_corr'] = pd.to_numeric(frame['best_pos_corr'], errors='coerce')
-    rows = []
-    for strength, sub in frame.groupby('strength'):
-        values = sub['best_pos_corr'].dropna()
-        rows.append({'strength': float(strength), 'n': int(len(values)),
-                     'mean': float(values.mean()) if len(values) else float('nan'),
-                     'min': float(values.min()) if len(values) else float('nan'),
-                     'max': float(values.max()) if len(values) else float('nan')})
-    return sorted(rows, key=lambda r: r['strength'])
+    """Cells of runs.csv (config, ic, formula, seed); empty frame when missing."""
+    frame = read_table(os.path.join(folder, RUNS_FILE), ('ic', 'seed'))
+    if frame.empty:
+        return frame
+    for column in ('ic', 'seed'):
+        frame[column] = pd.to_numeric(frame[column], errors='coerce')
+    return frame.dropna(subset=['ic', 'seed']).reset_index(drop=True)
 
 
 def present_values(runs: pd.DataFrame, column: str) -> List[float]:
@@ -173,24 +156,19 @@ def present_values(runs: pd.DataFrame, column: str) -> List[float]:
     return sorted(float(v) for v in pd.to_numeric(runs[column], errors='coerce').dropna().unique())
 
 
-def closest_points(seed_rows: List[Dict]) -> List[Dict]:
-    """[{x: target IC, y: closest_corr, top5}] per seed; top5 = the closest candidate's validation rank is <= 5."""
-    points = []
-    for r in seed_rows:
-        if 'closest_corr' not in r:
-            continue
-        rank = r.get('closest_val_rank')
-        points.append({'x': float(r['strength']), 'y': None if pd.isna(r['closest_corr']) else float(r['closest_corr']),
-                       'top5': bool(rank is not None and not pd.isna(rank) and rank <= 5)})
-    return points
-
-
-def near_chart_points(rows: List[Dict]) -> List[List[Optional[float]]]:
-    """[target IC, rate, low, high] per row; non-finite values become None."""
-    def clean(v):
-        return None if v is None or (isinstance(v, float) and not math.isfinite(v)) else float(v)
-    return [[clean(r['strength']), clean(r['near_rate']), clean(r['near_low']), clean(r['near_high'])] for r in rows]
-
-
-def near_threshold() -> float:
-    return NEAR_CORRELATION
+def near_rows_with_p(rows: List[Dict]) -> List[Dict]:
+    """
+    Adds `p_fisher` to every row: the one-sided Fisher p against the IC 0 row of the same A (None for IC 0
+    itself, NaN when the A has no IC 0 row).
+    """
+    base = {r['a']: r for r in rows if r['ic'] == 0.0}
+    out = []
+    for r in rows:
+        if r['ic'] == 0.0:
+            p = None
+        elif r['a'] not in base:
+            p = float('nan')
+        else:
+            p = fisher_p_greater(r['near_count'], r['n_runs'], base[r['a']]['near_count'], base[r['a']]['n_runs'])
+        out.append(dict(r, p_fisher=p))
+    return out

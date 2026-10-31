@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge, primary_box, metric_list %}
+{% block title %}Vai trò của LLM{% endblock %}
+{% block content %}
+<h1>{{ t.RQ1_TITLE }}</h1>
+{{ primary_box(primary, primary_value) }}
+
+<div class="card">
+  <p><b>{{ t.RQ1_QUESTION }}</b></p>
+  <ol>{% for line in t.RQ1_DESIGN %}<li>{{ line }}</li>{% endfor %}</ol>
+</div>
+
+<div class="tablebox scroll">
+{% if primary_rows %}
+<table>
+  <caption><b>{{ cap.rq1_primary.label }} — {{ cap.rq1_primary.title }}.</b>{{ badge(cap.rq1_primary.role) }} {{ t.RQ1_PRIMARY_RQ }}
+    <span class="reading">{{ readings.primary }}</span></caption>
+  <tr><th class="left">Loại A</th><th>Ngân sách</th><th title="{{ metric.near.measures }}">LLM + MCTS tìm lại gần</th><th title="{{ metric.near.measures }}">MCTS không LLM tìm lại gần</th><th>p Fisher hai phía</th><th title="{{ metric.holm_p.measures }}">p chỉnh Holm</th></tr>
+  {% for r in primary_rows %}
+  <tr><td class="left">{{ 'kinh điển (A1, A2)' if r.a_type == 'classical' else 'lạ (A3, A4)' if r.a_type == 'odd' else r.a_type }}</td><td>{{ (r.budget | num) }}{% if r.budget == mark %} (trước phản hồi){% endif %}</td>
+    <td>{{ r.near_llm_mcts }}/{{ r.n_llm_mcts }}</td><td>{{ r.near_mcts_only }}/{{ r.n_mcts_only }}</td>
+    <td>{{ r.p_two_sided | fmt(3) }}</td><td>{{ r.p_holm | fmt(3) }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p><b>{{ cap.rq1_primary.label }} — {{ cap.rq1_primary.title }}.</b>{{ badge(cap.rq1_primary.role) }} {{ t.RQ1_PRIMARY_PENDING }}</p>
+{% endif %}
+</div>
+
+<figure>
+  {% if series %}<div class="panels">{% for name in series %}<div class="chartbox"><canvas id="c-budget-{{ name }}"></canvas></div>{% endfor %}</div>{% endif %}
+  <figcaption><b>{{ cap.rq1_budget.label }} — {{ cap.rq1_budget.title }}.</b>{{ badge(cap.rq1_budget.role) }} {{ budget_rq }}
+    {% if series %}<span class="reading">{{ readings.budget }}</span>{% else %}{{ t.RQ1_PENDING }}{% endif %}</figcaption>
+</figure>
+
+<div class="tablebox scroll">
+{% if coverage %}
+<table>
+  <caption><b>{{ cap.rq1_coverage.label }} — {{ cap.rq1_coverage.title }}.</b>{{ badge(cap.rq1_coverage.role) }} {{ t.RQ1_COVERAGE_RQ }}
+    <span class="reading">{{ readings.coverage | inline_code }}</span></caption>
+  <tr><th>A</th><th class="left">Biểu thức</th><th title="{{ metric.in_region.measures }}">Trong vùng</th><th class="left">Blueprint điền ra được A</th><th title="{{ metric.completions.measures }}">Số cách điền của blueprint nhỏ nhất</th></tr>
+  {% for r in coverage %}
+  <tr><td>{{ r.a }}</td><td class="expr">{{ expressions.get(r.a, '–') }}</td><td>{{ 'trong' if r.in_region else 'ngoài' }}</td>
+    <td class="left">{{ r.expressing | join(', ') if r.expressing else '–' }}</td>
+    <td>{{ (r.completions | num) if r.completions is not none else '–' }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p><b>{{ cap.rq1_coverage.label }} — {{ cap.rq1_coverage.title }}.</b>{{ badge(cap.rq1_coverage.role) }} {{ t.RQ1_COVERAGE_PENDING }}</p>
+{% endif %}
+</div>
+
+<div class="tablebox scroll">
+{% if touch %}
+<table>
+  <caption><b>{{ cap.rq1_touch.label }} — {{ cap.rq1_touch.title }}.</b>{{ badge(cap.rq1_touch.role) }} {{ t.RQ1_TOUCH_RQ }}
+    <span class="reading">{{ readings.touch }}</span></caption>
+  <tr><th>A</th><th title="{{ metric.target_ic.measures }}">IC mục tiêu</th><th class="left">Cấu hình</th><th title="{{ metric.first_touch.measures }}">Đã chạm</th><th title="{{ metric.first_touch.measures }}">Trung vị số vòng</th><th title="{{ metric.first_touch.measures }}">Trung vị thời gian (giây)</th></tr>
+  {% for r in touch %}
+  <tr><td>{{ r.a }}</td><td>{{ '%g' | format(r.ic) }}</td><td class="left">{{ r.config | config_label }}</td><td>{{ r.n_touched }}/{{ r.n_runs }}</td>
+    <td>{{ r.median_iterations | fmt(0) }}</td><td>{{ r.median_wall_s | fmt(0) }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p><b>{{ cap.rq1_touch.label }} — {{ cap.rq1_touch.title }}.</b>{{ badge(cap.rq1_touch.role) }} {{ t.RQ1_PENDING }}</p>
+{% endif %}
+</div>
+
+<div class="tablebox scroll">
+{% if comparison %}
+<table>
+  <caption><b>{{ cap.rq1_walkforward.label }} — {{ cap.rq1_walkforward.title }}.</b>{{ badge(cap.rq1_walkforward.role) }} {{ t.RQ1_WALKFORWARD_RQ }}
+    <span class="reading">{{ readings.walkforward }}</span></caption>
+  <tr><th class="left">Cấu hình</th><th>Số ngày chung</th><th title="{{ metric.wf_sharpe.measures }}">Sharpe cấu hình</th><th title="{{ metric.wf_sharpe.measures }}">Sharpe LLM + MCTS (cùng ngày)</th><th title="{{ metric.wf_diff.measures }}">Chênh</th><th title="{{ metric.wf_diff.measures }}">Khoảng tin cậy 95%</th><th title="{{ metric.rho.measures }}">ρ</th></tr>
+  {% for r in comparison %}
+  <tr><td class="left">{{ r.config | config_label }}</td><td>{{ r.n_days }}</td><td>{{ r.sharpe_config | fmt(2) }}</td><td>{{ r.sharpe_reference | fmt(2) }}</td>
+    <td>{{ r.difference | fmt(2) }}</td><td>{{ r.ci_low | fmt(2) }} – {{ r.ci_high | fmt(2) }}</td><td>{{ r.rho | fmt(2) }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p><b>{{ cap.rq1_walkforward.label }} — {{ cap.rq1_walkforward.title }}.</b>{{ badge(cap.rq1_walkforward.role) }} {{ t.RQ1_WALKFORWARD_PENDING }}</p>
+{% endif %}
+</div>
+
+{{ metric_list(metric_rows) }}
+
+<script type="application/json" id="chart-data">{{ chart | tojson }}</script>
+<script>
+window.addEventListener('load', function () {
+  var d = JSON.parse(document.getElementById('chart-data').textContent);
+  Object.keys(d.series).forEach(function (name) {
+    budgetChart('c-budget-' + name, name, d.series[name], d.mark, d.labels);
+  });
+});
+</script>
+{% endblock %}

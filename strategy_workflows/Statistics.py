@@ -1,22 +1,55 @@
 """
 Statistics
 ==========
-Small statistical tools of the RQ1 comparison.
+Small statistical tools of the RQ1 comparison and of the thesis web.
 
+    wilson_interval              Wilson score interval of a binomial proportion
+    fisher_p_greater             one-sided Fisher exact p of a near-recovery count against a base count
+    detection_threshold          lowest target IC > 0 whose one-sided Fisher p against IC 0 is below FISHER_ALPHA
     holm_adjust                  Holm step-down adjustment of a family of p-values
     stationary_bootstrap_indices Politis-Romano (1994) stationary bootstrap resample indices
     paired_sharpe_bootstrap      confidence interval of the difference of two annualised Sharpe ratios on the same days
 """
 
-from typing import Dict, List, Sequence
+import math
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
+from scipy.stats import fisher_exact
 
 TRADING_DAYS_PER_YEAR = 252
 BOOTSTRAP_MEAN_BLOCK = 10
 BOOTSTRAP_RESAMPLES = 10_000
 BOOTSTRAP_SEED = 20261031
 _CHUNK = 500
+FISHER_ALPHA = 0.05
+
+
+def wilson_interval(successes: int, n: int, z: float = 1.96) -> Tuple[float, float]:
+    """Wilson score interval of a binomial proportion (95% by default); (nan, nan) when n == 0."""
+    if n <= 0:
+        return float('nan'), float('nan')
+    p = successes / n
+    denom = 1.0 + z * z / n
+    centre = (p + z * z / (2 * n)) / denom
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+    return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def fisher_p_greater(near: int, n: int, base_near: int, base_n: int) -> float:
+    """One-sided Fisher exact p: chance of at least `near` of `n` near recoveries if the level's rate equalled the base rate."""
+    if n <= 0 or base_n <= 0:
+        return float('nan')
+    return float(fisher_exact([[near, n - near], [base_near, base_n - base_near]], alternative='greater')[1])
+
+
+def detection_threshold(rows: List[Dict]) -> Optional[Dict]:
+    """
+    Row of the lowest target IC > 0 whose one-sided Fisher p against IC 0 is below FISHER_ALPHA; None if none.
+    Rows are dicts with `strength` (target IC, ascending) and `p_fisher` (None for IC 0).
+    """
+    return next((r for r in rows if r['strength'] > 0 and r.get('p_fisher') is not None
+                 and math.isfinite(r['p_fisher']) and r['p_fisher'] < FISHER_ALPHA), None)
 
 
 def holm_adjust(p_values: Sequence[float]) -> List[float]:

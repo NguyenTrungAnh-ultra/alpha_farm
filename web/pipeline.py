@@ -71,7 +71,7 @@ NODES: List[Dict] = [
          'Model qwen3.5 4B, Ollama chạy local.',
          '20 blueprint, mỗi cái là một khung công thức có các ô `?`.',
          'Prompt `anon_shapes` giấu tên thị trường và ghi luật chiều; temperature mặc định 0.3, chọn qua các lô thử 5 blueprint.',
-         'Bộ hiện tại: `results/blueprint_sets/20261029_212813/` (0 chép ví dụ, 20 khung khác nhau, ô `?` nào cũng điền được trong độ sâu 4).',
+         'Bộ cho RQ1: `results/blueprint_sets/20261031_rq1/` (0 chép ví dụ, 20 khung khác nhau, ô `?` nào cũng điền được trong độ sâu 4).',
          'Blueprint bị loại nếu chép ví dụ trong prompt, trùng khung với blueprint khác, hoặc không có `?`.',
          'Mã: `utilities/Prompts.py`, `strategy_workflows/GenerateStrategies.py`.']},
     {'id': 'freeze', 'label': 'Đóng băng', 'group': 'prepare', 'status': 'todo', 'x': 250, 'y': 40,
@@ -80,9 +80,9 @@ NODES: List[Dict] = [
          'git commit và dấu vân tay dữ liệu vào `results/walkforward/frozen.json`.',
          'Chạy dữ liệu thật đúng một lần, không đổi gì sau khi thấy kết quả.']},
     {'id': 'mcts', 'label': 'a. MCTS trên đoạn học', 'group': 'window', 'status': 'done', 'x': 20, 'y': 200,
-     'note': 'mã xong, bài cài tín hiệu đang dùng',
+     'note': 'mã xong',
      'details': [
-         'MCTS điền các ô `?`, 5.000 vòng lặp mỗi blueprint (100.000 lần đánh giá).',
+         'MCTS điền các ô `?`: giai đoạn A trên bộ blueprint đóng băng (50.000 vòng), vòng phản hồi của LLM, giai đoạn B trên blueprint mới (50.000 vòng); tổng 100.000 lần đánh giá.',
          'UCT trên reward lớn nhất. Reward sharpe = 0.6·clip(Sharpe/3) + 0.4·min(|IC|/0.15, 1), IC lấy trên z-score.',
          'Đoạn học: từ 2018-08 đến 12 tháng trước đoạn đánh giá.',
          'Mã: `strategy_workflows/MCTSEngine.py`.']},
@@ -112,19 +112,20 @@ NODES: List[Dict] = [
          '5 seed cho mỗi cấu hình.']},
     {'id': 'hmm', 'label': 'HMM mô tả rủi ro', 'group': 'result', 'status': 'reference', 'x': 480, 'y': 370,
      'details': ['Chỉ mô tả rủi ro của chiến lược cuối cùng (đường bootstrap), không loại gì.']},
-    {'id': 'rq2_planted', 'label': 'RQ2: bài cài tín hiệu (độ nhạy)', 'group': 'compare', 'status': 'done',
-     'x': 20, 'y': 520, 'note': 'cửa sổ 1: IC 0.1 tìm lại 6/10', 'link': '/results/planted',
+    {'id': 'rq2_planted', 'label': 'RQ2: bài cài tín hiệu (độ nhạy)', 'group': 'compare', 'status': 'todo',
+     'x': 20, 'y': 520, 'link': '/results/planted',
      'details': [
-         'Cài công thức A vào dữ liệu placebo với IC 0 / 0.05 / 0.1, chia đoạn như cửa sổ 1, bộ blueprint đã đóng băng, reward `sharpe`.',
-         'Kết quả (`results/planted_window1/`): tìm lại gần 0/5 / 1/5 / 6/10 (IC 0.1 có 10 seed); Sharpe ngoài mẫu −0.90 / −0.67 / −0.10.']},
+         'Cài bốn tín hiệu A (hai kinh điển, hai lạ) vào dữ liệu xáo với IC mục tiêu 0 / 0.05 / 0.1, chia đoạn như cửa sổ 1, bộ blueprint đã đóng băng, reward `sharpe`.',
+         'Ngưỡng phát hiện của LLM + MCTS theo từng A: mức IC thấp nhất có tỷ lệ tìm lại gần cao hơn IC 0 (Fisher một phía).']},
     {'id': 'rq1', 'label': 'RQ1: vai trò của LLM', 'group': 'compare', 'status': 'todo', 'x': 250, 'y': 520,
+     'link': '/results/rq1',
      'details': [
-         'Cùng quy trình, thay ① bằng: MCTS không LLM (gốc là một `?` rỗng), LLM không tìm kiếm, và tìm ngẫu nhiên.',
-         'Cùng ngân sách 100.000 lần đánh giá.']},
+         'Cùng quy trình, thay ① bằng: MCTS không LLM (gốc là một `?` trần), LLM không tìm kiếm, và tìm ngẫu nhiên.',
+         'Cùng ngân sách 100.000 lần đánh giá; phép so chính trên bài cài tín hiệu: LLM + MCTS với MCTS không LLM, Fisher hai phía chỉnh Holm.']},
     {'id': 'rq2_placebo', 'label': 'RQ2: placebo (19 bộ dữ liệu xáo)', 'group': 'compare', 'status': 'todo',
      'x': 480, 'y': 520,
      'details': [
-         'Lặp lại toàn bộ walk-forward trên 19 bộ dữ liệu có lợi suất bị xáo trong từng đoạn.',
+         'Lặp lại toàn bộ walk-forward của hệ thống LLM + MCTS có phản hồi trên 19 bộ dữ liệu có lợi suất bị xáo trong từng đoạn.',
          'p = tỉ lệ lần chạy có Sharpe ≥ lần chạy thật; giá trị nhỏ nhất có thể là 0.05.']},
 ]
 

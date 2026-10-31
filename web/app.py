@@ -1,8 +1,8 @@
 """
 FastAPI app of the read-only thesis web: one page per chapter, plus a machine-resources page.
 
-The app only reads the thesis result folder (planted.THESIS_PLANTED_DIR) and the frozen blueprint set
-under the results root; it never writes there. Prose lives in web/thesis.py, the diagram in web/pipeline.py.
+The app only reads the RQ1 planted-signal folder (planted.THESIS_PLANTED_DIR), the walk-forward folders of the
+LLM + MCTS system and the frozen blueprint set under the results root; it never writes there. Prose lives in web/thesis.py, the diagram in web/pipeline.py.
 Pages:
     /                               overview and progress table
     /data                           data description
@@ -10,7 +10,8 @@ Pages:
     /results/planted                planted-signal positive control (RQ2)
     /results/planted/illustration   what planting does to prices
     /results/placebo                placebo walk-forward (RQ2, negative control)
-    /results/rq1, /results/walkforward   chapters without results yet
+    /results/rq1                    role of the LLM (RQ1): primary tests, budget curves, coverage, first touch
+    /results/walkforward            chapter without results yet
     /system, /api/system            machine resources (tool outside the thesis)
 """
 
@@ -29,8 +30,9 @@ from core_engine.CalculateMetrics import compute_metrics
 from strategy_workflows import RunPlantedSignal as planted_run
 from strategy_workflows.MCTSEngine import MCTSEngine, _FixedPositions, describe_candidate
 from strategy_workflows.PlantedSignal import PlantedData, PlantedFormula, formula_from_dict
+from strategy_workflows.SearchConfigs import BudgetPlan
 from utilities.AppConfig import PROJECT_ROOT
-from web import charts, method, pipeline, placebo, planted, thesis
+from web import charts, method, pipeline, placebo, planted, rq1, thesis
 from web.system import read_system
 
 TEMPLATES_DIR = Path(__file__).parent / 'templates'
@@ -74,18 +76,18 @@ def _planted_equity(data: PlantedData, formula: PlantedFormula, seed: int, mode:
             'sharpe': metrics.get('sharpe_ratio'), 'trades': metrics.get('total_trades')}
 
 
-def _load_formula(folder: str) -> Optional[PlantedFormula]:
-    data = planted.read_json(os.path.join(folder, planted.FORMULA_FILE))
+def _load_formula(folder: str, name: str) -> Optional[PlantedFormula]:
+    data = planted.read_json(os.path.join(folder, planted.FORMULAS_FILE))
     try:
-        return formula_from_dict(data) if data else None
+        return formula_from_dict(data[name]) if isinstance(data, dict) and name in data else None
     except (ValueError, KeyError, TypeError):
         return None
 
 
-def _illustration_view(folder: str, strength: float, seed: int) -> Dict:
+def _illustration_view(folder: str, name: str, strength: float, seed: int) -> Dict:
     """Context of the illustration page; 'message' is set instead of charts when the data cannot be rebuilt."""
     segments = planted.read_segments(folder)
-    formula = _load_formula(folder)
+    formula = _load_formula(folder, name)
     if formula is None:
         return {'message': 'Chưa có công thức cài sẵn trong thư mục kết quả luận văn.'}
     base = planted_run.load_base(segments)
@@ -125,6 +127,8 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters['fmt'] = format_number
     templates.env.filters['inline_code'] = pipeline.format_text
+    templates.env.filters['num'] = thesis.num
+    templates.env.filters['config_label'] = thesis.config_label
 
     def folder() -> str:
         return planted.thesis_dir(app.state.results_root)
@@ -133,9 +137,16 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
         return placebo.placebo_view(placebo.read_summary(placebo.walkforward_dir(app.state.results_root)))
 
     def availability() -> Dict[str, bool]:
+        summary_ready = not planted.read_summary(folder()).empty
         return {'placebo_runs': placebo_view() is not None,
-                'planted_runs': not planted.read_runs(folder()).empty,
-                'positions': bool(planted.read_positions(folder())),
+                'planted_formulas': bool(planted.read_formulas(folder())),
+                'planted_detection': bool(planted.read_detection(folder())),
+                'planted_summary': summary_ready,
+                'rq1_primary': bool(rq1.read_primary(folder())),
+                'rq1_summary': summary_ready,
+                'rq1_touch': bool(rq1.read_first_touch(folder())),
+                'coverage': bool(rq1.read_coverage(folder())),
+                'wf_comparison': bool(rq1.read_comparison(app.state.results_root)),
                 'data': method.data_range() is not None,
                 'blueprint_set': method.blueprint_summary(app.state.results_root) is not None}
 
@@ -154,10 +165,13 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
 
     @app.get('/method', response_class=HTMLResponse)
     def method_page(request: Request):
+        blueprint_set = method.blueprint_summary(app.state.results_root)
+        steps = thesis.feedback_steps(BudgetPlan(), blueprint_set['count'] if blueprint_set else None)
         return render(request, 'method.html', 'method', **pipeline.build_view(), intro=thesis.METHOD_INTRO,
-                      gantt=method.gantt_view(), windows_caption=thesis.WINDOWS_CAPTION,
-                      blueprint_set=method.blueprint_summary(app.state.results_root),
-                      blueprint_caption=thesis.BLUEPRINT_CAPTION)
+                      gantt=method.gantt_view(), windows_caption=thesis.WINDOWS_CAPTION, t=thesis, sci=thesis.sci,
+                      blueprint_set=blueprint_set, config_rows=thesis.CONFIG_ROWS, feedback_steps=steps,
+                      blueprint_reading=thesis.reading_blueprints(blueprint_set) if blueprint_set else '',
+                      space_reading=thesis.reading_space(blueprint_set) if blueprint_set else '')
 
     @app.get('/pipeline')
     def pipeline_redirect():
@@ -165,40 +179,39 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
 
     @app.get('/results/planted', response_class=HTMLResponse)
     def planted_page(request: Request):
-        runs = planted.read_runs(folder())
-        rows = planted.strength_table(runs)
-        seed_rows = planted.seed_table(runs)
-        positions = planted.position_table(planted.read_positions(folder()))
-        threshold = planted.near_threshold()
-        chart = {'near': planted.near_chart_points(rows), 'corr': planted.closest_points(seed_rows),
-                 'threshold': threshold}
+        formulas = planted.read_formulas(folder())
+        detection = planted.read_detection(folder())
+        rows = planted.near_rows_with_p(planted.near_rows(planted.read_summary(folder())))
         return render(
-            request, 'planted.html', 'planted', t=thesis, rows=rows, seed_rows=seed_rows, positions=positions,
-            formula_expr=planted.read_formula_expr(folder()), chart=chart,
-            primary=thesis.METRICS[thesis.PLANTED_PRIMARY], primary_value=thesis.primary_value_planted(rows),
-            metric_rows=thesis.metric_rows(thesis.PLANTED_METRICS),
-            near_definition=thesis.NEAR_DEFINITION.format(threshold=threshold),
-            readings={'table': thesis.reading_table(rows), 'near': thesis.reading_near(rows),
-                      'corr': thesis.reading_corr(seed_rows, threshold),
-                      'positions': thesis.reading_positions(positions)})
+            request, 'planted.html', 'planted', t=thesis, formulas=formulas, detection=detection, rows=rows,
+            chart=planted.near_chart(rows), a_kinds=planted.A_KINDS, budget=planted.DETECTION_BUDGET,
+            config=planted.DETECTION_CONFIG, primary=thesis.METRICS[thesis.PLANTED_PRIMARY],
+            primary_value=thesis.primary_value_planted(detection),
+            metric_rows=thesis.metric_rows(thesis.PLANTED_METRICS), near_definition=thesis.METRICS['near']['measures'],
+            readings={'signals': thesis.reading_signals(formulas), 'detection': thesis.reading_detection(detection),
+                      'table': thesis.reading_near_table(rows), 'figure': thesis.reading_near_figure(rows)})
 
     @app.get('/results/planted/illustration', response_class=HTMLResponse)
-    def planted_illustration(request: Request, strength: Optional[float] = None, seed: Optional[int] = None):
+    def planted_illustration(request: Request, a: Optional[str] = None, strength: Optional[float] = None,
+                             seed: Optional[int] = None):
         runs = planted.read_runs(folder())
-        strengths = planted.present_values(runs, 'strength')
+        names = [f['name'] for f in planted.read_formulas(folder())]
+        strengths = planted.present_values(runs, 'ic')
         seeds = [int(s) for s in planted.present_values(runs, 'seed')]
-        context = {'title': thesis.ILLUSTRATION_TITLE, 'strengths': strengths, 'seeds': seeds,
-                   'strength': strength, 'seed': seed, 'segments': planted.read_segments(folder()).to_dict()}
-        if not strengths or not seeds:
-            return render(request, 'illustration.html', 'planted', view={'message': thesis.PLANTED_MISSING}, **context)
+        context = {'title': thesis.ILLUSTRATION_TITLE, 'strengths': strengths, 'seeds': seeds, 'names': names,
+                   'a': a, 'strength': strength, 'seed': seed, 'segments': planted.read_segments(folder()).to_dict()}
+        if not strengths or not seeds or not names:
+            return render(request, 'illustration.html', 'planted',
+                          view={'message': thesis.PLANTED_ILLUSTRATION_MISSING}, **context)
+        a = names[0] if a is None else a
         strength = strengths[0] if strength is None else strength
         seed = seeds[0] if seed is None else seed
         matched = [s for s in strengths if math.isclose(s, strength, abs_tol=1e-12)]
-        if not matched or seed not in seeds:
-            raise HTTPException(status_code=404, detail='Độ mạnh hoặc seed không có trong kết quả.')
-        context.update(strength=matched[0], seed=seed)
+        if a not in names or not matched or seed not in seeds:
+            raise HTTPException(status_code=404, detail='Tín hiệu, IC mục tiêu hoặc seed không có trong kết quả.')
+        context.update(a=a, strength=matched[0], seed=seed)
         return render(request, 'illustration.html', 'planted',
-                      view=_illustration_view(folder(), matched[0], seed), **context)
+                      view=_illustration_view(folder(), a, matched[0], seed), **context)
 
     @app.get('/results/placebo', response_class=HTMLResponse)
     def placebo_page(request: Request):
@@ -208,6 +221,28 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
             primary=thesis.METRICS[thesis.PLACEBO_PRIMARY], primary_value=thesis.primary_value_placebo(view),
             metric_rows=thesis.metric_rows(thesis.PLACEBO_METRICS), reading=thesis.reading_placebo(view),
             p_text=thesis.placebo_p_text(view))
+
+    @app.get('/results/rq1', response_class=HTMLResponse)
+    def rq1_page(request: Request):
+        summary = planted.read_summary(folder())
+        primary_rows = rq1.read_primary(folder())
+        series = rq1.budget_series(summary)
+        coverage = rq1.read_coverage(folder())
+        touch = rq1.read_first_touch(folder())
+        comparison = rq1.read_comparison(app.state.results_root)
+        mark = BudgetPlan().phase_a
+        expressions = {f['name']: f['expression'] for f in planted.read_formulas(folder())}
+        return render(
+            request, 'rq1.html', 'rq1', t=thesis, primary_rows=primary_rows, series=series, coverage=coverage,
+            touch=touch, comparison=comparison, expressions=expressions, ic=rq1.PRIMARY_IC, mark=mark,
+            primary=thesis.METRICS[thesis.RQ1_PRIMARY], primary_value=thesis.primary_value_rq1(primary_rows),
+            metric_rows=thesis.metric_rows(thesis.RQ1_METRICS, thesis.RQ1_ROLE_OVERRIDES),
+            chart={'series': series, 'mark': mark, 'labels': thesis.CONFIG_LABELS},
+            budget_rq=thesis.RQ1_BUDGET_RQ.format(ic=rq1.PRIMARY_IC, mark=thesis.num(mark)),
+            readings={'primary': thesis.reading_primary(primary_rows),
+                      'budget': thesis.reading_budget(series, rq1.PRIMARY_IC, mark),
+                      'coverage': thesis.reading_coverage(coverage), 'touch': thesis.reading_touch(touch),
+                      'walkforward': thesis.reading_walkforward(comparison)})
 
     def add_pending_page(key: str) -> None:
         def pending_page(request: Request):

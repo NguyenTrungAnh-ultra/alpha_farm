@@ -122,7 +122,7 @@ Web có nút khởi chạy tính toán trên máy này, nên chỉ được mở
 | Giai đoạn | Việc | Xong khi |
 |---|---|---|
 | W3a ✅ | Web chỉ xem, đọc thẳng tệp kết quả (chưa có DB): trang bài cài tín hiệu (mục 10), trang 8 tài nguyên máy | mở `http://127.0.0.1:8000`, thấy bảng + hình của `results/planted*/`, thấy tiến độ lượt `search` đang chạy và CPU / RAM / GPU |
-| W3b | Web luận văn (mục 10) | mọi trang ở mục 10 mở được; trang `/results/planted` chỉ đọc `planted_window1` |
+| W3b | Web luận văn (mục 10) | mọi trang ở mục 10 mở được; trang `/results/planted` chỉ đọc `planted_rq1` |
 | W1 ✅ | Móc tiến độ / dừng / danh sách blueprint / đếm −10 vào lõi (mục 4, điểm 1–4; điểm 5 làm ở W2 cùng bảng `run`) | test mục 4 xanh, CLI ra cùng kết quả |
 | W2 | Schema SQLite + bộ ghi + runner chạy được từ dòng lệnh | một lượt `mcts` thật ghi đủ bảng, đo được tốc độ chậm đi bao nhiêu |
 | W3 | Web chỉ xem: trang 1, 3, 5, 8 | xem được lượt đang chạy trên `127.0.0.1` |
@@ -134,40 +134,37 @@ Code giao cho agent `coder` từng giai đoạn, kiểm xong mới sang giai đo
 
 ## 10. Web luận văn (W3b, thay trang W3a)
 
-Web đọc như chính bài luận: mỗi trang là một chương, mỗi bảng / hình có số thứ tự, chú thích nói **trả lời câu hỏi nào** (RQ1 / RQ2) và một câu đọc kết quả. Chỉ hiện cấu hình đã chốt cho luận văn; ⛔ so các phương án đã thử trong quá trình làm (thư mục cũ, reward mode cũ, ngữ pháp cũ), ⛔ bảng thô nội bộ.
+Web đọc như chính bài luận: mỗi trang là một chương, mỗi bảng / hình có số thứ tự, chú thích nói **trả lời câu hỏi nào** (RQ1 / RQ2) và một câu đọc kết quả. Chỉ hiện hệ thống RQ1 (LLM + MCTS có vòng phản hồi) và cấu hình đã chốt cho luận văn; ⛔ so các phương án đã thử trong quá trình làm (thư mục cũ, hệ thống sinh một lần, reward mode cũ, ngữ pháp cũ), ⛔ bảng thô nội bộ. Kết quả của hệ thống cũ (`results/planted_window1/`, `results/walkforward/oneshot_placebo/`) là lịch sử, web không đọc.
 
-**Vấn đề của trang W3a (soát 2026-10-30):**
-- Không nói bài cài tín hiệu trả lời RQ2, không giải thích A là gì, "tìm lại gần / đúng" nghĩa là gì.
-- Liệt kê bốn thư mục (`planted`, `planted_run2_sharpe`, `planted_run3`, `planted_window1`) với reward `soft` / `sharpe` và hình so giữa chúng: đó là quá trình chọn phương án, không phải kết quả.
-- Bảng oracle thô (`reward_gated`, `z_soft`, `calmar`, seed in `1.0000` …) hiện ra trang.
-- "20 / 15 lượt": số lượt dự kiến đọc từ dòng đầu `search.log`, sai khi chạy thêm seed.
-- Chữ trạng thái nội bộ ("có search.log, chưa đủ lượt…").
-- Trang gốc `/` là bài cài tín hiệu, không có trang tổng quan tiến độ luận văn.
-- Ghi chú ô `rq2_planted` trên `/pipeline` còn nhắc "lần chạy 1–3 (ngữ pháp cũ)".
-- Kết quả so vị thế (`positions_vs_a.json`) chưa có trên web.
-- Trang "Một bộ dữ liệu" không vẽ được đường vốn top-5 vì `runs.csv` không lưu tham số template.
+Mục nào thiếu tệp kết quả hiện trạng thái chờ (chữ "chưa có" kèm lệnh cần chạy), không lỗi; trang vẫn dựng được khi chỉ có `planted_formulas.json` và `coverage.json`.
 
 **Cấu trúc:**
 
 | Đường dẫn | Chương | Nội dung |
 |---|---|---|
-| `/` | Tổng quan | tên đề tài, câu hỏi chính, RQ1 / RQ2; bảng tiến độ: mỗi chương / mỗi bảng-hình một dòng, trạng thái ✅ / 🔧 / chưa có |
-| `/method` | Phương pháp | sơ đồ luồng chính (trang `/pipeline` hiện có), bảng cửa sổ walk-forward, bộ blueprint đã đóng băng |
+| `/` | Tổng quan | tên đề tài, câu hỏi chính, RQ1 / RQ2; bảng tiến độ: mỗi chương / mỗi bảng-hình một dòng (registry `CHAPTERS` / `ITEMS` trong `web/thesis.py`), trạng thái ✅ / 🔧 / chưa có |
+| `/method` | Phương pháp | sơ đồ luồng chính (Hình 3.1), cửa sổ walk-forward (Hình 3.2), Bảng 3.1 bộ blueprint RQ1 đóng băng (20 khung, số cách điền, độ phủ toán tử 16/19), Bảng 3.2 các cấu hình so sánh, Bảng 3.3 vòng phản hồi và mốc ngân sách, Bảng 3.4 kích thước không gian tìm kiếm (toàn ngữ pháp ≈ 1.9 × 10⁴¹ so với bộ ≈ 2.2 × 10¹⁴; tính bằng `GrammarSize`, không gõ cứng) |
 | `/data` | Dữ liệu | VN30F1M 60m 2018-08 → 2025-12, số bar từng đoạn, ghi chú dữ liệu |
-| `/results/planted` | Kết quả — RQ2, kiểm soát dương | xem dưới |
-| `/results/placebo` | Kết quả — RQ2, kiểm soát âm | đọc `results/walkforward/llm_mcts/summary.csv`: phân bố Sharpe của K bộ placebo (chấm từng bộ, vạch Sharpe placebo lớn nhất), bảng từng bộ, câu đọc nói Sharpe thật phải vượt Sharpe placebo lớn nhất để p = 1/(K+1). p = (1 + số bộ có Sharpe ≥ thật) / (K + 1), tính từ dữ liệu; chưa có dòng `real` thì p hiện "chưa có, chờ lần chạy thật" |
-| `/results/rq1` | Kết quả — RQ1 | như trên |
-| `/results/walkforward` | Kết quả — chuỗi ngoài mẫu | như trên |
+| `/results/planted` | Kết quả: RQ2, kiểm soát dương | xem dưới |
+| `/results/placebo` | Kết quả: RQ2, kiểm soát âm | đọc `results/walkforward/llm_mcts/summary.csv`: phân bố Sharpe của K bộ placebo (chấm từng bộ, vạch Sharpe placebo lớn nhất), bảng từng bộ, câu đọc nói Sharpe thật phải vượt Sharpe placebo lớn nhất để p = 1/(K+1). p = (1 + số bộ có Sharpe ≥ thật) / (K + 1), tính từ dữ liệu; chưa có dòng `real` thì p hiện "chưa có, chờ lần chạy thật"; chưa có thư mục thì hiện trạng thái chờ |
+| `/results/rq1` | Kết quả: RQ1 | xem dưới |
+| `/results/walkforward` | Kết quả: chuỗi ngoài mẫu | chưa có kết quả (cần đóng băng rồi chạy thật) |
 | `/system` | Công cụ (ngoài luận văn) | tài nguyên máy, tiến độ lượt chạy đang chạy |
 
-**Trang `/results/planted`** (nguồn duy nhất: thư mục kết quả luận văn, hằng `THESIS_PLANTED_DIR = 'planted_window1'` trong `web/`):
-1. Đoạn mở: câu hỏi (quy trình có tìm lại một tín hiệu biết trước không → RQ2), cách làm trong ba câu (xáo lợi suất, cài A với IC biết trước, chạy đúng quy trình luận văn), A viết bằng lời và bằng công thức.
-2. Bảng: IC mục tiêu · số seed · IC đo được (đoạn tìm, đoạn đánh giá) · tìm lại gần · tìm lại đúng · Sharpe ngoài mẫu. Chú thích định nghĩa "tìm lại gần / đúng".
-3. Hình: tỷ lệ tìm lại gần theo IC (khoảng tin cậy 95% Wilson vẽ làm thanh sai số). Ngưỡng phát hiện = mức IC > 0 thấp nhất có p < 0.05 trong kiểm định chính xác Fisher một phía (`scipy.stats.fisher_exact`, alternative `greater`) so tỷ lệ tìm lại gần với IC 0; p có cột riêng ở Bảng 4.1 (IC 0 hiện "—"), ngưỡng và p hiện trong ô "Chỉ số chính" và câu đọc. Không mức nào đạt thì trang nói chưa xác định được ngưỡng.
-4. Hình: tương quan của ứng viên gần A nhất ở mỗi seed theo IC (chấm từng seed, vạch mốc 0.7).
-5. Bảng / hình: tương quan vị thế tốt nhất trong top-5 với A, theo IC, kèm mức nhiễu (IC 0) — từ `positions_vs_a.json` nếu có.
-6. Bảng từng seed (gọn): IC · seed · công thức gần A nhất · tương quan · tìm lại gần / đúng · Sharpe ngoài mẫu.
-7. Liên kết tới trang minh hoạ một bộ dữ liệu (giữ trang hiện có, đổi tiêu đề thành "Minh hoạ: cài tín hiệu làm gì với giá", bỏ chọn thư mục).
+**Trang `/results/planted`** (nguồn duy nhất: `results/planted_rq1/`, hằng `THESIS_PLANTED_DIR` trong `web/planted.py`):
+1. Đoạn mở: câu hỏi (quy trình có tìm lại một tín hiệu biết trước không → RQ2), cách làm trong ba câu (xáo lợi suất, cài A với IC biết trước, chạy đúng quy trình luận văn), định nghĩa "tìm lại gần".
+2. Bảng 4.1: bốn tín hiệu A: loại (kinh điển / lạ), số toán tử, biểu thức, độ đông (tỷ lệ công thức ngẫu nhiên gần A) và p ADF, từ `planted_formulas.json`.
+3. Bảng 4.2 (chính): ngưỡng phát hiện theo A của LLM + MCTS ở ngân sách 100.000, từ `detection_thresholds.csv` = mức IC > 0 thấp nhất có p < 0.05 trong kiểm định chính xác Fisher một phía (`Statistics.fisher_p_greater`, `Statistics.detection_threshold`) so tỷ lệ tìm lại gần với IC 0; kèm số seed tìm lại gần theo IC. Không mức nào đạt thì ghi "chưa xác định".
+4. Bảng 4.3 (phụ): tỷ lệ tìm lại gần theo A × IC kèm khoảng Wilson 95% và p Fisher một phía so với IC 0 (tính lại từ số đếm của `summary.csv`); Hình 4.1 (phụ): cùng số liệu, mỗi A một ô, Wilson vẽ làm dải.
+5. Liên kết tới trang minh hoạ một bộ dữ liệu (chọn A, IC, seed; cần `runs.csv` và `calibration.json`).
+
+**Trang `/results/rq1`** (nguồn: `results/planted_rq1/`, `results/walkforward/comparison.csv`):
+1. Đoạn mở: câu hỏi (LLM đưa MCTS tới tín hiệu sớm hơn hay chặn đường), thiết kế trong ba câu, phép so chính duy nhất.
+2. Bảng 4.4 (chính): bốn phép Fisher hai phía chỉnh Holm, LLM + MCTS với MCTS không LLM ở IC 0.1, gộp theo loại A (kinh điển, lạ) tại mốc 50.000 và 100.000, từ `primary_tests.csv`.
+3. Hình 4.3 (phụ): tỷ lệ tìm lại gần theo ngân sách (10.000 … 100.000) cho từng cấu hình, mỗi A một ô, ở IC 0.1, dải Wilson; đường dọc ở 50.000 ghi "hết giai đoạn A, trước phản hồi".
+4. Bảng 4.5 (chẩn đoán): A trong hay ngoài vùng của bộ blueprint ban đầu và số cách điền của blueprint nhỏ nhất chứa A, từ `coverage.json`.
+5. Bảng 4.6 (phụ): trung vị số vòng và thời gian tới lần đầu chạm A theo cấu hình × A, kèm số lượt đã chạm / số lượt, từ `first_touch.csv`.
+6. Bảng 4.7 (phụ, mô tả): Sharpe ngoài mẫu từng cấu hình, chênh so với LLM + MCTS kèm khoảng tin cậy bootstrap và ρ, từ `comparison.csv`; không có p.
 
 **Vai trò của chỉ số** (người dùng yêu cầu 2026-10-30):
 - Mỗi trang chương mở bằng ô **"Chỉ số chính"**: tên chỉ số trả lời trực tiếp câu hỏi của chương, nó đo gì, đọc thế nào, giá trị hiện tại (hoặc "chưa có").
@@ -176,12 +173,10 @@ Web đọc như chính bài luận: mỗi trang là một chương, mỗi bảng
 
 | Chương | Chỉ số chính | Phụ | Chẩn đoán |
 |---|---|---|---|
-| RQ2 — bài cài tín hiệu | tỷ lệ tìm lại gần theo IC (Bảng 4.1, Hình 4.1) | tìm lại đúng; tương quan vị thế top-5 với A; Sharpe ngoài mẫu 6 tháng (rất nhiễu, không dùng để kết luận) | ứng viên gần A nhất trong mọi ứng viên (đo MCTS có chạm tới A không) |
-| RQ2 — placebo | p-value: tỷ lệ bộ placebo có Sharpe ngoài mẫu ≥ lần thật | phân bố Sharpe 19 bộ placebo | — |
-| RQ1 | Sharpe năm của chuỗi ngoài mẫu từng cấu hình | IC, Calmar, vòng quay | — |
+| RQ2: bài cài tín hiệu | ngưỡng phát hiện theo A của LLM + MCTS ở 100.000 (Bảng 4.2) | tỷ lệ tìm lại gần theo A × IC kèm Wilson và p Fisher (Bảng 4.3, Hình 4.1) | độ đông và p ADF của A (Bảng 4.1) |
+| RQ2: placebo | p-value: tỷ lệ bộ placebo có Sharpe ngoài mẫu ≥ lần thật | phân bố Sharpe các bộ placebo | — |
+| RQ1 | bốn p Fisher hai phía chỉnh Holm (Bảng 4.4) | tỷ lệ tìm lại gần theo ngân sách (Hình 4.3); lần đầu chạm A (Bảng 4.6); Sharpe walk-forward và chênh so với LLM + MCTS (Bảng 4.7) | A trong / ngoài vùng blueprint và số cách điền (Bảng 4.5) |
 | Chuỗi ngoài mẫu | Sharpe năm của chuỗi 2022-07 → 2025-12 | Sharpe từng cửa sổ, sụt giảm lớn nhất | — |
-
-Hình "ứng viên gần A nhất" là chẩn đoán: tô khác màu điểm nằm trong top-5 và điểm không vào top-5; câu đọc nói "MCTS đã chạm tới A ở k/n seed", không nói "tìm thấy".
 
 **Nội dung chữ** (đoạn mở, chú thích, câu đọc kết quả, trạng thái từng chương) nằm trong một module Python của `web/` như `web/pipeline.py`; số liệu luôn tính từ tệp kết quả. Web không đọc `docs/`.
 

@@ -1,10 +1,11 @@
 """
 Read-only facts for the method and data pages: walk-forward windows, bar counts per segment taken
-from the data file, and the summary of the frozen blueprint set.
+from the data file, the frozen blueprint set with its completion counts, and the search-space sizes.
 """
 
 import json
 import os
+import re
 from collections import Counter
 from functools import lru_cache
 from typing import Dict, List, Optional
@@ -12,10 +13,14 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from core_engine.BacktestEngine import load_data
+from strategy_workflows.GrammarSize import count_completions, count_grammar
+from strategy_workflows.MCTSDimensions import OPERATOR_REGISTRY, UNIMPLEMENTED_OPERATORS
+from strategy_workflows.SemanticCompiler import SemanticCompiler
 from strategy_workflows.WalkForward import WINDOWS
 
 TIMEFRAME = '60m'
-BLUEPRINT_SET = os.path.join('blueprint_sets', '20261029_212813', 'blueprints.json')
+BLUEPRINT_SET = os.path.join('blueprint_sets', '20261031_rq1', 'blueprints.json')
+IMPLEMENTED_OPERATORS = frozenset(OPERATOR_REGISTRY) - UNIMPLEMENTED_OPERATORS
 
 
 @lru_cache(maxsize=1)
@@ -55,15 +60,40 @@ def window_rows(with_bars: bool = False) -> List[Dict]:
     return rows
 
 
+@lru_cache(maxsize=1)
+def grammar_size() -> int:
+    """Dimension-valid formulas of the whole grammar from one `?` root (template parameters not counted)."""
+    return count_grammar()
+
+
+def _completions(macro_blueprint: str) -> Optional[int]:
+    """Dimension-valid completions of one blueprint; None when it does not compile."""
+    try:
+        return count_completions(SemanticCompiler().compile_blueprint(macro_blueprint))
+    except Exception:
+        return None
+
+
 def blueprint_summary(results_root: str) -> Optional[Dict]:
-    """Count and root operators of the frozen blueprint set; None when the file is missing or unreadable."""
+    """
+    The frozen blueprint set: per blueprint its root operator and completion count, the root operators, the
+    operators used against the implemented ones, the total completions of the set and of the whole grammar.
+    None when the file is missing or unreadable.
+    """
     try:
         with open(os.path.join(results_root, BLUEPRINT_SET), 'r', encoding='utf-8') as f:
             blueprints = json.load(f)
-        roots = Counter(str(b['macro_blueprint']).split('(')[0] for b in blueprints)
+        items = [{'name': str(b['name']), 'macro_blueprint': str(b['macro_blueprint'])} for b in blueprints]
+        roots = Counter(b['macro_blueprint'].split('(')[0] for b in items)
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return None
-    return {'count': len(blueprints), 'roots': sorted(roots.items(), key=lambda kv: (-kv[1], kv[0]))}
+    for b in items:
+        b['completions'] = _completions(b['macro_blueprint'])
+    used = {op for b in items for op in re.findall(r'[A-Za-z_][A-Za-z_0-9]*(?=\()', b['macro_blueprint'])} & IMPLEMENTED_OPERATORS
+    return {'count': len(items), 'roots': sorted(roots.items(), key=lambda kv: (-kv[1], kv[0])), 'blueprints': items,
+            'operators_used': len(used), 'operators_total': len(IMPLEMENTED_OPERATORS),
+            'operators_missing': sorted(IMPLEMENTED_OPERATORS - used),
+            'set_size': sum(b['completions'] or 0 for b in items), 'grammar_size': grammar_size()}
 
 
 GANTT_WIDTH = 940

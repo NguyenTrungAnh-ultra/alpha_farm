@@ -38,6 +38,7 @@ main { flex:1; min-width:0; max-width:1150px; margin:0 auto; padding:20px; anima
 .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .chip { font-size:12px; padding:2px 8px; border-radius:10px; background:var(--bg); border:1px solid var(--line); }
 .chip.hit { border-color:var(--accent); color:var(--accent); }
+.panels { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; }
 .chartbox { position:relative; height:300px; } .chartbox.tall { height:340px; }
 .pulse { animation:pulse 1.4s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.55; } }
 h1 { font-size:22px; margin:8px 0 12px; } h2 { font-size:18px; margin:0 0 8px; } h3 { font-size:15px; margin:16px 0 6px; }
@@ -131,6 +132,32 @@ function intervalChart(canvasId, points, xTitle, yTitle) {
     options: { maintainAspectRatio: false, parsing: false, scales: {
       x: { type: 'linear', title: { display: true, text: xTitle } },
       y: { min: 0, max: 1, title: { display: true, text: yTitle } } } } });
+}
+// series: {configuration: [[budget, rate, low, high]]}; the band is the Wilson interval, the dashed vertical line
+// marks the end of phase A (before the feedback round).
+var budgetMark = { id: 'budgetMark', afterDatasetsDraw: function (chart, args, opts) {
+  if (!opts || opts.value === undefined) { return; }
+  var x = chart.scales.x.getPixelForValue(opts.value); var area = chart.chartArea; var ctx = chart.ctx;
+  ctx.save(); ctx.strokeStyle = '#c0392b'; ctx.setLineDash([5, 4]); ctx.beginPath();
+  ctx.moveTo(x, area.top); ctx.lineTo(x, area.bottom); ctx.stroke(); ctx.fillStyle = '#c0392b';
+  ctx.fillText(opts.label, Math.min(x + 4, area.right - 190), area.top + 12); ctx.restore(); } };
+function budgetChart(canvasId, title, series, mark, labels) {
+  var el = document.getElementById(canvasId); if (!el || typeof Chart === 'undefined') { return; }
+  var datasets = [];
+  Object.keys(series).forEach(function (name, i) {
+    var color = COLORS[i % COLORS.length];
+    var pick = function (k) { return series[name].map(function (p) { return { x: p[0], y: p[k] }; }); };
+    datasets.push({ label: (labels[name] || name) + ' cận dưới', data: pick(2), borderColor: 'transparent', backgroundColor: 'transparent', pointRadius: 0, hideLegend: true });
+    datasets.push({ label: (labels[name] || name) + ' cận trên', data: pick(3), borderColor: 'transparent', backgroundColor: color + '33', pointRadius: 0, fill: '-1', hideLegend: true });
+    datasets.push({ label: labels[name] || name, data: pick(1), borderColor: color, backgroundColor: color, pointRadius: 4 });
+  });
+  new Chart(el, { type: 'line', plugins: [budgetMark], data: { datasets: datasets },
+    options: { maintainAspectRatio: false, parsing: false, scales: {
+      x: { type: 'linear', title: { display: true, text: 'ngân sách (vòng MCTS)' } },
+      y: { min: 0, max: 1, title: { display: true, text: 'tỷ lệ tìm lại gần' } } },
+      plugins: { title: { display: true, text: title },
+        legend: { labels: { filter: function (item, data) { return !data.datasets[item.datasetIndex].hideLegend; } } },
+        budgetMark: { value: mark, label: mark.toLocaleString('vi-VN') + ': hết giai đoạn A, trước phản hồi' } } } });
 }
 // points: [{x, y, top5}] drawn as dots, split in two colours by top5; `line` is a horizontal reference value.
 function dotChart(canvasId, points, line, xTitle, yTitle, lineLabel) {

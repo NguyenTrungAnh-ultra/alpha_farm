@@ -57,10 +57,8 @@ from strategy_workflows.RunPlantedSignal import (
 from strategy_workflows.SearchConfigs import (
     CHECKPOINTS, SYSTEMS, BudgetPlan, create_worker_chat, llm_spec, run_search,
 )
-from strategy_workflows.Statistics import holm_adjust
+from strategy_workflows.Statistics import detection_threshold, fisher_p_greater, holm_adjust, wilson_interval
 from utilities.AppConfig import MCTS_MAX_DEPTH
-from web.planted import fisher_p_greater, wilson_interval
-from web.thesis import detection_threshold
 
 DEFAULT_OUT_DIR = os.path.join(PROJECT_ROOT, 'results', 'planted_rq1')
 DEFAULT_SEEDS = list(range(1, 11))
@@ -369,7 +367,7 @@ def detection_thresholds(checkpoints: pd.DataFrame, config: str = DETECTION_CONF
                          budget: int = DETECTION_BUDGET) -> pd.DataFrame:
     """
     RQ2 per A: the lowest target IC > 0 at which `config`'s near-recovery rate at `budget` beats IC 0 in a one-sided
-    Fisher test at 0.05 (`detection_threshold`, the rule of the web pages). NaN when no level passes.
+    Fisher test at 0.05 (`Statistics.detection_threshold`, the rule of the web pages). NaN when no level passes.
     """
     frame = latest_checkpoints(checkpoints)
     rows = []
