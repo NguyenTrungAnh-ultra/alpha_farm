@@ -15,7 +15,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 | 6 | Tăng tốc lượt chấm MCTS | ✅ 2026-10-30 | hai lượt: backtest ≈ 2,2×, rồi chỉ số + IC: 17,3 → 9,8 ms; kết quả giống hệt | [RESULTS](RESULTS.md#tốc-độ) |
 | 7 | Walk-forward LLM + MCTS | 🔧 | code xong (`main.py walkforward placebo\|freeze\|real\|summary`); placebo đã chạy (việc 8) | [WALK_FORWARD](design/WALK_FORWARD.md) |
 | 8 | Placebo walk-forward (RQ2) | ✅ 2026-10-31 | 19 × 7 = 133 lượt, 6 giờ 10 phút; Sharpe placebo 0.11 ± 0.51, lớn nhất 1.02 ⇒ lần thật cần > 1.02 cho p = 0.05 | [WALK_FORWARD](design/WALK_FORWARD.md#placebo) |
-| 9 | Cấu hình so sánh (RQ1): MCTS không LLM, LLM không tìm, tìm ngẫu nhiên, TSMOM | ⏸️ chờ duyệt | chưa code | [WALK_FORWARD](design/WALK_FORWARD.md#cấu-hình-so-sánh) |
+| 9 | Cấu hình so sánh (RQ1): bài cài tín hiệu cho LLM + MCTS / MCTS không LLM / tìm ngẫu nhiên; walk-forward thật các cấu hình làm mô tả | ⏸️ chờ chốt chi tiết | hướng đã chốt 2026-10-31; chưa code | [WALK_FORWARD](design/WALK_FORWARD.md#cấu-hình-so-sánh) |
 | 10 | Đóng băng (`results/walkforward/frozen.json`) | ⏸️ | làm sau việc 9 (đóng băng khoá code) | [WALK_FORWARD](design/WALK_FORWARD.md#đóng-băng) |
 | 11 | Chạy thật một lần, chuỗi lợi suất ngoài mẫu 2022-07 → 2025-12 | ⏸️ | sau việc 10 | [WALK_FORWARD](design/WALK_FORWARD.md) |
 | 12 | Đo lại ước thời gian walk-forward sau tăng tốc | 🔧 | placebo đo được 1.612 s/lượt (ước cũ 14 giờ ⇒ thật 6 giờ 10 phút với 10 lượt song song); các phần khác chưa ước lại | [WALK_FORWARD](design/WALK_FORWARD.md#thời-gian-máy) |
@@ -29,6 +29,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 - ⏸️ Số seed 5 cho lần chạy thật: Claude đề xuất theo proposal, chưa xác nhận riêng. (K = 19 đang chạy; muốn K = 39 thì chạy thêm bộ 20–39 sau, không phải chạy lại.)
 - ⏸️ Ngân sách placebo bằng lần thật nếu thời gian máy cho phép: Claude đề xuất.
 - ⏸️ Ghi số lệnh và Sharpe sau phí của A như một dòng mô tả tín hiệu cài trong kết quả bài cài tín hiệu.
+- ⏸️ RQ1 mới — A trung lập lấy từ đâu (công thức ngẫu nhiên theo ngữ pháp hay alpha kinh điển), bao nhiêu A, "MCTS không LLM" bắt đầu từ template nào, có giữ "LLM không tìm" trong bài cài tín hiệu không.
 
 ## Nợ
 
@@ -42,4 +43,4 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 - `test_hardware_concurrency.py` gọi `run_mcts_pipeline` thật nên ghi thêm vào `results/mcts_stats.json` (thay đổi này không commit).
 - `results/portfolio_summary.json`, `3tier_results.csv` tính theo công thức cũ, chỉ có chiến lược thế hệ đầu; `results/pushed/` khôi phục bằng `git checkout cfeb770 -- results/pushed`.
 - Ảnh chữ ký và PDF đã ký trong `proposal/` chỉ nằm trên máy (`.gitignore`).
-- Người dùng tự làm: báo thầy RQ2 cũ đã bỏ và câu hỏi đánh số lại; đăng xuất mọi phiên DeepSeek và Google (token cũ có thể còn hiệu lực).
+- Người dùng tự làm: báo thầy RQ2 cũ đã bỏ, câu hỏi đánh số lại và RQ1 đổi thước đo sang ngưỡng phát hiện; đăng xuất mọi phiên DeepSeek và Google (token cũ có thể còn hiệu lực).

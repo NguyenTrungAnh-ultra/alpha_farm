@@ -9,6 +9,7 @@ Mỗi quyết định một dòng, bản hiện hành: đổi ý thì sửa đú
 |---|---|---|---|
 | Bỏ RQ2 cũ (toán tử cơ bản vs chỉ báo kỹ thuật); luận văn ghi vào hướng phát triển | 2026-10-29 | người dùng | không trả lời câu chính; chỉ báo vốn là tổ hợp toán tử cơ bản; với ngưỡng phát hiện ≈ IC 0.1 gần chắc "không phân biệt được" |
 | Đánh số lại: RQ3 cũ (bằng chứng tìm thấy) thành RQ2; proposal giữ số cũ | 2026-10-29 | người dùng | còn hai câu hỏi |
+| RQ1 đổi thước đo: LLM có giúp quy trình phát hiện tín hiệu tốt hơn không, đo bằng bài cài tín hiệu chạy cho từng cấu hình (ngưỡng phát hiện có / không LLM); Sharpe ngoài mẫu các cấu hình chỉ còn là mô tả | 2026-10-31 | người dùng (hướng 1 Claude đề xuất) | 877 ngày ngoài mẫu chỉ phát hiện được chênh Sharpe ≈ 1.0–1.25; bài cài tín hiệu kiểm soát được nhiễu và vẫn phục vụ câu hỏi chính (quy trình có tìm thấy hơn may mắn không) |
 | Quy tắc dữ liệu thật: mọi lựa chọn ghi vào tài liệu và đóng băng trước lần chạy walk-forward đầu tiên; chạy một lần, không sửa theo kết quả. Mọi lần chỉnh trước đó chỉ chạy trên dữ liệu đã xáo | 2026-10-29 | người dùng | tránh chỉnh theo kết quả |
 | Không dùng năm 2025 trong bài cài tín hiệu (giữ ngoài mọi bài test); walk-forward dùng 2025 làm ngoài mẫu | 2026-10-29 | người dùng | 2025 chỉ dùng một lần |
 | Chỉ dùng LLM chạy máy (Ollama); gỡ code DeepSeek / Gemini, bỏ `token.txt`, `cookies.txt`, `api.txt` | 2026-10-28 | người dùng | luận văn ghi rõ mô hình local |
