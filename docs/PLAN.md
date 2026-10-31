@@ -19,7 +19,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 | 9a | Sinh lại bộ blueprint bằng prompt đã sửa, đóng băng | ✅ 2026-10-31 | `results/blueprint_sets/20261031_rq1/`; 4 A chốt trước (DECISIONS) | [LLM_FEEDBACK](design/LLM_FEEDBACK.md#sửa-prompt) |
 | 9b | Đo một lượt có phản hồi (thời gian LLM) | ✅ 2026-10-31 | LLM ≈ 110 s mỗi yêu cầu; cả kế hoạch ≈ 12–20 giờ, dưới ngưỡng dừng 48 giờ ⇒ giữ thiết kế | [LLM_FEEDBACK](design/LLM_FEEDBACK.md#thứ-tự-và-thời-gian-máy) |
 | 9c | Bài cài tín hiệu RQ1: 3 cấu hình × 4 A × 3 IC × 10 seed | ⏸️ | | [LLM_FEEDBACK](design/LLM_FEEDBACK.md#bài-cài-tín-hiệu-cho-rq1) |
-| 9d | Placebo chạy lại trên hệ thống có phản hồi | ⏸️ | kết quả việc 8 thuộc hệ thống sinh một lần | [WALK_FORWARD](design/WALK_FORWARD.md#placebo) |
+| 9d | Placebo chạy lại trên hệ thống có phản hồi | ⏸️ | kết quả việc 8 (hệ thống sinh một lần) chuyển sang `results/walkforward/oneshot_placebo/` 2026-10-31 | [WALK_FORWARD](design/WALK_FORWARD.md#placebo) |
 | 10 | Đóng băng (`results/walkforward/frozen.json`) | ⏸️ | làm sau việc 9–9d (đóng băng khoá code) | [WALK_FORWARD](design/WALK_FORWARD.md#đóng-băng) |
 | 11 | Chạy thật một lần, chuỗi lợi suất ngoài mẫu 2022-07 → 2025-12 | ⏸️ | sau việc 10 | [WALK_FORWARD](design/WALK_FORWARD.md) |
 | 12 | Đo lại ước thời gian walk-forward sau tăng tốc | 🔧 | placebo đo được 1.612 s/lượt (ước cũ 14 giờ ⇒ thật 6 giờ 10 phút với 10 lượt song song); các phần khác chưa ước lại | [WALK_FORWARD](design/WALK_FORWARD.md#thời-gian-máy) |
@@ -37,7 +37,6 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 ## Nợ
 
 - `RunRQ1` nhập `wilson_interval`, `fisher_p_greater`, `detection_threshold` từ `web/`; nên chuyển về một module thống kê chung.
-- `results/walkforward/llm_mcts/` đang chứa placebo bản sinh một lần (định dạng cũ); phải chuyển sang thư mục riêng trước khi chạy placebo mới.
 
 - `criteria_report` của `main.py planted summary` vẫn in đạt / trượt theo tiêu chí cũ (IC 0.05 ≥ 3/5), trong khi bài này đã đổi sang báo ngưỡng phát hiện.
 - ≈ 7% lượt chấm lỗi (−10) — người dùng chốt 2026-10-30 để nguyên, ghi vào mục hạn chế (như nhau ở mọi cấu hình; sửa thì phải chạy lại mọi kết quả) vì biểu thức toàn hằng (`Input array/series must be 1D, got shape ()`); MCTS còn sinh `(0.1 + low)`. Cần lọc hằng theo nút cha. Sau mỗi lượt xem `MCTSEngine.error_summary()`.

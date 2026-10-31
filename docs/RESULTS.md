@@ -30,7 +30,7 @@ Phương pháp: [design/PLANTED_SIGNAL](design/PLANTED_SIGNAL.md). Tệp: `resul
 
 ## Placebo walk-forward
 
-Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `results/walkforward/llm_mcts/` (`runs.csv` 133 dòng, `returns.csv`, `summary.csv`, dòng `mode = placebo`), log `results/walkforward/placebo.log`.
+Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `results/walkforward/oneshot_placebo/` (`runs.csv` 133 dòng, `returns.csv`, `summary.csv`, dòng `mode = placebo`), log `results/walkforward/placebo.log`.
 
 **Thiết lập:** K = 19 bộ × 7 cửa sổ, MCTS seed 1, 20 blueprint × 5.000 vòng, reward `sharpe`; Sharpe năm trên chuỗi lợi suất ngày ngoài mẫu nối 7 cửa sổ (877 ngày, 2022-07 → 2025-12).
 
