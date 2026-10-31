@@ -55,6 +55,14 @@ Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `r
 
 `results/blueprint_sets/20261029_212813/`: prompt `anon_shapes`, temperature 0.3, `qwen3.5:4b`; 20/20 đạt cả bốn tiêu chí ngay lần sinh đầu (0 chép ví dụ, 0 trùng khung, mọi blueprint có `?` và điền được ở độ sâu 4); 24 vòng hỏi, 37 phút. Gốc: 12 `greater_than`, 7 `mult`, 1 `sub`; 17/20 có `ts_zscore` hoặc `ts_rank` (gợi ý `ts_zscore(?)` trong luật chiều làm mô hình nghiêng về dạng này). Toán tử dùng: 10/19 toán tử đã cài (`ts_zscore` 16/20 blueprint, `mult` 14, `ts_mean` 13, `greater_than` 12, `sub` 11, `ts_rank` 9, `ts_max` 8, `ts_min` 4, `ts_argmax` 1, `ts_sum` 1); không blueprint nào dùng `ts_corr`, `ts_argmin`, `add`, `div`, `less_than`, `equal`, `and_`, `or_`, `not_`. `blueprints_sha256` `9b226af1…687e`, `prompt_sha256` `83c2e32f…5719` (đủ trong `generation.json`).
 
+## Không gian tìm kiếm
+
+Đếm số công thức hợp lệ về chiều (5 cửa sổ mỗi toán tử `ts_*` ở 60m, 4 trường giá + khối lượng, 7 hằng ngoài toán tử cuộn; chưa nhân tham số template: 5 ngưỡng z hoặc 5 × 5 ngưỡng RATIO), `MCTS_MAX_DEPTH = 4`, gốc số nằm dưới nút template nên còn 3 tầng toán tử, gốc BOOLEAN có đủ 4 tầng:
+
+- Cả ngữ pháp từ một ô `?`: ≈ 1.9 × 10⁴¹ (độ sâu 3: 3.1 × 10²⁰; độ sâu 2: 1.2 × 10¹⁰).
+- 20 blueprint `20261029_212813` cộng lại: ≈ 4.6 × 10¹⁴ (≈ 2.4 × 10⁻²⁷ cả ngữ pháp). Từng blueprint: 400 → 3.2 × 10¹⁴; 6/20 dưới 2 × 10⁴, 10/20 dưới 10⁸.
+- Blueprint chứa A của bài cài tín hiệu cửa sổ 1, `sub(ts_zscore(sub(pv_high, ?)), ts_zscore(sub(pv_close, ?)))`, chỉ có 400 cách điền (trước tham số template) với 5.000 vòng MCTS ⇒ gần như duyệt hết; ngưỡng phát hiện IC 0.1 vì thế đo khả năng **xếp hạng** công thức đúng lên top-5 (đoạn học → kiểm định) nhiều hơn khả năng **tìm** ra nó.
+
 ## Tốc độ
 
 Một lượt chấm MCTS trên đoạn học cửa sổ 1 (3 blueprint × 400 vòng, 1.196 lượt chấm): 9,8 ms. Thời gian: backtest ≈ 48%, `compute_metrics` ≈ 14%, IC xếp hạng ≈ 10%, tính công thức ≈ 13%. Kết quả giống hệt bản trước khi tăng tốc (200 backtest, 200 IC, bảng xếp hạng MCTS có seed). Một lượt bài cài tín hiệu cửa sổ 1 (20 blueprint × 5.000 vòng, 5 lượt song song): 1.236–1.283 s.
