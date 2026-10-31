@@ -63,6 +63,24 @@ Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `r
 - 20 blueprint `20261029_212813` cộng lại: ≈ 1.4 × 10¹⁴ (≈ 10⁻²⁷ cả ngữ pháp). Từng blueprint: 256 → 1.0 × 10¹⁴; 8/20 dưới 2 × 10⁴, 13/20 dưới 10⁸.
 - Blueprint chứa A của bài cài tín hiệu cửa sổ 1 (OrderFlowSkewnessSignal, `sub(ts_zscore(sub(pv_high, ?)), ts_zscore(sub(pv_close, ?)))`) chỉ có 256 cách điền (trước tham số template) với 5.000 vòng MCTS ⇒ gần như duyệt hết; ngưỡng phát hiện IC 0.1 vì thế đo khả năng **xếp hạng** công thức đúng lên top-5 (đoạn học → kiểm định) nhiều hơn khả năng **tìm** ra nó.
 
+## Độ đông của công thức cài (RQ1)
+
+Đoạn tìm cửa sổ 1 (2018-08-13 → 2022-06-30, 60m), mẫu 10.000 công thức ngẫu nhiên (ramped half-and-half, seed 2026): tỉ lệ công thức hợp lệ có \|Spearman\| ≥ 0.7 với công thức, tức xác suất "tìm lại gần" do tình cờ. Mọi công thức dưới đây qua ADF (p < 10⁻¹⁶).
+
+| Công thức | Toán tử | Độ đông |
+|---|---|---|
+| `ts_zscore(close)` | 1 | 6.87% |
+| `ts_rank(close)` | 1 | 6.21% |
+| `sub(close, ts_mean(close))` | 2 | 5.38% |
+| `ts_argmax(high)` | 1 | 2.76% |
+| `ts_zscore(close − open)` | 2 | 1.67% |
+| `ts_zscore(volume)` | 1 | 1.55% |
+| `ts_mean(close − open)` (A2) | 2 | 0.47% |
+| `ts_zscore(high − low)` | 2 | 0.28% |
+| `ts_corr(close, volume)` (A1) | 1 | 0.21% |
+
+Cửa sổ 10 cho mọi công thức. Hồi quy về trung bình trên mức giá nằm ở vùng đông: ≈ 1/15 công thức ngẫu nhiên trông giống nó.
+
 ## Tốc độ
 
 Một lượt chấm MCTS trên đoạn học cửa sổ 1 (3 blueprint × 400 vòng, 1.196 lượt chấm): 9,8 ms. Thời gian: backtest ≈ 48%, `compute_metrics` ≈ 14%, IC xếp hạng ≈ 10%, tính công thức ≈ 13%. Kết quả giống hệt bản trước khi tăng tốc (200 backtest, 200 IC, bảng xếp hạng MCTS có seed). Một lượt bài cài tín hiệu cửa sổ 1 (20 blueprint × 5.000 vòng, 5 lượt song song): 1.236–1.283 s.
