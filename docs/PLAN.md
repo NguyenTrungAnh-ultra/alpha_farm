@@ -11,12 +11,16 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 | 2 | Lõi: backtest, toán tử `ts_*`, giả lập HMM | ✅ | kiểm trên dữ liệu thật | [ARCH](design/ARCH.md) |
 | 3 | Nối pipeline `ts_*`, tách dữ liệu khỏi engine, quy đổi theo năm | ✅ 2026-10-28 | `main.py mcts` thật chưa chạy (cần `--retrain-hmm` một lần) | [ARCH](design/ARCH.md) |
 | 4 | Bộ 20 blueprint đóng băng | ✅ 2026-10-29 | `results/blueprint_sets/20261029_212813/` | [WALK_FORWARD](design/WALK_FORWARD.md#bộ-blueprint), [RESULTS](RESULTS.md#bộ-blueprint) |
-| 5 | Bài cài tín hiệu ở cách chia cửa sổ 1 | ✅ 2026-10-30 | 10 seed mỗi mức; ngưỡng phát hiện IC 0.1 (p = 0.005); so vị thế đủ 30 lượt | [PLANTED_SIGNAL](design/PLANTED_SIGNAL.md), [RESULTS](RESULTS.md#bài-cài-tín-hiệu) |
+| 5 | Bài cài tín hiệu ở cách chia cửa sổ 1 (hệ thống sinh một lần) | ✅ 2026-10-30 | 10 seed mỗi mức; ngưỡng phát hiện IC 0.1 (p = 0.005); so vị thế đủ 30 lượt | [PLANTED_SIGNAL](design/PLANTED_SIGNAL.md), [RESULTS](RESULTS.md#bài-cài-tín-hiệu) |
 | 6 | Tăng tốc lượt chấm MCTS | ✅ 2026-10-30 | hai lượt: backtest ≈ 2,2×, rồi chỉ số + IC: 17,3 → 9,8 ms; kết quả giống hệt | [RESULTS](RESULTS.md#tốc-độ) |
 | 7 | Walk-forward LLM + MCTS | 🔧 | code xong (`main.py walkforward placebo\|freeze\|real\|summary`); placebo đã chạy (việc 8) | [WALK_FORWARD](design/WALK_FORWARD.md) |
-| 8 | Placebo walk-forward (RQ2) | ✅ 2026-10-31 | 19 × 7 = 133 lượt, 6 giờ 10 phút; Sharpe placebo 0.11 ± 0.51, lớn nhất 1.02 ⇒ lần thật cần > 1.02 cho p = 0.05 | [WALK_FORWARD](design/WALK_FORWARD.md#placebo) |
-| 9 | Cấu hình so sánh (RQ1): bài cài tín hiệu cho LLM + MCTS / MCTS không LLM / tìm ngẫu nhiên; walk-forward thật các cấu hình làm mô tả | ⏸️ chờ chốt chi tiết | hướng đã chốt 2026-10-31; chưa code | [WALK_FORWARD](design/WALK_FORWARD.md#cấu-hình-so-sánh) |
-| 10 | Đóng băng (`results/walkforward/frozen.json`) | ⏸️ | làm sau việc 9 (đóng băng khoá code) | [WALK_FORWARD](design/WALK_FORWARD.md#đóng-băng) |
+| 8 | Placebo walk-forward (RQ2, hệ thống sinh một lần) | ✅ 2026-10-31 | 19 × 7 = 133 lượt, 6 giờ 10 phút; Sharpe placebo 0.11 ± 0.51, lớn nhất 1.02 ⇒ lần thật cần > 1.02 cho p = 0.05 | [WALK_FORWARD](design/WALK_FORWARD.md#placebo) |
+| 9 | Vòng phản hồi LLM + cấu hình so sánh (RQ1) + sửa prompt | 🔧 thiết kế | design viết 2026-10-31, còn 4 điểm ⏸️; chưa code | [LLM_FEEDBACK](design/LLM_FEEDBACK.md) |
+| 9a | Sinh lại bộ blueprint bằng prompt đã sửa, đóng băng | ⏸️ | sau việc 9 | [LLM_FEEDBACK](design/LLM_FEEDBACK.md#sửa-prompt) |
+| 9b | Đo một lượt có phản hồi (thời gian LLM) | ⏸️ | quyết định giữ thiết kế hay lùi về sinh một lần | [LLM_FEEDBACK](design/LLM_FEEDBACK.md#thứ-tự-và-thời-gian-máy) |
+| 9c | Bài cài tín hiệu RQ1: 3 cấu hình × 4 A × 3 IC × 10 seed | ⏸️ | | [LLM_FEEDBACK](design/LLM_FEEDBACK.md#bài-cài-tín-hiệu-cho-rq1) |
+| 9d | Placebo chạy lại trên hệ thống có phản hồi | ⏸️ | kết quả việc 8 thuộc hệ thống sinh một lần | [WALK_FORWARD](design/WALK_FORWARD.md#placebo) |
+| 10 | Đóng băng (`results/walkforward/frozen.json`) | ⏸️ | làm sau việc 9–9d (đóng băng khoá code) | [WALK_FORWARD](design/WALK_FORWARD.md#đóng-băng) |
 | 11 | Chạy thật một lần, chuỗi lợi suất ngoài mẫu 2022-07 → 2025-12 | ⏸️ | sau việc 10 | [WALK_FORWARD](design/WALK_FORWARD.md) |
 | 12 | Đo lại ước thời gian walk-forward sau tăng tốc | 🔧 | placebo đo được 1.612 s/lượt (ước cũ 14 giờ ⇒ thật 6 giờ 10 phút với 10 lượt song song); các phần khác chưa ước lại | [WALK_FORWARD](design/WALK_FORWARD.md#thời-gian-máy) |
 | 13 | SPA / DSR | chưa | Tháng 4 của proposal | |
@@ -29,7 +33,6 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 - ⏸️ Số seed 5 cho lần chạy thật: Claude đề xuất theo proposal, chưa xác nhận riêng. (K = 19 đang chạy; muốn K = 39 thì chạy thêm bộ 20–39 sau, không phải chạy lại.)
 - ⏸️ Ngân sách placebo bằng lần thật nếu thời gian máy cho phép: Claude đề xuất.
 - ⏸️ Ghi số lệnh và Sharpe sau phí của A như một dòng mô tả tín hiệu cài trong kết quả bài cài tín hiệu.
-- ⏸️ RQ1 mới — A trung lập lấy từ đâu (công thức ngẫu nhiên theo ngữ pháp hay alpha kinh điển), bao nhiêu A, "MCTS không LLM" bắt đầu từ template nào, có giữ "LLM không tìm" trong bài cài tín hiệu không.
 
 ## Nợ
 

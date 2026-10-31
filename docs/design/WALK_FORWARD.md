@@ -34,7 +34,7 @@ Lợi suất ngày = chênh lệch vốn cuối ngày chia vốn ban đầu; Sha
 
 ## Cấu hình so sánh
 
-Cùng ngân sách 100.000 lượt chấm mỗi cửa sổ, cùng bước 2–4. Cách làm các dòng chưa code là đề xuất, chờ duyệt.
+Cùng ngân sách 100.000 lượt chấm mỗi cửa sổ, cùng bước 2–4. Hệ thống chính có vòng phản hồi LLM và cách làm từng cấu hình: [LLM_FEEDBACK](LLM_FEEDBACK.md#các-cấu-hình) (bảng dưới là bản sinh một lần, thay khi code xong).
 
 | Cấu hình | Cách làm | RQ | Code |
 |---|---|---|---|

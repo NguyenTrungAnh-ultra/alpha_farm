@@ -11,6 +11,7 @@ Tệp cổng của vault `docs/` (mở thư mục này bằng Obsidian, hoặc �
 | Phương pháp bài cài tín hiệu (RQ2, độ nhạy) | [design/PLANTED_SIGNAL](design/PLANTED_SIGNAL.md) |
 | Phương pháp walk-forward, cấu hình so sánh, placebo, đóng băng | [design/WALK_FORWARD](design/WALK_FORWARD.md) |
 | Web điều khiển và theo dõi | [design/WEB_DASHBOARD](design/WEB_DASHBOARD.md) |
+| Vòng phản hồi LLM, cấu hình so sánh và bài cài tín hiệu cho RQ1 | [design/LLM_FEEDBACK](design/LLM_FEEDBACK.md) |
 | Công trình liên quan (LLM trong đầu tư, tìm alpha) | [design/RELATED_WORK](design/RELATED_WORK.md) |
 | Vì sao ngày đó quyết thế, các lần chạy cũ, kết luận đã rút lại | [log/](log/) |
 | Proposal luận văn | `proposal/thesis_proposal/Thesis_Proposal.pdf` |
