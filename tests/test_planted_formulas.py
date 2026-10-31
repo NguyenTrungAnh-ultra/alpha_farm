@@ -25,6 +25,26 @@ def frame():
     }, index=index)
 
 
+@pytest.fixture(scope='module')
+def crowd(frame):
+    return pf.CrowdingSample(frame, 400)
+
+
+@pytest.fixture(scope='module')
+def stationary_frame():
+    """Prices that mean-revert around 1000: every price-level series is stationary and they all correlate."""
+    rng = np.random.default_rng(5)
+    n = 900
+    level = np.zeros(n)
+    for i in range(1, n):
+        level[i] = 0.9 * level[i - 1] + rng.normal(0.0, 5.0)
+    close = 1000.0 + level
+    index = pd.date_range('2023-01-02', periods=n, freq='h', name='Datetime')
+    return pd.DataFrame({
+        'Open': close + rng.normal(0, 1, n), 'High': close + rng.uniform(0, 3, n), 'Low': close - rng.uniform(0, 3, n),
+        'Close': close, 'Volume': rng.uniform(1000, 5000, n)}, index=index)
+
+
 def node(name, window=None, children=(), value=None):
     return ASTNode(name=name, children=list(children), window=window, value=value)
 
@@ -100,24 +120,120 @@ def test_random_formulas_have_exactly_the_requested_operator_count(frame):
         assert seen > 10
 
 
-def test_a3_and_a4_are_deterministic_and_have_one_and_two_operators(frame):
-    first = pf.select_rq1_formulas(frame)
-    second = pf.select_rq1_formulas(frame)
+def passing_checks(formulas, frame_, crowd_):
+    return {n: {'adf_p': 0.0, 'crowding_share': 0.0} for n in formulas}
+
+
+def test_a3_and_a4_are_deterministic_and_have_one_and_two_operators(frame, crowd, monkeypatch):
+    monkeypatch.setattr(pf, 'check_classical_formulas', passing_checks)
+    first = pf.select_rq1_formulas(frame, crowd=crowd)
+    second = pf.select_rq1_formulas(frame, crowd=crowd)
     assert {k: v[0].expr for k, v in first.items()} == {k: v[0].expr for k, v in second.items()}
     assert pf.count_operators(first['A3'][0].tree) == 1 and pf.count_operators(first['A4'][0].tree) == 2
     assert first['A3'][1]['seed'] == 1 and first['A4'][1]['seed'] == 2
-    other_seed, _ = pf.select_random_formula('A3', 1, 99, frame, pf.classical_formulas())
+    other_seed, _ = pf.select_random_formula('A3', 1, 99, frame, pf.classical_formulas(), crowd=crowd)
     assert other_seed.expr != first['A3'][0].expr
 
 
-def test_selected_random_formulas_pass_all_three_rules(frame):
+def test_one_crowding_sample_serves_all_four_formulas(frame, monkeypatch):
+    built = []
+    real_init = pf.CrowdingSample.__init__
+
+    def counting_init(self, *args, **kwargs):
+        built.append(1)
+        real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(pf.CrowdingSample, '__init__', counting_init)
+    monkeypatch.setattr(pf, 'CROWDING_SAMPLES', 200)
+    monkeypatch.setattr(pf, 'check_classical_formulas', passing_checks)
+    selected = pf.select_rq1_formulas(frame)
+    assert len(built) == 1
+    assert {info['crowding_drawn'] for _, info in selected.values()} == {200}
+
+
+def test_selected_random_formulas_pass_all_rules_and_record_their_numbers(frame, crowd):
     references = pf.classical_formulas()
-    keys = pf.classical_shape_keys()
-    for name in ('A3', 'A4'):
-        formula, info = pf.select_rq1_formulas(frame)[name]
-        assert pf.rejection_reason(formula, frame, references, keys) is None
-        assert not pf.is_constant_on(formula, frame)
-        assert info['draws'] >= 1 and isinstance(info['rejected'], list)
+    for name, n_operators, seed in (('A3', 1, 1), ('A4', 2, 2)):
+        formula, info = pf.select_random_formula(name, n_operators, seed, frame, references, crowd=crowd)
+        assert pf.rejection_reason(formula, frame, references, crowd) is None
+        assert not pf.is_constant_on(formula, frame) and pf.has_rolling_operator(formula.tree)
+        assert info['adf_p'] < pf.ADF_ALPHA and info['crowding_share'] < pf.CROWDING_LIMIT
+        assert info['candidates'] == len(info['rejected']) + 1 and info['draws'] >= info['candidates']
+        assert all('reason' in item and 'expression' in item for item in info['rejected'])
+
+
+def test_adf_rejects_a_random_walk_level_and_accepts_a_zscore(frame):
+    level = pf.adf_p_value(formula_of(node('pv_close')).alpha_series(frame))
+    zscore = pf.adf_p_value(formula_of(node('ts_zscore', 10, [node('pv_close')])).alpha_series(frame))
+    assert level >= pf.ADF_ALPHA and not pf.is_stationary(level)
+    assert zscore < pf.ADF_ALPHA and pf.is_stationary(zscore)
+    assert not pf.is_stationary(float('nan'))
+    reason = pf.rejection_reason(formula_of(node('ts_sum', 5, [node('pv_close')])), frame, {})
+    assert reason.startswith('not stationary')
+
+
+def test_a_crowded_price_level_formula_is_rejected_and_an_unusual_one_is_not(stationary_frame):
+    crowd = pf.CrowdingSample(stationary_frame, 600)
+    level = formula_of(node('ts_mean', 3, [node('pv_high')]))        # stationary here, correlates with every price level
+    assert pf.is_stationary(pf.adf_p_value(level.alpha_series(stationary_frame)))
+    assert crowd.share(level.alpha_series(stationary_frame)) >= pf.CROWDING_LIMIT
+    assert pf.rejection_reason(level, stationary_frame, {}, crowd).startswith('crowded')
+    unusual = formula_of(node('ts_corr', 5, [node('pv_volume'), node('pv_low')]))
+    assert pf.rejection_reason(unusual, stationary_frame, {}, crowd) is None
+
+
+def test_crowding_share_counts_valid_formulas_only(frame):
+    crowd = pf.CrowdingSample(frame, 300)
+    assert 0 < crowd.n_valid < crowd.n_drawn
+    target = formula_of(node('ts_zscore', 10, [node('pv_close')])).alpha_series(frame)
+    hits = sum(spearman_abs(pd.Series(row, index=frame.index), target) >= pf.NEAR_CORRELATION for row in crowd.values)
+    assert hits > 0
+    assert crowd.share(target) == pytest.approx(hits / crowd.n_valid, abs=0.005)
+
+
+def test_crowding_sample_is_deterministic(frame):
+    first, second = pf.CrowdingSample(frame, 150), pf.CrowdingSample(frame, 150)
+    assert first.n_valid == second.n_valid and np.array_equal(first.values, second.values, equal_nan=True)
+
+
+def test_a_formula_without_a_rolling_operator_is_rejected(stationary_frame):
+    plain = formula_of(node('add', None, [node('pv_high'), node('pv_low')]))
+    assert not pf.has_rolling_operator(plain.tree)
+    assert pf.rejection_reason(plain, stationary_frame, {}) == 'no rolling ts_ operator'
+    mixed = formula_of(node('sub', None, [node('pv_high'), node('ts_mean', 3, [node('pv_low')])]))
+    assert pf.has_rolling_operator(mixed.tree)
+
+
+def test_a_formula_with_the_tree_shape_of_a1_or_a2_is_rejected_and_other_shapes_are_not(stationary_frame):
+    references = pf.classical_formulas()
+    like_a1 = formula_of(node('ts_zscore', 3, [node('pv_volume')]))
+    like_a2 = formula_of(node('ts_mean', 7, [node('sub', None, [node('pv_high'), node('pv_low')])]))
+    for formula in (like_a1, like_a2):
+        assert pf.rejection_reason(formula, stationary_frame, references) == 'same tree shape as A1 or A2'
+    other = formula_of(node('ts_mean', 3, [node('pv_volume')]))
+    assert pf.rejection_reason(other, stationary_frame, references) != 'same tree shape as A1 or A2'
+
+
+class FixedShareCrowd:
+    n_drawn, n_valid = 10, 10
+
+    def __init__(self, share):
+        self._share = share
+
+    def share(self, alpha):
+        return self._share
+
+
+def test_a1_or_a2_failing_stationarity_or_crowding_stops_the_selection(frame, monkeypatch):
+    formulas = pf.classical_formulas()
+    with pytest.raises(pf.ClassicalCheckFailed, match='crowded'):
+        pf.check_classical_formulas(formulas, frame, FixedShareCrowd(0.05))
+    assert set(pf.check_classical_formulas(formulas, frame, FixedShareCrowd(0.0))) == {'A1', 'A2'}
+    with pytest.raises(pf.ClassicalCheckFailed, match='A1 is crowded'):
+        pf.select_rq1_formulas(frame, crowd=FixedShareCrowd(0.5))
+    monkeypatch.setattr(pf, 'adf_p_value', lambda alpha: 0.4)
+    with pytest.raises(pf.ClassicalCheckFailed, match='not stationary'):
+        pf.select_rq1_formulas(frame, crowd=FixedShareCrowd(0.0))
 
 
 def test_constant_formulas_are_rejected():
@@ -144,52 +260,32 @@ def test_formulas_correlated_with_a1_or_a2_are_rejected(frame):
     assert 'A2' in pf.rejection_reason(like_a2, frame, references)
     unrelated = formula_of(node('ts_corr', 5, [node('pv_volume'), node('pv_low')]))
     assert spearman_abs(unrelated.alpha_series(frame), references['A1'].alpha_series(frame)) < 0.7
-    assert pf.rejection_reason(unrelated, frame, references, set()) is None
+    assert pf.rejection_reason(unrelated, frame, references) is None
 
 
-def test_classical_shapes_are_rejected_whatever_the_field_and_window(frame):
-    keys = pf.classical_shape_keys()
-    classical = [
-        node('ts_mean', 3, [node('pv_volume')]),
-        node('sub', None, [node('pv_high'), node('pv_low')]),
-        node('sub', None, [node('pv_open'), node('ts_mean', 5, [node('pv_open')])]),
-        node('ts_corr', 2, [node('pv_high'), node('pv_low')]),
-    ]
-    for tree in classical:
-        assert pf.is_classical_shape(tree, keys), tree
-    not_classical = [
-        node('add', None, [node('pv_high'), node('pv_low')]),
-        node('mult', None, [node('pv_close'), node('pv_volume')]),
-        node('ts_mean', 3, [node('ts_sum', 5, [node('pv_high')])]),
-        node('ts_max', 3, [node('sub', None, [node('pv_high'), node('pv_low')])]),
-    ]
-    for tree in not_classical:
-        assert not pf.is_classical_shape(tree, keys), tree
-    assert pf.rejection_reason(formula_of(classical[0]), frame, {}, keys) == 'classical shape'
-
-
-def test_the_next_candidate_of_the_same_seed_is_taken_after_a_rejection(frame, monkeypatch):
-    first, info = pf.select_random_formula('A3', 1, 1, frame, pf.classical_formulas())
+def test_the_next_candidate_of_the_same_seed_is_taken_after_a_rejection(frame, crowd, monkeypatch):
+    first, info = pf.select_random_formula('A3', 1, 1, frame, pf.classical_formulas(), crowd=crowd)
     # Force the first acceptable candidate to be rejected: the next acceptable draw of the same stream follows.
-    real = pf.rejection_reason
+    real = pf.check_formula
     state = {'seen': 0}
 
     def reject_first(formula, *args, **kwargs):
-        reason = real(formula, *args, **kwargs)
+        reason, stats = real(formula, *args, **kwargs)
         if reason is None:
             state['seen'] += 1
-            return 'forced' if state['seen'] == 1 else None
-        return reason
+            return ('forced' if state['seen'] == 1 else None), stats
+        return reason, stats
 
-    monkeypatch.setattr(pf, 'rejection_reason', reject_first)
-    second, second_info = pf.select_random_formula('A3', 1, 1, frame, pf.classical_formulas())
+    monkeypatch.setattr(pf, 'check_formula', reject_first)
+    second, second_info = pf.select_random_formula('A3', 1, 1, frame, pf.classical_formulas(), crowd=crowd)
     assert second.expr != first.expr
     assert second_info['draws'] > info['draws']
-    assert {'expression': first.expr, 'reason': 'forced'} in second_info['rejected']
+    assert any(item['expression'] == first.expr and item['reason'] == 'forced' for item in second_info['rejected'])
 
 
-def test_formulas_file_roundtrip(frame):
-    selected = pf.select_rq1_formulas(frame)
+def test_formulas_file_roundtrip(frame, crowd, monkeypatch):
+    monkeypatch.setattr(pf, 'check_classical_formulas', passing_checks)
+    selected = pf.select_rq1_formulas(frame, crowd=crowd)
     data = json.loads(json.dumps(pf.formulas_to_dict(selected)))
     back = pf.formulas_from_dict(data)
     assert {k: v.expr for k, v in back.items()} == {k: v[0].expr for k, v in selected.items()}

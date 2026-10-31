@@ -13,6 +13,14 @@ from tests.test_batched_blueprints import batch_reply, skeletons
 from tests.test_walk_forward import SMALL, hourly_frame
 
 
+@pytest.fixture(autouse=True)
+def light_selection(monkeypatch):
+    """Formula selection with a small crowding sample and without the A1 / A2 checks (covered in test_planted_formulas)."""
+    monkeypatch.setattr(pf, 'CROWDING_SAMPLES', 300)
+    monkeypatch.setattr(pf, 'check_classical_formulas',
+                        lambda formulas, frame, crowd: {n: {'adf_p': 0.0, 'crowding_share': 0.0} for n in formulas})
+
+
 def candidate(expr, reward=0.5):
     return {'expr': expr, 'reward': reward}
 
@@ -281,6 +289,20 @@ def test_formulas_step_refuses_to_overwrite_without_force(tmp_path, monkeypatch)
         rq.run_rq1(args)
     args.force = True
     rq.run_rq1(args)
+
+
+def test_formulas_step_stops_and_writes_nothing_when_a1_or_a2_fails_a_check(tmp_path, monkeypatch):
+    def fail(formulas, frame, crowd):
+        raise pf.ClassicalCheckFailed('A1 is crowded (5.00% of the random sample)')
+
+    monkeypatch.setattr(pf, 'check_classical_formulas', fail)
+    monkeypatch.setattr(rq, 'load_data', lambda tf, start, end: hourly_frame())
+    parser = argparse.ArgumentParser()
+    rq.add_rq1_parser(parser.add_subparsers(dest='command'))
+    args = parser.parse_args(['rq1', 'formulas', '--out-dir', str(tmp_path)])
+    with pytest.raises(SystemExit, match='A1 is crowded'):
+        rq.run_rq1(args)
+    assert not (tmp_path / 'planted_formulas.json').exists()
 
 
 def test_coverage_step_writes_the_region_report(tmp_path, capsys):

@@ -65,16 +65,24 @@ numpy==2.5.1
     #   hmmlearn
     #   matplotlib
     #   pandas
+    #   patsy
     #   scikit-learn
     #   scipy
+    #   statsmodels
 opentelemetry-api==1.45.1
     # via fastapi
 packaging==26.3
     # via
     #   matplotlib
+    #   patsy
     #   pytest
+    #   statsmodels
 pandas==3.0.3
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   statsmodels
+patsy==1.0.3
+    # via statsmodels
 pillow==13.0.0
     # via matplotlib
 pluggy==1.7.0
@@ -110,10 +118,13 @@ scipy==1.18.0
     #   -r requirements.in
     #   hmmlearn
     #   scikit-learn
+    #   statsmodels
 six==1.17.0
     # via python-dateutil
 starlette==1.10.0
     # via fastapi
+statsmodels==0.14.6
+    # via -r requirements.in
 threadpoolctl==3.7.0
     # via scikit-learn
 typing-extensions==4.16.0

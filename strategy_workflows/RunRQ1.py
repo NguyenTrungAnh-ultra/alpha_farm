@@ -6,7 +6,8 @@ earlier, or block the way to it? Same planted data, same budget, same top-5 sele
 candidates are produced (`SearchConfigs`).
 
 Steps (`main.py rq1 <step>`):
-    formulas   choose A1..A4 (A3 and A4 are random) and write planted_formulas.json
+    formulas   choose A1..A4 (A3 and A4 are random) and write planted_formulas.json; stops when A1 or A2 is
+               non-stationary or crowded
     coverage   which blueprints of the frozen set can fill in to each A, and how many completions the smallest has
     search     run every cell, resumable; writes runs.csv and checkpoints.csv
     summary    recovery rates per configuration x A x IC x budget
@@ -42,7 +43,7 @@ from core_engine.AlphaEngine import AlphaDataProxy
 from core_engine.BacktestEngine import load_data
 from strategy_workflows.MCTSEngine import MCTSEngine, evaluate_alpha
 from strategy_workflows.PlantedFormulas import (
-    coverage_report, formulas_from_dict, formulas_to_dict, select_rq1_formulas,
+    ClassicalCheckFailed, coverage_report, formulas_from_dict, formulas_to_dict, select_rq1_formulas,
 )
 from strategy_workflows.PlantedSignal import (
     NEAR_CORRELATION, PlantedFormula, Segments, assert_in_search_space, build_planted_data, spearman_abs,
@@ -324,7 +325,10 @@ def step_formulas(args) -> None:
                          "Use --force to overwrite.")
     segments = segments_from_args(args)
     frame = load_data(TIMEFRAME, start=segments.search_start, end=segments.search_end)
-    selected = select_rq1_formulas(frame)
+    try:
+        selected = select_rq1_formulas(frame)
+    except ClassicalCheckFailed as exc:
+        raise SystemExit(f"[rq1] A1 / A2 fail the stationarity or crowding check, nothing written: {exc}")
     os.makedirs(args.out_dir, exist_ok=True)
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(formulas_to_dict(selected), f, indent=2, ensure_ascii=False)
