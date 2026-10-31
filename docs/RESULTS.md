@@ -53,7 +53,7 @@ Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `r
 
 ## Bộ blueprint
 
-`results/blueprint_sets/20261029_212813/`: prompt `anon_shapes`, temperature 0.3, `qwen3.5:4b`; 20/20 đạt cả bốn tiêu chí ngay lần sinh đầu (0 chép ví dụ, 0 trùng khung, mọi blueprint có `?` và điền được ở độ sâu 4); 24 vòng hỏi, 37 phút. Gốc: 12 `greater_than`, 7 `mult`, 1 `sub`; 17/20 có `ts_zscore` hoặc `ts_rank` (gợi ý `ts_zscore(?)` trong luật chiều làm mô hình nghiêng về dạng này). `blueprints_sha256` `9b226af1…687e`, `prompt_sha256` `83c2e32f…5719` (đủ trong `generation.json`).
+`results/blueprint_sets/20261029_212813/`: prompt `anon_shapes`, temperature 0.3, `qwen3.5:4b`; 20/20 đạt cả bốn tiêu chí ngay lần sinh đầu (0 chép ví dụ, 0 trùng khung, mọi blueprint có `?` và điền được ở độ sâu 4); 24 vòng hỏi, 37 phút. Gốc: 12 `greater_than`, 7 `mult`, 1 `sub`; 17/20 có `ts_zscore` hoặc `ts_rank` (gợi ý `ts_zscore(?)` trong luật chiều làm mô hình nghiêng về dạng này). Toán tử dùng: 10/19 toán tử đã cài (`ts_zscore` 16/20 blueprint, `mult` 14, `ts_mean` 13, `greater_than` 12, `sub` 11, `ts_rank` 9, `ts_max` 8, `ts_min` 4, `ts_argmax` 1, `ts_sum` 1); không blueprint nào dùng `ts_corr`, `ts_argmin`, `add`, `div`, `less_than`, `equal`, `and_`, `or_`, `not_`. `blueprints_sha256` `9b226af1…687e`, `prompt_sha256` `83c2e32f…5719` (đủ trong `generation.json`).
 
 ## Tốc độ
 
