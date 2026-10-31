@@ -2,7 +2,7 @@
 
 Con số luận văn đang dùng, viết như hôm nay. Các lần chạy cũ và cách ra được số ở [log/](log/). Phương pháp ở `design/`.
 
-## Bài cài tín hiệu
+## Bài cài tín hiệu (hệ thống sinh một lần, bộ blueprint cũ)
 
 Phương pháp: [design/PLANTED_SIGNAL](design/PLANTED_SIGNAL.md). Tệp: `results/planted_window1/` (`runs.csv`, `oracle.csv`, `summary.csv`, `positions_vs_a.json`).
 
@@ -28,7 +28,7 @@ Phương pháp: [design/PLANTED_SIGNAL](design/PLANTED_SIGNAL.md). Tệp: `resul
 | 2018-08 → 2019-12 | 1.738 | 2/5 | 1/5 | 3/5 |
 | 2018-08 → 2022-06 | 4.831 | 0/5 | 1/5 | 5/5 |
 
-## Placebo walk-forward
+## Placebo walk-forward (hệ thống sinh một lần, bộ blueprint cũ)
 
 Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `results/walkforward/oneshot_placebo/` (`runs.csv` 133 dòng, `returns.csv`, `summary.csv`, dòng `mode = placebo`), log `results/walkforward/placebo.log`.
 

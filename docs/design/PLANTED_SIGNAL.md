@@ -1,6 +1,6 @@
 # Bài cài tín hiệu (kiểm soát dương, RQ2)
 
-Phương pháp như đang dùng. Kết quả: [RESULTS](../RESULTS.md#bài-cài-tín-hiệu). Quyết định: [DECISIONS](../DECISIONS.md#bài-cài-tín-hiệu). Các lần chạy trước: [log/2026-10_PLANTED_SIGNAL](../log/2026-10_PLANTED_SIGNAL.md). Code: `strategy_workflows/PlantedSignal.py`, `strategy_workflows/RunPlantedSignal.py`, mô tả ở [ARCH](ARCH.md) mục 3.4.
+Phương pháp như đang dùng. Kết quả: [RESULTS](../RESULTS.md#bài-cài-tín-hiệu-hệ-thống-sinh-một-lần-bộ-blueprint-cũ). Quyết định: [DECISIONS](../DECISIONS.md#bài-cài-tín-hiệu). Các lần chạy trước: [log/2026-10_PLANTED_SIGNAL](../log/2026-10_PLANTED_SIGNAL.md). Code: `strategy_workflows/PlantedSignal.py`, `strategy_workflows/RunPlantedSignal.py`, mô tả ở [ARCH](ARCH.md) mục 3.4.
 
 ## Câu hỏi
 
