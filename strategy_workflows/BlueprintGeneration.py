@@ -20,7 +20,7 @@ import sys
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
@@ -32,13 +32,16 @@ from llm_clients.OllamaClient import SAMPLING_OPTION_NAMES, extract_json
 from strategy_workflows.MCTSDimensions import DATA_FIELD_DIMENSIONS
 from strategy_workflows.SemanticCompiler import ASTNode, SemanticCompiler, count_slots
 from utilities.Prompts import (
-    PROMPT_VARIANTS, build_correction_prompt, build_idea_prompt, get_variant, prompt_hash, variant_examples,
+    PROMPT_VARIANTS, build_batch_correction_prompt, build_batch_prompt, build_correction_prompt,
+    build_feedback_prompt, build_idea_prompt, get_variant, prompt_hash, variant_examples,
 )
 
 TIMEFRAME = '60m'
 DEFAULT_TUNE_COUNT = 5
 DEFAULT_SET_COUNT = 20
 DEFAULT_ROUNDS_PER_BLUEPRINT = 4
+BATCH_REQUEST_TIMEOUT_S = 900
+MAX_BATCH_REQUESTS = 5
 INTEGER_OPTIONS = ("top_k", "seed")
 RUN_FIELDS = [
     'variant', 'params', 'n_requested', 'n_accepted', 'compile_rate', 'slot_rate', 'example_copy_rejections',
@@ -89,6 +92,8 @@ class GenerationStats:
     duplicate_rejections: int = 0
     rounds_used: int = 0
     seconds: float = 0.0
+    requests: int = 0                   # LLM requests made (batched generation: first replies and corrections)
+    llm_seconds: float = 0.0            # time spent waiting for the LLM (batched generation)
     proposed_structures: set = field(default_factory=set)
 
     @property
@@ -303,6 +308,202 @@ def generate_set(
     return accepted, stats
 
 
+# --------------------------------------------------------------------------- batched requests
+
+class LLMAsker:
+    """
+    Sends prompts to `chat` with fixed sampling options. A `seed` option advances by one per request so a fixed
+    seed gives a deterministic sequence of different replies; requests and waiting time are counted.
+    """
+
+    def __init__(self, chat, options: Optional[dict] = None, model: str = 'ollama-local',
+                 timeout: float = BATCH_REQUEST_TIMEOUT_S):
+        self.chat = chat
+        chat.request_timeout = timeout          # a batched thinking request alone takes ~100 s
+        self.options = {k: v for k, v in (options or {}).items() if v is not None}
+        self.model = model
+        self.requests = 0
+        self.seconds = 0.0
+
+    def ask(self, prompt: str) -> str:
+        call_options = dict(self.options)
+        if 'seed' in call_options:
+            call_options['seed'] += self.requests
+        self.requests += 1
+        extra = {'schema': 'json'} if self.model == 'ollama-local' else {}
+        if call_options:
+            extra['options'] = call_options
+        started = time.time()
+        try:
+            return self.chat.send(prompt, **extra)
+        finally:
+            self.seconds += time.time() - started
+
+
+def parse_ideas(text: str) -> Optional[List[dict]]:
+    """Idea objects of a batch reply: `{"ideas": [...]}`, a bare list, or one idea object. None when no JSON."""
+    if not text:
+        return None
+    try:
+        found = json.loads(text.strip())
+    except json.JSONDecodeError:
+        found = extract_json(text)
+    if isinstance(found, dict):
+        found = found['ideas'] if isinstance(found.get('ideas'), list) else [found]
+    if not isinstance(found, list):
+        return None
+    return [item for item in found if isinstance(item, dict)]
+
+
+def generate_batch(
+    asker: LLMAsker, n: int, prompt: str, example_keys: Dict[StructureKey, str],
+    accepted: List[Dict[str, str]], accepted_keys: Dict[StructureKey, str], seen_names: set, stats: GenerationStats,
+) -> int:
+    """
+    One request for up to `n` blueprints, then at most one correction request for the rejected ones.
+
+    Each idea is checked with `check_idea` against the prompt examples and everything already in
+    `accepted_keys` (earlier ideas of the same reply included). New blueprints are appended to `accepted` and
+    their structures to `accepted_keys`. Returns the number accepted by this call. Stats count the ideas of the
+    first reply (compile / slot rates before any correction) and every rejection.
+    """
+    start_accepted = len(accepted)
+
+    def take(idea_json: dict) -> Optional[str]:
+        """Accept the idea if it passes; returns the rejection reason otherwise."""
+        try:
+            idea, key = check_idea(idea_json, example_keys, accepted_keys)
+        except Exception as exc:
+            if isinstance(exc, StructureRejection):
+                if exc.kind == 'example':
+                    stats.example_copy_rejections += 1
+                else:
+                    stats.duplicate_rejections += 1
+            _, proposed_slot = _first_attempt_flags(idea_json)
+            if proposed_slot:
+                stats.proposed_structures.add(blueprint_key(idea_json['macro_blueprint']))
+            return str(exc)
+        stats.proposed_structures.add(key)
+        base = re.sub(r'[^a-zA-Z0-9_]', '', idea['name']) or f"Idea_{len(seen_names) + 1}"
+        name, suffix = base, 2
+        while name in seen_names:
+            name, suffix = f"{base}_{suffix}", suffix + 1
+        seen_names.add(name)
+        accepted_keys[key] = idea['macro_blueprint']
+        accepted.append({'name': name, 'macro_blueprint': idea['macro_blueprint']})
+        print(f"[blueprints] accepted {len(accepted) - start_accepted}/{n}: {name}: {idea['macro_blueprint']}")
+        return None
+
+    def done() -> bool:
+        return len(accepted) - start_accepted >= n
+
+    stats.rounds_used += 1
+    try:
+        ideas = parse_ideas(asker.ask(prompt))
+    except Exception as exc:
+        print(f"[blueprints] chat error: {exc}")
+        ideas = None
+    if not ideas:
+        return 0
+    rejected: List[Tuple[dict, str]] = []
+    for idea_json in ideas:
+        stats.ideas += 1
+        compiles, has_slot = _first_attempt_flags(idea_json)
+        stats.compiled += compiles
+        stats.with_slot += has_slot
+        if done():
+            continue
+        reason = take(idea_json)
+        if reason is not None:
+            print(f"[blueprints] rejected ({reason})")
+            rejected.append((idea_json, reason))
+    if rejected and not done():
+        stats.rounds_used += 1
+        failures = [(str(item.get('macro_blueprint', item)), reason) for item, reason in rejected]
+        try:
+            corrected = parse_ideas(asker.ask(build_batch_correction_prompt(failures))) or []
+        except Exception as exc:
+            print(f"[blueprints] chat error during correction: {exc}")
+            corrected = []
+        for (original, _), fix in zip(rejected, corrected):
+            if done():
+                break
+            reason = take({**original, **fix})
+            if reason is not None:
+                print(f"[blueprints] still rejected after correction ({reason})")
+    return len(accepted) - start_accepted
+
+
+def _finish_stats(stats: GenerationStats, asker: LLMAsker, started: float, accepted: list) -> None:
+    stats.seconds = time.time() - started
+    stats.requests = asker.requests
+    stats.llm_seconds = asker.seconds
+    stats.n_accepted = len(accepted)
+
+
+def generate_initial_set(
+    chat, total: int = DEFAULT_SET_COUNT, batch: int = 10, variant: str = 'anon_shapes', options: Optional[dict] = None,
+    model: str = 'ollama-local', experience: str = '', timeframe: str = TIMEFRAME,
+    max_batches: int = MAX_BATCH_REQUESTS,
+) -> Tuple[List[Dict[str, str]], GenerationStats]:
+    """
+    The initial blueprint set in batched requests of up to `batch` ideas, each followed by at most one
+    correction request. A request after the first lists the blueprints accepted so far, so the model avoids them,
+    and the structure check rejects any that repeat anyway. Requests continue (top-up) until `total` are
+    accepted or `max_batches` batched requests are spent. Fewer than `total` accepted is returned as is; the
+    caller decides what that means. `stats.requests` counts every request, corrections included.
+    """
+    asker = LLMAsker(chat, options, model)
+    example_keys = variant_example_keys(variant)
+    accepted: List[Dict[str, str]] = []
+    accepted_keys: Dict[StructureKey, str] = {}
+    seen_names: set = set()
+    stats = GenerationStats(n_requested=total)
+    started = time.time()
+    try:
+        for _ in range(max_batches):
+            need = min(batch, total - len(accepted))
+            if need <= 0:
+                break
+            prompt = build_batch_prompt(timeframe, need, avoid=[bp['macro_blueprint'] for bp in accepted],
+                                        variant=variant, experience=experience)
+            generate_batch(asker, need, prompt, example_keys, accepted, accepted_keys, seen_names, stats)
+    finally:
+        _finish_stats(stats, asker, started, accepted)
+    return accepted, stats
+
+
+def generate_feedback_blueprints(
+    chat, n: int, scored: List[dict], initial: Sequence[Dict[str, str]], variant: str = 'anon_shapes',
+    options: Optional[dict] = None, model: str = 'ollama-local', timeframe: str = TIMEFRAME,
+) -> Tuple[List[Dict[str, str]], GenerationStats, str]:
+    """
+    New blueprints from the best formulas so far: one batched request for `n` ideas (`scored` items hold
+    `expression`, `reward`, `rank_ic`) and at most one correction request. A new blueprint must not repeat the
+    structure of any `initial` blueprint, a prompt example, or another new one. Returns (new blueprints, stats,
+    the feedback prompt text).
+    """
+    asker = LLMAsker(chat, options, model)
+    example_keys = variant_example_keys(variant)
+    accepted_keys: Dict[StructureKey, str] = {}
+    for bp in initial:
+        try:
+            accepted_keys.setdefault(blueprint_key(bp['macro_blueprint']), bp['macro_blueprint'])
+        except Exception:
+            continue
+    seen_names = {bp['name'] for bp in initial}
+    prompt = build_feedback_prompt(timeframe, n, scored, avoid=[bp['macro_blueprint'] for bp in initial],
+                                   variant=variant)
+    new: List[Dict[str, str]] = []
+    stats = GenerationStats(n_requested=n)
+    started = time.time()
+    try:
+        generate_batch(asker, n, prompt, example_keys, new, accepted_keys, seen_names, stats)
+    finally:
+        _finish_stats(stats, asker, started, new)
+    return new, stats, prompt
+
+
 # --------------------------------------------------------------------------- sampling settings
 
 def parse_params(text: str) -> dict:
@@ -371,14 +572,18 @@ def step_tune(args) -> None:
 # --------------------------------------------------------------------------- step: build
 
 def build_set(chat, n: int, variant: str, params: dict, model: str, out_dir: str,
-              rounds_per_blueprint: int = DEFAULT_ROUNDS_PER_BLUEPRINT) -> bool:
+              rounds_per_blueprint: int = DEFAULT_ROUNDS_PER_BLUEPRINT, batch_size: int = 0) -> bool:
     """
     Generate the real set and write blueprints.json + generation.json into `out_dir`, but only when the
     set criteria hold: n accepted, 0 example copies, no duplicate structure, every blueprint compiles
-    with at least one `?`. Otherwise nothing is written and False is returned.
+    with at least one `?`. Otherwise nothing is written and False is returned. `batch_size` > 0 asks for the
+    set in batched requests of that many ideas (`generate_initial_set`) instead of one idea per round.
     """
     experience = load_variant_experience(variant)
-    accepted, stats = generate_set(chat, n, variant, params, model, experience, rounds_per_blueprint)
+    if batch_size > 0:
+        accepted, stats = generate_initial_set(chat, n, batch_size, variant, params, model, experience)
+    else:
+        accepted, stats = generate_set(chat, n, variant, params, model, experience, rounds_per_blueprint)
     problems = verify_set(accepted, variant)
     if len(accepted) < n:
         problems.append(f"only {len(accepted)} of {n} blueprints accepted in {stats.rounds_used} rounds")
@@ -394,7 +599,7 @@ def build_set(chat, n: int, variant: str, params: dict, model: str, out_dir: str
     with open(set_path, 'rb') as f:
         set_hash = hashlib.sha256(f.read()).hexdigest()
     record = {
-        'variant': variant, 'params': params, 'model': ollama_model_name(model), 'n': n,
+        'variant': variant, 'params': params, 'model': ollama_model_name(model), 'n': n, 'batch_size': batch_size,
         'prompt_sha256': prompt_hash(variant), 'blueprints_sha256': set_hash,
         'created': datetime.now().isoformat(timespec='seconds'),
         'stats': {k: v for k, v in asdict(stats).items() if k != 'proposed_structures'}
@@ -414,7 +619,7 @@ def step_build(args) -> None:
     chat = create_chat(args.model)
     try:
         ok = build_set(chat, args.n, args.variant, parse_params(args.params), args.model, out_dir,
-                       args.rounds_per_blueprint)
+                       args.rounds_per_blueprint, args.batch_size)
     finally:
         if hasattr(chat, 'stop_keepalive'):
             chat.stop_keepalive()
@@ -446,6 +651,8 @@ def add_blueprints_parser(subparsers) -> None:
     p.add_argument('--variant', required=True, choices=list(PROMPT_VARIANTS))
     p.add_argument('--params', default='default', help='One sampling setting, e.g. temperature=0.5,top_p=0.9')
     p.add_argument('--n', type=int, default=DEFAULT_SET_COUNT)
+    p.add_argument('--batch-size', type=int, default=0,
+                   help='Ask for this many blueprints per request (e.g. 10 for 2 requests of 10); 0 = one per round')
     p.add_argument('--out-dir', default=None, help='Default: results/blueprint_sets/<timestamp>')
 
 

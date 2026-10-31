@@ -68,7 +68,7 @@ DIMENSION_RULES = """**Dimensions** (every series has one: CURRENCY for price fi
   - `ts_mean`, `ts_sum`, `ts_max`, `ts_min` keep the dimension of their input.
   - `ts_rank`, `ts_zscore`, `ts_argmax`, `ts_argmin`, `ts_corr` always return a RATIO, whatever their input.
   - `add`, `sub`, `greater_than`, `less_than`, `equal`: both sides MUST have the same dimension (price with price, volume with volume, ratio with ratio).
-  - `mult`: at least one side MUST be a RATIO (result has the other side's dimension). Price x volume, price x price and volume x volume are REJECTED. To weight a non-RATIO series, pair it with a RATIO side such as `ts_zscore(?)` or `ts_rank(?)`.
+  - `mult`: at least one side MUST be a RATIO (result has the other side's dimension). Price x volume, price x price and volume x volume are REJECTED. To weight a non-RATIO series, pair it with a side whose dimension is RATIO (see the dimension list above).
   - `div`: both sides have the same dimension (result is a RATIO), or the divisor is a RATIO (result keeps the numerator's dimension).
   - Every `?` must be fillable within the depth limit: a `?` that has to be a RATIO inside a rolling function (for example both arguments of a `sub` that sits under `mult`) needs an extra nesting level there. Keep such skeletons shallow and simple.
 """
@@ -166,8 +166,6 @@ CRITICAL_RULES = """## CRITICAL RULES (MUST FOLLOW STRICTLY)
 
 # Skeletons the library text itself illustrates syntax with (`ts_mean(?)`, `ts_corr(?, ?)`).
 LIBRARY_ILLUSTRATIONS = ["ts_mean(?)", "ts_corr(?, ?)"]
-# Fragments named by DIMENSION_RULES (anonymised variants only).
-DIMENSION_FRAGMENTS = ["ts_zscore(?)", "ts_rank(?)"]
 
 # Slot rules without any concrete formula: used by the market-anonymised variants.
 SLOT_RULES_PLAIN = """
@@ -293,9 +291,9 @@ PROMPT_VARIANTS = {
         "current", _current_static_prefix,
         [blueprint for _, blueprint in FEW_SHOT_EXAMPLES] + [SLOT_RIGHT_EXAMPLE] + LIBRARY_ILLUSTRATIONS,
         anonymised=False),
-    "anon_rules": PromptVariant("anon_rules", _anon_rules_static_prefix, list(LIBRARY_ILLUSTRATIONS) + DIMENSION_FRAGMENTS, anonymised=True),
+    "anon_rules": PromptVariant("anon_rules", _anon_rules_static_prefix, list(LIBRARY_ILLUSTRATIONS), anonymised=True),
     "anon_shapes": PromptVariant(
-        "anon_shapes", _anon_shapes_static_prefix, list(SHAPE_EXAMPLES) + LIBRARY_ILLUSTRATIONS + DIMENSION_FRAGMENTS, anonymised=True),
+        "anon_shapes", _anon_shapes_static_prefix, list(SHAPE_EXAMPLES) + LIBRARY_ILLUSTRATIONS, anonymised=True),
 }
 
 
@@ -460,4 +458,108 @@ CRITICAL RULES FOR CORRECTION:
    - For example: syntax errors, unknown function names, wrong number of series arguments (`ts_mean(?)` takes one, `ts_corr(?, ?)` takes two), numbers written into the blueprint, mixing price and volume in one `add`/`sub`/comparison, or a BOOLEAN function fed with a non-BOOLEAN argument, or a blueprint with no `?` slot (it must contain at least one `?`: replace an open part by `?`).
 2. Fix the errors while preserving the core trading concept.
 3. Return ONLY a valid JSON block containing the corrected fields. Do not return the entire original JSON. Do not include any explanations or commentary.
+"""
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Batched requests: several blueprints in one reply
+# ═══════════════════════════════════════════════════════════════════════
+
+BATCH_FORMAT_RULES = """## BATCH OUTPUT FORMAT (OVERRIDES THE SINGLE-OBJECT FORMAT ABOVE)
+Return EXACTLY ONE JSON object with the key `ideas`, a list of {n} objects. Each element has the same fields as the OUTPUT FORMAT above (`name`, `timeframe`, `family`, `description`, `macro_blueprint`).
+```json
+{{"ideas": [{{"name": "...", "timeframe": "{timeframe}", "family": "...", "description": "...", "macro_blueprint": "..."}}, ...]}}
+```
+- Every `macro_blueprint` follows ALL the rules above (valid names only, at least one `?`, no numbers, nesting depth at most 3).
+- The {n} skeletons MUST differ from each other in operators or nesting, and every `name` must be different.
+"""
+
+
+def _avoid_section(avoid: list[str]) -> str:
+    if not avoid:
+        return ""
+    lines = "\n".join(f"  - `{text}`" for text in avoid)
+    return (f"## SKELETONS ALREADY TAKEN (DO NOT REPEAT THEM OR THEIR STRUCTURE)\n{lines}\n"
+            "A skeleton with the same operators and nesting as one above is REJECTED, even with other data fields.\n")
+
+
+def build_batch_prompt(
+    timeframe: str,
+    n: int,
+    avoid: list[str] = None,
+    variant: str = "anon_shapes",
+    experience: str = "",
+    market_regime: str = "High Volatility, Sideways",
+    investment_thesis: str = "Exploit asymmetric skewness in order flow.",
+) -> str:
+    """
+    Prompt asking for `n` blueprints at once as `{"ideas": [...]}`. `avoid` lists blueprint texts that are already
+    accepted, so the model does not repeat them. The static part is the one of `variant`.
+    """
+    static_prefix = build_static_prefix(variant, timeframe)
+    exp_section = f"## COMBAT EXPERIENCE (MANDATORY TO FOLLOW)\n{experience}\n" if experience else ""
+    return static_prefix + f"""
+{BATCH_FORMAT_RULES.format(n=n, timeframe=timeframe)}
+## CURRENT MISSION & MARKET CONTEXT
+- Task: Design {n} DIFFERENT intraday trading strategies for the **{timeframe}** timeframe, all in this one reply.
+- **Market Regime**: {market_regime}
+- **Investment Thesis**: {investment_thesis}
+- Cover several families: {', '.join(STRATEGY_FAMILIES)}.
+
+{TIMEFRAME_HINTS.get(timeframe, "")}
+
+{_avoid_section(avoid or [])}
+{exp_section}
+GIVE ME THE JSON NOW:
+"""
+
+
+def build_feedback_prompt(
+    timeframe: str,
+    n: int,
+    scored: list[dict],
+    avoid: list[str] = None,
+    variant: str = "anon_shapes",
+) -> str:
+    """
+    Prompt for the feedback round: `scored` holds the best formulas the search found so far, each a dict with
+    `expression` (text), `reward` and `rank_ic`, all measured on the training segment. Nothing else about the
+    data is shown (no market name, no later segment). The model is asked for `n` new blueprints in one reply.
+    """
+    static_prefix = build_static_prefix(variant, timeframe)
+    lines = "\n".join(
+        f"  {i}. `{item['expression']}`  reward {item['reward']:.4f}, rank IC {item['rank_ic']:+.4f}"
+        for i, item in enumerate(scored, start=1)
+    )
+    return static_prefix + f"""
+{BATCH_FORMAT_RULES.format(n=n, timeframe=timeframe)}
+## FEEDBACK FROM THE SEARCH SO FAR
+A search filled earlier skeletons with data fields and rolling windows and scored every complete formula on historical {timeframe} bars. These are the {len(scored)} best distinct formulas, best first. `reward` is the search score (higher is better); `rank IC` is the Spearman correlation between the formula and the next bar's return. The windows in these formulas are shown for information only: never write a window or any number in a blueprint.
+{lines}
+
+## CURRENT MISSION
+- Task: Design {n} NEW skeletons that the search should try next, in this one reply. Learn from which operators, nestings and data fields scored well above, and also try neighbouring ideas that the formulas above do not cover.
+- Every skeleton must contain at least one `?` and must differ in operators or nesting from each other and from the skeletons already taken.
+
+{_avoid_section(avoid or [])}
+GIVE ME THE JSON NOW:
+"""
+
+
+def build_batch_correction_prompt(failures: list[tuple[str, str]]) -> str:
+    """
+    One correction request for several rejected ideas: `failures` is a list of (macro_blueprint, error message).
+    The reply is a JSON object `{"ideas": [...]}` with one corrected entry per failure, in the same order.
+    """
+    blocks = "\n".join(
+        f"{i}. blueprint: `{blueprint}`\n   error: {error}" for i, (blueprint, error) in enumerate(failures, start=1)
+    )
+    return f"""Some of the strategy skeletons you just generated failed validation in our sandbox.
+
+Failures, in order:
+{blocks}
+
+CRITICAL RULES FOR CORRECTION:
+1. Fix each skeleton so that it passes while keeping its trading idea. Typical causes: unknown function names, a wrong number of series arguments (`ts_mean(?)` takes one, `ts_corr(?, ?)` takes two), numbers written into the blueprint, mixing price and volume in one `add`/`sub`/comparison, a BOOLEAN function fed with a non-BOOLEAN argument, no `?` slot, or a structure equal to one that is already taken (then change the operators or the nesting).
+2. Return ONLY one JSON object `{{"ideas": [...]}}` with exactly {len(failures)} objects, in the same order as above. Each object has the single field `macro_blueprint` holding the corrected skeleton. No explanations.
 """

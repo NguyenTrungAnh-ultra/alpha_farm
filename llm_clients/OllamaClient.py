@@ -53,6 +53,8 @@ def extract_json(text: str) -> Optional[Union[dict, list]]:
 
 
 # Sampling options a caller may override per request; anything else is ignored.
+# Seconds `send` waits for a reply; a client may carry its own `request_timeout`.
+DEFAULT_REQUEST_TIMEOUT_S = 300
 SAMPLING_OPTION_NAMES = ("temperature", "top_p", "top_k", "repeat_penalty", "seed")
 
 
@@ -93,13 +95,28 @@ class OllamaChatClient:
     using a Modelfile template, pre-loads the model in VRAM, routes query prompts, 
     and handles process cleanup on shutdown.
     """
-    def __init__(self, model: str = "qwen3.5:4b", host: str = "http://localhost:11434", verbose: bool = True):
+    def __init__(self, model: str = "qwen3.5:4b", host: str = "http://localhost:11434", verbose: bool = True,
+                 request_timeout: float = DEFAULT_REQUEST_TIMEOUT_S):
+        self.request_timeout = request_timeout
         self.model = model
         self.host = host
         self.verbose = verbose
         self.server_process = None
         self._setup()
         
+    @classmethod
+    def attach(cls, model: str, host: str = "http://localhost:11434", verbose: bool = False,
+               request_timeout: float = DEFAULT_REQUEST_TIMEOUT_S) -> 'OllamaChatClient':
+        """
+        Client for a server and model that are already up (`model` is the name of the model to call, e.g.
+        the custom one another client created). Nothing is started, created or pre-loaded, so a worker
+        process can make its own requests without repeating the setup.
+        """
+        client = cls.__new__(cls)
+        client.model, client.host, client.verbose, client.server_process = model, host, verbose, None
+        client.request_timeout = request_timeout
+        return client
+
     def _is_server_running(self):
         """
         Check if the local Ollama server is currently listening.
@@ -247,7 +264,7 @@ class OllamaChatClient:
         
         try:
             if self.verbose: print(f"[Ollama] Generating response using '{self.model}'...")
-            response = requests.post(url, json=payload, timeout=300)
+            response = requests.post(url, json=payload, timeout=getattr(self, 'request_timeout', DEFAULT_REQUEST_TIMEOUT_S))
             response.raise_for_status()
             data = response.json()
             

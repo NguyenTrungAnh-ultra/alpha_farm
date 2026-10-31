@@ -285,8 +285,10 @@ def test_anon_prompts_state_the_dimension_rules_and_not_the_outdated_line(varian
     for rule in ("`ts_argmax`, `ts_argmin`, `ts_corr` always return a RATIO",
                  "at least one side MUST be a RATIO", "divisor is a RATIO", "fillable within the depth limit"):
         assert rule in prompt
-    for fragment in ("ts_zscore(?)", "ts_rank(?)"):
-        assert fragment in variant_examples(variant)
+    # The rule names no formula fragment, so the model has nothing to copy and no fragment counts as a shown skeleton.
+    assert "ts_zscore(?)" not in prompt and "ts_rank(?)" not in prompt
+    assert "pair it with a side whose dimension is RATIO" in prompt
+    assert "ts_zscore(?)" not in variant_examples(variant) and "ts_rank(?)" not in variant_examples(variant)
 
 
 def test_current_prompt_keeps_the_original_dimension_line():

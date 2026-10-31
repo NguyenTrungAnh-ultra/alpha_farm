@@ -12,10 +12,13 @@ Steps (`main.py walkforward <step>`):
     real      run on the real data; refuses unless frozen.json equals the current configuration
     summary   annualised Sharpe of the concatenated evaluation returns per mode and the placebo p-value
 
-Per-window pipeline (same functions as the planted-signal runner): MCTS on the train segment with
+Per-window pipeline (same functions as the planted-signal runner): a search on the train segment with
 reward mode `sharpe`, the distinct leaderboard expressions (at most MAX_RANKED) re-scored on
 validation, top-5 by validation reward, equal-weight positions traded on the evaluation segment
-with the indicator history taken from the continuous frame.
+with the indicator history taken from the continuous frame. The search is one of `WF_SYSTEMS`:
+`llm_mcts` (frozen blueprints, then one feedback round; the default), `mcts_only`, `random`
+(`SearchConfigs`, one budget of `BudgetPlan.total` per window) or `oneshot` (every blueprint in turn for
+`iterations` each, no feedback).
 
 Placebo seeds: the permutation seed of placebo set k (1-based) in window w (1..99) is
 `PLACEBO_SEED_BASE + 100 * k + w`, i.e. at least 100101. Real runs use MCTS seeds 1-5 and the
@@ -51,11 +54,13 @@ from strategy_workflows.PlantedSignal import (
 from strategy_workflows.RunPlantedSignal import (
     MAX_RANKED, TIMEFRAME, candidate_positions, load_blueprints, quiet, rank_leaderboard,
 )
+from strategy_workflows.SearchConfigs import SYSTEMS, BudgetPlan, create_worker_chat, llm_spec, run_search
 from strategy_workflows.SemanticCompiler import SemanticCompiler
 from utilities.AppConfig import MCTS_MAX_DEPTH, REWARD_WEIGHTS
 
 REWARD_MODE = 'sharpe'
-DEFAULT_CONFIG = 'llm_mcts'
+DEFAULT_SYSTEM = 'llm_mcts'
+WF_SYSTEMS = SYSTEMS + ('oneshot',)
 DEFAULT_BLUEPRINTS = os.path.join(PROJECT_ROOT, 'results', 'blueprint_sets', '20261029_212813', 'blueprints.json')
 DEFAULT_RESULTS_ROOT = os.path.join(PROJECT_ROOT, 'results', 'walkforward')
 DEFAULT_ITERATIONS = 5000
@@ -76,12 +81,18 @@ RUN_KEY = ['mode', 'placebo_set', 'window', 'seed']
 RUN_FIELDS = RUN_KEY + [
     'data_seed', 'iterations', 'n_blueprints', 'blueprint_errors', 'evaluations', 'failed', 'top_errors',
     'n_ranked', 'n_top', 'train_best_reward', 'top', 'top_train_rewards', 'top_val_rewards', 'eval_sharpe',
-    'eval_trades', 'elapsed_s',
+    'eval_trades', 'elapsed_s', 'system', 'llm_s', 'llm_requests', 'new_blueprints', 'feedback',
 ]
 RETURN_FIELDS = ['date', 'window', 'seed', 'mode', 'placebo_set', 'return']
 
 
 # --------------------------------------------------------------------------- windows
+
+
+def wf_plan(total: int = BudgetPlan().total, phase_a: int = BudgetPlan().phase_a,
+            chunk: int = BudgetPlan().chunk) -> BudgetPlan:
+    """Budget plan of a walk-forward run: only the ranking at the end of the budget is used, so no checkpoints."""
+    return BudgetPlan(total=total, phase_a=phase_a, chunk=chunk, checkpoints=())
 
 
 def build_windows(first_eval_start: str = FIRST_EVAL_START, n_windows: int = N_WINDOWS,
@@ -188,41 +199,67 @@ def describe_top(candidates: List[dict], val_rewards: List[float]) -> str:
     ])
 
 
+def run_key_text(task: Dict) -> str:
+    """Identity of a run for seeding the LLM: the same window, seed and data ask the same questions."""
+    return f"wf|{task['mode']}|{task.get('placebo_set', 0)}|{task['window']}|{task['seed']}"
+
+
+def search_oneshot(engine: MCTSEngine, task: Dict, search: pd.DataFrame, segments: Segments) -> Dict:
+    """Every blueprint in turn for `iterations` iterations, then the top-5 selection: no feedback, no budget plan."""
+    compiler = SemanticCompiler()
+    blueprint_errors = 0
+    for bp in task['blueprints']:
+        try:
+            engine.run_search_from_blueprint(compiler.compile_blueprint(bp['macro_blueprint']),
+                                             n_iterations=task['iterations'])
+        except Exception as exc:
+            blueprint_errors += 1
+            print(f"blueprint {bp['name']} failed: {exc}")
+    return {'picked': rank_leaderboard(engine, search, segments, TOP_K), 'summary': engine.error_summary(),
+            'iterations': task['iterations'], 'blueprint_errors': blueprint_errors, 'llm_s': 0.0,
+            'llm_requests': 0, 'new_blueprints': [], 'feedback': {}}
+
+
+def search_with_plan(engine: MCTSEngine, task: Dict, search: pd.DataFrame, segments: Segments) -> Dict:
+    """One of `SYSTEMS` under `task['plan']`; the final ranking is the one at the end of the budget."""
+    llm = task.get('llm')
+    chat = create_worker_chat(llm) if task['system'] == 'llm_mcts' else None
+    outcome = run_search(task['system'], engine, search, segments, task['plan'], task['blueprints'],
+                         run_key_text(task), chat, (llm or {}).get('model_key', 'ollama-local'))
+    return {'picked': outcome.final, 'summary': outcome.error_summary, 'iterations': outcome.iterations,
+            'blueprint_errors': outcome.blueprint_errors, 'llm_s': outcome.llm_s,
+            'llm_requests': outcome.llm_requests, 'new_blueprints': outcome.new_blueprints,
+            'feedback': outcome.feedback}
+
+
 def run_window(task: Dict) -> Dict:
     """
     One (window, seed, mode, placebo set). `task['frame']` is the continuous real frame from
-    search_start to eval_end. Returns {'row': ..., 'returns': daily evaluation returns}.
+    search_start to eval_end. `task['system']` picks the search (`WF_SYSTEMS`; `oneshot` when absent).
+    Returns {'row': ..., 'returns': daily evaluation returns}.
     """
     warnings.filterwarnings('ignore')
     started = time.time()
     segments: Segments = task['segments']
     full = task['frame']
     data_seed = task.get('data_seed', 0)
+    system = task.get('system', 'oneshot')
     if task['mode'] == 'placebo':
         full = placebo_frame(full, segments, data_seed)
     search = full.loc[:segments.search_end]
     with quiet():
         engine = MCTSEngine(timeframe=TIMEFRAME, max_depth=MCTS_MAX_DEPTH, global_position_matrix=None,
                             seed=task['seed'], data=full.loc[:segments.train_end], reward_mode=REWARD_MODE)
-        compiler = SemanticCompiler()
-        blueprint_errors = 0
-        for bp in task['blueprints']:
-            try:
-                engine.run_search_from_blueprint(compiler.compile_blueprint(bp['macro_blueprint']),
-                                                 n_iterations=task['iterations'])
-            except Exception as exc:
-                blueprint_errors += 1
-                print(f"blueprint {bp['name']} failed: {exc}")
-        summary = engine.error_summary()
-        picked = rank_leaderboard(engine, search, segments, TOP_K)
+        found = (search_oneshot if system == 'oneshot' else search_with_plan)(engine, task, search, segments)
+        picked, summary = found['picked'], found['summary']
         top = [picked['ranked'][i] for i in picked['chosen']]
         top_val = [picked['val_rewards'][i] for i in picked['chosen']]
         traded = trade_top(top, full, full.loc[segments.eval_start:segments.eval_end].index)
     returns = traded['returns']
     row = {
         'mode': task['mode'], 'placebo_set': task.get('placebo_set', 0), 'window': task['window'],
-        'seed': task['seed'], 'data_seed': data_seed, 'iterations': task['iterations'],
-        'n_blueprints': len(task['blueprints']), 'blueprint_errors': blueprint_errors,
+        'seed': task['seed'], 'data_seed': data_seed, 'iterations': found['iterations'],
+        'n_blueprints': len(task['blueprints']), 'blueprint_errors': found['blueprint_errors'],
         'evaluations': summary['evaluations'], 'failed': summary['failed_evaluations'],
         'top_errors': json.dumps(summary['top_errors']),
         'n_ranked': len(picked['ranked']), 'n_top': len(top),
@@ -230,7 +267,9 @@ def run_window(task: Dict) -> Dict:
         'top': describe_top(top, top_val),
         'top_train_rewards': json.dumps([c['reward'] for c in top]), 'top_val_rewards': json.dumps(top_val),
         'eval_sharpe': annualised_sharpe(returns), 'eval_trades': traded['trades'],
-        'elapsed_s': time.time() - started,
+        'elapsed_s': time.time() - started, 'system': system, 'llm_s': found['llm_s'],
+        'llm_requests': found['llm_requests'], 'new_blueprints': json.dumps(found['new_blueprints']),
+        'feedback': json.dumps(found['feedback']),
     }
     return {'row': row, 'returns': returns}
 
@@ -267,8 +306,14 @@ def completed_keys(out_dir: str) -> set:
 
 def build_tasks(mode: str, windows: Sequence[Segments], seeds: Sequence[int], blueprints: List[Dict],
                 iterations: int, frame: pd.DataFrame, placebo_sets: int = 0,
-                window_numbers: Optional[Sequence[int]] = None) -> List[Dict]:
-    """Tasks for `mode`; `window_numbers` (1-based) restricts to some windows of `windows`."""
+                window_numbers: Optional[Sequence[int]] = None, system: str = DEFAULT_SYSTEM,
+                plan: Optional[BudgetPlan] = None, llm: Optional[dict] = None) -> List[Dict]:
+    """
+    Tasks for `mode`; `window_numbers` (1-based) restricts to some windows of `windows`. `system` is one of
+    `WF_SYSTEMS`; `plan` (budget) and `llm` (see `llm_spec`) are used by the systems other than `oneshot`.
+    """
+    if system not in WF_SYSTEMS:
+        raise ValueError(f"system must be one of {WF_SYSTEMS}, got {system!r}")
     numbers = list(window_numbers) if window_numbers else list(range(1, len(windows) + 1))
     tasks = []
     if mode == 'real':
@@ -280,8 +325,8 @@ def build_tasks(mode: str, windows: Sequence[Segments], seeds: Sequence[int], bl
         tasks.append({
             'mode': mode, 'placebo_set': k, 'window': w, 'seed': seed, 'segments': segments,
             'data_seed': placebo_seed(k, w) if mode == 'placebo' else 0,
-            'iterations': iterations, 'blueprints': blueprints,
-            'frame': frame.loc[segments.search_start:segments.eval_end],
+            'iterations': iterations, 'blueprints': blueprints, 'system': system, 'plan': plan or wf_plan(),
+            'llm': llm, 'frame': frame.loc[segments.search_start:segments.eval_end],
         })
     return tasks
 
@@ -357,8 +402,9 @@ def changed_code_files(commit: str) -> List[str]:
 
 
 def current_config(blueprint_path: str, n_blueprints: int, iterations: int, seeds: Sequence[int],
-                   data_sha256: str, windows: Sequence[Segments] = WINDOWS) -> Dict:
-    """Everything a frozen configuration pins, except the git commit."""
+                   data_sha256: str, windows: Sequence[Segments] = WINDOWS, plan: Optional[BudgetPlan] = None,
+                   llm_model: str = 'ollama-local') -> Dict:
+    """Everything a frozen configuration pins, except the git commit and the choice of system."""
     blueprints = load_blueprints(blueprint_path)[:n_blueprints]
     return {
         'reward_mode': REWARD_MODE, 'reward_weights': dict(REWARD_WEIGHTS),
@@ -366,7 +412,7 @@ def current_config(blueprint_path: str, n_blueprints: int, iterations: int, seed
         'blueprints_path': relative_path(blueprint_path), 'blueprints_sha256': file_sha256(blueprint_path),
         'n_blueprints': len(blueprints), 'iterations': int(iterations), 'seeds': [int(s) for s in seeds],
         'timeframe': TIMEFRAME, 'max_ranked': MAX_RANKED, 'top_k': TOP_K, 'mcts_max_depth': MCTS_MAX_DEPTH,
-        'data_sha256': data_sha256,
+        'data_sha256': data_sha256, 'budget_plan': (plan or wf_plan()).to_dict(), 'llm_model': llm_model,
     }
 
 
@@ -435,23 +481,37 @@ def summarize(returns: pd.DataFrame) -> pd.DataFrame:
 
 
 def out_dir_of(args) -> str:
-    return os.path.join(args.results_root, args.config)
+    return os.path.join(args.results_root, args.config or args.system)
 
 
 def worker_count(args) -> int:
     return args.workers if args.workers else max(1, multiprocessing.cpu_count() - 2)
 
 
+def plan_from_args(args) -> BudgetPlan:
+    return wf_plan(args.total_budget, args.phase_a, args.chunk)
+
+
+def llm_from_args(args) -> Optional[dict]:
+    """Start (or reach) the Ollama model once in the parent; workers attach to it. None for systems without LLM."""
+    if args.system != 'llm_mcts':
+        return None
+    from strategy_workflows.BlueprintGeneration import create_chat
+    return llm_spec(create_chat(args.model), args.model)
+
+
 def step_placebo(args) -> None:
     blueprints = load_blueprints(args.blueprints)[:args.n_blueprints]
     frame = load_full_frame()
     tasks = build_tasks('placebo', WINDOWS, [PLACEBO_MCTS_SEED], blueprints, args.iterations, frame,
-                        placebo_sets=args.sets, window_numbers=args.windows)
+                        placebo_sets=args.sets, window_numbers=args.windows, system=args.system,
+                        plan=plan_from_args(args), llm=llm_from_args(args))
     execute(tasks, out_dir_of(args), worker_count(args))
 
 
 def config_from_args(args, frame: pd.DataFrame) -> Dict:
-    return current_config(args.blueprints, args.n_blueprints, args.iterations, args.seeds, data_fingerprint(frame))
+    return current_config(args.blueprints, args.n_blueprints, args.iterations, args.seeds, data_fingerprint(frame),
+                          plan=plan_from_args(args), llm_model=args.model)
 
 
 def step_freeze(args) -> None:
@@ -476,7 +536,8 @@ def step_real(args) -> None:
         raise SystemExit("[walkforward] The current configuration differs from frozen.json:\n  "
                          + '\n  '.join(problems))
     blueprints = load_blueprints(args.blueprints)[:args.n_blueprints]
-    tasks = build_tasks('real', WINDOWS, args.seeds, blueprints, args.iterations, frame)
+    tasks = build_tasks('real', WINDOWS, args.seeds, blueprints, args.iterations, frame, system=args.system,
+                        plan=plan_from_args(args), llm=llm_from_args(args))
     execute(tasks, out_dir_of(args), worker_count(args))
 
 
@@ -501,13 +562,24 @@ def add_walkforward_parser(subparsers) -> None:
     steps = parser.add_subparsers(dest='step', required=True)
 
     def common(p, run_options=True):
-        p.add_argument('--config', default=DEFAULT_CONFIG, help='Configuration name (folder under the results root)')
+        p.add_argument('--system', default=DEFAULT_SYSTEM, choices=list(WF_SYSTEMS),
+                       help='Search: llm_mcts (frozen blueprints + feedback round), mcts_only, random, or oneshot '
+                            '(every blueprint in turn, no feedback)')
+        p.add_argument('--config', default=None, help='Folder name under the results root (default: the system)')
         p.add_argument('--results-root', default=DEFAULT_RESULTS_ROOT)
         if run_options:
             p.add_argument('--blueprints', default=DEFAULT_BLUEPRINTS)
             p.add_argument('--n-blueprints', type=int, default=DEFAULT_BLUEPRINT_COUNT,
                            help='Use the first N blueprints of the file')
-            p.add_argument('--iterations', type=int, default=DEFAULT_ITERATIONS)
+            p.add_argument('--iterations', type=int, default=DEFAULT_ITERATIONS,
+                           help='Iterations per blueprint (oneshot only)')
+            p.add_argument('--total-budget', type=int, default=BudgetPlan().total,
+                           help='Iterations (random: samples) per window and seed, all systems but oneshot')
+            p.add_argument('--phase-a', type=int, default=BudgetPlan().phase_a,
+                           help='Share of the budget for the frozen blueprints before the feedback round (llm_mcts)')
+            p.add_argument('--chunk', type=int, default=BudgetPlan().chunk, help='Iterations per blueprint per pass')
+            p.add_argument('--model', default='ollama-local', choices=['ollama-local', 'ollama-9b'],
+                           help='LLM of the feedback round (llm_mcts)')
             p.add_argument('--workers', type=int, default=0, help='Worker processes (default: cpu_count - 2)')
 
     p = steps.add_parser('placebo', help='Run on permuted-return copies of the data')

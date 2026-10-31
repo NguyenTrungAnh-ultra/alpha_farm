@@ -55,6 +55,14 @@ FIELD_EXPRESSIONS = {
 NODE_WITH_VALUE_SLOT = ('window', 'z_score', 'threshold_upper', 'threshold_lower')
 
 
+def scaled_ladders(timeframe: str) -> tuple:
+    """(rolling-window choices, z-score-window choices) of a timeframe: the 10m baselines scaled by bar length."""
+    scale = BASELINE_TF_MINUTES / TIMEFRAME_MINUTES.get(timeframe, 10)
+    periods = sorted(set(max(2, round(p * scale)) for p in BASE_PERIODS))
+    windows = sorted(set(max(2, round(w * scale)) for w in BASE_WINDOW_SEARCH))
+    return periods, windows
+
+
 def _sample_std(values: np.ndarray) -> float:
     """Sample standard deviation (ddof=1) with the arithmetic of `pandas.Series.std`, so a constant input gives exactly the same 0 test."""
     mean = values.sum(dtype=np.float64) / len(values)
@@ -435,6 +443,17 @@ class NormalizedMCTSStrategy(_TemplateStrategy):
     template = "NORMALIZED"
 
 
+class SearchSession:
+    """State of one blueprint's search between `continue_search` calls: the tree and the stopping counters."""
+
+    def __init__(self, root_node: 'MCTSNode'):
+        self.root_node = root_node
+        self.iterations = 0
+        self.best_reward = -float('inf')
+        self.no_improvement = 0
+        self.stop_reason: Optional[str] = None
+
+
 class _FixedPositions:
     """Adapter so precomputed positions can go through AlphaBacktestEngine.run."""
     def __init__(self, positions: pd.Series):
@@ -488,15 +507,8 @@ class MCTSEngine:
         self.exploration_c = exploration_c
         self.global_position_matrix = global_position_matrix
         
-        tf_minutes = TIMEFRAME_MINUTES.get(timeframe, 10)
-        scale = BASELINE_TF_MINUTES / tf_minutes
-        
-        self.scaled_periods = sorted(set(
-            max(2, round(p * scale)) for p in BASE_PERIODS
-        ))
-        self.scaled_window_search = sorted(set(
-            max(2, round(w * scale)) for w in BASE_WINDOW_SEARCH
-        ))
+        scale = BASELINE_TF_MINUTES / TIMEFRAME_MINUTES.get(timeframe, 10)
+        self.scaled_periods, self.scaled_window_search = scaled_ladders(timeframe)
         
         print(f"[MCTS] Timeframe: {timeframe} | Scale: {scale:.1f}x")
         print(f"[MCTS] Scaled PERIODS: {self.scaled_periods}")
@@ -767,6 +779,20 @@ class MCTSEngine:
         self.cache[cache_key] = (best_reward, best_direction, best_metrics)
         return best_reward, best_direction, best_metrics
 
+    def start_search(self, root_ast: ASTNode) -> 'SearchSession':
+        """
+        Check a blueprint and open a resumable search on it; no iteration runs yet. `continue_search`
+        advances it, in as many calls as wanted, keeping the tree, the visit counts and the stopping counters.
+        """
+        unimplemented = find_unimplemented_operator(root_ast)
+        if unimplemented is not None:
+            raise ValueError(f"Blueprint uses operator '{unimplemented}', which has no code generation")
+        analysis = analyze_dimensions(root_ast, self.max_depth)
+        if analysis.error:
+            raise ValueError(f"Blueprint cannot be completed at max_depth={self.max_depth}: {analysis.error}")
+        root_state = MCTSState(root_ast, self.max_depth, self.scaled_window_search, self.scaled_periods)
+        return SearchSession(MCTSNode(root_state))
+
     def run_search_from_blueprint(
         self,
         root_ast: ASTNode,
@@ -776,7 +802,8 @@ class MCTSEngine:
         progress_interval_s: float = 2.0,
     ) -> str:
         """
-        Run MCTS to expand an AST tree blueprint into trading strategies.
+        Run MCTS to expand an AST tree blueprint into trading strategies (`start_search` then one
+        `continue_search` of `n_iterations`).
 
         Every `progress_interval_s` seconds (every iteration when 0) `on_progress(snapshot)` is
         called, then `should_stop()`; a True result ends the search. The callbacks never touch
@@ -785,20 +812,32 @@ class MCTSEngine:
 
         Returns the stop reason: "budget", "patience", "entropy" or "stopped".
         """
-        unimplemented = find_unimplemented_operator(root_ast)
-        if unimplemented is not None:
-            raise ValueError(f"Blueprint uses operator '{unimplemented}', which has no code generation")
-        analysis = analyze_dimensions(root_ast, self.max_depth)
-        if analysis.error:
-            raise ValueError(f"Blueprint cannot be completed at max_depth={self.max_depth}: {analysis.error}")
-        root_state = MCTSState(root_ast, self.max_depth, self.scaled_window_search, self.scaled_periods)
-        root_node = MCTSNode(root_state)
-        
-        print(f"[MCTS] Starting unified search from Blueprint | Depth: {self.max_depth} | Iterations: {n_iterations}")
-        
+        session = self.start_search(root_ast)
+        return self.continue_search(session, n_iterations, on_progress, should_stop, progress_interval_s)
+
+    def continue_search(
+        self,
+        session: 'SearchSession',
+        n_iterations: int,
+        on_progress: Optional[Callable[[dict], None]] = None,
+        should_stop: Optional[Callable[[], bool]] = None,
+        progress_interval_s: float = 2.0,
+        early_stop: bool = True,
+    ) -> str:
+        """
+        Advance `session` by up to `n_iterations` iterations (same callbacks and return value as
+        `run_search_from_blueprint`). The entropy check, the patience counter and the periodic log
+        count the session's iterations since `start_search`, not those of this call, so splitting a
+        search into chunks gives the same tree and leaderboard as one long call. `early_stop=False`
+        turns the entropy and patience stops off, so the whole budget is spent. A session that already
+        stopped on entropy or patience returns that reason without running.
+        """
+        if session.stop_reason in ("entropy", "patience"):
+            return session.stop_reason
+        root_node = session.root_node
+        print(f"[MCTS] Search from Blueprint | Depth: {self.max_depth} | Iterations: {n_iterations}")
+
         start_time = time.time()
-        current_best_reward = -float('inf')
-        no_improvement_count = 0
         stop_reason = "budget"
         completed = 0
         last_report = time.monotonic()
@@ -814,17 +853,18 @@ class MCTSEngine:
                 'elapsed_s': time.time() - start_time,
             }
 
-        for i in range(1, n_iterations + 1):
+        for _ in range(n_iterations):
+            i = session.iterations + 1
             if i % 500 == 0:
                 import gc
                 gc.collect()
-                
+
             if i % 10 == 0:
                 elapsed = time.time() - start_time
-                print(f"  [MCTS] Iteration {i}/{n_iterations} | Cache size: {len(self.cache)} | Best reward: {max([x['reward'] for x in self.leaderboard]) if self.leaderboard else 'N/A'} | Elapsed: {elapsed:.1f}s")
-                
+                print(f"  [MCTS] Iteration {i} | Cache size: {len(self.cache)} | Best reward: {max([x['reward'] for x in self.leaderboard]) if self.leaderboard else 'N/A'} | Elapsed: {elapsed:.1f}s")
+
             # Entropy Convergence Check
-            if i >= REWARD_WEIGHTS['burn_in'] and i % 500 == 0:
+            if early_stop and i >= REWARD_WEIGHTS['burn_in'] and i % 500 == 0:
                 total_visits = root_node.visit_count
                 valid_children = [c for c in root_node.children if c.visit_count > 0]
                 k = len(valid_children)
@@ -840,13 +880,13 @@ class MCTSEngine:
                         print(f"[MCTS] Normalized Entropy: {normalized_entropy:.4f} < {REWARD_WEIGHTS['entropy_threshold']}")
                         stop_reason = "entropy"
                         break
-                        
+
             node = root_node
             path = [node]
             while node.is_fully_expanded() and not node.is_leaf():
                 node = self.select_best_child(node)
                 path.append(node)
-                
+
             if not node.state.is_terminal():
                 if not node.is_fully_expanded():
                     action = node.untried_actions.pop(self.rng.randrange(len(node.untried_actions)))
@@ -855,10 +895,10 @@ class MCTSEngine:
                     node.children.append(child_node)
                     node = child_node
                     path.append(node)
-                    
+
             terminal_state = self.rollout(node.state)
             reward, direction, metrics = self.evaluate_expression(terminal_state.ast_tree)
-            
+
             if terminal_state.is_terminal():
                 try:
                     desc = describe_candidate(terminal_state.ast_tree)
@@ -866,25 +906,26 @@ class MCTSEngine:
                     desc = None  # already counted as a render error by evaluate_expression
                 if desc is not None:
                     self.update_leaderboard(desc['expr'], reward, direction, metrics)
-                
+
             # Risk-Seeking Backpropagation (Tail Quantile)
             for p_node in path:
                 p_node.visit_count += 1
                 if reward > p_node.max_reward:
                     p_node.max_reward = reward
-            completed = i
-                    
+            session.iterations += 1
+            completed += 1
+
             # Early Stopping (Patience Check)
             if self.leaderboard:
                 max_reward = max(x['reward'] for x in self.leaderboard)
-                if max_reward > current_best_reward:
-                    current_best_reward = max_reward
-                    no_improvement_count = 0
+                if max_reward > session.best_reward:
+                    session.best_reward = max_reward
+                    session.no_improvement = 0
                 else:
-                    no_improvement_count += 1
-                    
-                if no_improvement_count >= REWARD_WEIGHTS.get('patience', 5000):
-                    print(f"\n[MCTS] Early Stopping triggered after {no_improvement_count} iterations without improvement!")
+                    session.no_improvement += 1
+
+                if early_stop and session.no_improvement >= REWARD_WEIGHTS.get('patience', 5000):
+                    print(f"\n[MCTS] Early Stopping triggered after {session.no_improvement} iterations without improvement!")
                     stop_reason = "patience"
                     break
 
@@ -898,6 +939,7 @@ class MCTSEngine:
                         stop_reason = "stopped"
                         break
 
+        session.stop_reason = stop_reason if stop_reason in ("entropy", "patience") else None
         print(f"[MCTS] Search completed in {time.time() - start_time:.1f}s.")
         summary = self.error_summary()
         print(f"[MCTS] Evaluations: {summary['evaluations']} | Failed with an exception: {summary['failed_evaluations']} | Gated (-10): {summary['gated_evaluations']} {summary['gate_reasons']}")

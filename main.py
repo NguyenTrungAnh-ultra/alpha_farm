@@ -72,6 +72,13 @@ def cmd_planted(args):
     run_planted(args)
 
 
+def cmd_rq1(args):
+    """Run one step of the RQ1 planted-signal comparison (`main.py rq1 <step>`)."""
+    from strategy_workflows.RunRQ1 import run_rq1
+
+    run_rq1(args)
+
+
 def cmd_walkforward(args):
     """Run one step of the walk-forward test (`main.py walkforward <step>`)."""
     from strategy_workflows.WalkForward import run_walkforward
@@ -297,6 +304,8 @@ def main():
     
     from strategy_workflows.RunPlantedSignal import add_planted_parser
     add_planted_parser(subparsers)
+    from strategy_workflows.RunRQ1 import add_rq1_parser
+    add_rq1_parser(subparsers)
     from strategy_workflows.WalkForward import add_walkforward_parser
     add_walkforward_parser(subparsers)
     from strategy_workflows.BlueprintGeneration import add_blueprints_parser
@@ -330,6 +339,8 @@ def main():
         cmd_full(args)
     elif args.command == "planted":
         cmd_planted(args)
+    elif args.command == "rq1":
+        cmd_rq1(args)
     elif args.command == "walkforward":
         cmd_walkforward(args)
     elif args.command == "blueprints":

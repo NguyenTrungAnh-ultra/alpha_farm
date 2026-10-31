@@ -277,7 +277,7 @@ def analyze_dimensions(root, max_depth: Optional[int] = None) -> DimensionAnalys
     Check a tree's dimensions and work out which dimensions each `?` slot can take.
 
     `root` is any node with `.name` and `.children` (an ASTNode, possibly wrapped in a
-    normalized_template / ratio_template). Bottom-up pass: set of reachable dimensions per node,
+    normalized_template / ratio_template; a bare `?` root is a BOOLEAN root). Bottom-up pass: set of reachable dimensions per node,
     first invalid node recorded in `error`. Top-down pass: for each slot, the dimensions that
     still allow the rest of the tree to be valid. `max_depth` (None = unbounded) is the MCTS
     depth limit, which bounds what a slot can still grow into.
@@ -293,7 +293,8 @@ def analyze_dimensions(root, max_depth: Optional[int] = None) -> DimensionAnalys
     def up(node, depth, expect_boolean, in_ts) -> FrozenSet[Dimension]:
         name = node.name
         if name == "?":
-            s = hole_dims(max(limit - depth, 0), expect_boolean, in_ts)
+            # A bare `?` at the root is a BOOLEAN root: numeric roots always sit under a template node.
+            s = hole_dims(max(limit - depth, 0), expect_boolean or depth == 0, in_ts)
             info[id(node)] = ([], [])
             return s
         if name == "Constant":

@@ -1,6 +1,6 @@
 # Vòng phản hồi LLM và RQ1
 
-Phương pháp như sẽ làm (chưa code). Quyết định: [DECISIONS](../DECISIONS.md#câu-hỏi-nghiên-cứu-và-quy-tắc-chung). Trạng thái: [PLAN](../PLAN.md). Công trình liên quan: [RELATED_WORK](RELATED_WORK.md).
+Phương pháp như sẽ làm (đã code, chưa chạy). Quyết định: [DECISIONS](../DECISIONS.md#câu-hỏi-nghiên-cứu-và-quy-tắc-chung). Trạng thái: [PLAN](../PLAN.md). Công trình liên quan: [RELATED_WORK](RELATED_WORK.md).
 
 ## Câu hỏi
 

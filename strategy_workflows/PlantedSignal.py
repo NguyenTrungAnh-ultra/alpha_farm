@@ -96,7 +96,8 @@ TARGET_WINDOW = 10
 @dataclass(frozen=True)
 class PlantedFormula:
     """
-    A planted alpha A (`tree`, every ts_* node has a window) and its signal s = ts_zscore(A, z_window).
+    A planted alpha A (`tree`, every ts_* node has a window) and its signal s = sign * ts_zscore(A, z_window).
+    `sign` -1 plants the mirrored signal (a mean-reverting A); the expression, and so the search target, is unchanged.
 
     The windows must be values the engine's scaled periods / z-score windows offer for the
     timeframe, otherwise the search can never produce the formula (`assert_in_search_space`).
@@ -105,6 +106,7 @@ class PlantedFormula:
     z_window: int
     source: str = ''
     rule: str = ''
+    sign: float = 1.0
 
     @property
     def expr(self) -> str:
@@ -138,13 +140,13 @@ class PlantedFormula:
         namespace = {k: np.asarray(v[-self.lookback:], dtype=np.float64) for k, v in window.items()}
         namespace.update(TS_FUNCTIONS)
         alpha = eval(_compiled_expression(self.expr), {"__builtins__": {}}, namespace)
-        return float(ts_zscore(alpha, self.z_window)[-1])
+        return self.sign * float(ts_zscore(alpha, self.z_window)[-1])
 
     def alpha_series(self, frame: pd.DataFrame) -> pd.Series:
         return evaluate_alpha(self.expr, AlphaDataProxy(frame))
 
     def signal_series(self, frame: pd.DataFrame) -> pd.Series:
-        return ts_zscore(self.alpha_series(frame), self.z_window)
+        return self.sign * ts_zscore(self.alpha_series(frame), self.z_window)
 
 
 @lru_cache(maxsize=None)
@@ -205,19 +207,26 @@ def formula_to_dict(formula: PlantedFormula) -> dict:
         out = {'name': n.name}
         if n.window is not None:
             out['window'] = n.window
+        if n.value is not None:
+            out['value'] = n.value
         kids = _data_children(n)
         if kids:
             out['children'] = [node(c) for c in kids]
         return out
-    return {'expression': formula.expr, 'z_window': formula.z_window, 'source_blueprint': formula.source,
-            'rule': formula.rule, 'tree': node(formula.tree)}
+    out = {'expression': formula.expr, 'z_window': formula.z_window, 'source_blueprint': formula.source,
+           'rule': formula.rule, 'tree': node(formula.tree)}
+    if formula.sign != 1.0:
+        out['sign'] = formula.sign
+    return out
 
 
 def formula_from_dict(data: dict) -> PlantedFormula:
     def node(d: dict) -> ASTNode:
-        return ASTNode(name=d['name'], children=[node(c) for c in d.get('children', [])], window=d.get('window'))
+        return ASTNode(name=d['name'], children=[node(c) for c in d.get('children', [])], window=d.get('window'),
+                       value=d.get('value'))
     formula = PlantedFormula(tree=node(data['tree']), z_window=int(data['z_window']),
-                             source=data.get('source_blueprint', ''), rule=data.get('rule', ''))
+                             source=data.get('source_blueprint', ''), rule=data.get('rule', ''),
+                             sign=float(data.get('sign', 1.0)))
     if formula.expr != data['expression']:
         raise ValueError(f"Stored expression {data['expression']} does not match its tree {formula.expr}")
     return formula

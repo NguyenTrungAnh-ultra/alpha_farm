@@ -167,3 +167,132 @@ def test_run_window_end_to_end_tiny(tmp_path):
         assert outcome['returns'].index.max() <= pd.Timestamp(SMALL.eval_end)
         wf.append_run(str(tmp_path), 1, outcome)
     assert len(pd.read_csv(tmp_path / 'runs.csv')) == 2
+
+
+# --- search systems -----------------------------------------------------------
+
+import argparse
+
+from tests.test_batched_blueprints import batch_reply, skeletons
+
+TINY_PLAN = wf.wf_plan(total=60, phase_a=30, chunk=10)
+TINY_BLUEPRINTS = [{'name': f'B{i}', 'macro_blueprint': b} for i, b in enumerate(skeletons(16)[:3])]
+
+
+class TinyChat:
+    model, host = 'fake', 'http://fake'
+
+    def __init__(self):
+        self.prompts, self.options = [], []
+
+    def send(self, prompt, schema=None, options=None):
+        self.prompts.append(prompt)
+        self.options.append(options)
+        return batch_reply(skeletons(16)[8:11], 'New')
+
+
+def window_task(system, mode='real', k=0, seed=1):
+    return {'mode': mode, 'placebo_set': k, 'window': 1, 'seed': seed, 'segments': SMALL, 'frame': hourly_frame(),
+            'data_seed': wf.placebo_seed(k, 1) if k else 0, 'iterations': 20, 'blueprints': TINY_BLUEPRINTS,
+            'system': system, 'plan': TINY_PLAN, 'llm': {'model_key': 'ollama-9b', 'name': 'fake', 'host': 'http://fake'}}
+
+
+@pytest.fixture
+def chats(monkeypatch):
+    made = []
+    monkeypatch.setattr(wf, 'create_worker_chat', lambda spec: made.append(TinyChat()) or made[-1])
+    return made
+
+
+@pytest.mark.parametrize("system", ["llm_mcts", "mcts_only", "random"])
+@pytest.mark.parametrize("mode, k", [("real", 0), ("placebo", 1)])
+def test_run_window_with_each_search_system(system, mode, k, chats):
+    outcome = wf.run_window(window_task(system, mode, k))
+    row = outcome['row']
+    assert row['system'] == system and row['mode'] == mode and row['iterations'] == TINY_PLAN.total
+    assert row['evaluations'] > 0 and row['n_ranked'] > 0 and set(wf.RUN_FIELDS) == set(row)
+    assert outcome['returns'].index.min() >= pd.Timestamp(SMALL.eval_start)
+    if system == 'llm_mcts':
+        assert len(chats) == 1 and row['llm_requests'] == 1
+        assert len(json.loads(row['new_blueprints'])) == 3 and json.loads(row['feedback'])['n_new'] == 3
+        assert chats[0].options == [{'seed': json.loads(row['feedback'])['seed']}]
+    else:
+        assert chats == [] and row['llm_requests'] == 0 and json.loads(row['new_blueprints']) == []
+
+
+def test_run_window_is_reproducible_and_seed_of_the_llm_follows_the_run(chats):
+    first = wf.run_window(window_task('llm_mcts'))['row']
+    second = wf.run_window(window_task('llm_mcts'))['row']
+    for column in ('top', 'evaluations', 'new_blueprints', 'feedback'):
+        assert first[column] == second[column]
+    other_seed = wf.run_window(window_task('llm_mcts', seed=2))['row']
+    assert json.loads(other_seed['feedback'])['seed'] != json.loads(first['feedback'])['seed']
+    assert chats[0].prompts == chats[1].prompts                 # same run, same question
+
+
+def test_run_window_defaults_to_the_old_sequential_search_without_a_system():
+    task = window_task('oneshot')
+    del task['system']
+    row = wf.run_window(task)['row']
+    assert row['system'] == 'oneshot' and row['iterations'] == 20 and row['llm_requests'] == 0
+
+
+def test_build_tasks_carry_system_plan_and_llm():
+    frame = hourly_frame()
+    plan = wf.wf_plan(40, 20, 10)
+    tasks = wf.build_tasks('real', [SMALL], [1, 2], [], 5, frame, system='random', plan=plan, llm={'name': 'x'})
+    assert {t['system'] for t in tasks} == {'random'} and tasks[0]['plan'] is plan and tasks[0]['llm'] == {'name': 'x'}
+    assert wf.build_tasks('real', [SMALL], [1], [], 5, frame)[0]['system'] == 'llm_mcts'
+    with pytest.raises(ValueError, match='system'):
+        wf.build_tasks('real', [SMALL], [1], [], 5, frame, system='nonsense')
+    assert wf.wf_plan().checkpoints == () and wf.wf_plan(10, 5, 5).total == 10
+
+
+def test_frozen_config_pins_the_budget_plan_and_the_llm_model(config):
+    _, make = config
+    frozen = json.loads(json.dumps({**make(), 'git_commit': 'abc'}))
+    assert frozen['budget_plan']['total'] == 100000 and frozen['budget_plan']['phase_a'] == 50000
+    assert frozen['budget_plan']['checkpoints'] == [] and frozen['llm_model'] == 'ollama-local'
+    changed = make(plan=wf.wf_plan(50000, 25000, 500))
+    assert any('budget_plan' in p for p in wf.verify_frozen(frozen, changed, lambda c: []))
+    assert any('llm_model' in p for p in wf.verify_frozen(frozen, make(llm_model='ollama-9b'), lambda c: []))
+
+
+def test_cli_defaults_to_the_feedback_system_and_names_the_folder_after_it(tmp_path):
+    parser = argparse.ArgumentParser()
+    wf.add_walkforward_parser(parser.add_subparsers(dest='command'))
+    args = parser.parse_args(['walkforward', 'summary', '--results-root', str(tmp_path)])
+    assert args.system == 'llm_mcts' and wf.out_dir_of(args) == str(tmp_path / 'llm_mcts')
+    args = parser.parse_args(['walkforward', 'summary', '--results-root', str(tmp_path), '--system', 'random'])
+    assert wf.out_dir_of(args) == str(tmp_path / 'random')
+    args = parser.parse_args(['walkforward', 'summary', '--results-root', str(tmp_path), '--system', 'oneshot',
+                              '--config', 'old_style'])
+    assert wf.out_dir_of(args) == str(tmp_path / 'old_style')
+    with pytest.raises(SystemExit):
+        parser.parse_args(['walkforward', 'real', '--system', 'llm_only'])
+
+
+def test_placebo_step_passes_system_plan_and_llm_to_the_tasks(tmp_path, monkeypatch):
+    parser = argparse.ArgumentParser()
+    wf.add_walkforward_parser(parser.add_subparsers(dest='command'))
+    frame = hourly_frame()
+    captured = {}
+    monkeypatch.setattr(wf, 'load_full_frame', lambda *a: frame)
+    monkeypatch.setattr(wf, 'WINDOWS', [SMALL, SMALL])
+    monkeypatch.setattr(wf, 'execute', lambda tasks, out, workers: captured.update(tasks=tasks, out=out))
+    monkeypatch.setattr('strategy_workflows.BlueprintGeneration.create_chat',
+                        lambda model: type('C', (), {'model': 'custom', 'host': 'http://h'})())
+    bp = tmp_path / 'bp.json'
+    bp.write_text(json.dumps(TINY_BLUEPRINTS), encoding='utf-8')
+    args = parser.parse_args(['walkforward', 'placebo', '--results-root', str(tmp_path), '--blueprints', str(bp),
+                              '--sets', '1', '--total-budget', '200', '--phase-a', '100', '--chunk', '20'])
+    wf.step_placebo(args)
+    task = captured['tasks'][0]
+    assert task['system'] == 'llm_mcts' and task['plan'].total == 200 and task['plan'].phase_a == 100
+    assert task['plan'].chunk == 20 and task['plan'].checkpoints == ()
+    assert task['llm'] == {'model_key': 'ollama-local', 'name': 'custom', 'host': 'http://h'}
+    assert captured['out'] == str(tmp_path / 'llm_mcts')
+    args = parser.parse_args(['walkforward', 'placebo', '--results-root', str(tmp_path), '--blueprints', str(bp),
+                              '--sets', '1', '--system', 'random'])
+    wf.step_placebo(args)
+    assert captured['tasks'][0]['llm'] is None and captured['out'] == str(tmp_path / 'random')

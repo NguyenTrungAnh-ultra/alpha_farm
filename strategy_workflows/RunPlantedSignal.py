@@ -137,7 +137,8 @@ def calibration_key(base: pd.DataFrame, strength: float, formula: PlantedFormula
                     segments: Segments = Segments()) -> str:
     """Cache key: strength, formula (expression and z-score window) and the data window (bounds, size, price checksum)."""
     checksum = hashlib.md5(base['Close'].to_numpy().tobytes()).hexdigest()[:12]
-    return (f"strength={strength}|expr={formula.expr}|z_window={formula.z_window}"
+    sign = '' if formula.sign == 1.0 else f"|sign={formula.sign}"
+    return (f"strength={strength}|expr={formula.expr}|z_window={formula.z_window}{sign}"
             f"|data={base.index[0]}..{base.index[-1]}|n={len(base)}|search_end={segments.search_end}|close={checksum}")
 
 
