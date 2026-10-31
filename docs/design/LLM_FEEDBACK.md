@@ -36,16 +36,14 @@ Mỗi lượt (một cửa sổ walk-forward hoặc một lượt bài cài tín
 |---|---|---|---|
 | LLM + MCTS có phản hồi | như trên | ✅ | ✅ |
 | MCTS không LLM | MCTS từ một ô `?` dưới mỗi template NORMALIZED / BOOLEAN / RATIO, chia đều 100.000 lượt | ✅ | ✅ |
-| Tìm ngẫu nhiên | 100.000 công thức hợp lệ về chiều, sinh đều theo ngữ pháp, cùng độ sâu | ✅ | ✅ |
+| Tìm ngẫu nhiên | 100.000 công thức hợp lệ về chiều, sinh theo kích thước (ramped half-and-half), cùng độ sâu | ✅ | ✅ |
 | LLM không tìm | LLM viết công thức hoàn chỉnh (không `?`), chấm hết số viết được | — (LLM không thấy dữ liệu, không có gì để tìm lại) | ✅, kiêm kiểm tra rò rỉ |
 | Mua và giữ, TSMOM | tham chiếu | — | ✅ |
 
 ## Bài cài tín hiệu cho RQ1
 
 - Cách chia cửa sổ 1, 10 seed mỗi ô, IC 0 / 0.05 / 0.1; IC 0 không cài gì nên dùng chung cho mọi A.
-- **Bốn A, chốt trước khi chạy:**
-  - 2 kinh điển: ⏸️ hồi quy về trung bình `ts_zscore(close, 10)` đổi dấu; động lượng `ts_mean(sub(close, open), 10)`.
-  - 2 lạ: công thức sinh ngẫu nhiên theo ngữ pháp, seed 1 và 2; bỏ biểu thức hằng và biểu thức có |Spearman| ≥ 0.7 với A kinh điển, rồi lấy công thức hợp lệ kế tiếp.
+- **Bốn A:** 2 kinh điển, 2 lạ, kích thước khớp nhau; cách chọn ở [Quy tắc chốt trước khi chạy](#quy-tắc-chốt-trước-khi-chạy).
   - Mọi A phải biểu diễn được ở độ sâu 4 và không trùng nguyên văn blueprint nào.
   - Với mỗi A ghi trước khi chạy: A có nằm trong vùng của bộ blueprint ban đầu không (blueprint nào điền ra được A), và số cách điền của blueprint nhỏ nhất chứa A (độ khó tìm trong vùng). Blueprint chứa A cũ chỉ có 400 cách điền ⇒ gần như duyệt hết; A mới nên nằm ở chỗ tìm thật sự khó.
 - **Thước đo chính:** tỉ lệ tìm lại gần (|Spearman| ≥ 0.7 trong top-5) theo cấu hình × A × IC tại các mốc 10.000 / 25.000 / 50.000 / 75.000 / 100.000 lượt chấm (chụp bảng xếp hạng trong cùng lượt, không chạy thêm); so LLM + MCTS với MCTS không LLM bằng Fisher ở cùng ô và cùng mốc. **Phụ:** số lượt chấm và thời gian thật tới lần đầu chạm A; blueprint phản hồi có chứa A không; độ phủ toán tử của blueprint mới.
@@ -59,10 +57,24 @@ Mỗi lượt (một cửa sổ walk-forward hoặc một lượt bài cài tín
 - Tóm lại: thắng ở cả A kinh điển lẫn A lạ ⇒ LLM giúp tìm nói chung; thắng kinh điển, thua lạ ⇒ LLM là định kiến về dạng quen; không thắng ⇒ mô hình 4B không góp vào việc tìm.
 - 10 seed chỉ phân biệt được chênh lớn (cỡ 6/10 với 1/10); ghi kèm kết quả.
 
+## Quy tắc chốt trước khi chạy
+
+⏸️ Toàn bộ mục này là đề xuất của Claude (2026-10-31), chờ người dùng duyệt.
+
+1. **Chọn A trước khi sinh lại blueprint.** Ghi 4 A (biểu thức, chiều cài, seed sinh) vào DECISIONS và commit **trước** khi chạy sinh bộ blueprint mới; sau đó mới kiểm A trong / ngoài vùng. Kích thước khớp nhau để độ dài không lẫn vào kết luận:
+   - A1 kinh điển: `ts_zscore(pv_close, 10)`, cài chiều âm (hồi quy về trung bình); 1 toán tử.
+   - A2 kinh điển: `ts_mean(sub(pv_close, pv_open), 10)` (động lượng trong phiên); 2 toán tử.
+   - A3 lạ: sinh ngẫu nhiên đúng 1 toán tử, seed 1. A4 lạ: đúng 2 toán tử, seed 2. Bỏ biểu thức hằng, |Spearman| ≥ 0.7 với A1 / A2, hoặc trùng dạng kinh điển; lấy biểu thức hợp lệ kế tiếp của cùng seed.
+   - Báo kết quả theo từng A, không gộp thành một con số.
+2. **Một phép so chính, còn lại là mô tả.** Chính: LLM + MCTS so với MCTS không LLM, IC 0.1, gộp theo loại A (A1 + A2 = 20 lượt, A3 + A4 = 20 lượt mỗi cấu hình), tại mốc 50.000 và 100.000 ⇒ 4 phép Fisher hai phía (LLM có thể chặn đường), chỉnh Holm. Mọi ô khác (IC 0.05, từng A, các mốc khác, tìm ngẫu nhiên) chỉ mô tả, không đọc p.
+3. **Tìm ngẫu nhiên theo kích thước:** "ramped half-and-half" như GP: chia đều 100.000 mẫu cho độ sâu 1–4, mỗi độ sâu nửa cây đầy nửa cây mọc tự do; hợp lệ về chiều; cửa sổ và tham số template rút đều; bỏ biểu thức trùng.
+4. **RQ2 theo từng A:** ngưỡng phát hiện của LLM + MCTS ở mốc 100.000 báo riêng cho từng A. Không A nào qua ở IC 0.1 ⇒ thêm mức IC 0.2 chỉ cho LLM + MCTS (luật đặt trước, không chọn sau khi xem).
+5. **Ngưỡng dừng giờ máy:** đo một lượt có phản hồi, thử `OLLAMA_NUM_PARALLEL` 2–4. Ước tổng phần LLM > 48 giờ ⇒ giảm còn 5 blueprint phản hồi; vẫn > 48 giờ ⇒ bỏ phản hồi, chỉ trả lời câu (a) và (c).
+
 ## Thứ tự và thời gian máy
 
-1. Code: vòng phản hồi, MCTS không LLM, tìm ngẫu nhiên, chọn A, sửa prompt. Test cho mỗi phần.
-2. Sinh lại bộ blueprint; đóng băng bộ mới.
+1. Code: vòng phản hồi, MCTS không LLM, tìm ngẫu nhiên, chọn A (kèm kiểm trong / ngoài vùng), chụp bảng xếp hạng theo mốc, sửa prompt. Test cho mỗi phần.
+2. Chọn và commit 4 A; rồi sinh lại bộ blueprint, đóng băng bộ mới.
 3. **Đo một lượt có phản hồi** (thời gian LLM, thời gian MCTS) và thử `OLLAMA_NUM_PARALLEL`. Ước thô: 10 blueprint ≈ 10–20 phút LLM mỗi lượt (lần sinh 20 blueprint mất 37 phút) — chưa đo.
 4. Bài cài tín hiệu RQ1: LLM + MCTS 90 lượt (4 A × 2 IC × 10 + 10 ở IC 0), MCTS không LLM 90, tìm ngẫu nhiên 90.
 5. Placebo chạy lại trên hệ thống có phản hồi: 19 × 7 = 133 lượt.
