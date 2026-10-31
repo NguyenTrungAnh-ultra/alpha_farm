@@ -24,11 +24,11 @@ Số bar từng đoạn: [RESULTS](../RESULTS.md#dữ-liệu). Độ nhạy củ
 
 ## Mỗi cửa sổ
 
-1. MCTS trên đoạn học, reward `sharpe`, 20 blueprint × 5.000 vòng (100.000 lượt chấm).
+1. Tìm trên đoạn học, reward `sharpe`, 100.000 vòng MCTS. Hệ thống chính (`--system llm_mcts`): 20 blueprint `results/blueprint_sets/20261031_rq1/` × 2.500 vòng, một vòng phản hồi LLM, 10 blueprint mới × 5.000 vòng, chạy luân phiên từng đoạn 500 vòng ([LLM_FEEDBACK](LLM_FEEDBACK.md#hệ-thống-llm--mcts-có-phản-hồi)). Bản sinh một lần cũ (`--system oneshot`, 20 × 5.000 tuần tự) giữ để chạy lại placebo 2026-10-31.
 2. ≤ 100 biểu thức khác nhau tốt nhất → chấm lại trên đoạn kiểm định → top-5.
 3. Vị thế top-5 trọng số đều, giao dịch trên đoạn đánh giá (phí, ký quỹ như `AlphaBacktestEngine`); lịch sử chỉ báo lấy từ khung liên tục.
 4. Ghi lợi suất ngày của đoạn đánh giá, top-5 (biểu thức + tham số template + chiều), reward học / kiểm định.
-5. 5 seed (1–5) mỗi cấu hình.
+5. 5 seed (1–5) mỗi cấu hình tìm; LLM không tìm, mua và giữ, TSMOM chỉ seed 1 (tất định).
 
 Lợi suất ngày = chênh lệch vốn cuối ngày chia vốn ban đầu; Sharpe = trung bình / độ lệch (ddof 0) × √252.
 
