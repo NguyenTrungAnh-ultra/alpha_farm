@@ -80,19 +80,15 @@ Người dùng duyệt 2026-10-31 (đề xuất của Claude).
 5. Placebo chạy lại trên hệ thống có phản hồi: 19 × 7 = 133 lượt.
 6. Đóng băng → chạy thật một lần (mọi cấu hình, 5 seed).
 
-Ước thời gian máy (2026-10-31, chưa đo; MCTS ≈ 1.600 s mỗi lượt khi 10 lượt song song như placebo):
+Thời gian máy, ước lại từ lượt đo 2026-10-31 ([RESULTS](../RESULTS.md#tốc-độ)): mỗi lượt cửa sổ 1 tốn CPU ≈ 450 s (MCTS không LLM), ≈ 265 s (tìm ngẫu nhiên), ≈ 580 s + 1–2 yêu cầu LLM ≈ 110 s mỗi yêu cầu (LLM + MCTS); cửa sổ walk-forward sau dài gấp tới 2 lần cửa sổ 1.
 
-| Phần | Lượt | MCTS (CPU) | LLM |
+| Phần | Lượt | CPU (10 song song) | LLM (từng yêu cầu một) |
 |---|---|---|---|
-| Sinh lại bộ blueprint | — | — | 0,7 giờ (tệ nhất 5 lần sinh ≈ 3 giờ) |
-| Đo một lượt | 1 | 0,5 giờ | 0,3 giờ |
-| Bài cài tín hiệu RQ1 | 270 (+ 40 nếu thêm IC 0.2) | 12–14 giờ | 90–130 lượt có phản hồi |
-| Placebo chạy lại | 133 | 6 giờ | 133 lượt có phản hồi |
-| Chạy thật (3 cấu hình tìm × 35) | 105 | 5 giờ | 35 lượt có phản hồi + LLM không tìm |
+| Bài cài tín hiệu RQ1 | 270 (+ 40 nếu thêm IC 0.2) | ≈ 3 giờ | 90 lượt × ≈ 1,5 yêu cầu × 110 s ≈ 4 giờ |
+| Placebo chạy lại | 133 | ≈ 3 giờ | ≈ 6 giờ |
+| Chạy thật (3 cấu hình tìm × 35) | 105 | ≈ 2 giờ | ≈ 1,6 giờ + LLM không tìm |
 
-- MCTS cộng lại ≈ 24 giờ; MCTS không LLM và tìm ngẫu nhiên có cây sâu hơn, chấm có thể chậm hơn ⇒ tệ nhất ≈ 30 giờ.
-- LLM (bật suy nghĩ, 10 blueprint một yêu cầu đo được 99,9 s): ≈ 300 lượt có phản hồi × ≈ 2 phút (gồm một yêu cầu sửa) ≈ 10 giờ nếu chạy từng yêu cầu một; LLM không tìm ≈ 12 giờ ⇒ có thể giảm cùng cách.
-- LLM chạy GPU, MCTS chạy CPU nên chồng lên nhau được. **Tốt nhất ≈ 30 giờ (gần như chỉ còn MCTS); tệ nhất, không chồng: 30 + 10 + 12 + 1 ≈ 53 giờ.**
+- LLM là nút cổ chai (Ollama xử lý từng yêu cầu một); CPU chạy chồng trong lúc chờ. **Tốt nhất ≈ 12 giờ; tệ nhất, không chồng ≈ 20 giờ.**
 
 ## Ngoài phạm vi
 

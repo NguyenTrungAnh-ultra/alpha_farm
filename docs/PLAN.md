@@ -17,7 +17,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 | 8 | Placebo walk-forward (RQ2, hệ thống sinh một lần) | ✅ 2026-10-31 | 19 × 7 = 133 lượt, 6 giờ 10 phút; Sharpe placebo 0.11 ± 0.51, lớn nhất 1.02 ⇒ lần thật cần > 1.02 cho p = 0.05 | [WALK_FORWARD](design/WALK_FORWARD.md#placebo) |
 | 9 | Vòng phản hồi LLM + cấu hình so sánh (RQ1) + sửa prompt | 🔧 | phần 1 code xong 2026-10-31 (`2ed3c49`: phản hồi, MCTS không LLM, tìm ngẫu nhiên, mốc ngân sách, chọn A, `main.py rq1`; 478 test qua); phần 2 còn: LLM không tìm, mua và giữ, TSMOM, Fisher + Holm, web; chưa chạy gì | [LLM_FEEDBACK](design/LLM_FEEDBACK.md) |
 | 9a | Sinh lại bộ blueprint bằng prompt đã sửa, đóng băng | ✅ 2026-10-31 | `results/blueprint_sets/20261031_rq1/`; 4 A chốt trước (DECISIONS) | [LLM_FEEDBACK](design/LLM_FEEDBACK.md#sửa-prompt) |
-| 9b | Đo một lượt có phản hồi (thời gian LLM) | ⏸️ | quyết định giữ thiết kế hay lùi về sinh một lần | [LLM_FEEDBACK](design/LLM_FEEDBACK.md#thứ-tự-và-thời-gian-máy) |
+| 9b | Đo một lượt có phản hồi (thời gian LLM) | ✅ 2026-10-31 | LLM ≈ 110 s mỗi yêu cầu; cả kế hoạch ≈ 12–20 giờ, dưới ngưỡng dừng 48 giờ ⇒ giữ thiết kế | [LLM_FEEDBACK](design/LLM_FEEDBACK.md#thứ-tự-và-thời-gian-máy) |
 | 9c | Bài cài tín hiệu RQ1: 3 cấu hình × 4 A × 3 IC × 10 seed | ⏸️ | | [LLM_FEEDBACK](design/LLM_FEEDBACK.md#bài-cài-tín-hiệu-cho-rq1) |
 | 9d | Placebo chạy lại trên hệ thống có phản hồi | ⏸️ | kết quả việc 8 thuộc hệ thống sinh một lần | [WALK_FORWARD](design/WALK_FORWARD.md#placebo) |
 | 10 | Đóng băng (`results/walkforward/frozen.json`) | ⏸️ | làm sau việc 9–9d (đóng băng khoá code) | [WALK_FORWARD](design/WALK_FORWARD.md#đóng-băng) |

@@ -91,6 +91,8 @@ Một lượt chấm MCTS trên đoạn học cửa sổ 1 (3 blueprint × 400 v
 
 **LLM sinh blueprint** (`qwen3.5:4b`, prompt `anon_shapes` 60m ≈ 1.720 token vào, 2026-10-31, một yêu cầu): bật suy nghĩ (mặc định của `OllamaChatClient`, không truyền `think`) 90,9 s, 8.843 token ra; tắt suy nghĩ 3,3–7,3 s, 121 token ra. Bộ `20261029_212813` sinh khi bật suy nghĩ: 24 yêu cầu, 2.241 s. Một yêu cầu bật suy nghĩ xin 10 blueprint cùng lúc (lô thử, không chấm dữ liệu): 99,9 s, 9.348 token ra, 10/10 biên dịch được, 10 khung khác nhau.
 
+**Một lượt RQ1 đủ cỡ** (cửa sổ 1, 100.000 vòng, 2026-10-31, 5 lượt LLM + MCTS chạy cùng lúc với 2 lượt cấu hình khác; thư mục thử `results/planted_rq1_timing/`, không dùng làm kết quả): MCTS không LLM 446–449 s (65–75 nghìn lượt chấm); tìm ngẫu nhiên 261–262 s (60.725 công thức khác nhau trên 100.000 mẫu, 39% trùng, chủ yếu ở độ sâu 1); LLM + MCTS 631–1.398 s, trong đó phần không phải LLM ≈ 520–630 s và LLM 109 s khi chạy một mình, tới 811 s khi xếp hàng sau các lượt khác (Ollama xử lý từng yêu cầu một); 1–2 yêu cầu mỗi lượt.
+
 ## Dữ liệu
 
 - CAGR mua-và-giữ 2020–2024: 8.94% (1m), 8.93% (15m), 8.90% (60m).
