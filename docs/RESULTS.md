@@ -55,6 +55,10 @@ Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `r
 
 `results/blueprint_sets/20261029_212813/`: prompt `anon_shapes`, temperature 0.3, `qwen3.5:4b`; 20/20 đạt cả bốn tiêu chí ngay lần sinh đầu (0 chép ví dụ, 0 trùng khung, mọi blueprint có `?` và điền được ở độ sâu 4); 24 vòng hỏi, 37 phút. Gốc: 12 `greater_than`, 7 `mult`, 1 `sub`; 17/20 có `ts_zscore` hoặc `ts_rank` (gợi ý `ts_zscore(?)` trong luật chiều làm mô hình nghiêng về dạng này). Toán tử dùng: 10/19 toán tử đã cài (`ts_zscore` 16/20 blueprint, `mult` 14, `ts_mean` 13, `greater_than` 12, `sub` 11, `ts_rank` 9, `ts_max` 8, `ts_min` 4, `ts_argmax` 1, `ts_sum` 1); không blueprint nào dùng `ts_corr`, `ts_argmin`, `add`, `div`, `less_than`, `equal`, `and_`, `or_`, `not_`. `blueprints_sha256` `9b226af1…687e`, `prompt_sha256` `83c2e32f…5719` (đủ trong `generation.json`).
 
+**Bộ RQ1** `results/blueprint_sets/20261031_rq1/` (2026-10-31): prompt `anon_shapes` sau khi bỏ ví dụ `ts_zscore(?)`, `qwen3.5:4b` bật suy nghĩ, hỏi theo lô 10, temperature 0.3, seed 2026; 20/20 đạt tiêu chí bộ thật lần đầu (0 chép ví dụ, 0 trùng khung, 20 khung khác nhau), 4 yêu cầu, 511 s. Dùng 16/19 toán tử (bộ cũ 10/19); `ts_zscore` ở 2/20 blueprint (bộ cũ 16/20); còn thiếu `ts_argmin`, `div`, `and_`. Tổng cách điền ≈ 2.2 × 10¹⁴; 2/20 dưới 2 × 10⁴. `blueprints_sha256` `31e8c4c1…7d7d`, `prompt_sha256` `2cb84c5f…8548`.
+
+**A trong vùng bộ RQ1:** A1, A2, A3 nằm ngoài vùng (không blueprint nào điền ra được); A4 nằm trong vùng qua `ts_argmax(?)` (≈ 1.0 × 10⁷ cách điền).
+
 ## Không gian tìm kiếm
 
 Đếm bằng `strategy_workflows/GrammarSize.py`: số công thức hợp lệ về chiều ở 60m (4 cửa sổ mỗi toán tử `ts_*` = `scaled_periods` {2, 3, 5, 10}; 4 trường giá + khối lượng; 7 hằng ngoài toán tử cuộn; chưa nhân tham số template), `MCTS_MAX_DEPTH = 4`, gốc số nằm dưới nút template nên còn 3 tầng toán tử, gốc BOOLEAN có đủ 4 tầng:
