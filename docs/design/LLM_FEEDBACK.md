@@ -17,7 +17,7 @@ Mỗi lượt (một cửa sổ walk-forward hoặc một lượt bài cài tín
 
 1. **Giai đoạn A:** 20 blueprint ban đầu (bộ đóng băng, sinh lại bằng prompt đã sửa) × 2.500 vòng MCTS = 50.000 lượt chấm, trên đoạn học.
 2. **Phản hồi:** lấy 10 biểu thức khác nhau tốt nhất theo reward đoạn học; đưa LLM: biểu thức, reward, IC đoạn học. ⛔ đoạn kiểm định và đoạn đánh giá. Ẩn tên thị trường như prompt sinh ban đầu.
-3. **LLM viết 10 blueprint mới** qua `generate_set` (cùng luật hợp lệ: biên dịch được, có `?`, không trùng khung với 20 blueprint ban đầu và với nhau). Phản hồi đưa vào qua tham số `experience`.
+3. **LLM viết 10 blueprint mới trong một yêu cầu** (bật suy nghĩ), mở rộng `generate_set` (cùng luật hợp lệ: biên dịch được, có `?`, không trùng khung với 20 blueprint ban đầu và với nhau). Phản hồi đưa vào qua tham số `experience`.
 4. **Giai đoạn B:** 10 blueprint mới × 5.000 vòng = 50.000 lượt chấm.
 5. Chọn top-5 như cũ: ≤ 100 biểu thức tốt nhất của cả hai giai đoạn → đoạn kiểm định → top-5.
 6. Ghi lại 10 blueprint mới, prompt phản hồi (hash), thời gian LLM của từng lượt.
@@ -91,8 +91,8 @@ Người dùng duyệt 2026-10-31 (đề xuất của Claude).
 | Chạy thật (3 cấu hình tìm × 35) | 105 | 5 giờ | 35 lượt có phản hồi + LLM không tìm |
 
 - MCTS cộng lại ≈ 24 giờ; MCTS không LLM và tìm ngẫu nhiên có cây sâu hơn, chấm có thể chậm hơn ⇒ tệ nhất ≈ 30 giờ.
-- LLM: ≈ 300 lượt có phản hồi × 10–20 phút. Tốt nhất (10 phút, 3 yêu cầu song song) ≈ 17 giờ; chạy từng yêu cầu một, 20 phút ≈ 100 giờ ⇒ ngưỡng dừng giới hạn ở 48 giờ. LLM không tìm: ≈ 12 giờ (trần thời gian bằng một vòng phản hồi mỗi lượt).
-- LLM chạy GPU, MCTS chạy CPU nên chồng lên nhau được. **Tốt nhất ≈ 30 giờ; tệ nhất trong ngưỡng dừng, không chồng: 30 + 48 + 12 + 3 ≈ 93 giờ (≈ 4 ngày).**
+- LLM (bật suy nghĩ, 10 blueprint một yêu cầu đo được 99,9 s): ≈ 300 lượt có phản hồi × ≈ 2 phút (gồm một yêu cầu sửa) ≈ 10 giờ nếu chạy từng yêu cầu một; LLM không tìm ≈ 12 giờ ⇒ có thể giảm cùng cách.
+- LLM chạy GPU, MCTS chạy CPU nên chồng lên nhau được. **Tốt nhất ≈ 30 giờ (gần như chỉ còn MCTS); tệ nhất, không chồng: 30 + 10 + 12 + 1 ≈ 53 giờ.**
 
 ## Ngoài phạm vi
 
