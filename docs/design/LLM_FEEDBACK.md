@@ -37,8 +37,8 @@ Mỗi lượt (một cửa sổ walk-forward hoặc một lượt bài cài tín
 | LLM + MCTS có phản hồi | như trên | ✅ | ✅ |
 | MCTS không LLM | MCTS từ một ô `?` dưới mỗi template NORMALIZED / BOOLEAN / RATIO, chia đều 100.000 lượt | ✅ | ✅ |
 | Tìm ngẫu nhiên | 100.000 công thức hợp lệ về chiều, sinh theo kích thước (ramped half-and-half), cùng độ sâu | ✅ | ✅ |
-| LLM không tìm | LLM viết công thức hoàn chỉnh (không `?`), chấm hết số viết được | — (LLM không thấy dữ liệu, không có gì để tìm lại) | ✅, kiêm kiểm tra rò rỉ |
-| Mua và giữ, TSMOM | tham chiếu | — | ✅ |
+| LLM không tìm | LLM viết một lần 100 công thức hoàn chỉnh (không `?`, mọi cửa sổ lấy từ thang của engine ở 60m), 10 yêu cầu suy nghĩ × 10, đóng băng; mỗi cửa sổ chấm hết trên lưới tham số khuôn (≈ 2.500 lượt chấm) | — (LLM không thấy dữ liệu, không có gì để tìm lại) | ✅, kiêm kiểm tra rò rỉ; seed 1 duy nhất |
+| Mua và giữ, TSMOM | tham chiếu: luôn long; dấu lợi suất quá khứ L bar, L ∈ {1 phiên, 1 tuần, 1 tháng} chọn theo Sharpe kiểm định | — | ✅; seed 1 duy nhất |
 
 ## Bài cài tín hiệu cho RQ1
 

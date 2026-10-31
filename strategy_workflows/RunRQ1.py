@@ -10,7 +10,9 @@ Steps (`main.py rq1 <step>`):
                non-stationary or crowded
     coverage   which blueprints of the frozen set can fill in to each A, and how many completions the smallest has
     search     run every cell, resumable; writes runs.csv and checkpoints.csv
-    summary    recovery rates per configuration x A x IC x budget
+    summary    recovery rates per configuration x A x IC x budget (Wilson intervals, no p), the one primary test
+               (llm_mcts vs mcts_only at IC 0.1, pooled by A type, 4 two-sided Fisher tests with Holm), the RQ2
+               detection threshold of llm_mcts per A, and first-touch medians
 
 A cell is (configuration, IC, A, seed). IC 0 plants nothing, so its cell is shared by the four A: one run per
 (configuration, seed) is scored against every A. Per cell and per checkpoint budget the ranking on the leaderboard
@@ -30,10 +32,11 @@ import sys
 import time
 import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
+from scipy.stats import fisher_exact
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -54,7 +57,10 @@ from strategy_workflows.RunPlantedSignal import (
 from strategy_workflows.SearchConfigs import (
     CHECKPOINTS, SYSTEMS, BudgetPlan, create_worker_chat, llm_spec, run_search,
 )
+from strategy_workflows.Statistics import holm_adjust
 from utilities.AppConfig import MCTS_MAX_DEPTH
+from web.planted import fisher_p_greater, wilson_interval
+from web.thesis import detection_threshold
 
 DEFAULT_OUT_DIR = os.path.join(PROJECT_ROOT, 'results', 'planted_rq1')
 DEFAULT_SEEDS = list(range(1, 11))
@@ -63,6 +69,15 @@ CONDITIONAL_IC = 0.2
 FORMULA_NAMES = ['A1', 'A2', 'A3', 'A4']
 REWARD_MODE = 'sharpe'
 SHARED = ''                    # `formula` value of an IC 0 run, shared by every A
+
+# The one primary comparison and the RQ2 reading, fixed before the runs.
+PRIMARY_CONFIGS = ('llm_mcts', 'mcts_only')
+PRIMARY_IC = 0.1
+PRIMARY_BUDGETS = (50_000, 100_000)
+A_TYPES = {'classical': ('A1', 'A2'), 'odd': ('A3', 'A4')}
+DETECTION_CONFIG = 'llm_mcts'
+DETECTION_BUDGET = 100_000
+CHECKPOINT_KEY = ['config', 'ic', 'run_formula', 'seed', 'a', 'budget']
 
 RUN_KEY = ['config', 'ic', 'formula', 'seed']
 RUN_FIELDS = RUN_KEY + [
@@ -280,14 +295,17 @@ def execute(tasks: List[dict], out_dir: str, workers: int, runner: Callable[[dic
 # --------------------------------------------------------------------------- summary
 
 
+def latest_checkpoints(checkpoints: pd.DataFrame) -> pd.DataFrame:
+    """A rerun of the same cell replaces the old rows."""
+    return checkpoints.drop_duplicates(subset=CHECKPOINT_KEY, keep='last')
+
+
 def summarize_checkpoints(checkpoints: pd.DataFrame) -> pd.DataFrame:
     """
-    Per (configuration, IC, A, budget): number of runs, how many are near / touched, their rates, the mean best
-    top-5 |Spearman| and the median iterations to first touch. A rerun of the same cell replaces the old rows.
+    Per (configuration, IC, A, budget): number of runs, how many are near / touched, their rates with 95% Wilson
+    intervals (no p-value), the mean best top-5 |Spearman| and the median iterations to first touch.
     """
-    keys = ['config', 'ic', 'run_formula', 'seed', 'a', 'budget']
-    frame = checkpoints.drop_duplicates(subset=keys, keep='last')
-    grouped = frame.groupby(['config', 'ic', 'a', 'budget'])
+    grouped = latest_checkpoints(checkpoints).groupby(['config', 'ic', 'a', 'budget'])
     out = grouped.agg(
         n_runs=('seed', 'size'), near_count=('near', 'sum'), touched_count=('touched', 'sum'),
         mean_best_corr_top5=('best_corr_top5', 'mean'), mean_closest_corr=('closest_corr', 'mean'),
@@ -295,7 +313,103 @@ def summarize_checkpoints(checkpoints: pd.DataFrame) -> pd.DataFrame:
     ).reset_index()
     out['near_rate'] = out['near_count'] / out['n_runs']
     out['touched_rate'] = out['touched_count'] / out['n_runs']
+    for name in ('near', 'touched'):
+        bounds = [wilson_interval(int(k), int(n)) for k, n in zip(out[f'{name}_count'], out['n_runs'])]
+        out[f'{name}_low'] = [low for low, _ in bounds]
+        out[f'{name}_high'] = [high for _, high in bounds]
     return out
+
+
+def near_counts(frame: pd.DataFrame, config: str, ic: float, names: Sequence[str], budget: int) -> Tuple[int, int]:
+    """(near recoveries, runs) of `config` at `ic` and `budget`, pooled over the A in `names`."""
+    part = frame[(frame['config'] == config) & np.isclose(frame['ic'].astype(float), ic)
+                 & frame['a'].isin(names) & (frame['budget'] == budget)]
+    return int(part['near'].astype(bool).sum()), len(part)
+
+
+def fisher_two_sided(near: int, n: int, other_near: int, other_n: int) -> float:
+    """Two-sided Fisher exact p of two near-recovery counts (NaN when a group is empty)."""
+    if n <= 0 or other_n <= 0:
+        return float('nan')
+    return float(fisher_exact([[near, n - near], [other_near, other_n - other_near]], alternative='two-sided')[1])
+
+
+PRIMARY_FIELDS = ['budget', 'a_type', 'ic', 'near_llm_mcts', 'n_llm_mcts', 'near_mcts_only', 'n_mcts_only',
+                  'p_two_sided', 'p_holm']
+
+
+def primary_tests(checkpoints: pd.DataFrame) -> pd.DataFrame:
+    """
+    The primary comparison: llm_mcts against mcts_only at IC 0.1, near recovery pooled by A type (classical = A1 + A2,
+    odd = A3 + A4) at budgets 50,000 and 100,000: four two-sided Fisher exact tests, Holm-adjusted over the family
+    (tests with an empty group are not counted in it).
+    """
+    frame = latest_checkpoints(checkpoints)
+    first, second = PRIMARY_CONFIGS
+    rows = []
+    for budget in PRIMARY_BUDGETS:
+        for a_type, names in A_TYPES.items():
+            k1, n1 = near_counts(frame, first, PRIMARY_IC, names, budget)
+            k2, n2 = near_counts(frame, second, PRIMARY_IC, names, budget)
+            rows.append({'budget': budget, 'a_type': a_type, 'ic': PRIMARY_IC, 'near_llm_mcts': k1, 'n_llm_mcts': n1,
+                         'near_mcts_only': k2, 'n_mcts_only': n2, 'p_two_sided': fisher_two_sided(k1, n1, k2, n2)})
+    valid = [i for i, row in enumerate(rows) if not np.isnan(row['p_two_sided'])]
+    adjusted = holm_adjust([rows[i]['p_two_sided'] for i in valid])
+    for row in rows:
+        row['p_holm'] = float('nan')
+    for i, value in zip(valid, adjusted):
+        rows[i]['p_holm'] = value
+    return pd.DataFrame(rows, columns=PRIMARY_FIELDS)
+
+
+DETECTION_FIELDS = ['a', 'config', 'budget', 'threshold_ic', 'p_fisher', 'rates']
+
+
+def detection_thresholds(checkpoints: pd.DataFrame, config: str = DETECTION_CONFIG,
+                         budget: int = DETECTION_BUDGET) -> pd.DataFrame:
+    """
+    RQ2 per A: the lowest target IC > 0 at which `config`'s near-recovery rate at `budget` beats IC 0 in a one-sided
+    Fisher test at 0.05 (`detection_threshold`, the rule of the web pages). NaN when no level passes.
+    """
+    frame = latest_checkpoints(checkpoints)
+    rows = []
+    for name in sorted(frame['a'].unique()):
+        part = frame[(frame['config'] == config) & (frame['a'] == name) & (frame['budget'] == budget)]
+        levels = []
+        for ic in sorted(part['ic'].astype(float).unique()):
+            level = part[np.isclose(part['ic'].astype(float), ic)]
+            levels.append({'strength': ic, 'near_count': int(level['near'].astype(bool).sum()), 'n_runs': len(level)})
+        base = next((r for r in levels if r['strength'] == 0.0), None)
+        for r in levels:
+            r['p_fisher'] = None if r['strength'] == 0.0 else (
+                float('nan') if base is None else
+                fisher_p_greater(r['near_count'], r['n_runs'], base['near_count'], base['n_runs']))
+        hit = detection_threshold(levels)
+        rows.append({'a': name, 'config': config, 'budget': budget,
+                     'threshold_ic': float('nan') if hit is None else hit['strength'],
+                     'p_fisher': float('nan') if hit is None else hit['p_fisher'],
+                     'rates': '; '.join(f"IC {r['strength']:g}: {r['near_count']}/{r['n_runs']}" for r in levels)})
+    return pd.DataFrame(rows, columns=DETECTION_FIELDS)
+
+
+FIRST_TOUCH_FIELDS = ['config', 'a', 'ic', 'budget', 'n_runs', 'n_touched', 'median_iterations', 'median_evaluations',
+                      'median_wall_s']
+
+
+def first_touch_table(checkpoints: pd.DataFrame) -> pd.DataFrame:
+    """
+    Medians of iterations, evaluations and wall seconds at the first touch of A per configuration x A x IC, over the
+    runs that touched it by the last budget (`n_touched` of `n_runs`: a run that never touched is not in the median).
+    """
+    frame = latest_checkpoints(checkpoints)
+    last = frame[frame['budget'] == frame['budget'].max()]
+    grouped = last.groupby(['config', 'a', 'ic'])
+    out = grouped.agg(
+        budget=('budget', 'max'), n_runs=('seed', 'size'), n_touched=('touched', 'sum'),
+        median_iterations=('touch_iterations', 'median'), median_evaluations=('touch_evaluations', 'median'),
+        median_wall_s=('touch_wall_s', 'median'),
+    ).reset_index()
+    return out[FIRST_TOUCH_FIELDS]
 
 
 # --------------------------------------------------------------------------- steps
@@ -387,12 +501,23 @@ def step_summary(args) -> None:
     if not os.path.exists(path):
         print(f"[rq1] {path} not found; run the search step first.")
         return
-    summary = summarize_checkpoints(pd.read_csv(path, keep_default_na=True, dtype={'run_formula': str}))
-    out = os.path.join(args.out_dir, 'summary.csv')
-    summary.to_csv(out, index=False)
-    with pd.option_context('display.width', 220, 'display.max_columns', None):
-        print(summary.round(3).to_string(index=False))
-    print(f"[rq1] Wrote {out}")
+    checkpoints = pd.read_csv(path, keep_default_na=True, dtype={'run_formula': str})
+    tables = [
+        ('summary.csv', 'Recovery rates (Wilson intervals; no p-values outside the primary test)',
+         summarize_checkpoints(checkpoints)),
+        ('primary_tests.csv', 'Primary test: llm_mcts vs mcts_only at IC 0.1, two-sided Fisher, Holm',
+         primary_tests(checkpoints)),
+        ('detection_thresholds.csv', f"RQ2 detection threshold of {DETECTION_CONFIG} at {DETECTION_BUDGET:,} per A",
+         detection_thresholds(checkpoints)),
+        ('first_touch.csv', 'First touch of A (medians over the runs that touched it)',
+         first_touch_table(checkpoints)),
+    ]
+    for name, title, table in tables:
+        table.to_csv(os.path.join(args.out_dir, name), index=False)
+        print(f"[rq1] {title}")
+        with pd.option_context('display.width', 220, 'display.max_columns', None):
+            print(table.round(3).to_string(index=False))
+        print(f"[rq1] Wrote {os.path.join(args.out_dir, name)}")
 
 
 # --------------------------------------------------------------------------- CLI

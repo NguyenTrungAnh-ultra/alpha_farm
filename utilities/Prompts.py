@@ -563,3 +563,101 @@ CRITICAL RULES FOR CORRECTION:
 1. Fix each skeleton so that it passes while keeping its trading idea. Typical causes: unknown function names, a wrong number of series arguments (`ts_mean(?)` takes one, `ts_corr(?, ?)` takes two), numbers written into the blueprint, mixing price and volume in one `add`/`sub`/comparison, a BOOLEAN function fed with a non-BOOLEAN argument, no `?` slot, or a structure equal to one that is already taken (then change the operators or the nesting).
 2. Return ONLY one JSON object `{{"ideas": [...]}}` with exactly {len(failures)} objects, in the same order as above. Each object has the single field `macro_blueprint` holding the corrected skeleton. No explanations.
 """
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Complete formulas (the LLM-only configuration): no `?`, every window written out
+# ═══════════════════════════════════════════════════════════════════════
+
+# The dimension rules minus their last bullet, which is about `?` slots.
+FORMULA_DIMENSION_RULES = "\n".join(DIMENSION_RULES.rstrip("\n").split("\n")[:-1]).replace(
+    "the blueprint is REJECTED", "the formula is REJECTED")
+assert "`?`" not in FORMULA_DIMENSION_RULES
+
+# Syntax illustrations shown to the model; a reply equal to one of them is rejected as a copy.
+FORMULA_EXAMPLES = [
+    "ts_mean(pv_close, 5)",
+    "sub(pv_high, ts_min(pv_low, 3))",
+    "ts_corr(pv_open, pv_volume, 10)",
+]
+
+
+def _formula_prefix(windows: list[int]) -> str:
+    shown = ", ".join(str(w) for w in windows)
+    examples = "\n".join(f"- `{text}`" for text in FORMULA_EXAMPLES)
+    return f"""{ANON_INTRO}
+
+## REFERENCE LIBRARY
+## Available Data Fields
+{', '.join(DATA_FIELDS)}
+
+## Available Operator Functions
+**Time-Series** (rolling window): {_operator_names(OperatorGroup.TIME_SERIES)}
+  - Each takes its series argument(s) first and ONE integer window LAST: `ts_mean(pv_close, 5)`; `ts_corr` takes two series, then the window: `ts_corr(pv_close, pv_volume, 5)`.
+  - The window MUST be one of: {shown}. No other number may appear anywhere in the formula.
+**Math** (two series arguments): {_operator_names(OperatorGroup.STATISTICS)}
+**Logic**: {_operator_names(OperatorGroup.LOGIC)}
+  - `and_`, `or_`, `not_` take BOOLEAN arguments; `greater_than`, `less_than`, `equal` take two series and return BOOLEAN.
+{FORMULA_DIMENSION_RULES}
+## WHAT A FORMULA IS
+A COMPLETE formula: every series argument is a data field or another function call. There is NO `?` and no open slot; the search tunes only the trading thresholds afterwards.
+formula  := FUNCTION(argument, ...)
+argument := formula | DATA_FIELD
+## SYNTAX ILLUSTRATIONS (NOT SUGGESTIONS)
+{examples}
+NEVER output one of these exactly. Design formulas of your own.
+
+## CRITICAL RULES (MUST FOLLOW STRICTLY)
+1. **Root**: prefer a root whose output keeps its input dimension (`sub`, `add`, `mult`, `ts_mean`, `ts_sum`, `ts_max`, `ts_min`, `ts_argmax`, `ts_argmin`); a BOOLEAN root (`greater_than`, `less_than`, `equal`, `and_`, `or_`, `not_`) is also fine. AVOID a RATIO root (`div`, `ts_rank`, `ts_corr`, `ts_zscore`).
+2. **Valid names ONLY**: exactly the names above; do not invent indicators (no `ema`, `rsi`, `macd`, `zscore`, `diff`, `shift`).
+3. **Windows**: the last argument of every time-series function, one of {shown}; no other numbers.
+4. **Depth**: DO NOT nest functions deeper than 3 levels. Close all parentheses.
+5. **JSON only**."""
+
+
+def _formula_taken(avoid: list[str]) -> str:
+    if not avoid:
+        return ""
+    lines = "\n".join(f"  - `{text}`" for text in avoid)
+    return f"## FORMULAS ALREADY TAKEN (DO NOT REPEAT THEM EXACTLY)\n{lines}\n"
+
+
+def build_formula_batch_prompt(timeframe: str, n: int, windows: list[int], avoid: list[str] = None) -> str:
+    """
+    Prompt asking for `n` complete formulas at once as `{"ideas": [{"name", "family", "description", "formula"}]}`.
+    No market name, no data. `windows` are the rolling windows the engine offers at `timeframe` (the only numbers
+    allowed); `avoid` lists the formulas already accepted.
+    """
+    if timeframe != "60m":
+        raise ValueError(f"The formula prompt is written for 60m bars, got {timeframe}")
+    return _formula_prefix(windows) + f"""
+
+## BATCH OUTPUT FORMAT
+Return EXACTLY ONE JSON object with the key `ideas`, a list of {n} objects with the fields `name`, `family`, `description`, `formula`.
+```json
+{{"ideas": [{{"name": "...", "family": "...", "description": "...", "formula": "..."}}, ...]}}
+```
+- The {n} formulas MUST be different from each other and every `name` must be different.
+
+## CURRENT MISSION
+- Task: Design {n} DIFFERENT complete trading formulas for the **{timeframe}** timeframe of an index futures contract, all in this one reply.
+- Cover several families: {', '.join(STRATEGY_FAMILIES)}.
+
+{_formula_taken(avoid or [])}
+GIVE ME THE JSON NOW:
+"""
+
+
+def build_formula_correction_prompt(failures: list[tuple[str, str]], windows: list[int]) -> str:
+    """One correction request for several rejected formulas: `failures` is a list of (formula, error message)."""
+    shown = ", ".join(str(w) for w in windows)
+    blocks = "\n".join(f"{i}. formula: `{text}`\n   error: {error}" for i, (text, error) in enumerate(failures, start=1))
+    return f"""Some of the formulas you just generated failed validation in our sandbox.
+
+Failures, in order:
+{blocks}
+
+CRITICAL RULES FOR CORRECTION:
+1. Fix each formula so that it passes while keeping its trading idea. Typical causes: unknown function names, a wrong number of series arguments, a missing or disallowed window (the window is the LAST argument of every time-series function and must be one of {shown}), any other number, a `?`, mixing price and volume in one `add`/`sub`/comparison, nesting deeper than 3 levels, or a formula equal to one that is already taken.
+2. Return ONLY one JSON object `{{"ideas": [...]}}` with exactly {len(failures)} objects, in the same order as above. Each object has the single field `formula` holding the corrected formula. No explanations.
+"""

@@ -34,16 +34,16 @@ Lợi suất ngày = chênh lệch vốn cuối ngày chia vốn ban đầu; Sha
 
 ## Cấu hình so sánh
 
-Cùng ngân sách 100.000 lượt chấm mỗi cửa sổ, cùng bước 2–4. Hệ thống chính có vòng phản hồi LLM và cách làm từng cấu hình: [LLM_FEEDBACK](LLM_FEEDBACK.md#các-cấu-hình) (bảng dưới là bản sinh một lần, thay khi code xong).
+Cùng ngân sách 100.000 lượt chấm mỗi cửa sổ, cùng bước 2–4. Hệ thống chính có vòng phản hồi LLM và cách làm từng cấu hình: [LLM_FEEDBACK](LLM_FEEDBACK.md#các-cấu-hình). Cả sáu cấu hình đã có code (chưa chạy); `--system` chọn cấu hình, mô tả ở [ARCH](ARCH.md) mục 3.5–3.8.
 
 | Cấu hình | Cách làm | RQ | Code |
 |---|---|---|---|
 | LLM + MCTS | như mục trên | 1, 2 | ✅ |
-| MCTS không có LLM | MCTS từ gốc là một ô `?` dưới template NORMALIZED, 100.000 vòng | 1 | ⛔ |
-| LLM không tìm | LLM viết công thức hoàn chỉnh (không `?`); chấm hết số LLM viết được, ghi rõ ngoại lệ về ngân sách | 1 | ⛔ |
-| Tìm ngẫu nhiên | 100.000 công thức hợp lệ về chiều, sinh ngẫu nhiên đều theo ngữ pháp | 1 | ⛔ |
-| Mua và giữ | luôn long | tham chiếu | ⛔ |
-| TSMOM | momentum chuỗi thời gian (Moskowitz 2012), chuyển sang bar trong ngày | tham chiếu | ⛔ |
+| MCTS không có LLM | MCTS từ một ô `?` dưới mỗi template NORMALIZED / BOOLEAN / RATIO, chia đều 100.000 vòng | 1 | ✅ |
+| LLM không tìm | LLM viết một lần 100 công thức hoàn chỉnh (không `?`, 10 yêu cầu × 10, đóng băng); mỗi cửa sổ chấm hết trên lưới tham số khuôn của MCTS (ngoại lệ ngân sách: ≈ 2.500 lượt chấm, không phải 100.000); chỉ seed 1 vì LLM không thấy dữ liệu | 1 | ✅ |
+| Tìm ngẫu nhiên | 100.000 công thức hợp lệ về chiều, sinh theo kích thước (ramped half-and-half) | 1 | ✅ |
+| Mua và giữ | luôn long, cùng cỡ vị thế, phí và ký quỹ; chỉ seed 1 | tham chiếu | ✅ |
+| TSMOM | momentum chuỗi thời gian (Moskowitz 2012) trên bar 60m: dấu lợi suất L bar, không chia theo biến động; L ∈ {1 phiên, 1 tuần, 1 tháng} chọn theo Sharpe kiểm định; chỉ seed 1 | tham chiếu | ✅ |
 
 **Độ chênh Sharpe phát hiện được** (877 ngày; Memmel 2003, một phía α = 0.05): phương sai của chênh lệch Sharpe ngày = (2 − 2ρ + ½(sr₁² + sr₂² − 2ρ²sr₁sr₂)) / 877, sr là Sharpe theo ngày, ρ là tương quan lợi suất ngày giữa hai cấu hình (chưa đo, chờ lần chạy thật); nhân √252 ra theo năm. Số hạng sr² nhỏ không đáng kể với dữ liệu ngày (Sharpe năm 1 ⇒ sr² ≈ 0.004). Chênh tối thiểu với power 50% / 80%: ρ = 0 ⇒ 1.25 / 1.89; ρ = 0.3 ⇒ 1.04 / 1.58; ρ = 0.5 ⇒ 0.88 / 1.33; ρ = 0.7 ⇒ 0.68 / 1.03. Một Sharpe đơn lẻ có sai số chuẩn 0.54 (placebo đo được 0.51).
 
@@ -55,7 +55,7 @@ Cùng ngân sách 100.000 lượt chấm mỗi cửa sổ, cùng bước 2–4. 
 
 ## Đóng băng
 
-`main.py walkforward freeze` ghi `results/walkforward/frozen.json`: reward + `REWARD_WEIGHTS`, bảng cửa sổ, tệp blueprint (sha256), ngân sách, seed, khung, `MAX_RANKED`, `TOP_K`, commit git, dấu vân tay dữ liệu. `real` từ chối chạy nếu bất kỳ trường nào khác bản đóng băng, hoặc `git diff --name-only <commit đóng băng>` trên `main.py`, `core_engine/`, `strategy_workflows/`, `utilities/` không rỗng. Vì thế mọi code (kể cả cấu hình so sánh) phải xong trước khi đóng băng.
+`main.py walkforward freeze --formulas <formulas.json>` ghi `results/walkforward/frozen.json`: reward + `REWARD_WEIGHTS`, bảng cửa sổ, tệp blueprint (sha256), bộ công thức của LLM không tìm (đường dẫn, sha256, sha256 bản ghi sinh) và lưới tham số khuôn của nó, lưới TSMOM (số phiên, luật chọn), cỡ vị thế tham chiếu, ngân sách, mô hình LLM, seed từng cấu hình, khung, `MAX_RANKED`, `TOP_K`, commit git, dấu vân tay dữ liệu. `real` từ chối chạy nếu bất kỳ trường nào khác bản đóng băng, hoặc `git diff --name-only <commit đóng băng>` trên `main.py`, `core_engine/`, `strategy_workflows/`, `utilities/` không rỗng. Vì thế mọi code (kể cả cấu hình so sánh) phải xong trước khi đóng băng.
 
 ## Bộ blueprint
 

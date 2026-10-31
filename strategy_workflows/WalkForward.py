@@ -10,7 +10,8 @@ Steps (`main.py walkforward <step>`):
     placebo   run the pipeline on K return-permuted copies of the data (no frozen config needed)
     freeze    write frozen.json from the current configuration
     real      run on the real data; refuses unless frozen.json equals the current configuration
-    summary   annualised Sharpe of the concatenated evaluation returns per mode and the placebo p-value
+    summary   annualised Sharpe of the concatenated evaluation returns per mode and the placebo p-value, and the
+              Sharpe difference of every other configuration against llm_mcts (paired stationary block bootstrap)
 
 Per-window pipeline (same functions as the planted-signal runner): a search on the train segment with
 reward mode `sharpe`, the distinct leaderboard expressions (at most MAX_RANKED) re-scored on
@@ -18,7 +19,9 @@ validation, top-5 by validation reward, equal-weight positions traded on the eva
 with the indicator history taken from the continuous frame. The search is one of `WF_SYSTEMS`:
 `llm_mcts` (frozen blueprints, then one feedback round; the default), `mcts_only`, `random`
 (`SearchConfigs`, one budget of `BudgetPlan.total` per window) or `oneshot` (every blueprint in turn for
-`iterations` each, no feedback).
+`iterations` each, no feedback) or `llm_only` (the frozen set of complete LLM formulas scored over the template
+grid, `LLMOnly`). Two reference strategies skip the search: `buy_hold` and `tsmom` (`Baselines`). Systems without any
+randomness (`llm_only`, `buy_hold`, `tsmom`) run with seed 1 only.
 
 Placebo seeds: the permutation seed of placebo set k (1-based) in window w (1..99) is
 `PLACEBO_SEED_BASE + 100 * k + w`, i.e. at least 100101. Real runs use MCTS seeds 1-5 and the
@@ -47,6 +50,10 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from core_engine.BacktestEngine import AlphaBacktestEngine, load_data
+from strategy_workflows.Baselines import (
+    POSITION_SCALE, TSMOM_LOOKBACK_SESSIONS, bars_per_session, buy_hold_positions, tsmom_lookbacks, tsmom_positions,
+)
+from strategy_workflows.LLMOnly import load_formula_set, score_formulas, template_grid, window_ladders
 from strategy_workflows.MCTSEngine import MCTSEngine, _FixedPositions
 from strategy_workflows.PlantedSignal import (
     TOP_K, Segments, build_ohlcv_from_returns, combine_positions, permute_returns, split_bars,
@@ -56,11 +63,17 @@ from strategy_workflows.RunPlantedSignal import (
 )
 from strategy_workflows.SearchConfigs import SYSTEMS, BudgetPlan, create_worker_chat, llm_spec, run_search
 from strategy_workflows.SemanticCompiler import SemanticCompiler
+from strategy_workflows.Statistics import paired_sharpe_bootstrap
 from utilities.AppConfig import MCTS_MAX_DEPTH, REWARD_WEIGHTS
 
 REWARD_MODE = 'sharpe'
 DEFAULT_SYSTEM = 'llm_mcts'
-WF_SYSTEMS = SYSTEMS + ('oneshot',)
+# Systems whose result cannot depend on the seed (no sampling anywhere): one run each.
+DETERMINISTIC_SYSTEMS = ('llm_only', 'buy_hold', 'tsmom')
+REFERENCE_SYSTEMS = ('buy_hold', 'tsmom')
+DETERMINISTIC_SEEDS = [1]
+WF_SYSTEMS = SYSTEMS + ('oneshot',) + DETERMINISTIC_SYSTEMS
+COMPARISON_REFERENCE = 'llm_mcts'
 DEFAULT_BLUEPRINTS = os.path.join(PROJECT_ROOT, 'results', 'blueprint_sets', '20261029_212813', 'blueprints.json')
 DEFAULT_RESULTS_ROOT = os.path.join(PROJECT_ROOT, 'results', 'walkforward')
 DEFAULT_ITERATIONS = 5000
@@ -81,7 +94,7 @@ RUN_KEY = ['mode', 'placebo_set', 'window', 'seed']
 RUN_FIELDS = RUN_KEY + [
     'data_seed', 'iterations', 'n_blueprints', 'blueprint_errors', 'evaluations', 'failed', 'top_errors',
     'n_ranked', 'n_top', 'train_best_reward', 'top', 'top_train_rewards', 'top_val_rewards', 'eval_sharpe',
-    'eval_trades', 'elapsed_s', 'system', 'llm_s', 'llm_requests', 'new_blueprints', 'feedback',
+    'eval_trades', 'elapsed_s', 'system', 'llm_s', 'llm_requests', 'new_blueprints', 'feedback', 'info',
 ]
 RETURN_FIELDS = ['date', 'window', 'seed', 'mode', 'placebo_set', 'return']
 
@@ -177,17 +190,28 @@ def annualised_sharpe(returns: pd.Series) -> float:
     return float(values.mean() / values.std(ddof=0) * np.sqrt(TRADING_DAYS_PER_YEAR))
 
 
-def trade_top(candidates: List[dict], full: pd.DataFrame, evaluation_index: pd.Index) -> Dict:
-    """Equal-weight top-k positions (history from the whole frame) traded on the evaluation bars."""
+def filled_frame(full: pd.DataFrame) -> pd.DataFrame:
+    """Copy of the frame with a missing Volume read as 0, as the search engine does."""
     frame = full.copy()
     frame['Volume'] = frame['Volume'].fillna(0.0)
-    evaluation = frame.loc[evaluation_index]
+    return frame
+
+
+def trade_positions(positions: pd.Series, frame: pd.DataFrame, index: pd.Index) -> Dict:
+    """Target positions (computed on a frame that includes the history) traded on the bars `index`."""
+    evaluation = frame.loc[index]
+    result = AlphaBacktestEngine().run(_FixedPositions(positions.loc[evaluation.index]), evaluation)
+    return {'returns': daily_returns(result), 'trades': int(result.total_trades)}
+
+
+def trade_top(candidates: List[dict], full: pd.DataFrame, evaluation_index: pd.Index) -> Dict:
+    """Equal-weight top-k positions (history from the whole frame) traded on the evaluation bars."""
+    frame = filled_frame(full)
     if not candidates:
-        days = evaluation.index.normalize().unique()
+        days = frame.loc[evaluation_index].index.normalize().unique()
         return {'returns': pd.Series(0.0, index=days), 'trades': 0}
     combined = combine_positions([candidate_positions(c, frame) for c in candidates])
-    result = AlphaBacktestEngine().run(_FixedPositions(combined.loc[evaluation.index]), evaluation)
-    return {'returns': daily_returns(result), 'trades': int(result.total_trades)}
+    return trade_positions(combined, frame, evaluation_index)
 
 
 def describe_top(candidates: List[dict], val_rewards: List[float]) -> str:
@@ -232,6 +256,61 @@ def search_with_plan(engine: MCTSEngine, task: Dict, search: pd.DataFrame, segme
             'feedback': outcome.feedback}
 
 
+def search_llm_only(engine: MCTSEngine, task: Dict, search: pd.DataFrame, segments: Segments) -> Dict:
+    """
+    The frozen LLM formulas scored over the template grid on the train segment (best parameters per formula), then
+    the usual top-5 selection. The budget is the number of grid evaluations, recorded as `iterations`.
+    """
+    scored = score_formulas(engine, task['formulas'])
+    return {'picked': rank_leaderboard(engine, search, segments, TOP_K), 'summary': engine.error_summary(),
+            'iterations': scored['evaluations'], 'blueprint_errors': scored['rejected'], 'llm_s': 0.0,
+            'llm_requests': 0, 'new_blueprints': [], 'feedback': {},
+            'info': {'formulas': scored['formulas'], 'rejected': scored['rejected'],
+                     'grid_evaluations': scored['evaluations']}}
+
+
+def choose_lookback(validation_sharpes: Dict[str, float]) -> str:
+    """Label with the highest validation Sharpe; a NaN Sharpe loses, a tie goes to the earlier (shorter) label."""
+    labels = list(validation_sharpes)
+    return max(labels, key=lambda label: (
+        -float('inf') if np.isnan(validation_sharpes[label]) else validation_sharpes[label], -labels.index(label)))
+
+
+def run_reference(task: Dict, full: pd.DataFrame, segments: Segments) -> Dict:
+    """
+    `buy_hold` or `tsmom` on one window. TSMOM picks its lookback by validation Sharpe (positions from the whole
+    continuous frame, traded on the validation bars), then trades the evaluation bars with it.
+    """
+    frame = filled_frame(full)
+    info: Dict = {}
+    if task['system'] == 'buy_hold':
+        positions = buy_hold_positions(frame.index)
+    else:
+        bars = tsmom_lookbacks(bars_per_session(frame.loc[:segments.train_end]))
+        validation = frame.loc[segments.validation_start:segments.search_end].index
+        sharpes = {label: annualised_sharpe(
+            trade_positions(tsmom_positions(frame['Close'], n), frame, validation)['returns'])
+            for label, n in bars.items()}
+        chosen = choose_lookback(sharpes)
+        positions = tsmom_positions(frame['Close'], bars[chosen])
+        info = {'chosen': chosen, 'lookback_bars': bars[chosen], 'bars_by_label': bars,
+                'validation_sharpe': {k: None if np.isnan(v) else v for k, v in sharpes.items()}}
+    traded = trade_positions(positions, frame, frame.loc[segments.eval_start:segments.eval_end].index)
+    return {'returns': traded['returns'], 'trades': traded['trades'], 'info': info}
+
+
+def reference_outcome(task: Dict, traded: Dict, started: float) -> Dict:
+    """Row and returns of a reference run: nothing was searched, so the search columns are empty."""
+    row = {field: 0 for field in RUN_FIELDS}
+    row.update(
+        mode=task['mode'], placebo_set=task.get('placebo_set', 0), window=task['window'], seed=task['seed'],
+        data_seed=task.get('data_seed', 0), top_errors='[]', train_best_reward=float('nan'), top='[]',
+        top_train_rewards='[]', top_val_rewards='[]', eval_sharpe=annualised_sharpe(traded['returns']),
+        eval_trades=traded['trades'], elapsed_s=time.time() - started, system=task['system'], new_blueprints='[]',
+        feedback='{}', info=json.dumps(traded['info']))
+    return {'row': row, 'returns': traded['returns']}
+
+
 def run_window(task: Dict) -> Dict:
     """
     One (window, seed, mode, placebo set). `task['frame']` is the continuous real frame from
@@ -246,11 +325,14 @@ def run_window(task: Dict) -> Dict:
     system = task.get('system', 'oneshot')
     if task['mode'] == 'placebo':
         full = placebo_frame(full, segments, data_seed)
+    if system in REFERENCE_SYSTEMS:
+        return reference_outcome(task, run_reference(task, full, segments), started)
     search = full.loc[:segments.search_end]
     with quiet():
         engine = MCTSEngine(timeframe=TIMEFRAME, max_depth=MCTS_MAX_DEPTH, global_position_matrix=None,
                             seed=task['seed'], data=full.loc[:segments.train_end], reward_mode=REWARD_MODE)
-        found = (search_oneshot if system == 'oneshot' else search_with_plan)(engine, task, search, segments)
+        found = {'oneshot': search_oneshot, 'llm_only': search_llm_only}.get(system, search_with_plan)(
+            engine, task, search, segments)
         picked, summary = found['picked'], found['summary']
         top = [picked['ranked'][i] for i in picked['chosen']]
         top_val = [picked['val_rewards'][i] for i in picked['chosen']]
@@ -269,7 +351,7 @@ def run_window(task: Dict) -> Dict:
         'eval_sharpe': annualised_sharpe(returns), 'eval_trades': traded['trades'],
         'elapsed_s': time.time() - started, 'system': system, 'llm_s': found['llm_s'],
         'llm_requests': found['llm_requests'], 'new_blueprints': json.dumps(found['new_blueprints']),
-        'feedback': json.dumps(found['feedback']),
+        'feedback': json.dumps(found['feedback']), 'info': json.dumps(found.get('info', {})),
     }
     return {'row': row, 'returns': returns}
 
@@ -304,20 +386,27 @@ def completed_keys(out_dir: str) -> set:
     return {(m, int(k), int(w), int(s)) for m, k, w, s in runs[RUN_KEY].itertuples(index=False)}
 
 
+def seeds_for(system: str, seeds: Sequence[int]) -> List[int]:
+    """Seeds a system is run with: all of `seeds`, or the single seed 1 for a system that cannot vary with it."""
+    return list(DETERMINISTIC_SEEDS) if system in DETERMINISTIC_SYSTEMS else list(seeds)
+
+
 def build_tasks(mode: str, windows: Sequence[Segments], seeds: Sequence[int], blueprints: List[Dict],
                 iterations: int, frame: pd.DataFrame, placebo_sets: int = 0,
                 window_numbers: Optional[Sequence[int]] = None, system: str = DEFAULT_SYSTEM,
-                plan: Optional[BudgetPlan] = None, llm: Optional[dict] = None) -> List[Dict]:
+                plan: Optional[BudgetPlan] = None, llm: Optional[dict] = None,
+                formulas: Optional[List[Dict]] = None) -> List[Dict]:
     """
     Tasks for `mode`; `window_numbers` (1-based) restricts to some windows of `windows`. `system` is one of
-    `WF_SYSTEMS`; `plan` (budget) and `llm` (see `llm_spec`) are used by the systems other than `oneshot`.
+    `WF_SYSTEMS`; `plan` (budget) and `llm` (see `llm_spec`) are used by the search systems, `formulas` (the frozen
+    LLM formula set) by `llm_only`. A system without randomness runs with `DETERMINISTIC_SEEDS` whatever `seeds` is.
     """
     if system not in WF_SYSTEMS:
         raise ValueError(f"system must be one of {WF_SYSTEMS}, got {system!r}")
     numbers = list(window_numbers) if window_numbers else list(range(1, len(windows) + 1))
     tasks = []
     if mode == 'real':
-        combos = [(0, w, s) for w in numbers for s in seeds]
+        combos = [(0, w, s) for w in numbers for s in seeds_for(system, seeds)]
     else:
         combos = [(k, w, PLACEBO_MCTS_SEED) for k in range(1, placebo_sets + 1) for w in numbers]
     for k, w, seed in combos:
@@ -326,7 +415,7 @@ def build_tasks(mode: str, windows: Sequence[Segments], seeds: Sequence[int], bl
             'mode': mode, 'placebo_set': k, 'window': w, 'seed': seed, 'segments': segments,
             'data_seed': placebo_seed(k, w) if mode == 'placebo' else 0,
             'iterations': iterations, 'blueprints': blueprints, 'system': system, 'plan': plan or wf_plan(),
-            'llm': llm, 'frame': frame.loc[segments.search_start:segments.eval_end],
+            'llm': llm, 'formulas': formulas, 'frame': frame.loc[segments.search_start:segments.eval_end],
         })
     return tasks
 
@@ -401,12 +490,44 @@ def changed_code_files(commit: str) -> List[str]:
     return [line for line in out.splitlines() if line.strip()]
 
 
+def template_grid_sizes() -> Dict[str, int]:
+    """Number of template-parameter settings per template, from the grid MCTS offers (what `llm_only` scores)."""
+    from strategy_workflows.LLMOnly import parse_formula
+    periods, window_search = window_ladders()
+    samples = {'NORMALIZED': f"ts_mean(pv_close, {periods[0]})", 'RATIO': f"ts_zscore(pv_close, {periods[0]})",
+               'BOOLEAN': 'greater_than(pv_close, pv_open)'}
+    return {template: len(template_grid(parse_formula(text, periods).tree, window_search, periods))
+            for template, text in samples.items()}
+
+
+def formula_set_config(formulas_path: Optional[str]) -> Dict:
+    """The inputs of the `llm_only` configuration: the formula set (and its generation record) and the grid."""
+    periods, window_search = window_ladders()
+    generation = os.path.join(os.path.dirname(formulas_path), 'generation.json') if formulas_path else None
+    return {
+        'formulas_path': relative_path(formulas_path) if formulas_path else None,
+        'formulas_sha256': file_sha256(formulas_path) if formulas_path else None,
+        'n_formulas': len(load_formula_set(formulas_path)) if formulas_path else 0,
+        'formulas_generation_sha256': file_sha256(generation) if generation and os.path.exists(generation) else None,
+        'llm_only_grid': {'rolling_windows': periods, 'template_windows': window_search,
+                          'sizes': template_grid_sizes() if formulas_path else None},
+    }
+
+
+def reference_config() -> Dict:
+    """The inputs of the reference strategies: TSMOM lookbacks and selection rule, and the shared position size."""
+    return {'tsmom_grid': {'lookback_sessions': dict(TSMOM_LOOKBACK_SESSIONS), 'selection': 'validation_sharpe',
+                           'bars_per_session': 'median over the train segment', 'weighting': 'none'},
+            'reference_position_scale': POSITION_SCALE}
+
+
 def current_config(blueprint_path: str, n_blueprints: int, iterations: int, seeds: Sequence[int],
                    data_sha256: str, windows: Sequence[Segments] = WINDOWS, plan: Optional[BudgetPlan] = None,
-                   llm_model: str = 'ollama-local') -> Dict:
+                   llm_model: str = 'ollama-local', formulas_path: Optional[str] = None) -> Dict:
     """Everything a frozen configuration pins, except the git commit and the choice of system."""
     blueprints = load_blueprints(blueprint_path)[:n_blueprints]
-    return {
+    return {**formula_set_config(formulas_path), **reference_config(),
+            'seeds_by_system': {system: seeds_for(system, seeds) for system in WF_SYSTEMS if system != 'oneshot'},
         'reward_mode': REWARD_MODE, 'reward_weights': dict(REWARD_WEIGHTS),
         'windows': [w.to_dict() for w in windows],
         'blueprints_path': relative_path(blueprint_path), 'blueprints_sha256': file_sha256(blueprint_path),
@@ -505,18 +626,31 @@ def step_placebo(args) -> None:
     frame = load_full_frame()
     tasks = build_tasks('placebo', WINDOWS, [PLACEBO_MCTS_SEED], blueprints, args.iterations, frame,
                         placebo_sets=args.sets, window_numbers=args.windows, system=args.system,
-                        plan=plan_from_args(args), llm=llm_from_args(args))
+                        plan=plan_from_args(args), llm=llm_from_args(args), formulas=formulas_for(args))
     execute(tasks, out_dir_of(args), worker_count(args))
 
 
-def config_from_args(args, frame: pd.DataFrame) -> Dict:
+def config_from_args(args, frame: pd.DataFrame, formulas_path: Optional[str]) -> Dict:
     return current_config(args.blueprints, args.n_blueprints, args.iterations, args.seeds, data_fingerprint(frame),
-                          plan=plan_from_args(args), llm_model=args.model)
+                          plan=plan_from_args(args), llm_model=args.model, formulas_path=formulas_path)
+
+
+def formulas_for(args, frozen: Optional[Dict] = None) -> Optional[List[Dict]]:
+    """The LLM formula set of an `llm_only` run (`--formulas`, else the path the frozen record names); else None."""
+    if args.system != 'llm_only':
+        return None
+    path = args.formulas or (frozen or {}).get('formulas_path')
+    if not path:
+        raise SystemExit("[walkforward] llm_only needs --formulas (the formula set built by `llmonly build`).")
+    return load_formula_set(path if os.path.isabs(path) else os.path.join(PROJECT_ROOT, path))
 
 
 def step_freeze(args) -> None:
+    if not args.formulas:
+        raise SystemExit("[walkforward] freeze pins the LLM-only formula set: pass --formulas "
+                         "(the formulas.json built by `llmonly build`).")
     frame = load_full_frame()
-    record = {**config_from_args(args, frame), 'git_commit': current_commit()}
+    record = {**config_from_args(args, frame, args.formulas), 'git_commit': current_commit()}
     path = frozen_path(args.results_root)
     os.makedirs(args.results_root, exist_ok=True)
     with open(path, 'w', encoding='utf-8') as f:
@@ -531,14 +665,68 @@ def step_real(args) -> None:
     with open(path, 'r', encoding='utf-8') as f:
         frozen = json.load(f)
     frame = load_full_frame()
-    problems = verify_frozen(frozen, config_from_args(args, frame))
+    formulas_path = args.formulas or frozen.get('formulas_path')
+    if formulas_path and not os.path.isabs(formulas_path):
+        formulas_path = os.path.join(PROJECT_ROOT, formulas_path)
+    problems = verify_frozen(frozen, config_from_args(args, frame, formulas_path))
     if problems:
         raise SystemExit("[walkforward] The current configuration differs from frozen.json:\n  "
                          + '\n  '.join(problems))
     blueprints = load_blueprints(args.blueprints)[:args.n_blueprints]
     tasks = build_tasks('real', WINDOWS, args.seeds, blueprints, args.iterations, frame, system=args.system,
-                        plan=plan_from_args(args), llm=llm_from_args(args))
+                        plan=plan_from_args(args), llm=llm_from_args(args), formulas=formulas_for(args, frozen))
     execute(tasks, out_dir_of(args), worker_count(args))
+
+
+COMPARISON_FIELDS = ['config', 'n_days', 'sharpe_reference', 'sharpe_config', 'difference', 'ci_low', 'ci_high', 'rho']
+
+
+def real_daily_series(returns: pd.DataFrame) -> pd.Series:
+    """Evaluation returns of the real runs, averaged over seeds per day (a repeated row counts once)."""
+    returns = returns.drop_duplicates(subset=['date', 'window', 'seed', 'mode', 'placebo_set'], keep='last')
+    return returns[returns['mode'] == 'real'].groupby('date')['return'].mean().sort_index()
+
+
+def compare_configs(series: Dict[str, pd.Series], reference: str = COMPARISON_REFERENCE) -> pd.DataFrame:
+    """
+    Per configuration other than `reference`: Sharpe of both on their common days, `difference` = Sharpe(reference)
+    - Sharpe(config) with its 95% interval from the paired stationary block bootstrap, and the daily-return
+    correlation rho. Positive means the reference is better.
+    """
+    rows = []
+    for name, other in series.items():
+        if name == reference or reference not in series:
+            continue
+        joined = pd.concat([series[reference].rename('reference'), other.rename('config')], axis=1, join='inner').dropna()
+        if len(joined) < 2:
+            continue
+        stats = paired_sharpe_bootstrap(joined['reference'].to_numpy(), joined['config'].to_numpy())
+        rows.append({'config': name, 'n_days': stats['n_days'], 'sharpe_reference': annualised_sharpe(joined['reference']),
+                     'sharpe_config': annualised_sharpe(joined['config']), 'difference': stats['difference'],
+                     'ci_low': stats['ci_low'], 'ci_high': stats['ci_high'], 'rho': stats['rho']})
+    return pd.DataFrame(rows, columns=COMPARISON_FIELDS)
+
+
+def step_compare(args) -> None:
+    """Write and print `comparison.csv` for every configuration folder of the results root that has real returns."""
+    series = {}
+    for name in sorted(os.listdir(args.results_root)) if os.path.isdir(args.results_root) else []:
+        path = os.path.join(args.results_root, name, 'returns.csv')
+        if os.path.exists(path):
+            daily = real_daily_series(pd.read_csv(path))
+            if not daily.empty:
+                series[name] = daily
+    if COMPARISON_REFERENCE not in series:
+        print(f"[walkforward] No real {COMPARISON_REFERENCE} returns under {args.results_root}; no comparison.")
+        return
+    comparison = compare_configs(series)
+    out = os.path.join(args.results_root, 'comparison.csv')
+    comparison.to_csv(out, index=False)
+    print(f"[walkforward] Sharpe({COMPARISON_REFERENCE}) minus Sharpe(config), 95% CI of the paired stationary block "
+          "bootstrap")
+    with pd.option_context('display.width', 200, 'display.max_columns', None):
+        print(comparison.round(4).to_string(index=False))
+    print(f"[walkforward] Wrote {out}")
 
 
 def step_summary(args) -> None:
@@ -552,6 +740,7 @@ def step_summary(args) -> None:
     with pd.option_context('display.width', 200, 'display.max_columns', None):
         print(summary.round(4).to_string(index=False))
     print(f"[walkforward] Wrote {out}")
+    step_compare(args)
 
 
 # --------------------------------------------------------------------------- CLI
@@ -563,12 +752,15 @@ def add_walkforward_parser(subparsers) -> None:
 
     def common(p, run_options=True):
         p.add_argument('--system', default=DEFAULT_SYSTEM, choices=list(WF_SYSTEMS),
-                       help='Search: llm_mcts (frozen blueprints + feedback round), mcts_only, random, or oneshot '
-                            '(every blueprint in turn, no feedback)')
+                       help='Search: llm_mcts (frozen blueprints + feedback round), mcts_only, random, oneshot '
+                            '(every blueprint in turn, no feedback), llm_only (frozen LLM formulas), or the '
+                            'references buy_hold and tsmom')
         p.add_argument('--config', default=None, help='Folder name under the results root (default: the system)')
         p.add_argument('--results-root', default=DEFAULT_RESULTS_ROOT)
         if run_options:
             p.add_argument('--blueprints', default=DEFAULT_BLUEPRINTS)
+            p.add_argument('--formulas', default=None,
+                           help='Frozen LLM formula set (llm_only; required by freeze, taken from frozen.json by real)')
             p.add_argument('--n-blueprints', type=int, default=DEFAULT_BLUEPRINT_COUNT,
                            help='Use the first N blueprints of the file')
             p.add_argument('--iterations', type=int, default=DEFAULT_ITERATIONS,

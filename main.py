@@ -310,6 +310,8 @@ def main():
     add_walkforward_parser(subparsers)
     from strategy_workflows.BlueprintGeneration import add_blueprints_parser
     add_blueprints_parser(subparsers)
+    from strategy_workflows.LLMOnly import add_llm_only_parser
+    add_llm_only_parser(subparsers)
 
     parser_web = subparsers.add_parser("web", help="Read-only dashboard on 127.0.0.1")
     parser_web.add_argument("--port", type=int, default=8000, help="Port (host is always 127.0.0.1)")
@@ -343,6 +345,9 @@ def main():
         cmd_rq1(args)
     elif args.command == "walkforward":
         cmd_walkforward(args)
+    elif args.command == "llmonly":
+        from strategy_workflows.LLMOnly import run_llm_only
+        run_llm_only(args)
     elif args.command == "blueprints":
         from strategy_workflows.BlueprintGeneration import run_blueprints
         run_blueprints(args)

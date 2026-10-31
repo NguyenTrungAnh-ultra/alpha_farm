@@ -93,8 +93,17 @@ def config(tmp_path):
     path = tmp_path / 'blueprints.json'
     path.write_text(json.dumps([{'name': 'a', 'macro_blueprint': 'ts_mean(?)'},
                                 {'name': 'b', 'macro_blueprint': 'ts_max(?)'}]), encoding='utf-8')
-    return path, lambda **kw: wf.current_config(str(path), **{'n_blueprints': 2, 'iterations': 5000,
-                                                              'seeds': [1, 2, 3, 4, 5], 'data_sha256': 'x', **kw})
+    folder = tmp_path / 'formula_set'
+    folder.mkdir()
+    (folder / 'formulas.json').write_text(json.dumps([{'name': 'f1', 'formula': 'ts_mean(pv_close, 5)'},
+                                                      {'name': 'f2', 'formula': 'ts_max(pv_high, 3)'}]), encoding='utf-8')
+    (folder / 'generation.json').write_text(json.dumps({'n': 2}), encoding='utf-8')
+
+    def make(**kw):
+        return wf.current_config(str(path), **{'n_blueprints': 2, 'iterations': 5000, 'seeds': [1, 2, 3, 4, 5],
+                                               'data_sha256': 'x', 'formulas_path': str(folder / 'formulas.json'), **kw})
+    make.folder = folder
+    return path, make
 
 
 def test_frozen_check_accepts_identical_and_refuses_changes(config):
@@ -117,6 +126,124 @@ def test_frozen_config_pins_the_required_fields(config):
                 'iterations', 'seeds', 'timeframe', 'max_ranked', 'top_k', 'mcts_max_depth', 'data_sha256'):
         assert key in make()
     assert make()['reward_mode'] == 'sharpe' and len(make()['windows']) == 7
+
+
+def frozen_of(make):
+    return json.loads(json.dumps({**make(), 'git_commit': 'abc'}))
+
+
+def problems_of(frozen, current):
+    return wf.verify_frozen(frozen, current, lambda c: [])
+
+
+def test_freeze_pins_the_inputs_of_every_configuration(config):
+    _, make = config
+    frozen = frozen_of(make)
+    for key in ('blueprints_path', 'blueprints_sha256', 'formulas_path', 'formulas_sha256', 'n_formulas',
+                'formulas_generation_sha256', 'llm_only_grid', 'tsmom_grid', 'reference_position_scale',
+                'seeds_by_system', 'budget_plan', 'llm_model'):
+        assert key in frozen, key
+    assert frozen['n_formulas'] == 2 and len(frozen['formulas_sha256']) == 64
+    assert frozen['llm_only_grid'] == {'rolling_windows': [2, 3, 5, 10], 'template_windows': [2, 3, 5, 7, 10],
+                                       'sizes': {'NORMALIZED': 25, 'RATIO': 25, 'BOOLEAN': 1}}
+    assert frozen['tsmom_grid']['lookback_sessions'] == {'day': 1, 'week': 5, 'month': 21}
+    assert frozen['tsmom_grid']['selection'] == 'validation_sharpe'
+    assert frozen['seeds_by_system'] == {'llm_mcts': [1, 2, 3, 4, 5], 'mcts_only': [1, 2, 3, 4, 5],
+                                         'random': [1, 2, 3, 4, 5], 'llm_only': [1], 'buy_hold': [1], 'tsmom': [1]}
+    assert frozen['formulas_sha256'] == wf.file_sha256(str(make.folder / 'formulas.json'))
+    assert problems_of(frozen, make()) == []
+
+
+def test_verify_refuses_when_the_formula_set_or_its_generation_record_changes(config):
+    _, make = config
+    frozen = frozen_of(make)
+    (make.folder / 'generation.json').write_text(json.dumps({'n': 3}), encoding='utf-8')
+    assert any('formulas_generation_sha256' in p for p in problems_of(frozen, make()))
+    (make.folder / 'generation.json').write_text(json.dumps({'n': 2}), encoding='utf-8')
+    assert problems_of(frozen, make()) == []
+    moved = make.folder.parent / 'other'
+    moved.mkdir()
+    (moved / 'formulas.json').write_text((make.folder / 'formulas.json').read_text(encoding='utf-8'), encoding='utf-8')
+    assert any('formulas_path' in p for p in problems_of(frozen, make(formulas_path=str(moved / 'formulas.json'))))
+    (make.folder / 'formulas.json').write_text(json.dumps([{'name': 'f1', 'formula': 'ts_mean(pv_close, 5)'}]),
+                                               encoding='utf-8')
+    problems = problems_of(frozen, make())
+    assert any('formulas_sha256' in p for p in problems) and any('n_formulas' in p for p in problems)
+
+
+def test_verify_refuses_when_the_tsmom_grid_the_position_size_or_the_seed_plan_changes(config, monkeypatch):
+    _, make = config
+    frozen = frozen_of(make)
+    monkeypatch.setattr(wf, 'TSMOM_LOOKBACK_SESSIONS', {'day': 1, 'week': 5, 'month': 22})
+    assert any('tsmom_grid' in p for p in problems_of(frozen, make()))
+    monkeypatch.undo()
+    monkeypatch.setattr(wf, 'POSITION_SCALE', 0.5)
+    assert any('reference_position_scale' in p for p in problems_of(frozen, make()))
+    monkeypatch.undo()
+    assert any('seeds_by_system' in p for p in problems_of(frozen, make(seeds=[1, 2])))
+    assert any('budget_plan' in p for p in problems_of(frozen, make(plan=wf.wf_plan(1000, 500, 100))))
+    assert any('llm_model' in p for p in problems_of(frozen, make(llm_model='ollama-9b')))
+
+
+def test_verify_refuses_when_the_code_differs_from_the_frozen_commit(config):
+    _, make = config
+    frozen = frozen_of(make)
+    assert any('code changed' in p for p in wf.verify_frozen(frozen, make(), lambda c: ['strategy_workflows/LLMOnly.py']))
+
+
+def test_every_module_of_the_configurations_lives_under_a_checked_code_path():
+    import os
+    for module in ('LLMOnly', 'Baselines', 'Statistics', 'SearchConfigs', 'RandomSearch', 'WalkForward'):
+        path = os.path.join('strategy_workflows', f'{module}.py').replace(os.sep, '/')
+        assert os.path.exists(os.path.join(wf.PROJECT_ROOT, path))
+        assert any(path.startswith(p + '/') or path == p for p in wf.CODE_PATHS), module
+
+
+def freeze_env(tmp_path, monkeypatch):
+    parser = argparse.ArgumentParser()
+    wf.add_walkforward_parser(parser.add_subparsers(dest='command'))
+    frame = hourly_frame()
+    monkeypatch.setattr(wf, 'load_full_frame', lambda *a: frame)
+    monkeypatch.setattr(wf, 'WINDOWS', [SMALL])
+    monkeypatch.setattr(wf, 'current_commit', lambda: 'abc123')
+    monkeypatch.setattr(wf.verify_frozen, '__defaults__', (lambda commit: [],))
+    bp = tmp_path / 'bp.json'
+    bp.write_text(json.dumps(TINY_BLUEPRINTS), encoding='utf-8')
+    folder = tmp_path / 'fset'
+    folder.mkdir()
+    formulas = folder / 'formulas.json'
+    formulas.write_text(json.dumps([{'name': 'f1', 'formula': 'ts_mean(pv_close, 5)'}]), encoding='utf-8')
+    root = tmp_path / 'wf'
+    base = ['--results-root', str(root), '--blueprints', str(bp), '--n-blueprints', '3']
+    return parser, base, formulas, root
+
+
+def test_freeze_step_needs_the_formula_set_and_real_step_refuses_after_it_changes(tmp_path, monkeypatch):
+    parser, base, formulas, root = freeze_env(tmp_path, monkeypatch)
+    with pytest.raises(SystemExit, match='--formulas'):
+        wf.step_freeze(parser.parse_args(['walkforward', 'freeze'] + base))
+    wf.step_freeze(parser.parse_args(['walkforward', 'freeze'] + base + ['--formulas', str(formulas)]))
+    frozen = json.loads((root / 'frozen.json').read_text(encoding='utf-8'))
+    assert frozen['git_commit'] == 'abc123' and frozen['formulas_sha256'] == wf.file_sha256(str(formulas))
+
+    captured = {}
+    monkeypatch.setattr(wf, 'execute', lambda tasks, out, workers: captured.update(tasks=tasks, out=out))
+    wf.step_real(parser.parse_args(['walkforward', 'real', '--system', 'llm_only'] + base))   # formulas: frozen.json
+    assert {t['seed'] for t in captured['tasks']} == {1} and captured['tasks'][0]['formulas'][0]['name'] == 'f1'
+    assert captured['out'] == str(root / 'llm_only')
+
+    formulas.write_text(json.dumps([{'name': 'f1', 'formula': 'ts_mean(pv_close, 3)'}]), encoding='utf-8')
+    for system in ('llm_only', 'random', 'tsmom'):       # one frozen record guards every configuration
+        with pytest.raises(SystemExit, match='formulas_sha256'):
+            wf.step_real(parser.parse_args(['walkforward', 'real', '--system', system] + base))
+
+
+def test_real_step_refuses_a_changed_tsmom_grid(tmp_path, monkeypatch):
+    parser, base, formulas, root = freeze_env(tmp_path, monkeypatch)
+    wf.step_freeze(parser.parse_args(['walkforward', 'freeze'] + base + ['--formulas', str(formulas)]))
+    monkeypatch.setattr(wf, 'TSMOM_LOOKBACK_SESSIONS', {'day': 1, 'week': 5, 'month': 22})
+    with pytest.raises(SystemExit, match='tsmom_grid'):
+        wf.step_real(parser.parse_args(['walkforward', 'real', '--system', 'tsmom'] + base))
 
 
 def test_summary_sharpe_matches_hand_computation_and_p_value_counts_ties():
@@ -220,14 +347,40 @@ def test_run_window_with_each_search_system(system, mode, k, chats):
         assert chats == [] and row['llm_requests'] == 0 and json.loads(row['new_blueprints']) == []
 
 
+def without_clock(feedback_json):
+    """The feedback record minus `llm_s`, a measured wall time that never repeats between two runs."""
+    record = json.loads(feedback_json)
+    record.pop('llm_s')
+    return record
+
+
 def test_run_window_is_reproducible_and_seed_of_the_llm_follows_the_run(chats):
     first = wf.run_window(window_task('llm_mcts'))['row']
     second = wf.run_window(window_task('llm_mcts'))['row']
-    for column in ('top', 'evaluations', 'new_blueprints', 'feedback'):
+    for column in ('top', 'evaluations', 'new_blueprints'):
         assert first[column] == second[column]
+    assert without_clock(first['feedback']) == without_clock(second['feedback'])
     other_seed = wf.run_window(window_task('llm_mcts', seed=2))['row']
     assert json.loads(other_seed['feedback'])['seed'] != json.loads(first['feedback'])['seed']
     assert chats[0].prompts == chats[1].prompts                 # same run, same question
+
+
+def test_feedback_record_differs_between_identical_runs_only_in_the_measured_llm_time(chats, monkeypatch):
+    """
+    Reproduces the intermittent failure of the reproducibility test: `llm_s` is a wall time. The Windows clock ticks
+    every ~16 ms, so two runs of a fast fake LLM usually read 0.0 twice, but a run that straddles a tick differs.
+    """
+    import itertools
+    import types
+    ticks = itertools.count()
+    monkeypatch.setattr('strategy_workflows.BlueprintGeneration.time',
+                        types.SimpleNamespace(time=lambda: next(ticks) ** 2 * 0.01))     # never the same step twice
+    first = wf.run_window(window_task('llm_mcts'))['row']
+    second = wf.run_window(window_task('llm_mcts'))['row']
+    assert first['feedback'] != second['feedback']
+    assert json.loads(first['feedback'])['llm_s'] != json.loads(second['feedback'])['llm_s']
+    assert without_clock(first['feedback']) == without_clock(second['feedback'])
+    assert first['top'] == second['top'] and first['new_blueprints'] == second['new_blueprints']
 
 
 def test_run_window_defaults_to_the_old_sequential_search_without_a_system():
@@ -268,8 +421,11 @@ def test_cli_defaults_to_the_feedback_system_and_names_the_folder_after_it(tmp_p
     args = parser.parse_args(['walkforward', 'summary', '--results-root', str(tmp_path), '--system', 'oneshot',
                               '--config', 'old_style'])
     assert wf.out_dir_of(args) == str(tmp_path / 'old_style')
+    for system in ('llm_only', 'buy_hold', 'tsmom'):
+        assert parser.parse_args(['walkforward', 'summary', '--results-root', str(tmp_path),
+                                  '--system', system]).system == system
     with pytest.raises(SystemExit):
-        parser.parse_args(['walkforward', 'real', '--system', 'llm_only'])
+        parser.parse_args(['walkforward', 'real', '--system', 'nonsense'])
 
 
 def test_placebo_step_passes_system_plan_and_llm_to_the_tasks(tmp_path, monkeypatch):
