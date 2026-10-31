@@ -4,7 +4,10 @@ Phương pháp như sẽ làm (chưa code). Quyết định: [DECISIONS](../DECI
 
 ## Câu hỏi
 
-- **RQ1 (chính):** có LLM trong vòng tìm kiếm thì quy trình phát hiện được tín hiệu yếu hơn không, so với cùng ngân sách mà không có LLM? Đo bằng bài cài tín hiệu chạy cho từng cấu hình.
+- **RQ1 (chính):** cùng giới hạn độ dài công thức, LLM đưa MCTS tới tín hiệu đúng sớm hơn hay chặn đường tới nó? Blueprint thu vùng tìm kiếm từ ≈ 1.9 × 10⁴¹ xuống ≈ 4.6 × 10¹⁴ công thức ([RESULTS](../RESULTS.md#không-gian-tìm-kiếm)); "sớm hơn" chỉ đúng khi tín hiệu nằm trong vùng đó. Ba câu con:
+  - **(a) Sinh một lần:** tới A sớm hơn MCTS không LLM, hay bị chặn khi A nằm ngoài vùng blueprint? Đo ở mốc 50.000 lượt chấm (hết giai đoạn A, trước phản hồi).
+  - **(b) Phản hồi:** khi bị chặn, sau khi thấy điểm đoạn học LLM có viết được blueprint mới chứa A (hoặc gần A) không? Đo ở 100.000.
+  - **(c) Chi phí:** "sớm hơn" tính theo lượt chấm và theo thời gian thật (LLM tính cả).
 - **RQ1 (mô tả):** Sharpe ngoài mẫu của các cấu hình trong lần chạy thật, kèm khoảng tin cậy của chênh lệch (dữ liệu chỉ phân biệt được chênh ≈ 1.0–1.25, [WALK_FORWARD](WALK_FORWARD.md#cấu-hình-so-sánh)).
 - RQ2 giữ nguyên câu hỏi, chạy lại trên hệ thống có vòng phản hồi.
 
@@ -44,8 +47,16 @@ Mỗi lượt (một cửa sổ walk-forward hoặc một lượt bài cài tín
   - 2 kinh điển: ⏸️ hồi quy về trung bình `ts_zscore(close, 10)` đổi dấu; động lượng `ts_mean(sub(close, open), 10)`.
   - 2 lạ: công thức sinh ngẫu nhiên theo ngữ pháp, seed 1 và 2; bỏ biểu thức hằng và biểu thức có |Spearman| ≥ 0.7 với A kinh điển, rồi lấy công thức hợp lệ kế tiếp.
   - Mọi A phải biểu diễn được ở độ sâu 4 và không trùng nguyên văn blueprint nào.
-- **Thước đo chính:** tỉ lệ tìm lại gần (|Spearman| ≥ 0.7 trong top-5) theo cấu hình × A × IC; so LLM + MCTS với từng cấu hình khác bằng Fisher ở cùng ô. **Phụ:** số lượt chấm tới lần đầu chạm A; độ phủ toán tử của blueprint mới so với blueprint ban đầu.
-- Đọc: thắng ở cả hai loại A ⇒ LLM giúp tìm nói chung; thắng kinh điển, thua lạ ⇒ LLM là định kiến về dạng quen; không thắng ⇒ mô hình 4B không góp vào độ nhạy.
+  - Với mỗi A ghi trước khi chạy: A có nằm trong vùng của bộ blueprint ban đầu không (blueprint nào điền ra được A), và số cách điền của blueprint nhỏ nhất chứa A (độ khó tìm trong vùng). Blueprint chứa A cũ chỉ có 400 cách điền ⇒ gần như duyệt hết; A mới nên nằm ở chỗ tìm thật sự khó.
+- **Thước đo chính:** tỉ lệ tìm lại gần (|Spearman| ≥ 0.7 trong top-5) theo cấu hình × A × IC tại các mốc 10.000 / 25.000 / 50.000 / 75.000 / 100.000 lượt chấm (chụp bảng xếp hạng trong cùng lượt, không chạy thêm); so LLM + MCTS với MCTS không LLM bằng Fisher ở cùng ô và cùng mốc. **Phụ:** số lượt chấm và thời gian thật tới lần đầu chạm A; blueprint phản hồi có chứa A không; độ phủ toán tử của blueprint mới.
+- Đọc theo A trong / ngoài vùng blueprint ban đầu:
+
+| | A trong vùng | A ngoài vùng |
+|---|---|---|
+| Có LLM tới A sớm hơn | LLM rút ngắn đường | (không xảy ra ở mốc 50.000) |
+| Có LLM chậm hơn hoặc không tới | vùng đúng nhưng xếp hạng / tìm trong vùng kém | **bị chặn**; nếu phản hồi mở được đường ở mốc 100.000 ⇒ phản hồi có giá trị |
+
+- Tóm lại: thắng ở cả A kinh điển lẫn A lạ ⇒ LLM giúp tìm nói chung; thắng kinh điển, thua lạ ⇒ LLM là định kiến về dạng quen; không thắng ⇒ mô hình 4B không góp vào việc tìm.
 - 10 seed chỉ phân biệt được chênh lớn (cỡ 6/10 với 1/10); ghi kèm kết quả.
 
 ## Thứ tự và thời gian máy
