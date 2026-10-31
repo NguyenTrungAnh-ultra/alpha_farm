@@ -45,7 +45,7 @@ Cùng ngân sách 100.000 lượt chấm mỗi cửa sổ, cùng bước 2–4. 
 | Mua và giữ | luôn long | tham chiếu | ⛔ |
 | TSMOM | momentum chuỗi thời gian (Moskowitz 2012), chuyển sang bar trong ngày | tham chiếu | ⛔ |
 
-**Độ chênh Sharpe phát hiện được** (877 ngày = 3,48 năm; Memmel 2003, một phía α = 0.05): sai số chuẩn của chênh lệch = √((2 − 2ρ + ½(SR₁² + SR₂² − 2ρ²SR₁SR₂)) / 3,48), ρ là tương quan lợi suất ngày giữa hai cấu hình (chưa đo, chờ lần chạy thật). Chênh tối thiểu với power 50% / 80% (SR₁ = 1, SR₂ = 0): ρ = 0 ⇒ 1.39 / 2.11; ρ = 0.3 ⇒ 1.22 / 1.84; ρ = 0.5 ⇒ 1.08 / 1.63; ρ = 0.7 ⇒ 0.92 / 1.40. Một Sharpe đơn lẻ có sai số chuẩn 0.54 (placebo đo được 0.51).
+**Độ chênh Sharpe phát hiện được** (877 ngày; Memmel 2003, một phía α = 0.05): phương sai của chênh lệch Sharpe ngày = (2 − 2ρ + ½(sr₁² + sr₂² − 2ρ²sr₁sr₂)) / 877, sr là Sharpe theo ngày, ρ là tương quan lợi suất ngày giữa hai cấu hình (chưa đo, chờ lần chạy thật); nhân √252 ra theo năm. Số hạng sr² nhỏ không đáng kể với dữ liệu ngày (Sharpe năm 1 ⇒ sr² ≈ 0.004). Chênh tối thiểu với power 50% / 80%: ρ = 0 ⇒ 1.25 / 1.89; ρ = 0.3 ⇒ 1.04 / 1.58; ρ = 0.5 ⇒ 0.88 / 1.33; ρ = 0.7 ⇒ 0.68 / 1.03. Một Sharpe đơn lẻ có sai số chuẩn 0.54 (placebo đo được 0.51).
 
 ## Placebo
 
