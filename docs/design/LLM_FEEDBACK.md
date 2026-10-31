@@ -64,7 +64,7 @@ Người dùng duyệt 2026-10-31 (đề xuất của Claude).
 1. **Chọn A trước khi sinh lại blueprint.** Ghi 4 A (biểu thức, chiều cài, seed sinh) vào DECISIONS và commit **trước** khi chạy sinh bộ blueprint mới; sau đó mới kiểm A trong / ngoài vùng. Kích thước khớp nhau để độ dài không lẫn vào kết luận:
    - A1 kinh điển: `ts_zscore(pv_close, 10)`, cài chiều âm (hồi quy về trung bình); 1 toán tử.
    - A2 kinh điển: `ts_mean(sub(pv_close, pv_open), 10)` (động lượng trong phiên); 2 toán tử.
-   - A3 lạ: sinh ngẫu nhiên đúng 1 toán tử, seed 1. A4 lạ: đúng 2 toán tử, seed 2. Bỏ biểu thức hằng, |Spearman| ≥ 0.7 với A1 / A2, hoặc trùng dạng kinh điển; lấy biểu thức hợp lệ kế tiếp của cùng seed.
+   - A3 lạ: sinh ngẫu nhiên đúng 1 toán tử, seed 1. A4 lạ: đúng 2 toán tử, seed 2. Loại khi: hằng; \|Spearman\| ≥ 0.7 với A1 / A2; cùng dạng cây với A1 / A2; không có toán tử `ts_*`; ADF p ≥ 0.05 trên đoạn tìm (không dừng); ≥ 1% của 10.000 công thức ngẫu nhiên (seed 2026) có \|Spearman\| ≥ 0.7 với nó (vùng đông, tìm lại gần xảy ra tình cờ). Lấy biểu thức hợp lệ kế tiếp của cùng seed. ADF và độ đông kiểm cả A1 / A2; trượt thì dừng, hỏi người dùng.
    - Báo kết quả theo từng A, không gộp thành một con số.
 2. **Một phép so chính, còn lại là mô tả.** Chính: LLM + MCTS so với MCTS không LLM, IC 0.1, gộp theo loại A (A1 + A2 = 20 lượt, A3 + A4 = 20 lượt mỗi cấu hình), tại mốc 50.000 và 100.000 ⇒ 4 phép Fisher hai phía (LLM có thể chặn đường), chỉnh Holm. Mọi ô khác (IC 0.05, từng A, các mốc khác, tìm ngẫu nhiên) chỉ mô tả, không đọc p.
 3. **Tìm ngẫu nhiên theo kích thước:** "ramped half-and-half" như GP: chia đều 100.000 mẫu cho độ sâu 1–4, mỗi độ sâu nửa cây đầy nửa cây mọc tự do; hợp lệ về chiều; cửa sổ và tham số template rút đều; bỏ biểu thức trùng.

@@ -33,7 +33,6 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 - ⏸️ Số seed 5 cho lần chạy thật: Claude đề xuất theo proposal, chưa xác nhận riêng. (K = 19 đang chạy; muốn K = 39 thì chạy thêm bộ 20–39 sau, không phải chạy lại.)
 - ⏸️ Ngân sách placebo bằng lần thật nếu thời gian máy cho phép: Claude đề xuất.
 - ⏸️ Ghi số lệnh và Sharpe sau phí của A như một dòng mô tả tín hiệu cài trong kết quả bài cài tín hiệu.
-- ⏸️ Định nghĩa A "lạ" (A3, A4): code hiện coi mọi `ts_*(trường)` là kinh điển nên A3 một toán tử chỉ còn dạng `high + low` (mức giá). Claude đề xuất: chỉ loại khi cùng dạng A1 / A2, hằng, hoặc \|Spearman\| ≥ 0.7 với A1 / A2, và bắt buộc có ít nhất một toán tử `ts_*`. Chốt trước khi commit 4 A.
 
 ## Nợ
 
