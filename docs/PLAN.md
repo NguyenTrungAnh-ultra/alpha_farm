@@ -36,7 +36,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 - `criteria_report` của `main.py planted summary` vẫn in đạt / trượt theo tiêu chí cũ (IC 0.05 ≥ 3/5), trong khi bài này đã đổi sang báo ngưỡng phát hiện.
 - ≈ 7% lượt chấm lỗi (−10) — người dùng chốt 2026-10-30 để nguyên, ghi vào mục hạn chế (như nhau ở mọi cấu hình; sửa thì phải chạy lại mọi kết quả) vì biểu thức toàn hằng (`Input array/series must be 1D, got shape ()`); MCTS còn sinh `(0.1 + low)`. Cần lọc hằng theo nút cha. Sau mỗi lượt xem `MCTSEngine.error_summary()`.
 - `CRITICAL_RULES` (dùng chung mọi biến thể prompt) còn xếp `ts_argmax` / `ts_argmin` vào nhóm "giữ chiều"; không sửa vì đổi hash prompt `current`. Template vẫn chọn theo `output_dim` khai báo.
-- Rò rỉ qua trọng số LLM: `qwen3.5:4b` có thể đã đọc văn bản về 2020–2025. Đã ẩn tên thị trường trong prompt; còn: so blueprint có tên và ẩn danh cùng ngân sách, tra ngày cắt dữ liệu huấn luyện, nêu trong mục hạn chế.
+- Rò rỉ qua trọng số LLM: `qwen3.5:4b` có thể đã đọc văn bản về 2020–2025. Đã ẩn tên thị trường trong prompt; đã dò mức và hướng VN30 theo tháng 2020–2025 (2026-10-31: không hơn đoán hằng, [RESULTS](RESULTS.md#rò-rỉ-qua-trọng-số-llm)); ngày cắt không công bố. Còn: so blueprint có tên và ẩn danh cùng ngân sách, nêu trong mục hạn chế.
 - Dữ liệu khung phút thiếu 126 ngày (2023-03-22 → 2024-03-14) so với tệp 1H; kiểm tệp gốc trước khi chạy RQ trên khung phút.
 - Template BOOLEAN luôn có vị thế (bar NaN và False thành short); RATIO 60–80 / 20–40 làm gốc `ts_zscore` gần như luôn short.
 - `generate_strategy_code` mới test với NORMALIZED; `generate_descriptive_name` còn tìm `self.feat.*`.

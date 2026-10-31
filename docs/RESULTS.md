@@ -42,6 +42,15 @@ Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `r
 - Số lệnh mỗi cửa sổ 6 tháng: trung vị 343 (26–568).
 - Thời gian: 133 lượt × trung bình 1.612 s; 21:02 → 03:12 (6 giờ 10 phút, 10 lượt song song).
 
+## Rò rỉ qua trọng số LLM
+
+`qwen3.5:4b` (Ollama, temperature 0, tắt suy nghĩ), hỏi 2026-10-31; so với giá đóng cửa cuối tháng của `data/DNSE_VN30F_1H.csv` (hợp đồng tương lai, lệch chỉ số vài điểm).
+
+- **Ngày cắt dữ liệu:** model card Hugging Face không ghi; mô hình phát hành 2026-02 ⇒ dữ liệu huấn luyện có thể phủ cả 2020–2025. Tự khai "2026-01" khi hỏi thẳng, nhưng khi hỏi giá tháng 10/2025 lại trả lời "chúng ta đang ở 2024" ⇒ tự khai không đáng tin.
+- **Mức VN30 cuối tháng, 72 tháng 2020–2025:** mô hình đoán gần như hằng (12 giá trị khác nhau cho 60 tháng 2020–2024; 1085.67 lặp 27 lần); từ 2025-04 từ chối hoặc lặp lại năm. Sai số tương đối trung bình 0.197 (64 câu có số), **tệ hơn đoán một hằng số bằng trung bình thật (0.183)**; tương quan với giá thật 0.37 (2020–2024), chỉ do mức đoán nhích theo năm.
+- **Hướng tháng (tăng / giảm so với tháng trước):** đúng 48.6%, thấp hơn luôn đoán lớp đa số (58.3%); trả lời "giảm" 82% số câu.
+- ⇒ Mô hình không mang thông tin dùng được về đường giá VN30 2020–2025 ở mức tháng. Không loại được rò rỉ tinh vi hơn (kiểu công thức hiệu quả), nhưng blueprint sinh với prompt ẩn tên thị trường và không thấy dữ liệu. Script: không giữ trong repo (chạy một lần).
+
 ## Bộ blueprint
 
 `results/blueprint_sets/20261029_212813/`: prompt `anon_shapes`, temperature 0.3, `qwen3.5:4b`; 20/20 đạt cả bốn tiêu chí ngay lần sinh đầu (0 chép ví dụ, 0 trùng khung, mọi blueprint có `?` và điền được ở độ sâu 4); 24 vòng hỏi, 37 phút. Gốc: 12 `greater_than`, 7 `mult`, 1 `sub`; 17/20 có `ts_zscore` hoặc `ts_rank` (gợi ý `ts_zscore(?)` trong luật chiều làm mô hình nghiêng về dạng này). `blueprints_sha256` `9b226af1…687e`, `prompt_sha256` `83c2e32f…5719` (đủ trong `generation.json`).
