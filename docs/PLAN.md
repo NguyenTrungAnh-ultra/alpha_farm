@@ -33,6 +33,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 - ⏸️ Số seed 5 cho lần chạy thật: Claude đề xuất theo proposal, chưa xác nhận riêng. (K = 19 đang chạy; muốn K = 39 thì chạy thêm bộ 20–39 sau, không phải chạy lại.)
 - ⏸️ Ngân sách placebo bằng lần thật nếu thời gian máy cho phép: Claude đề xuất.
 - ⏸️ Ghi số lệnh và Sharpe sau phí của A như một dòng mô tả tín hiệu cài trong kết quả bài cài tín hiệu.
+- ⏸️ Bật hay tắt suy nghĩ của `qwen3.5:4b` khi sinh blueprint (tắt nhanh ≈ 25×, chất lượng chưa so): Claude đề xuất lô thử 5 blueprint mỗi chế độ, so theo tiêu chí bộ thật và độ phủ toán tử, không chấm trên dữ liệu; chốt trước khi sinh lại bộ.
 
 ## Nợ
 

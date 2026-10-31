@@ -67,6 +67,8 @@ Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `r
 
 Một lượt chấm MCTS trên đoạn học cửa sổ 1 (3 blueprint × 400 vòng, 1.196 lượt chấm): 9,8 ms. Thời gian: backtest ≈ 48%, `compute_metrics` ≈ 14%, IC xếp hạng ≈ 10%, tính công thức ≈ 13%. Kết quả giống hệt bản trước khi tăng tốc (200 backtest, 200 IC, bảng xếp hạng MCTS có seed). Một lượt bài cài tín hiệu cửa sổ 1 (20 blueprint × 5.000 vòng, 5 lượt song song): 1.236–1.283 s.
 
+**LLM sinh blueprint** (`qwen3.5:4b`, prompt `anon_shapes` 60m ≈ 1.720 token vào, 2026-10-31, một yêu cầu): bật suy nghĩ (mặc định của `OllamaChatClient`, không truyền `think`) 90,9 s, 8.843 token ra; tắt suy nghĩ 3,3–7,3 s, 121 token ra. Bộ `20261029_212813` sinh khi bật suy nghĩ: 24 yêu cầu, 2.241 s.
+
 ## Dữ liệu
 
 - CAGR mua-và-giữ 2020–2024: 8.94% (1m), 8.93% (15m), 8.90% (60m).
