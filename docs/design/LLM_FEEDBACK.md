@@ -1,6 +1,6 @@
 # Vòng phản hồi LLM và RQ1
 
-Phương pháp như sẽ làm (chưa code). Quyết định: [DECISIONS](../DECISIONS.md#câu-hỏi-nghiên-cứu-và-quy-tắc-chung). Trạng thái: [PLAN](../PLAN.md). Công trình liên quan: [RELATED_WORK](RELATED_WORK.md). Dòng có ⏸️ là đề xuất của Claude, chờ người dùng chốt.
+Phương pháp như sẽ làm (chưa code). Quyết định: [DECISIONS](../DECISIONS.md#câu-hỏi-nghiên-cứu-và-quy-tắc-chung). Trạng thái: [PLAN](../PLAN.md). Công trình liên quan: [RELATED_WORK](RELATED_WORK.md).
 
 ## Câu hỏi
 
@@ -22,8 +22,8 @@ Mỗi lượt (một cửa sổ walk-forward hoặc một lượt bài cài tín
 5. Chọn top-5 như cũ: ≤ 100 biểu thức tốt nhất của cả hai giai đoạn → đoạn kiểm định → top-5.
 6. Ghi lại 10 blueprint mới, prompt phản hồi (hash), thời gian LLM của từng lượt.
 
-- ⏸️ Một vòng phản hồi, 10 blueprint mới, chia 50/50 ngân sách. Nhiều vòng hơn làm thời gian LLM tăng tuyến tính.
-- ⏸️ Ollama `seed` cố định theo (lượt, seed MCTS) để chạy lại ra cùng blueprint; temperature 0.3 như lần sinh đầu.
+- Một vòng phản hồi, 10 blueprint mới, chia 50/50 ngân sách. Nhiều vòng hơn làm thời gian LLM tăng tuyến tính.
+- Ollama `seed` cố định theo (lượt, seed MCTS) để chạy lại ra cùng blueprint; temperature 0.3 như lần sinh đầu.
 
 ## Sửa prompt
 
@@ -59,7 +59,7 @@ Mỗi lượt (một cửa sổ walk-forward hoặc một lượt bài cài tín
 
 ## Quy tắc chốt trước khi chạy
 
-⏸️ Toàn bộ mục này là đề xuất của Claude (2026-10-31), chờ người dùng duyệt.
+Người dùng duyệt 2026-10-31 (đề xuất của Claude).
 
 1. **Chọn A trước khi sinh lại blueprint.** Ghi 4 A (biểu thức, chiều cài, seed sinh) vào DECISIONS và commit **trước** khi chạy sinh bộ blueprint mới; sau đó mới kiểm A trong / ngoài vùng. Kích thước khớp nhau để độ dài không lẫn vào kết luận:
    - A1 kinh điển: `ts_zscore(pv_close, 10)`, cài chiều âm (hồi quy về trung bình); 1 toán tử.
@@ -80,7 +80,19 @@ Mỗi lượt (một cửa sổ walk-forward hoặc một lượt bài cài tín
 5. Placebo chạy lại trên hệ thống có phản hồi: 19 × 7 = 133 lượt.
 6. Đóng băng → chạy thật một lần (mọi cấu hình, 5 seed).
 
-Riêng phần LLM, nếu Ollama xử lý từng yêu cầu một: 90 + 133 + 35 lượt × 10–20 phút ≈ 43–86 giờ. Bước 3 quyết định có giữ được thiết kế này không; quá đắt ⇒ phương án lùi: giữ sinh một lần, RQ1 hỏi giá trị của bộ khung vạch sẵn.
+Ước thời gian máy (2026-10-31, chưa đo; MCTS ≈ 1.600 s mỗi lượt khi 10 lượt song song như placebo):
+
+| Phần | Lượt | MCTS (CPU) | LLM |
+|---|---|---|---|
+| Sinh lại bộ blueprint | — | — | 0,7 giờ (tệ nhất 5 lần sinh ≈ 3 giờ) |
+| Đo một lượt | 1 | 0,5 giờ | 0,3 giờ |
+| Bài cài tín hiệu RQ1 | 270 (+ 40 nếu thêm IC 0.2) | 12–14 giờ | 90–130 lượt có phản hồi |
+| Placebo chạy lại | 133 | 6 giờ | 133 lượt có phản hồi |
+| Chạy thật (3 cấu hình tìm × 35) | 105 | 5 giờ | 35 lượt có phản hồi + LLM không tìm |
+
+- MCTS cộng lại ≈ 24 giờ; MCTS không LLM và tìm ngẫu nhiên có cây sâu hơn, chấm có thể chậm hơn ⇒ tệ nhất ≈ 30 giờ.
+- LLM: ≈ 300 lượt có phản hồi × 10–20 phút. Tốt nhất (10 phút, 3 yêu cầu song song) ≈ 17 giờ; chạy từng yêu cầu một, 20 phút ≈ 100 giờ ⇒ ngưỡng dừng giới hạn ở 48 giờ. LLM không tìm: ≈ 12 giờ (trần thời gian bằng một vòng phản hồi mỗi lượt).
+- LLM chạy GPU, MCTS chạy CPU nên chồng lên nhau được. **Tốt nhất ≈ 30 giờ; tệ nhất trong ngưỡng dừng, không chồng: 30 + 48 + 12 + 3 ≈ 93 giờ (≈ 4 ngày).**
 
 ## Ngoài phạm vi
 
