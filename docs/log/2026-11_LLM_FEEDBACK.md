@@ -30,3 +30,11 @@ Lượt có phản hồi: số blueprint mới 1–10 (placebo: 42 lượt đủ
 4. Lỗi trong tiến trình con (`[blueprints] chat error`, `rejected`) không vào log: stdout của worker bị mất. `runs.csv` chỉ ghi `ideas` / `compiled`, không ghi lý do.
 
 **Hệ quả:** placebo 133 lượt và 90 ô LLM + MCTS của RQ1 đo một hệ thống nửa có phản hồi nửa không ⇒ không dùng. Số của placebo này, chỉ để tham khảo: Sharpe 19 bộ trung bình −0.13, độ lệch chuẩn 0.62, từ −0.98 đến 1.43; số lệnh mỗi cửa sổ trung vị 54 (hệ thống sinh một lần: 343). Ô MCTS không LLM và tìm ngẫu nhiên của RQ1 không dùng LLM, để chạy tiếp.
+
+## 2026-11-01 — chạy thử sau khi sửa (commit `415227e`)
+
+**Chạy:** placebo 2 bộ × cửa sổ 1, 3, 5, 6, 7 = 10 lượt cùng lúc (10 worker), song song với RQ1 thử (`llm_mcts`, A4, IC 0.1, seed 1–2, 2 worker) và RQ1 thật (4 worker, ô MCTS không LLM / ngẫu nhiên); thư mục `results/smoke_20261101/`. Tiêu chí qua đặt trước: ≤ 1/10 lượt rơi về, 0 hết giờ, 0 tràn ngữ cảnh, mọi blueprint mới biên dịch được, hai lệnh `summary` đọc được.
+
+**Placebo thử: trượt.** 4/10 lượt rơi về, cả 4 do tràn ngữ cảnh (`context_length`); 0 hết giờ; 6 lượt còn lại ra 6–10 blueprint mới, 10/10 ý tưởng biên dịch được ở 4 lượt (lỗi cú pháp cửa sổ đã hết). Một yêu cầu: prompt 2.727 + sinh 30.041 token ⇒ suy nghĩ có lúc chạy dài gấp ≈ 3 lần bình thường (8–14 nghìn token), không chỉ thiếu chỗ. Thời gian LLM mỗi lượt 678–2.723 s (xếp hàng), mỗi lượt 2.095–4.287 s khi máy chạy 16 tiến trình. `walkforward summary` in đúng tỉ lệ rơi về và lý do.
+
+**RQ1 thử, ô đầu (seed 1):** 5 blueprint mới, 4/10 ý tưởng đầu biên dịch được; loại vì thiếu `?` 4, sai chiều 4 (mô hình chép nguyên công thức hoàn chỉnh từ phản hồi).
