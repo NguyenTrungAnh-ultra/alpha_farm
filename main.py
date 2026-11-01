@@ -16,8 +16,9 @@ import time
 import argparse
 from utilities.AppConfig import PROJECT_ROOT
 
-# Fix Windows terminal UTF-8 encoding issue
-sys.stdout.reconfigure(encoding='utf-8')
+# Fix Windows terminal UTF-8 encoding issue. Line buffering: stdout redirected to a log file is otherwise block
+# buffered, so progress lines of a long run reach the log minutes late (or not at all if the run is killed).
+sys.stdout.reconfigure(encoding='utf-8', line_buffering=True)
 
 def cmd_generate(args):
     """

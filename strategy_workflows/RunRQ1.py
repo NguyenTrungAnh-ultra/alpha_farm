@@ -55,7 +55,8 @@ from strategy_workflows.RunPlantedSignal import (
     TIMEFRAME, ensure_segments, get_beta, load_base, load_blueprints, out_of_sample_sharpe, quiet,
 )
 from strategy_workflows.SearchConfigs import (
-    CHECKPOINTS, SYSTEMS, BudgetPlan, create_worker_chat, llm_spec, run_search,
+    CHECKPOINTS, SYSTEMS, BudgetPlan, create_worker_chat, feedback_records, feedback_summary_lines, llm_spec,
+    run_search, summarize_feedback,
 )
 from strategy_workflows.Statistics import detection_threshold, fisher_p_greater, holm_adjust, wilson_interval
 from utilities.AppConfig import MCTS_MAX_DEPTH
@@ -499,6 +500,11 @@ def step_summary(args) -> None:
     if not os.path.exists(path):
         print(f"[rq1] {path} not found; run the search step first.")
         return
+    runs_path = os.path.join(args.out_dir, 'runs.csv')
+    if os.path.exists(runs_path):
+        runs = pd.read_csv(runs_path, dtype={'formula': str}, keep_default_na=False)
+        for line in feedback_summary_lines(summarize_feedback(feedback_records(runs, RUN_KEY)), '[rq1]'):
+            print(line)
     checkpoints = pd.read_csv(path, keep_default_na=True, dtype={'run_formula': str})
     tables = [
         ('summary.csv', 'Recovery rates (Wilson intervals; no p-values outside the primary test)',

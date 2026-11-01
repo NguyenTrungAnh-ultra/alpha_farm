@@ -52,10 +52,23 @@ def extract_json(text: str) -> Optional[Union[dict, list]]:
     return None
 
 
-# Sampling options a caller may override per request; anything else is ignored.
+# Context window of every request and of the Modelfile: all request kinds must use the same value, or Ollama
+# reloads the model when the context changes. A thinking reply can run past 10k tokens, so 16k is not enough.
+NUM_CTX = 32768
 # Seconds `send` waits for a reply; a client may carry its own `request_timeout`.
 DEFAULT_REQUEST_TIMEOUT_S = 300
+# Seconds to open the connection; short so a dead Ollama fails fast whatever the read timeout is.
+CONNECT_TIMEOUT_S = 10
+# Sampling options a caller may override per request; anything else is ignored.
 SAMPLING_OPTION_NAMES = ("temperature", "top_p", "top_k", "repeat_penalty", "seed")
+
+
+class OllamaReplyError(Exception):
+    """Ollama answered but gave no usable reply; `kind` is 'context_length' or 'empty_reply'."""
+
+    def __init__(self, kind: str, message: str):
+        super().__init__(message)
+        self.kind = kind
 
 
 def _find_ollama_cmd():
@@ -218,7 +231,7 @@ class OllamaChatClient:
         # 3. Nạp model vào VRAM
         if self.verbose: print(f"[Ollama] Pre-loading model '{self.model}' into VRAM...")
         try:
-            requests.post(f"{self.host}/api/generate", json={"model": self.model, "prompt": "", "keep_alive": "24h", "options": {"num_ctx": 16384}}, timeout=30)
+            requests.post(f"{self.host}/api/generate", json={"model": self.model, "prompt": "", "keep_alive": "24h", "options": {"num_ctx": NUM_CTX}}, timeout=30)
         except Exception:
             pass
             
@@ -246,6 +259,10 @@ class OllamaChatClient:
         ------
         Exception
             If the HTTP request to the Ollama server fails.
+        OllamaReplyError
+            Only when the client has `strict_reply` set: the reply was cut off by the context limit
+            (`done_reason` "length") or its `response` is empty. Without it, an empty `response` falls back to the
+            `thinking` text, which holds no answer when the model ran out of context while thinking.
         """
         url = f"{self.host}/api/generate"
         payload = {
@@ -253,7 +270,7 @@ class OllamaChatClient:
             "prompt": prompt,
             "stream": False,
             "options": {
-                "num_ctx": 16384
+                "num_ctx": NUM_CTX
             }
         }
         for name in SAMPLING_OPTION_NAMES:
@@ -264,13 +281,22 @@ class OllamaChatClient:
         
         try:
             if self.verbose: print(f"[Ollama] Generating response using '{self.model}'...")
-            response = requests.post(url, json=payload, timeout=getattr(self, 'request_timeout', DEFAULT_REQUEST_TIMEOUT_S))
+            response = requests.post(url, json=payload, timeout=(CONNECT_TIMEOUT_S, getattr(self, 'request_timeout', DEFAULT_REQUEST_TIMEOUT_S)))
             response.raise_for_status()
             data = response.json()
             
             resp_text = data.get("response", "")
             thinking = data.get("thinking", "")
-            
+
+            if getattr(self, 'strict_reply', False):
+                if data.get("done_reason") == "length":
+                    raise OllamaReplyError(
+                        "context_length", f"reply cut off at the context limit (num_ctx {NUM_CTX}, "
+                        f"prompt {data.get('prompt_eval_count')} + generated {data.get('eval_count')} tokens)")
+                if not resp_text.strip():
+                    raise OllamaReplyError("empty_reply", "the reply has no response text")
+                return resp_text
+
             if not resp_text and thinking:
                 resp_text = thinking
                 

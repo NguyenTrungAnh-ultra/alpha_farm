@@ -89,9 +89,10 @@ def test_llm_seed_is_stable_in_range_and_depends_on_the_run_key():
     assert sc.llm_seed("x") == int.from_bytes(hashlib.sha256(b"x").digest()[:4], "big") & 0x7FFFFFFF
 
 
-def test_expression_text_uses_blueprint_notation():
-    assert sc.expression_to_blueprint_text("(close - ts_mean(close, 10))") == "sub(pv_close, ts_mean(pv_close, 10))"
-    assert sc.expression_to_blueprint_text("(open_ * ts_zscore(volume, 5))") == "mult(pv_open, ts_zscore(pv_volume, 5))"
+def test_expression_text_uses_blueprint_notation_without_windows():
+    assert sc.expression_to_blueprint_text("(close - ts_mean(close, 10))") == "sub(pv_close, ts_mean(pv_close))"
+    assert sc.expression_to_blueprint_text("(open_ * ts_zscore(volume, 5))") == "mult(pv_open, ts_zscore(pv_volume))"
+    assert sc.expression_to_blueprint_text("ts_corr(close, volume, 20)") == "ts_corr(pv_close, pv_volume)"
     assert sc.expression_to_blueprint_text("(high / (low + 1e-8))") == "div(pv_high, pv_low)"
     assert sc.expression_to_blueprint_text("(0.5 + close)") == "add(0.5, pv_close)"
     assert sc.expression_to_blueprint_text("not valid ((") == "not valid (("

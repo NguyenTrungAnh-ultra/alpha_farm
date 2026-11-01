@@ -28,7 +28,9 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from llm_clients.OllamaClient import SAMPLING_OPTION_NAMES, extract_json
+import requests
+
+from llm_clients.OllamaClient import SAMPLING_OPTION_NAMES, OllamaReplyError, extract_json
 from strategy_workflows.MCTSDimensions import DATA_FIELD_DIMENSIONS
 from strategy_workflows.SemanticCompiler import ASTNode, SemanticCompiler, count_slots
 from utilities.Prompts import (
@@ -40,7 +42,9 @@ TIMEFRAME = '60m'
 DEFAULT_TUNE_COUNT = 5
 DEFAULT_SET_COUNT = 20
 DEFAULT_ROUNDS_PER_BLUEPRINT = 4
-BATCH_REQUEST_TIMEOUT_S = 900
+# Read timeout of a batched request. Ollama serves one request at a time, so with many worker processes a request
+# waits behind the others for far longer than its own ~100-300 s; the cap only catches a hung server, not a queue.
+BATCH_REQUEST_TIMEOUT_S = 6 * 3600
 MAX_BATCH_REQUESTS = 5
 INTEGER_OPTIONS = ("top_k", "seed")
 RUN_FIELDS = [
@@ -49,6 +53,15 @@ RUN_FIELDS = [
 ]
 
 StructureKey = tuple
+
+
+def log(message: str) -> None:
+    """
+    Progress line on stderr. Search workers run with stdout redirected to the null device (`quiet()` in
+    RunPlantedSignal), so a `print` from the generation code never reaches the parent's log; stderr is untouched
+    by it and flushed here because a redirected stderr may otherwise buffer.
+    """
+    print(message, file=sys.stderr, flush=True)
 
 
 # --------------------------------------------------------------------------- structure
@@ -81,6 +94,39 @@ class StructureRejection(ValueError):
         self.kind = kind
 
 
+# Message fragment -> short label, for counting why ideas are rejected; first match wins.
+REJECTION_KINDS = (
+    ('Arity mismatch', 'arity'), ('Unknown operator', 'unknown_operator'),
+    ('Unknown data field', 'unknown_field'), ('has no `?` slot', 'no_slot'),
+    ('Dimensional', 'dimension'), ('Syntax error', 'syntax'), ('depth limit', 'depth'),
+    ('no code generation', 'unimplemented_operator'),
+)
+
+
+def rejection_kind(exc: Exception) -> str:
+    """Short label of why `check_idea` raised `exc`: 'example', 'duplicate', 'schema', a compiler kind or 'other'."""
+    if isinstance(exc, StructureRejection):
+        return exc.kind
+    if type(exc).__name__ == 'ValidationError':
+        return 'schema'
+    text = str(exc)
+    for fragment, kind in REJECTION_KINDS:
+        if fragment in text:
+            return kind
+    return 'other'
+
+
+def chat_error_kind(exc: Exception) -> str:
+    """Short label of a failed request: 'timeout', 'connection', the reply error kind, or the exception text."""
+    if isinstance(exc, OllamaReplyError):
+        return exc.kind
+    if isinstance(exc, requests.exceptions.Timeout):
+        return 'timeout'
+    if isinstance(exc, requests.exceptions.ConnectionError):
+        return 'connection'
+    return f"exception: {type(exc).__name__}: {str(exc)[:80]}"
+
+
 @dataclass
 class GenerationStats:
     n_requested: int = 0
@@ -92,6 +138,10 @@ class GenerationStats:
     duplicate_rejections: int = 0
     rounds_used: int = 0
     seconds: float = 0.0
+    error: str = ''                     # why the first request gave no ideas (`chat_error_kind`, 'no_json', 'no_ideas')
+    correction_error: str = ''          # why the correction request failed, same labels
+    rejections: Dict[str, int] = field(default_factory=dict)                    # kind -> count, first reply
+    rejections_after_correction: Dict[str, int] = field(default_factory=dict)   # kind -> count, still rejected
     requests: int = 0                   # LLM requests made (batched generation: first replies and corrections)
     llm_seconds: float = 0.0            # time spent waiting for the LLM (batched generation)
     proposed_structures: set = field(default_factory=set)
@@ -319,7 +369,8 @@ class LLMAsker:
     def __init__(self, chat, options: Optional[dict] = None, model: str = 'ollama-local',
                  timeout: float = BATCH_REQUEST_TIMEOUT_S):
         self.chat = chat
-        chat.request_timeout = timeout          # a batched thinking request alone takes ~100 s
+        chat.request_timeout = timeout
+        chat.strict_reply = True                # a cut-off or empty reply is an error, not the thinking text
         self.options = {k: v for k, v in (options or {}).items() if v is not None}
         self.model = model
         self.requests = 0
@@ -369,11 +420,13 @@ def generate_batch(
     """
     start_accepted = len(accepted)
 
-    def take(idea_json: dict) -> Optional[str]:
-        """Accept the idea if it passes; returns the rejection reason otherwise."""
+    def take(idea_json: dict, kinds: Dict[str, int]) -> Optional[str]:
+        """Accept the idea if it passes; returns the rejection reason otherwise (its kind is counted in `kinds`)."""
         try:
             idea, key = check_idea(idea_json, example_keys, accepted_keys)
         except Exception as exc:
+            kind = rejection_kind(exc)
+            kinds[kind] = kinds.get(kind, 0) + 1
             if isinstance(exc, StructureRejection):
                 if exc.kind == 'example':
                     stats.example_copy_rejections += 1
@@ -391,7 +444,7 @@ def generate_batch(
         seen_names.add(name)
         accepted_keys[key] = idea['macro_blueprint']
         accepted.append({'name': name, 'macro_blueprint': idea['macro_blueprint']})
-        print(f"[blueprints] accepted {len(accepted) - start_accepted}/{n}: {name}: {idea['macro_blueprint']}")
+        log(f"[blueprints] accepted {len(accepted) - start_accepted}/{n}: {name}: {idea['macro_blueprint']}")
         return None
 
     def done() -> bool:
@@ -400,10 +453,16 @@ def generate_batch(
     stats.rounds_used += 1
     try:
         ideas = parse_ideas(asker.ask(prompt))
+        if ideas is None:
+            stats.error = 'no_json'
+        elif not ideas:
+            stats.error = 'no_ideas'
     except Exception as exc:
-        print(f"[blueprints] chat error: {exc}")
+        stats.error = chat_error_kind(exc)
+        log(f"[blueprints] chat error: {stats.error}: {exc}")
         ideas = None
     if not ideas:
+        log(f"[blueprints] no ideas from the first request ({stats.error})")
         return 0
     rejected: List[Tuple[dict, str]] = []
     for idea_json in ideas:
@@ -413,24 +472,30 @@ def generate_batch(
         stats.with_slot += has_slot
         if done():
             continue
-        reason = take(idea_json)
+        reason = take(idea_json, stats.rejections)
         if reason is not None:
-            print(f"[blueprints] rejected ({reason})")
+            log(f"[blueprints] rejected ({reason})")
             rejected.append((idea_json, reason))
     if rejected and not done():
         stats.rounds_used += 1
         failures = [(str(item.get('macro_blueprint', item)), reason) for item, reason in rejected]
         try:
-            corrected = parse_ideas(asker.ask(build_batch_correction_prompt(failures))) or []
+            corrected = parse_ideas(asker.ask(build_batch_correction_prompt(failures)))
+            if corrected is None:
+                stats.correction_error = 'no_json'
+            elif not corrected:
+                stats.correction_error = 'no_ideas'
+            corrected = corrected or []
         except Exception as exc:
-            print(f"[blueprints] chat error during correction: {exc}")
+            stats.correction_error = chat_error_kind(exc)
+            log(f"[blueprints] chat error during correction: {stats.correction_error}: {exc}")
             corrected = []
         for (original, _), fix in zip(rejected, corrected):
             if done():
                 break
-            reason = take({**original, **fix})
+            reason = take({**original, **fix}, stats.rejections_after_correction)
             if reason is not None:
-                print(f"[blueprints] still rejected after correction ({reason})")
+                log(f"[blueprints] still rejected after correction ({reason})")
     return len(accepted) - start_accepted
 
 

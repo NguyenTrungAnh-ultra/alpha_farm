@@ -534,7 +534,7 @@ def build_feedback_prompt(
     return static_prefix + f"""
 {BATCH_FORMAT_RULES.format(n=n, timeframe=timeframe)}
 ## FEEDBACK FROM THE SEARCH SO FAR
-A search filled earlier skeletons with data fields and rolling windows and scored every complete formula on historical {timeframe} bars. These are the {len(scored)} best distinct formulas, best first. `reward` is the search score (higher is better); `rank IC` is the Spearman correlation between the formula and the next bar's return. The windows in these formulas are shown for information only: never write a window or any number in a blueprint.
+A search filled earlier skeletons with data fields and rolling windows and scored every complete formula on historical {timeframe} bars. These are the {len(scored)} best distinct formulas, best first. `reward` is the search score (higher is better); `rank IC` is the Spearman correlation between the formula and the next bar's return. Rolling windows are left out of the formulas on purpose: in a blueprint every `ts_*` operator takes only its series (one argument, `ts_corr` two) and you never write a window or any number.
 {lines}
 
 ## CURRENT MISSION
@@ -560,7 +560,7 @@ Failures, in order:
 {blocks}
 
 CRITICAL RULES FOR CORRECTION:
-1. Fix each skeleton so that it passes while keeping its trading idea. Typical causes: unknown function names, a wrong number of series arguments (`ts_mean(?)` takes one, `ts_corr(?, ?)` takes two), numbers written into the blueprint, mixing price and volume in one `add`/`sub`/comparison, a BOOLEAN function fed with a non-BOOLEAN argument, no `?` slot, or a structure equal to one that is already taken (then change the operators or the nesting).
+1. Fix each skeleton so that it passes while keeping its trading idea. Typical causes: unknown function names, a wrong number of series arguments (`ts_mean(?)` takes one, `ts_corr(?, ?)` takes two; a window is never an argument), numbers written into the blueprint, mixing price and volume in one `add`/`sub`/comparison, a BOOLEAN function fed with a non-BOOLEAN argument, no `?` slot, or a structure equal to one that is already taken (then change the operators or the nesting).
 2. Return ONLY one JSON object `{{"ideas": [...]}}` with exactly {len(failures)} objects, in the same order as above. Each object has the single field `macro_blueprint` holding the corrected skeleton. No explanations.
 """
 

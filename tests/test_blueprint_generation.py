@@ -134,12 +134,12 @@ def send_with(monkeypatch, **kwargs):
 
 
 def test_sampling_options_reach_the_payload_only_when_given(monkeypatch):
-    assert send_with(monkeypatch)["options"] == {"num_ctx": 16384}
-    assert send_with(monkeypatch, options={})["options"] == {"num_ctx": 16384}
+    assert send_with(monkeypatch)["options"] == {"num_ctx": 32768}
+    assert send_with(monkeypatch, options={})["options"] == {"num_ctx": 32768}
     given = {"temperature": 0.7, "top_p": 0.9, "top_k": 40, "repeat_penalty": 1.1, "seed": 7}
-    assert send_with(monkeypatch, options=given)["options"] == {"num_ctx": 16384, **given}
+    assert send_with(monkeypatch, options=given)["options"] == {"num_ctx": 32768, **given}
     partial = send_with(monkeypatch, options={"temperature": 0.0, "top_p": None, "bogus": 1})["options"]
-    assert partial == {"num_ctx": 16384, "temperature": 0.0}
+    assert partial == {"num_ctx": 32768, "temperature": 0.0}
 
 
 def test_generation_passes_options_only_when_given_and_advances_the_seed():

@@ -329,7 +329,7 @@ def test_top_up_stops_at_five_batched_requests_plus_their_corrections(tmp_path):
     assert not out.exists()
 
 
-def test_request_timeout_is_a_client_parameter_and_batches_use_900_seconds(monkeypatch):
+def test_request_timeout_is_a_client_parameter_and_batches_wait_hours_behind_the_queue(monkeypatch):
     from llm_clients import OllamaClient
     from llm_clients.OllamaClient import OllamaChatClient
     from strategy_workflows import SearchConfigs
@@ -349,7 +349,7 @@ def test_request_timeout_is_a_client_parameter_and_batches_use_900_seconds(monke
     legacy.model, legacy.host, legacy.verbose = "m", "http://x", False
     legacy.send("x")
     SearchConfigs.create_worker_chat({"name": "m", "host": "http://x"}).send("x")
-    assert seen == [300, 42, 300, 900]
+    assert seen == [(10, 300), (10, 42), (10, 300), (10, 6 * 3600)]       # (connect, read)
     chat = FakeChat([])
     BG.LLMAsker(chat)
-    assert chat.request_timeout == 900
+    assert chat.request_timeout == 6 * 3600 and chat.strict_reply is True

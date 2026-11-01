@@ -61,7 +61,10 @@ from strategy_workflows.PlantedSignal import (
 from strategy_workflows.RunPlantedSignal import (
     MAX_RANKED, TIMEFRAME, candidate_positions, load_blueprints, quiet, rank_leaderboard,
 )
-from strategy_workflows.SearchConfigs import SYSTEMS, BudgetPlan, create_worker_chat, llm_spec, run_search
+from strategy_workflows.SearchConfigs import (
+    SYSTEMS, BudgetPlan, create_worker_chat, feedback_records, feedback_summary_lines, llm_spec, run_search,
+    summarize_feedback,
+)
 from strategy_workflows.SemanticCompiler import SemanticCompiler
 from strategy_workflows.Statistics import paired_sharpe_bootstrap
 from utilities.AppConfig import MCTS_MAX_DEPTH, REWARD_WEIGHTS
@@ -740,6 +743,11 @@ def step_summary(args) -> None:
     with pd.option_context('display.width', 200, 'display.max_columns', None):
         print(summary.round(4).to_string(index=False))
     print(f"[walkforward] Wrote {out}")
+    runs_path = os.path.join(out_dir_of(args), 'runs.csv')
+    if os.path.exists(runs_path):
+        runs = pd.read_csv(runs_path)
+        for line in feedback_summary_lines(summarize_feedback(feedback_records(runs, RUN_KEY)), '[walkforward]'):
+            print(line)
     step_compare(args)
 
 

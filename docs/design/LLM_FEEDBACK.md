@@ -16,11 +16,13 @@ Phương pháp như sẽ làm (đã code, chưa chạy). Quyết định: [DECIS
 Mỗi lượt (một cửa sổ walk-forward hoặc một lượt bài cài tín hiệu), tổng 100.000 lượt chấm như cũ:
 
 1. **Giai đoạn A:** 20 blueprint ban đầu (bộ đóng băng, sinh lại bằng prompt đã sửa) × 2.500 vòng MCTS = 50.000 lượt chấm, trên đoạn học.
-2. **Phản hồi:** lấy 10 biểu thức khác nhau tốt nhất theo reward đoạn học; đưa LLM: biểu thức, reward, IC đoạn học. ⛔ đoạn kiểm định và đoạn đánh giá. Ẩn tên thị trường như prompt sinh ban đầu.
+2. **Phản hồi:** lấy 10 biểu thức khác nhau tốt nhất theo reward đoạn học; đưa LLM: biểu thức (bỏ cửa sổ, viết theo cú pháp blueprint; biểu thức chỉ khác cửa sổ gộp làm một, giữ cái reward cao hơn), reward, IC đoạn học. ⛔ đoạn kiểm định và đoạn đánh giá. Ẩn tên thị trường như prompt sinh ban đầu.
 3. **LLM viết 10 blueprint mới trong một yêu cầu** (bật suy nghĩ), mở rộng `generate_set` (cùng luật hợp lệ: biên dịch được, có `?`, không trùng khung với 20 blueprint ban đầu và với nhau). Phản hồi đưa vào qua tham số `experience`.
 4. **Giai đoạn B:** 10 blueprint mới × 5.000 vòng = 50.000 lượt chấm.
 5. Chọn top-5 như cũ: ≤ 100 biểu thức tốt nhất của cả hai giai đoạn → đoạn kiểm định → top-5.
-6. Ghi lại 10 blueprint mới, prompt phản hồi (hash), thời gian LLM của từng lượt.
+6. Ghi lại 10 blueprint mới, prompt phản hồi (hash), thời gian LLM của từng lượt, và lý do khi vòng phản hồi không ra blueprint nào (rơi về bộ ban đầu cho giai đoạn B): hết giờ, tràn ngữ cảnh, không có JSON, mọi ý tưởng bị loại (đếm theo loại lỗi). `walkforward summary` / `rq1 summary` in tỉ lệ rơi về.
+
+- Mọi yêu cầu Ollama dùng `num_ctx` 32.768 (suy nghĩ dài tới ≈ 14 nghìn token); chờ trả lời tối đa 6 giờ vì Ollama xử lý từng yêu cầu một, kết nối tối đa 10 s.
 
 - Một vòng phản hồi, 10 blueprint mới, chia 50/50 ngân sách. Nhiều vòng hơn làm thời gian LLM tăng tuyến tính.
 - Ollama `seed` cố định theo (lượt, seed MCTS) để chạy lại ra cùng blueprint; temperature 0.3 như lần sinh đầu.

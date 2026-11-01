@@ -16,12 +16,15 @@ validation and the top-5 recorded; this reads the leaderboard only, so the searc
 """
 
 import hashlib
+import json
 import time
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from typing import Callable, Dict, List, Optional, Sequence
 
-from strategy_workflows.BlueprintGeneration import BATCH_REQUEST_TIMEOUT_S
+import pandas as pd
+
+from strategy_workflows.BlueprintGeneration import BATCH_REQUEST_TIMEOUT_S, log
 from strategy_workflows.MCTSEngine import FIELD_EXPRESSIONS, MCTSEngine, SearchSession
 from strategy_workflows.PlantedSignal import TOP_K, Segments, distinct_expressions, parse_expression
 from strategy_workflows.RandomSearch import TEMPLATES, random_search, template_root
@@ -93,14 +96,14 @@ def _render(node) -> str:
         return _FIELD_NAMES[label]
     if label == 'Constant':
         return repr(extra)
+    # The window of a `ts_*` call is dropped: blueprints give those operators only their series, and a model shown
+    # `ts_mean(pv_close, 10)` copies the two-argument form into blueprints, which do not compile.
     arguments = [_render(child) for child in children]
-    if extra is not None:
-        arguments.append(str(extra))
     return f"{label}({', '.join(arguments)})"
 
 
 def expression_to_blueprint_text(expr: str) -> str:
-    """A leaderboard expression (`(close - ts_mean(close, 10))`) in the operator notation of blueprints."""
+    """A leaderboard expression (`(close - ts_mean(close, 10))`) in blueprint notation, windows left out."""
     try:
         return _render(parse_expression(expr))
     except (ValueError, SyntaxError):
@@ -110,13 +113,71 @@ def expression_to_blueprint_text(expr: str) -> str:
 def feedback_items(engine: MCTSEngine, k: int) -> List[dict]:
     """
     The `k` best distinct expressions of the engine's leaderboard by reward on the data the engine searched
-    (its train segment), each as {expression, reward, rank_ic}. Nothing from later segments is involved.
+    (its train segment), each as {expression, reward, rank_ic}. Nothing from later segments is involved. Formulas
+    that differ only in their windows read the same without them, so only the best of each is kept.
     """
+    items, seen = [], set()
+    for c in distinct_expressions(engine.get_best_candidates()):
+        text = expression_to_blueprint_text(c['expr'])
+        if text in seen:
+            continue
+        seen.add(text)
+        items.append({'expression': text, 'reward': float(c['reward']),
+                      'rank_ic': float((c.get('metrics') or {}).get('rank_ic', 0.0) or 0.0)})
+        if len(items) == k:
+            break
+    return items
+
+
+def summarize_feedback(records: Sequence[dict]) -> dict:
+    """
+    Feedback rounds of a set of runs (the `feedback` dicts of runs.csv; runs of other systems hold `{}` and are
+    skipped): {'runs', 'fallbacks', 'reasons', 'rejections', 'rejections_after_correction'}. `reasons` counts the
+    fallback runs by `error`; a run recorded before the field existed counts as 'unrecorded'.
+    """
+    rounds = [r for r in records if r and 'fallback' in r]
+    out = {'runs': len(rounds), 'fallbacks': 0, 'reasons': {}, 'rejections': {}, 'rejections_after_correction': {}}
+    for record in rounds:
+        if record['fallback']:
+            out['fallbacks'] += 1
+            reason = record.get('error') or 'unrecorded'
+            out['reasons'][reason] = out['reasons'].get(reason, 0) + 1
+        for name in ('rejections', 'rejections_after_correction'):
+            for kind, count in (record.get(name) or {}).items():
+                out[name][kind] = out[name].get(kind, 0) + int(count)
+    return out
+
+
+def feedback_summary_lines(summary: dict, prefix: str) -> List[str]:
+    """Printable lines of `summarize_feedback`; empty when no run had a feedback round."""
+    if not summary['runs']:
+        return []
+
+    def counts(values: dict) -> str:
+        return ', '.join(f"{k} {v}" for k, v in sorted(values.items(), key=lambda kv: -kv[1])) or 'none'
+
+    share = summary['fallbacks'] / summary['runs']
     return [
-        {'expression': expression_to_blueprint_text(c['expr']), 'reward': float(c['reward']),
-         'rank_ic': float((c.get('metrics') or {}).get('rank_ic', 0.0) or 0.0)}
-        for c in distinct_expressions(engine.get_best_candidates())[:k]
+        f"{prefix} feedback round: {summary['runs']} runs, {summary['fallbacks']} fell back to the initial blueprints "
+        f"({share:.0%})",
+        f"{prefix}   fallback reasons: {counts(summary['reasons'])}",
+        f"{prefix}   ideas rejected in the first reply: {counts(summary['rejections'])}",
+        f"{prefix}   ideas still rejected after correction: {counts(summary['rejections_after_correction'])}",
     ]
+
+
+def feedback_records(runs: 'pd.DataFrame', key: Sequence[str]) -> List[dict]:
+    """The `feedback` dicts of a runs.csv frame, one per run (a rerun of the same run replaces the old row)."""
+    if 'feedback' not in runs.columns:
+        return []
+    runs = runs.drop_duplicates(subset=list(key), keep='last')
+    records = []
+    for text in runs['feedback'].dropna():
+        try:
+            records.append(json.loads(text))
+        except (TypeError, ValueError):
+            continue
+    return records
 
 
 # --------------------------------------------------------------------------- clock and records
@@ -210,7 +271,7 @@ def _start_sessions(engine: MCTSEngine, blueprints: Sequence[dict], outcome: Sea
             sessions.append(engine.start_search(compiler.compile_blueprint(bp['macro_blueprint'])))
         except Exception as exc:
             outcome.blueprint_errors += 1
-            print(f"blueprint {bp.get('name')} failed: {exc}")
+            log(f"blueprint {bp.get('name')} failed: {exc}")
     return sessions
 
 
@@ -220,7 +281,8 @@ def _feedback_round(engine, plan: BudgetPlan, blueprints, run_key: str, chat, ou
     from strategy_workflows.BlueprintGeneration import generate_feedback_blueprints
     items = feedback_items(engine, plan.feedback_expressions)
     info = {'n_scored': len(items), 'prompt_sha256': None, 'n_new': 0, 'fallback': False, 'requests': 0,
-            'llm_s': 0.0, 'seed': llm_seed(run_key + '|feedback')}
+            'llm_s': 0.0, 'seed': llm_seed(run_key + '|feedback'), 'error': 'no_scored_formulas' if not items else '',
+            'correction_error': '', 'rejections': {}, 'rejections_after_correction': {}}
     new: List[dict] = []
     if items:
         new, stats, prompt = generate_feedback_blueprints(
@@ -229,7 +291,11 @@ def _feedback_round(engine, plan: BudgetPlan, blueprints, run_key: str, chat, ou
         info.update(prompt_sha256=hashlib.sha256(prompt.encode('utf-8')).hexdigest(), n_new=len(new),
                     requests=stats.requests, llm_s=stats.llm_seconds, ideas=stats.ideas, compiled=stats.compiled,
                     with_slot=stats.with_slot, example_copy_rejections=stats.example_copy_rejections,
-                    duplicate_rejections=stats.duplicate_rejections)
+                    duplicate_rejections=stats.duplicate_rejections, error=stats.error,
+                    correction_error=stats.correction_error, rejections=dict(stats.rejections),
+                    rejections_after_correction=dict(stats.rejections_after_correction))
+        if not new and not info['error']:
+            info['error'] = 'all_rejected'
     info['fallback'] = not new
     outcome.feedback = info
     outcome.new_blueprints = new
@@ -286,6 +352,7 @@ def run_search(
                             outcome.stop_reasons)
         else:
             outcome.feedback['fallback'] = True
+            outcome.feedback['error'] = outcome.feedback.get('error') or 'no_session_started'
             run_round_robin(engine, sessions, split_evenly(rest, len(sessions)), plan.chunk, clock,
                             outcome.stop_reasons)
     elif system == 'mcts_only':
