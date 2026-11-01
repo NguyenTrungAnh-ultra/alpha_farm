@@ -238,7 +238,7 @@ def test_llm_requests_are_seeded_from_the_run_key(frame):
     assert first == options_for('wf|real|0|1|1')
     assert first != options_for('wf|real|0|1|2')
     seed = sc.llm_seed('wf|real|0|1|1|feedback')
-    assert first[0] == {'seed': seed} and first[1] == {'seed': seed + 1}      # advances per request
+    assert first[0]['seed'] == seed and first[1]['seed'] == seed + 1      # advances per request
 
 
 def test_same_run_gives_the_same_prompt_and_blueprints(frame):

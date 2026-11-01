@@ -146,13 +146,13 @@ def test_seed_advances_per_request_and_think_is_never_passed():
     good = skeletons(5)
     chat, asker, *_ = run_batch([batch_reply(good[:3] + ["bad_op(?)", "worse(?)"]), correction_reply(good[3:5])],
                                 n=5, options={"seed": 100, "temperature": None})
-    assert chat.options == [{"seed": 100}, {"seed": 101}]
+    assert chat.options == [{"seed": 100, "num_predict": 16384}, {"seed": 101, "num_predict": 16384}]
     assert all(set(kw) <= {"schema"} for kw in chat.kwargs)          # no `think`, no other keyword
     assert [kw["schema"] for kw in chat.kwargs] == [None, None]      # ollama-9b: no JSON schema forced
     fixed = FakeChat([batch_reply(skeletons(2))])
     BG.generate_batch(BG.LLMAsker(fixed, None, "ollama-local"), 2, "P", BG.variant_example_keys("anon_rules"),
                       [], {}, set(), BG.GenerationStats())
-    assert fixed.options == [None] and fixed.kwargs[0]["schema"] == "json"
+    assert fixed.options == [{"num_predict": 16384}] and fixed.kwargs[0]["schema"] == "json"
 
 
 def test_initial_set_is_two_requests_of_ten_and_the_second_lists_the_first_ten():
@@ -162,7 +162,7 @@ def test_initial_set_is_two_requests_of_ten_and_the_second_lists_the_first_ten()
     assert [b["macro_blueprint"] for b in accepted] == both
     assert len({b["name"] for b in accepted}) == 20
     assert stats.requests == 2 and stats.n_accepted == 20 and stats.llm_seconds >= 0.0
-    assert chat.options == [{"seed": 7}, {"seed": 8}]
+    assert chat.options == [{"seed": 7, "num_predict": 16384}, {"seed": 8, "num_predict": 16384}]
     assert "Design 10 DIFFERENT" in chat.prompts[0] and "ALREADY TAKEN" not in chat.prompts[0]
     assert "ALREADY TAKEN" in chat.prompts[1] and all(bp in chat.prompts[1] for bp in both[:10])
     assert not MARKET_NAME.search(chat.prompts[0]) and not MARKET_NAME.search(chat.prompts[1])
@@ -219,7 +219,7 @@ def test_feedback_blueprints_must_differ_from_the_initial_set_and_from_each_othe
     assert stats.requests == 2 and stats.duplicate_rejections == 2 and stats.n_accepted == 6
     assert prompt == chat.prompts[0]
     assert all(b["macro_blueprint"] in prompt for b in initial)           # listed as taken
-    assert chat.options == [{"seed": 5}, {"seed": 6}]
+    assert chat.options == [{"seed": 5, "num_predict": 16384}, {"seed": 6, "num_predict": 16384}]
     assert not ({b["name"] for b in new} & {b["name"] for b in initial})
 
 

@@ -46,6 +46,11 @@ DEFAULT_ROUNDS_PER_BLUEPRINT = 4
 # waits behind the others for far longer than its own ~100-300 s; the cap only catches a hung server, not a queue.
 BATCH_REQUEST_TIMEOUT_S = 6 * 3600
 MAX_BATCH_REQUESTS = 5
+# Cap on tokens generated per batched request (Ollama `num_predict`, thinking tokens included). Good replies take
+# 8-14k; a runaway thought fills the whole 32k context and blocks the single-queue server for ~10 minutes.
+MAX_GENERATED_TOKENS = 16384
+# Attempts per request when the reply is cut off or empty (`OllamaReplyError`); each attempt gets its own seed.
+MAX_REPLY_ATTEMPTS = 3
 INTEGER_OPTIONS = ("top_k", "seed")
 RUN_FIELDS = [
     'variant', 'params', 'n_requested', 'n_accepted', 'compile_rate', 'slot_rate', 'example_copy_rejections',
@@ -142,7 +147,9 @@ class GenerationStats:
     correction_error: str = ''          # why the correction request failed, same labels
     rejections: Dict[str, int] = field(default_factory=dict)                    # kind -> count, first reply
     rejections_after_correction: Dict[str, int] = field(default_factory=dict)   # kind -> count, still rejected
-    requests: int = 0                   # LLM requests made (batched generation: first replies and corrections)
+    requests: int = 0                   # LLM requests made, every attempt counted (batched generation)
+    retries: int = 0                    # attempts repeated after a cut-off or empty reply
+    retry_errors: List[str] = field(default_factory=list)   # reply error kind of each attempt that was repeated
     llm_seconds: float = 0.0            # time spent waiting for the LLM (batched generation)
     proposed_structures: set = field(default_factory=set)
 
@@ -374,21 +381,32 @@ class LLMAsker:
         self.options = {k: v for k, v in (options or {}).items() if v is not None}
         self.model = model
         self.requests = 0
+        self.retry_errors: List[str] = []
         self.seconds = 0.0
 
     def ask(self, prompt: str) -> str:
-        call_options = dict(self.options)
-        if 'seed' in call_options:
-            call_options['seed'] += self.requests
-        self.requests += 1
-        extra = {'schema': 'json'} if self.model == 'ollama-local' else {}
-        if call_options:
+        """
+        One reply for `prompt`. A cut-off or empty reply (`OllamaReplyError`) is asked again, up to
+        `MAX_REPLY_ATTEMPTS` attempts in total; every attempt advances the seed, so a rerun repeats the sequence.
+        Timeouts, connection errors and any other exception propagate at once.
+        """
+        for attempt in range(1, MAX_REPLY_ATTEMPTS + 1):
+            call_options = {**self.options, 'num_predict': MAX_GENERATED_TOKENS}
+            if 'seed' in call_options:
+                call_options['seed'] += self.requests
+            self.requests += 1
+            extra = {'schema': 'json'} if self.model == 'ollama-local' else {}
             extra['options'] = call_options
-        started = time.time()
-        try:
-            return self.chat.send(prompt, **extra)
-        finally:
-            self.seconds += time.time() - started
+            started = time.time()
+            try:
+                return self.chat.send(prompt, **extra)
+            except OllamaReplyError as exc:
+                if attempt == MAX_REPLY_ATTEMPTS:
+                    raise
+                self.retry_errors.append(exc.kind)
+                log(f"[blueprints] reply failed ({exc.kind}), asking again (attempt {attempt + 1}/{MAX_REPLY_ATTEMPTS})")
+            finally:
+                self.seconds += time.time() - started
 
 
 def parse_ideas(text: str) -> Optional[List[dict]]:
@@ -503,6 +521,8 @@ def _finish_stats(stats: GenerationStats, asker: LLMAsker, started: float, accep
     stats.seconds = time.time() - started
     stats.requests = asker.requests
     stats.llm_seconds = asker.seconds
+    stats.retries = len(asker.retry_errors)
+    stats.retry_errors = list(asker.retry_errors)
     stats.n_accepted = len(accepted)
 
 

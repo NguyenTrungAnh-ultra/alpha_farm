@@ -61,6 +61,8 @@ DEFAULT_REQUEST_TIMEOUT_S = 300
 CONNECT_TIMEOUT_S = 10
 # Sampling options a caller may override per request; anything else is ignored.
 SAMPLING_OPTION_NAMES = ("temperature", "top_p", "top_k", "repeat_penalty", "seed")
+# `num_predict` (generated-token cap, thinking included) is passed through `send` but is not a sampling setting.
+REQUEST_OPTION_NAMES = SAMPLING_OPTION_NAMES + ("num_predict",)
 
 
 class OllamaReplyError(Exception):
@@ -246,7 +248,7 @@ class OllamaChatClient:
         schema : dict, optional
             A JSON Schema dictionary (typically from Pydantic) to enforce structured JSON output.
         options : dict, optional
-            Sampling overrides (`temperature`, `top_p`, `top_k`, `repeat_penalty`, `seed`) merged into the
+            Overrides (`temperature`, `top_p`, `top_k`, `repeat_penalty`, `seed`, `num_predict`) merged into the
             request `options`. Keys that are None or not listed are dropped; when nothing is given the
             request carries only `num_ctx` and the Modelfile defaults apply.
 
@@ -273,7 +275,7 @@ class OllamaChatClient:
                 "num_ctx": NUM_CTX
             }
         }
-        for name in SAMPLING_OPTION_NAMES:
+        for name in REQUEST_OPTION_NAMES:
             if options and options.get(name) is not None:
                 payload["options"][name] = options[name]
         if schema:

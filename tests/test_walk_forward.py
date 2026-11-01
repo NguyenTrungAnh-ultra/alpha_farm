@@ -342,7 +342,7 @@ def test_run_window_with_each_search_system(system, mode, k, chats):
     if system == 'llm_mcts':
         assert len(chats) == 1 and row['llm_requests'] == 1
         assert len(json.loads(row['new_blueprints'])) == 3 and json.loads(row['feedback'])['n_new'] == 3
-        assert chats[0].options == [{'seed': json.loads(row['feedback'])['seed']}]
+        assert [o['seed'] for o in chats[0].options] == [json.loads(row['feedback'])['seed']]
     else:
         assert chats == [] and row['llm_requests'] == 0 and json.loads(row['new_blueprints']) == []
 

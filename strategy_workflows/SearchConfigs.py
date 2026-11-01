@@ -129,15 +129,24 @@ def feedback_items(engine: MCTSEngine, k: int) -> List[dict]:
     return items
 
 
+REPLY_ERRORS = ('context_length', 'empty_reply')
+
+
 def summarize_feedback(records: Sequence[dict]) -> dict:
     """
     Feedback rounds of a set of runs (the `feedback` dicts of runs.csv; runs of other systems hold `{}` and are
-    skipped): {'runs', 'fallbacks', 'reasons', 'rejections', 'rejections_after_correction'}. `reasons` counts the
+    skipped): {'runs', 'fallbacks', 'reasons', 'rejections', 'rejections_after_correction', 'runs_with_retry',
+    'cut_off_attempts'}. `cut_off_attempts` counts the repeated attempts plus each request (first or
+    correction) that stayed cut off or empty after its last attempt. `reasons` counts the
     fallback runs by `error`; a run recorded before the field existed counts as 'unrecorded'.
     """
     rounds = [r for r in records if r and 'fallback' in r]
-    out = {'runs': len(rounds), 'fallbacks': 0, 'reasons': {}, 'rejections': {}, 'rejections_after_correction': {}}
+    out = {'runs': len(rounds), 'fallbacks': 0, 'reasons': {}, 'rejections': {}, 'rejections_after_correction': {},
+           'runs_with_retry': 0, 'cut_off_attempts': 0}
     for record in rounds:
+        retried = len(record.get('retry_errors') or [])
+        out['runs_with_retry'] += retried > 0
+        out['cut_off_attempts'] += retried + sum(record.get(name) in REPLY_ERRORS for name in ('error', 'correction_error'))
         if record['fallback']:
             out['fallbacks'] += 1
             reason = record.get('error') or 'unrecorded'
@@ -163,6 +172,8 @@ def feedback_summary_lines(summary: dict, prefix: str) -> List[str]:
         f"{prefix}   fallback reasons: {counts(summary['reasons'])}",
         f"{prefix}   ideas rejected in the first reply: {counts(summary['rejections'])}",
         f"{prefix}   ideas still rejected after correction: {counts(summary['rejections_after_correction'])}",
+        f"{prefix}   runs that needed a retry: {summary['runs_with_retry']}, "
+        f"attempts cut off or empty in total: {summary['cut_off_attempts']}",
     ]
 
 
@@ -281,7 +292,7 @@ def _feedback_round(engine, plan: BudgetPlan, blueprints, run_key: str, chat, ou
     from strategy_workflows.BlueprintGeneration import generate_feedback_blueprints
     items = feedback_items(engine, plan.feedback_expressions)
     info = {'n_scored': len(items), 'prompt_sha256': None, 'n_new': 0, 'fallback': False, 'requests': 0,
-            'llm_s': 0.0, 'seed': llm_seed(run_key + '|feedback'), 'error': 'no_scored_formulas' if not items else '',
+            'llm_s': 0.0, 'retries': 0, 'retry_errors': [], 'seed': llm_seed(run_key + '|feedback'), 'error': 'no_scored_formulas' if not items else '',
             'correction_error': '', 'rejections': {}, 'rejections_after_correction': {}}
     new: List[dict] = []
     if items:
@@ -289,7 +300,8 @@ def _feedback_round(engine, plan: BudgetPlan, blueprints, run_key: str, chat, ou
             chat, plan.feedback_blueprints, items, blueprints, variant=plan.feedback_variant,
             options={'seed': info['seed']}, model=model_key)
         info.update(prompt_sha256=hashlib.sha256(prompt.encode('utf-8')).hexdigest(), n_new=len(new),
-                    requests=stats.requests, llm_s=stats.llm_seconds, ideas=stats.ideas, compiled=stats.compiled,
+                    requests=stats.requests, llm_s=stats.llm_seconds, retries=stats.retries,
+                    retry_errors=list(stats.retry_errors), ideas=stats.ideas, compiled=stats.compiled,
                     with_slot=stats.with_slot, example_copy_rejections=stats.example_copy_rejections,
                     duplicate_rejections=stats.duplicate_rejections, error=stats.error,
                     correction_error=stats.correction_error, rejections=dict(stats.rejections),

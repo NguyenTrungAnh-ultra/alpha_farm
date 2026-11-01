@@ -69,7 +69,7 @@ def test_the_asker_makes_the_client_strict_and_a_cut_off_reply_is_recorded_as_th
     chat = Cut([])
     new, stats, _ = BG.generate_feedback_blueprints(chat, 3, SCORED, [], "anon_shapes", None, "ollama-9b")
     assert chat.strict_reply is True and new == []
-    assert stats.error == "context_length" and stats.requests == 1
+    assert stats.error == "context_length" and stats.requests == 3 and stats.retries == 2
 
 
 # --- recorded reasons ---------------------------------------------------------
