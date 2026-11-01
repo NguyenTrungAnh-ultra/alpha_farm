@@ -38,3 +38,26 @@ Lượt có phản hồi: số blueprint mới 1–10 (placebo: 42 lượt đủ
 **Placebo thử: trượt.** 4/10 lượt rơi về, cả 4 do tràn ngữ cảnh (`context_length`); 0 hết giờ; 6 lượt còn lại ra 6–10 blueprint mới, 10/10 ý tưởng biên dịch được ở 4 lượt (lỗi cú pháp cửa sổ đã hết). Một yêu cầu: prompt 2.727 + sinh 30.041 token ⇒ suy nghĩ có lúc chạy dài gấp ≈ 3 lần bình thường (8–14 nghìn token), không chỉ thiếu chỗ. Thời gian LLM mỗi lượt 678–2.723 s (xếp hàng), mỗi lượt 2.095–4.287 s khi máy chạy 16 tiến trình. `walkforward summary` in đúng tỉ lệ rơi về và lý do.
 
 **RQ1 thử, ô đầu (seed 1):** 5 blueprint mới, 4/10 ý tưởng đầu biên dịch được; loại vì thiếu `?` 4, sai chiều 4 (mô hình chép nguyên công thức hoàn chỉnh từ phản hồi).
+
+## 2026-11-01 — chạy thử lần 2 sau khi chặn 16.384 token + thử lại 2 lần (commit `6719dc9`)
+
+**Chạy:** cùng 10 lượt placebo như lần 1 (2 bộ × cửa sổ 1, 3, 5, 6, 7, 10 worker), song song với RQ1 thật (4 worker); thư mục `results/smoke2_20261101/`, 20:51 → 21:54. Cùng tiêu chí đặt trước.
+
+**Qua cả 5 tiêu chí.** 0/10 lượt rơi về; 0 hết giờ; 0 tràn ngữ cảnh còn sót sau thử lại; mọi blueprint mới biên dịch được (theo định nghĩa: chỉ blueprint qua trình biên dịch mới được nhận); `walkforward summary` in đủ tỉ lệ rơi về, lý do loại, số lần thử lại.
+
+| | Số |
+|---|---|
+| Blueprint mới mỗi lượt | 10 ở 7 lượt, 9 ở 2 lượt, 6 ở 1 lượt |
+| Lượt cần thử lại | 4/10; 6 lần bị cắt (`context_length`) trên 16 lần gửi yêu cầu đầu ⇒ ≈ 38 % mỗi lần |
+| Lượt dùng hết 3 lần | 2/10 (lần thứ 3 qua) |
+| Ý tưởng bị loại ở câu trả lời đầu | no_slot 6, khác 4, sai chiều 3, sai số đối số 2 |
+| Còn bị loại sau sửa lỗi | no_slot 4, toán tử lạ 1, khác 1 |
+| Thời gian LLM mỗi lượt | 277–2.183 s (có xếp hàng) |
+| Thời gian mỗi lượt | 1.404–3.770 s |
+
+**Ước (suy đoán, Claude, 2026-11-01):** nếu mỗi lần bị cắt độc lập với xác suất ≈ 0,38 thì ≈ 0,38³ ≈ 5 % lượt rơi về ⇒ ≈ 7/133 lượt placebo; dưới ngưỡng 1/10 đặt trước. Số thật đọc từ `summary` khi chạy xong.
+
+**Chạy dài bắt đầu 2026-11-01 ≈ 22:00:**
+- Placebo 133 lượt, 6 worker, `results/walkforward/llm_mcts/`, log `results/logs/placebo_llm_mcts_rerun.log`. Bản hỏng chuyển sang `results/walkforward/llm_mcts_broken_20261101/`.
+- 90 ô LLM + MCTS của RQ1, 4 worker, thư mục riêng `results/planted_rq1_llm/` (chép `calibration.json`, `planted_formulas.json`, `segments.json`, `coverage.json` từ `results/planted_rq1/`) để không ghi chung `runs.csv` với RQ1 thật đang chạy. Khi cả hai xong: bỏ 90 dòng `llm_mcts` hỏng khỏi `results/planted_rq1/` (giữ bản lưu) và ghép dòng mới vào.
+- Ước ≈ 14 giờ cho cả hai (suy đoán từ 10 lượt / 3.770 s; hàng đợi Ollama là nút thắt).
