@@ -85,3 +85,7 @@ Người dùng giữ thiết kế, nhờ review; giả thuyết của người d
 9. Không thấy rò rỉ giữa các đoạn. Random tiêu ≈ 39 % ngân sách vào mẫu trùng mà vẫn ngang hai cấu hình kia.
 
 Kết luận của agent (chưa phải của luận văn): vòng phản hồi không thêm gì ròng; MCTS không hơn lấy mẫu ngẫu nhiên cùng ngữ pháp; khác biệt chủ yếu từ bộ blueprint ban đầu và bước chọn trên bảng xếp hạng / đoạn kiểm định.
+
+## 2026-11-02 — walk-forward thật: LLM + MCTS xong
+
+18:26 → 22:03 (3 giờ 37 phút, 6 worker; ước trước 10–15 giờ cho cả lượt chạy thật là quá cao vì lần này không chung hàng đợi Ollama với RQ1). Sharpe seed 1 = 0.68, p = 0.15; MCTS không LLM xong cùng lúc. Số: [RESULTS](../RESULTS.md#walk-forward-thật-đóng-băng-bfe7faf). Ghi chú chưa giải thích: số lệnh mỗi cửa sổ lần thật trung vị 509, placebo 48.

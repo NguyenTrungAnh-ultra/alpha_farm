@@ -56,6 +56,17 @@ Phương pháp: [design/PLANTED_SIGNAL](design/PLANTED_SIGNAL.md). Tệp: `resul
 | 2018-08 → 2019-12 | 1.738 | 2/5 | 1/5 | 3/5 |
 | 2018-08 → 2022-06 | 4.831 | 0/5 | 1/5 | 5/5 |
 
+## Walk-forward thật (đóng băng `bfe7faf`)
+
+Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md). Tệp: `results/walkforward/<cấu hình>/` (`runs.csv`, `returns.csv`, `summary.csv`), `results/walkforward/comparison.csv`; log `results/logs/real_llm_mcts.log`, `results/logs/real_other.log`. 7 cửa sổ, Sharpe năm trên 877 ngày ngoài mẫu (2022-07 → 2025-12), seed MCTS 1–5.
+
+- **LLM + MCTS** (2026-11-02 18:26 → 22:03, 35 lượt, 6 worker): Sharpe seed 1 = **0.68**, p placebo = **0.15** (2/19 bộ placebo ≥ 0.68: 1.04, 0.74) ⇒ không có ý nghĩa ở 0.05. Theo seed: 0.68 / 0.21 / 0.22 / 0.47 / 0.26; chuỗi trung bình 5 seed 0.44 (mô tả).
+- **MCTS không LLM** (xong trong `real_other.log`): theo seed 0.12 / 0.70 / −0.40 / 0.99 / 0.18; chuỗi trung bình 0.40.
+- Sharpe trung bình theo cửa sổ, LLM + MCTS: 1.01 / −0.17 / −0.02 / −0.07 / 0.79 / −1.03 / 1.05; MCTS không LLM: 0.73 / −1.12 / 0.05 / −0.12 / 1.05 / −1.24 / 1.20.
+- Số lệnh mỗi cửa sổ 6 tháng (trung vị): LLM + MCTS 509, MCTS không LLM 298 (placebo LLM + MCTS: 48).
+- Vòng phản hồi lần thật: 2/35 rơi về (`context_length`), 17/35 cần thử lại. Lỗi chấm 10.6 % (MCTS không LLM 8.2 %).
+- So sánh (bootstrap khối dừng ghép cặp, CI 95 %) chờ đủ cấu hình; `comparison.csv` hiện tính trên phần đã chạy.
+
 ## Placebo walk-forward (hệ thống có phản hồi, bộ RQ1)
 
 Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `results/walkforward/llm_mcts/` (`runs.csv` 133 dòng, `returns.csv`, `summary.csv`), log `results/logs/placebo_llm_mcts_rerun.log`. Chạy 2026-11-01 21:56 → 2026-11-02 14:11 sau khi sửa vòng phản hồi (`6719dc9`); bản hỏng trước đó ở `results/walkforward/llm_mcts_broken_20261101/`.
