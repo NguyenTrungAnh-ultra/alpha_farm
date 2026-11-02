@@ -89,3 +89,7 @@ Kết luận của agent (chưa phải của luận văn): vòng phản hồi kh
 ## 2026-11-02 — walk-forward thật: LLM + MCTS xong
 
 18:26 → 22:03 (3 giờ 37 phút, 6 worker; ước trước 10–15 giờ cho cả lượt chạy thật là quá cao vì lần này không chung hàng đợi Ollama với RQ1). Sharpe seed 1 = 0.68, p = 0.15; MCTS không LLM xong cùng lúc. Số: [RESULTS](../RESULTS.md#walk-forward-thật-đóng-băng-bfe7faf). Ghi chú chưa giải thích: số lệnh mỗi cửa sổ lần thật trung vị 509, placebo 48.
+
+## 2026-11-02 — walk-forward thật xong cả 6 cấu hình
+
+Năm cấu hình còn lại xong 22:12 (MCTS không LLM 18:26 → 20:52, tìm ngẫu nhiên → 22:12, ba cấu hình tham chiếu vài giây). Mọi CI chênh Sharpe chứa 0; LLM không tìm cao nhất (1.10). Số: [RESULTS](../RESULTS.md#walk-forward-thật-đóng-băng-bfe7faf).

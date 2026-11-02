@@ -61,11 +61,21 @@ Phương pháp: [design/PLANTED_SIGNAL](design/PLANTED_SIGNAL.md). Tệp: `resul
 Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md). Tệp: `results/walkforward/<cấu hình>/` (`runs.csv`, `returns.csv`, `summary.csv`), `results/walkforward/comparison.csv`; log `results/logs/real_llm_mcts.log`, `results/logs/real_other.log`. 7 cửa sổ, Sharpe năm trên 877 ngày ngoài mẫu (2022-07 → 2025-12), seed MCTS 1–5.
 
 - **LLM + MCTS** (2026-11-02 18:26 → 22:03, 35 lượt, 6 worker): Sharpe seed 1 = **0.68**, p placebo = **0.15** (2/19 bộ placebo ≥ 0.68: 1.04, 0.74) ⇒ không có ý nghĩa ở 0.05. Theo seed: 0.68 / 0.21 / 0.22 / 0.47 / 0.26; chuỗi trung bình 5 seed 0.44 (mô tả).
-- **MCTS không LLM** (xong trong `real_other.log`): theo seed 0.12 / 0.70 / −0.40 / 0.99 / 0.18; chuỗi trung bình 0.40.
-- Sharpe trung bình theo cửa sổ, LLM + MCTS: 1.01 / −0.17 / −0.02 / −0.07 / 0.79 / −1.03 / 1.05; MCTS không LLM: 0.73 / −1.12 / 0.05 / −0.12 / 1.05 / −1.24 / 1.20.
-- Số lệnh mỗi cửa sổ 6 tháng (trung vị): LLM + MCTS 509, MCTS không LLM 298 (placebo LLM + MCTS: 48).
+- Năm cấu hình còn lại chạy tuần tự 18:26 → 22:12 (4 worker). Placebo chỉ có cho LLM + MCTS; `summary` in p = 1.0 cho cấu hình không có placebo, con số đó không mang nghĩa.
+
+| Cấu hình | Sharpe theo seed (1–5) | Chuỗi trung bình | LLM + MCTS trừ cấu hình, CI 95 % | ρ | Lệnh / cửa sổ (trung vị) |
+|---|---|---|---|---|---|
+| LLM + MCTS | 0.68 / 0.21 / 0.22 / 0.47 / 0.26 | 0.44 | — | — | 509 |
+| MCTS không LLM | 0.12 / 0.70 / −0.40 / 0.99 / 0.18 | 0.40 | +0.04 [−0.58, 0.67] | 0.81 | 298 |
+| Tìm ngẫu nhiên | 0.67 / 0.77 / 0.95 / −0.67 / −0.11 | 0.46 | −0.02 [−0.64, 0.59] | 0.79 | 444 |
+| LLM không tìm | 1.10 (tất định) | 1.10 | −0.66 [−1.59, 0.27] | 0.65 | 519 |
+| Mua và giữ | 0.67 | 0.67 | −0.23 [−1.57, 1.03] | 0.07 | 1 |
+| TSMOM | 0.08 | 0.08 | +0.37 [−1.05, 1.75] | −0.07 | 44 |
+
+- Mọi CI chứa 0 ⇒ không phân biệt được LLM + MCTS với cấu hình nào. LLM không tìm có Sharpe cao nhất nhưng là một lần chọn duy nhất, không có placebo; hai cửa sổ 1 (2.41) và 7 (3.98) gánh phần lớn.
+- Sharpe trung bình theo cửa sổ (1 → 7): LLM + MCTS 1.01 / −0.17 / −0.02 / −0.07 / 0.79 / −1.03 / 1.05; MCTS không LLM 0.73 / −1.12 / 0.05 / −0.12 / 1.05 / −1.24 / 1.20; tìm ngẫu nhiên 1.15 / −0.01 / 0.15 / −0.06 / −0.54 / −0.73 / 0.39; mua và giữ −1.43 / 1.02 / 0.04 / 1.30 / 0.68 / 0.84 / 2.45.
+- Số lệnh lần thật LLM + MCTS 509, placebo 48 (chưa giải thích).
 - Vòng phản hồi lần thật: 2/35 rơi về (`context_length`), 17/35 cần thử lại. Lỗi chấm 10.6 % (MCTS không LLM 8.2 %).
-- So sánh (bootstrap khối dừng ghép cặp, CI 95 %) chờ đủ cấu hình; `comparison.csv` hiện tính trên phần đã chạy.
 
 ## Placebo walk-forward (hệ thống có phản hồi, bộ RQ1)
 

@@ -22,7 +22,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 | 9d | Placebo chạy lại trên hệ thống có phản hồi | ✅ | xong 2026-11-02 14:11 (133 lượt, `results/walkforward/llm_mcts/`): Sharpe trung bình −0.15, lớn nhất 1.04 ⇒ p = 0.05 cần Sharpe thật > 1.04; số ở [RESULTS](RESULTS.md#placebo-walk-forward-hệ-thống-có-phản-hồi-bộ-rq1) | [WALK_FORWARD](design/WALK_FORWARD.md#placebo) |
 | 9e | Sửa vòng phản hồi LLM | ✅ | `415227e` + `6719dc9`: ngữ cảnh 32k, chờ 6 giờ, công thức phản hồi bỏ cửa sổ, ghi lý do lỗi, chặn 16.384 token + thử lại 2 lần. Chạy thử lần 2: 0/10 lượt rơi về, 4/10 cần thử lại | [log](log/2026-11_LLM_FEEDBACK.md) |
 | 10 | Đóng băng (`results/walkforward/frozen.json`) | ✅ | 2026-11-02, code ở `9d58d63`, commit `bfe7faf`: bộ blueprint `20261031_rq1` (sha `31e8c4c1…`), bộ 100 công thức LLM không tìm `results/formula_sets/20261102_llm_only/` (sinh 17:25 → 18:25), p placebo trên seed 1 | [WALK_FORWARD](design/WALK_FORWARD.md#đóng-băng) |
-| 11 | Chạy thật một lần, chuỗi lợi suất ngoài mẫu 2022-07 → 2025-12 | 🔧 | LLM + MCTS xong 22:03: Sharpe seed 1 = 0.68, p = 0.15 ([RESULTS](RESULTS.md#walk-forward-thật-đóng-băng-bfe7faf)); MCTS không LLM xong; còn lại đang chạy. Từ 2026-11-02 18:26: LLM + MCTS 35 lượt (6 worker, log `results/logs/real_llm_mcts.log`); MCTS không LLM → tìm ngẫu nhiên → LLM không tìm → mua và giữ → TSMOM tuần tự (4 worker, log `results/logs/real_other.log`) | [WALK_FORWARD](design/WALK_FORWARD.md) |
+| 11 | Chạy thật một lần, chuỗi lợi suất ngoài mẫu 2022-07 → 2025-12 | ✅ 2026-11-02 | 6 cấu hình xong 22:12; LLM + MCTS Sharpe seed 1 = 0.68, p placebo = 0.15; mọi CI chênh với cấu hình khác chứa 0; LLM không tìm 1.10 ([RESULTS](RESULTS.md#walk-forward-thật-đóng-băng-bfe7faf)) | [WALK_FORWARD](design/WALK_FORWARD.md) |
 | 12 | Đo lại ước thời gian walk-forward sau tăng tốc | 🔧 | placebo đo được 1.612 s/lượt (ước cũ 14 giờ ⇒ thật 6 giờ 10 phút với 10 lượt song song); các phần khác chưa ước lại | [WALK_FORWARD](design/WALK_FORWARD.md#thời-gian-máy) |
 | 13 | SPA / DSR | chưa | Tháng 4 của proposal | |
 | 14 | Web điều khiển và theo dõi | 🔧 | W1, W3b (web luận văn, 2026-10-30; trang placebo và ngưỡng Fisher 2026-10-31) xong; W2, W3–W6 còn | [WEB_DASHBOARD](design/WEB_DASHBOARD.md) |
@@ -37,6 +37,8 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 
 ## Nợ
 
+- `main.py walkforward summary` in p = 1.0 cho cấu hình không có placebo (nên là NaN); code đang đóng băng nên chưa sửa.
+- Lần thật LLM + MCTS trung vị 509 lệnh mỗi cửa sổ, placebo 48: chưa giải thích.
 - Viết lại các câu RQ1 sai sau review 2026-11-02 ([log](log/2026-11_LLM_FEEDBACK.md)): "A ngoài vùng" (chỉ đúng về cấu trúc, `sub(?, ?)` điền được A − hằng), "chia đoạn như cửa sổ 1" (thật ra là `Segments()` mặc định), "LLM tới A sớm hơn" (lần đầu chạm đo theo khối 500 vòng); báo tìm lại gần ở ngưỡng 0.7 / 0.8 / 0.9. Áp cho RESULTS, LLM_FEEDBACK, PLANTED_SIGNAL và chữ trên web.
 
 - `criteria_report` của `main.py planted summary` vẫn in đạt / trượt theo tiêu chí cũ (IC 0.05 ≥ 3/5), trong khi bài này đã đổi sang báo ngưỡng phát hiện.
