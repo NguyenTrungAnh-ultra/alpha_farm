@@ -7,7 +7,8 @@
 
 <div class="card">
   <p><b>{{ t.RQ1_QUESTION }}</b></p>
-  <ol>{% for line in t.RQ1_DESIGN %}<li>{{ line }}</li>{% endfor %}</ol>
+  <ol>{% for line in design %}<li>{{ line }}</li>{% endfor %}</ol>
+  {% if feedback_reading %}<p class="reading">{{ feedback_reading }}</p>{% endif %}
 </div>
 
 <div class="tablebox scroll">

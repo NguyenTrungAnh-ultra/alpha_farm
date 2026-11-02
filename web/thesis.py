@@ -10,6 +10,7 @@ key that makes the item "done"; None = no result yet).
 import math
 from typing import Dict, List, Optional
 
+from strategy_workflows.BlueprintGeneration import MAX_GENERATED_TOKENS, MAX_REPLY_ATTEMPTS
 from strategy_workflows.PlantedSignal import NEAR_CORRELATION
 from strategy_workflows.RunRQ1 import DETECTION_BUDGET, DETECTION_CONFIG, IC_LEVELS, PRIMARY_BUDGETS, PRIMARY_IC
 from strategy_workflows.SearchConfigs import BudgetPlan
@@ -106,7 +107,8 @@ METHOD_INTRO = ('Sơ đồ dưới là quy trình được đánh giá. Đối t
 WINDOWS_CAPTION = ('Cửa sổ walk-forward nở dần: đoạn học bắt đầu cố định, đoạn kiểm định là 12 tháng trước đoạn đánh giá, '
                    'đoạn đánh giá dài 6 tháng và dịch 6 tháng mỗi cửa sổ.')
 
-BLUEPRINT_CAPTION = ('Bộ blueprint do LLM sinh một lần và được đóng băng cho mọi cấu hình có LLM. Mỗi blueprint là một khung '
+BLUEPRINT_CAPTION = ('Bộ blueprint ban đầu do LLM sinh một lần và được đóng băng cho mọi cấu hình có LLM (LLM + MCTS còn viết thêm '
+                     'blueprint ở vòng phản hồi). Mỗi blueprint là một khung '
                      'công thức có ô `?`; "số cách điền" là số công thức hợp thứ nguyên MCTS có thể dựng từ nó '
                      f'(độ sâu tối đa {MCTS_MAX_DEPTH}).')
 CONFIGS_CAPTION = ('Các cấu hình tiêu cùng một ngân sách đánh giá và kết thúc bằng cùng phép chọn top-5 trên đoạn kiểm định, '
@@ -132,7 +134,7 @@ CONFIG_ROWS: List[Dict[str, str]] = [
 ]
 
 PLANTED_QUESTION = ('Câu hỏi: nếu trong dữ liệu có một tín hiệu biết trước, quy trình có tìm lại được nó không? '
-                    'Đây là kiểm soát dương của RQ2.')
+                    'Đây là kiểm soát dương của RQ2 (ngưỡng phát hiện) và cũng là nơi đo phép so chính của RQ1 (trang RQ1).')
 PLANTED_METHOD = [
     'Xáo thứ tự lợi suất từng nến trong mỗi đoạn dữ liệu thật để xoá mọi cấu trúc có sẵn, giữ khối lượng và hình dạng '
     'trong nến.',
@@ -170,15 +172,24 @@ PLACEBO_P_PENDING = 'chưa có, chờ lần chạy thật'
 
 RQ1_QUESTION = ('Câu hỏi: cùng giới hạn độ dài công thức, LLM đưa MCTS tới tín hiệu đúng sớm hơn hay chặn đường tới nó? '
                 'Đo trên bài cài tín hiệu, nơi đáp án biết trước.')
-RQ1_DESIGN = [
-    'Bốn tín hiệu A (Bảng 4.1) được cài vào dữ liệu xáo ở từng mức IC mục tiêu; mỗi cấu hình chạy nhiều seed cho mỗi A; '
-    'IC 0 không cài gì nên một lượt được chấm với cả bốn A.',
-    f'Mỗi lượt ghi lại top-5 tại các mốc ngân sách; mốc {num(BudgetPlan().phase_a)} là hết giai đoạn A, trước phản hồi của '
-    'LLM. Tìm lại gần nghĩa là top-5 có công thức với |Spearman| ≥ ' + f'{NEAR_CORRELATION:g}' + ' với A.',
-    f"Phép so chính duy nhất: LLM + MCTS với MCTS không LLM ở IC {PRIMARY_IC:g}, gộp theo loại A (kinh điển, lạ), tại "
-    f"{' và '.join(f'{num(b)}' for b in PRIMARY_BUDGETS)}: bốn kiểm định Fisher hai phía (LLM có thể chặn đường), chỉnh Holm. "
-    'Mọi ô khác chỉ mô tả, không đọc p.',
-]
+def seed_phrase(seeds: Optional[int]) -> str:
+    """'10 seed', or a vague count when the result files do not say."""
+    return f"{seeds} seed" if seeds else 'ít seed'
+
+
+def rq1_design(seeds: Optional[int]) -> List[str]:
+    """The three design sentences of the RQ1 page; `seeds` is the seed count per cell read from summary.csv."""
+    return [
+        f"Bốn tín hiệu A (Bảng 4.1) được cài vào dữ liệu xáo ở từng mức IC mục tiêu; mỗi cấu hình chạy {seed_phrase(seeds)} cho mỗi A; "
+        'IC 0 không cài gì nên một lượt được chấm với cả bốn A.',
+        f'Mỗi lượt ghi lại top-5 tại các mốc ngân sách; mốc {num(BudgetPlan().phase_a)} là hết giai đoạn A, trước phản hồi của '
+        'LLM. Tìm lại gần nghĩa là top-5 có công thức với |Spearman| ≥ ' + f'{NEAR_CORRELATION:g}' + ' với A.',
+        f"Phép so chính duy nhất: LLM + MCTS với MCTS không LLM ở IC {PRIMARY_IC:g}, gộp theo loại A (kinh điển, lạ), tại "
+        f"{' và '.join(f'{num(b)}' for b in PRIMARY_BUDGETS)}: bốn kiểm định Fisher hai phía (LLM có thể chặn đường), chỉnh Holm. "
+        'Mọi ô khác chỉ mô tả, không đọc p.',
+    ]
+
+
 RQ1_PRIMARY_RQ = ('Trả lời RQ1: LLM + MCTS có tìm lại gần A khác MCTS không LLM không (hai phía), tại hai mốc ngân sách, chia '
                   'theo loại A. Phép so chính duy nhất; p đã chỉnh Holm cho cả bốn phép.')
 RQ1_BUDGET_RQ = ('Bổ sung cho RQ1: tỷ lệ tìm lại gần theo ngân sách ở IC {ic:g}, mỗi ô là một A, mỗi đường là một cấu hình, '
@@ -233,7 +244,7 @@ METRICS: Dict[str, Dict[str, str]] = {
         'name': 'Ngưỡng phát hiện',
         'measures': f'Mức IC > 0 thấp nhất mà tỷ lệ tìm lại gần của {config_label(DETECTION_CONFIG)} ở ngân sách {num(DETECTION_BUDGET)} '
                     f'cao hơn ở IC 0 với p < {FISHER_ALPHA:g} (kiểm định chính xác Fisher một phía), tính riêng từng A.',
-        'reading': 'Thấp hơn là nhạy hơn. "Chưa xác định" nghĩa là không mức IC nào đạt; mỗi mức chỉ có vài chục seed nên '
+        'reading': 'Thấp hơn là nhạy hơn. "Chưa xác định" nghĩa là không mức IC nào đạt; mỗi mức chỉ có {seeds} nên '
                    'kiểm định có ít sức, và điều đó không có nghĩa là quy trình không phát hiện được.',
         'role': 'chính'},
     'fisher_p': {'name': 'p Fisher so với IC 0',
@@ -314,9 +325,16 @@ METRICS: Dict[str, Dict[str, str]] = {
 }
 
 
-def metric_rows(keys: List[str], roles: Optional[Dict[str, str]] = None) -> List[Dict]:
+def metric_entry(key: str, seeds: Optional[int] = None) -> Dict[str, str]:
+    """One glossary entry with the `{seeds}` placeholder of its reading filled in."""
+    entry = dict(METRICS[key])
+    entry['reading'] = entry['reading'].replace('{seeds}', seed_phrase(seeds))
+    return entry
+
+
+def metric_rows(keys: List[str], roles: Optional[Dict[str, str]] = None, seeds: Optional[int] = None) -> List[Dict]:
     """Glossary rows (name, what it measures, how to read, role) for a chapter's list of metrics; `roles` overrides a role."""
-    return [dict(METRICS[k], key=k, **({'role': roles[k]} if roles and k in roles else {})) for k in keys]
+    return [dict(metric_entry(k, seeds), key=k, **({'role': roles[k]} if roles and k in roles else {})) for k in keys]
 
 
 def chapter_status(chapter: Dict, availability: Dict[str, bool]) -> str:
@@ -368,9 +386,12 @@ def feedback_steps(plan: BudgetPlan, n_blueprints: Optional[int]) -> List[Dict[s
         {'stage': 'Giai đoạn A',
          'text': f"{first} đóng băng chia đều {num(plan.phase_a)} vòng MCTS{each}, trên đoạn học."},
         {'stage': 'Phản hồi',
-         'text': f"Lấy {plan.feedback_expressions} biểu thức khác nhau tốt nhất theo reward đoạn học; đưa LLM biểu thức, reward "
-                 'và IC đoạn học (không đoạn kiểm định hay đánh giá, không tên thị trường). LLM viết '
-                 f"{plan.feedback_blueprints} blueprint mới trong một yêu cầu, cùng luật hợp lệ với bộ ban đầu."},
+         'text': f"Lấy {plan.feedback_expressions} biểu thức khác nhau tốt nhất theo reward đoạn học (bỏ cửa sổ khỏi biểu thức rồi "
+                 'mới khử trùng); đưa LLM biểu thức đã bỏ cửa sổ, reward và IC đoạn học (không đoạn kiểm định hay đánh giá, '
+                 f"không tên thị trường). LLM viết {plan.feedback_blueprints} blueprint mới trong một yêu cầu, cùng luật hợp lệ "
+                 'với bộ ban đầu, và thêm một yêu cầu sửa cho các ý bị loại. Mỗi yêu cầu giới hạn '
+                 f"{num(MAX_GENERATED_TOKENS)} token sinh ra (tính cả thinking); bị cắt hoặc rỗng thì hỏi lại tối đa "
+                 f"{MAX_REPLY_ATTEMPTS - 1} lần với seed mới. Không nhận được blueprint mới nào thì giai đoạn B dùng lại bộ ban đầu."},
         {'stage': 'Giai đoạn B', 'text': f"{plan.feedback_blueprints} blueprint mới chia đều {num(phase_b)} vòng còn lại."},
         {'stage': 'Mốc ngân sách',
          'text': 'Bảng xếp hạng được chụp tại ' + ', '.join(f"{num(c)}" for c in plan.checkpoints)
@@ -560,6 +581,35 @@ def reading_walkforward(rows: List[Dict]) -> str:
         parts.append(f"{config_label(r['config'])}: chênh {_fmt(r['difference'])} ({_fmt(r['ci_low'])} đến {_fmt(r['ci_high'])}, {verdict}, "
                      f"ρ = {_fmt(r['rho'])})")
     return 'Đọc: Sharpe(LLM + MCTS) trừ Sharpe(cấu hình), ' + '; '.join(parts) + '.'
+
+
+FEEDBACK_REASONS = {
+    'context_length': 'trả lời bị cắt ở giới hạn token',
+    'empty_reply': 'trả lời rỗng',
+    'all_rejected': 'mọi blueprint mới bị loại',
+    'no_scored_formulas': 'chưa có biểu thức nào được chấm',
+    'no_session_started': 'không blueprint mới nào chạy được',
+    'unrecorded': 'chưa ghi lý do',
+}
+
+
+def reading_feedback(summary: Optional[Dict]) -> str:
+    """
+    One line on the feedback round of the runs a page shows, from `SearchConfigs.summarize_feedback`: runs, runs that
+    fell back to the initial blueprints (with the reasons) and runs that needed a retry. Empty without feedback rounds.
+    """
+    if not summary or not summary.get('runs'):
+        return ''
+    runs, fallbacks = summary['runs'], summary['fallbacks']
+    if fallbacks:
+        reasons = sorted(summary['reasons'].items(), key=lambda kv: -kv[1])
+        counts = ', '.join(f"{key} {n}" for key, n in reasons)
+        gloss = '; '.join(f"{key} = {FEEDBACK_REASONS[key]}" for key, _ in reasons if key in FEEDBACK_REASONS)
+        fell = f"{fallbacks} lượt ({fallbacks / runs:.0%}) quay về bộ blueprint ban đầu (lý do: {counts}" + (f"; {gloss}" if gloss else '') + ')'
+    else:
+        fell = 'không lượt nào quay về bộ blueprint ban đầu'
+    return (f"Vòng phản hồi của {runs} lượt LLM + MCTS trong kết quả này: {fell}; "
+            f"{summary['runs_with_retry']} lượt phải hỏi lại LLM ít nhất một lần.")
 
 
 def placebo_p_text(view: Optional[Dict]) -> str:

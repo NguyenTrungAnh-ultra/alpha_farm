@@ -10,10 +10,14 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
+from strategy_workflows.SearchConfigs import feedback_records, summarize_feedback
+from strategy_workflows.WalkForward import RUN_KEY
+
 WALKFORWARD_DIR = os.path.join('walkforward', 'llm_mcts')
 SUMMARY_FILE = 'summary.csv'
 PLACEBO_MODE = 'placebo'
 REAL_MODE = 'real'
+RUNS_FILE = 'runs.csv'
 
 
 def walkforward_dir(root: str) -> str:
@@ -31,6 +35,20 @@ def read_summary(folder: str) -> pd.DataFrame:
         return pd.DataFrame()
     frame['sharpe'] = pd.to_numeric(frame['sharpe'], errors='coerce')
     return frame.dropna(subset=['mode', 'sharpe']).reset_index(drop=True)
+
+
+def read_feedback(folder: str) -> Optional[Dict]:
+    """
+    Feedback-round statistics of the placebo runs in runs.csv (`SearchConfigs.summarize_feedback`, the numbers
+    `walkforward summary` prints); None when runs.csv or its `feedback` column is missing.
+    """
+    try:
+        frame = pd.read_csv(os.path.join(folder, RUNS_FILE))
+    except (OSError, ValueError, pd.errors.ParserError, pd.errors.EmptyDataError):
+        return None
+    if not {'feedback', *RUN_KEY} <= set(frame.columns):
+        return None
+    return summarize_feedback(feedback_records(frame[frame['mode'] == PLACEBO_MODE], RUN_KEY))
 
 
 def placebo_view(summary: pd.DataFrame) -> Optional[Dict]:

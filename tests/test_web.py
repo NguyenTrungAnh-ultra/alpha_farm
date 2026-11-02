@@ -655,3 +655,123 @@ def test_glossary_states_near_threshold_and_placebo_tag():
     from strategy_workflows.PlantedSignal import NEAR_CORRELATION
     assert f'{NEAR_CORRELATION:g}' in thesis.METRICS['near']['measures']
     assert thesis.ITEM_BY_KEY['placebo_dist']['role'] == 'chính'
+
+
+# --------------------------------------------------------------------------- derived diagram statuses, seeds, feedback health
+
+
+def node_status(html, node_id):
+    """Status class (st-done / st-progress / st-todo ...) of one diagram node in the rendered method page."""
+    start = html.index(f'id="node-{node_id}"')
+    return html[html.rindex('class="node ', 0, start):start].split('st-')[1].split('"')[0].split()[0]
+
+
+def write_walkforward_real(root):
+    path = root / 'walkforward' / 'llm_mcts' / 'summary.csv'
+    frame = pd.read_csv(path)
+    frame.loc[len(frame)] = {'mode': 'real', 'placebo_set': 0, 'n_days': 877, 'n_windows': 7, 'sharpe': 0.5,
+                             'p_value': np.nan}
+    frame.to_csv(path, index=False)
+
+
+def test_diagram_statuses_follow_the_result_files(tmp_path):
+    from web import pipeline
+    assert {k: v['status'] for k, v in pipeline.derived_states({}).items()} == {
+        'rq2_planted': 'todo', 'rq1': 'todo', 'rq2_placebo': 'todo'}
+    planted_only = pipeline.derived_states({'planted_detection': True, 'rq1_primary': True})
+    assert planted_only['rq2_planted']['status'] == 'done' and planted_only['rq1']['status'] == 'progress'
+    with_walkforward = pipeline.derived_states({'rq1_primary': True, 'wf_comparison': True})
+    assert with_walkforward['rq1']['status'] == 'done'
+    sets_only = pipeline.derived_states({'placebo_runs': True})
+    assert sets_only['rq2_placebo']['status'] == 'progress' and 'chờ lần chạy thật' in sets_only['rq2_placebo']['note']
+    assert pipeline.derived_states({'placebo_runs': True, 'placebo_real': True})['rq2_placebo']['status'] == 'done'
+
+    write_rq1(tmp_path)                                  # planted benchmark and primary tests, no comparison, no placebo
+    html = TestClient(web_app.create_app(str(tmp_path))).get('/method').text
+    assert node_status(html, 'rq2_planted') == 'done' and node_status(html, 'rq1') == 'progress'
+    assert node_status(html, 'rq2_placebo') == 'todo'
+    write_comparison(tmp_path)
+    write_walkforward(tmp_path)
+    html = TestClient(web_app.create_app(str(tmp_path))).get('/method').text
+    assert node_status(html, 'rq1') == 'done' and node_status(html, 'rq2_placebo') == 'progress'
+    write_walkforward_real(tmp_path)
+    html = TestClient(web_app.create_app(str(tmp_path))).get('/method').text
+    assert node_status(html, 'rq2_placebo') == 'done'
+
+
+def test_diagram_draws_the_feedback_round_and_the_rq1_edge():
+    from web import pipeline
+    ids = {n['id'] for n in pipeline.NODES}
+    assert {'mcts_a', 'feedback', 'mcts_b'} <= ids and 'mcts' not in ids
+    edges = {(e['from'], e['to']) for e in pipeline.EDGES}
+    assert {('mcts_a', 'feedback'), ('feedback', 'mcts_b'), ('mcts_b', 'top100')} <= edges
+    assert ('rq2_planted', 'rq1') in edges and ('oos', 'rq1') in edges
+    loop = [e for e in pipeline.EDGES if e.get('loop')]
+    assert len(loop) == 1 and (loop[0]['from'], loop[0]['to']) == ('trade', 'mcts_a')
+    by_id = {n['id']: n for n in pipeline.NODES}
+    assert 'RQ1' in by_id['rq2_planted']['label'] and 'RQ2' in by_id['rq2_planted']['label']
+    text = ' '.join(' '.join(by_id[i]['details']) for i in ('feedback', 'mcts_a', 'blueprints'))
+    assert thesis.num(BudgetPlan().phase_a) in text and thesis.num(16384) in text and '1 − tương quan lớn nhất' in text
+    assert 'BlueprintGeneration.py' in text and 'GenerateStrategies' not in text
+
+
+def test_rq1_wording_is_the_planted_question_everywhere():
+    from web import pipeline
+    rq1_text = pipeline.THESIS['rqs'][0]['text']
+    assert 'sớm hơn hay chặn đường' in rq1_text and 'tốt hơn ngoài mẫu' not in rq1_text
+    method = ' '.join(pipeline.THESIS['method'])
+    assert 'Kiểm định SPA' in method and 'dự kiến' in method
+
+
+def test_feedback_step_names_cap_retries_correction_and_fallback():
+    from strategy_workflows.BlueprintGeneration import MAX_GENERATED_TOKENS, MAX_REPLY_ATTEMPTS
+    text = {s['stage']: s['text'] for s in thesis.feedback_steps(BudgetPlan(), 20)}['Phản hồi']
+    assert thesis.num(MAX_GENERATED_TOKENS) in text and f'tối đa {MAX_REPLY_ATTEMPTS - 1} lần' in text
+    assert 'yêu cầu sửa' in text and 'bỏ cửa sổ' in text and 'dùng lại bộ ban đầu' in text
+
+
+def test_seed_counts_come_from_the_data(client):
+    planted_text = client.get('/results/planted').text
+    rq1_text = client.get('/results/rq1').text
+    assert 'chỉ có 10 seed' in planted_text and 'vài chục' not in planted_text
+    assert 'chạy 10 seed' in rq1_text and 'nhiều seed' not in rq1_text
+
+
+def feedback_cell(fallback, error='', retry_errors=()):
+    return json.dumps({'fallback': fallback, 'error': error, 'retry_errors': list(retry_errors), 'rejections': {},
+                       'rejections_after_correction': {}})
+
+
+def test_rq1_page_reads_feedback_health_from_runs_csv(results):
+    cells = [(False,), (True, 'context_length', ['context_length']), (True, 'all_rejected'), (False, '', ['empty_reply'])]
+    rows = [{'config': 'llm_mcts', 'ic': 0.1, 'formula': 'A1', 'seed': s, 'feedback': feedback_cell(*args)}
+            for s, args in enumerate(cells, start=1)]
+    rows.append({'config': 'mcts_only', 'ic': 0.1, 'formula': 'A1', 'seed': 1, 'feedback': '{}'})   # no feedback round
+    pd.DataFrame(rows).to_csv(results / FOLDER / 'runs.csv', index=False)
+    text = TestClient(web_app.create_app(str(results))).get('/results/rq1').text
+    assert 'Vòng phản hồi của 4 lượt' in text and '2 lượt (50%) quay về bộ blueprint ban đầu' in text
+    assert 'context_length 1, all_rejected 1' in text and '2 lượt phải hỏi lại' in text
+
+
+def test_feedback_line_is_absent_without_the_column_or_the_file(results):
+    pd.DataFrame([{'config': 'llm_mcts', 'ic': 0.1, 'formula': 'A1', 'seed': 1}]).to_csv(results / FOLDER / 'runs.csv', index=False)
+    assert web_rq1.read_feedback(str(results / FOLDER)) is None
+    assert 'Vòng phản hồi của' not in TestClient(web_app.create_app(str(results))).get('/results/rq1').text
+    (results / FOLDER / 'runs.csv').unlink()
+    assert web_rq1.read_feedback(str(results / FOLDER)) is None
+    assert thesis.reading_feedback(None) == '' and thesis.reading_feedback({'runs': 0}) == ''
+
+
+def test_placebo_page_reads_feedback_health_of_placebo_runs_only(tmp_path):
+    write_walkforward(tmp_path)
+    folder = tmp_path / 'walkforward' / 'llm_mcts'
+    cells = [('placebo', 1, 1, feedback_cell(False)),
+             ('placebo', 1, 2, feedback_cell(True, 'context_length', ['context_length'])),
+             ('placebo', 2, 1, feedback_cell(False)), ('real', 0, 1, feedback_cell(True, 'all_rejected'))]
+    pd.DataFrame([{'mode': m, 'placebo_set': k, 'window': w, 'seed': 1, 'feedback': f} for m, k, w, f in cells]
+                 ).to_csv(folder / 'runs.csv', index=False)
+    text = TestClient(web_app.create_app(str(tmp_path))).get('/results/placebo').text
+    assert 'Vòng phản hồi của 3 lượt' in text and '1 lượt (33%)' in text and 'context_length 1' in text
+    assert 'all_rejected' not in text
+    pd.DataFrame([{'mode': 'placebo', 'placebo_set': 1, 'window': 1, 'seed': 1}]).to_csv(folder / 'runs.csv', index=False)
+    assert 'Vòng phản hồi của' not in TestClient(web_app.create_app(str(tmp_path))).get('/results/placebo').text

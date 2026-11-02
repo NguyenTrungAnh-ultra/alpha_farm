@@ -7,7 +7,7 @@ Pages:
     /                               overview and progress table
     /data                           data description
     /method (/pipeline)             main-flow diagram, walk-forward windows, frozen blueprint set
-    /results/planted                planted-signal positive control (RQ2)
+    /results/planted                planted-signal benchmark (RQ2 positive control, RQ1 comparison data)
     /results/planted/illustration   what planting does to prices
     /results/placebo                placebo walk-forward (RQ2, negative control)
     /results/rq1                    role of the LLM (RQ1): primary tests, budget curves, coverage, first touch
@@ -138,7 +138,9 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
 
     def availability() -> Dict[str, bool]:
         summary_ready = not planted.read_summary(folder()).empty
-        return {'placebo_runs': placebo_view() is not None,
+        placebo_now = placebo_view()
+        return {'placebo_runs': placebo_now is not None,
+                'placebo_real': placebo_now is not None and placebo_now['p'] is not None,
                 'planted_formulas': bool(planted.read_formulas(folder())),
                 'planted_detection': bool(planted.read_detection(folder())),
                 'planted_summary': summary_ready,
@@ -167,7 +169,7 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
     def method_page(request: Request):
         blueprint_set = method.blueprint_summary(app.state.results_root)
         steps = thesis.feedback_steps(BudgetPlan(), blueprint_set['count'] if blueprint_set else None)
-        return render(request, 'method.html', 'method', **pipeline.build_view(), intro=thesis.METHOD_INTRO,
+        return render(request, 'method.html', 'method', **pipeline.build_view(availability()), intro=thesis.METHOD_INTRO,
                       gantt=method.gantt_view(), windows_caption=thesis.WINDOWS_CAPTION, t=thesis, sci=thesis.sci,
                       blueprint_set=blueprint_set, config_rows=thesis.CONFIG_ROWS, feedback_steps=steps,
                       blueprint_reading=thesis.reading_blueprints(blueprint_set) if blueprint_set else '',
@@ -182,12 +184,13 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
         formulas = planted.read_formulas(folder())
         detection = planted.read_detection(folder())
         rows = planted.near_rows_with_p(planted.near_rows(planted.read_summary(folder())))
+        seeds = planted.seeds_per_cell(planted.read_summary(folder()))
         return render(
             request, 'planted.html', 'planted', t=thesis, formulas=formulas, detection=detection, rows=rows,
             chart=planted.near_chart(rows), a_kinds=planted.A_KINDS, budget=planted.DETECTION_BUDGET,
-            config=planted.DETECTION_CONFIG, primary=thesis.METRICS[thesis.PLANTED_PRIMARY],
+            config=planted.DETECTION_CONFIG, primary=thesis.metric_entry(thesis.PLANTED_PRIMARY, seeds),
             primary_value=thesis.primary_value_planted(detection),
-            metric_rows=thesis.metric_rows(thesis.PLANTED_METRICS), near_definition=thesis.METRICS['near']['measures'],
+            metric_rows=thesis.metric_rows(thesis.PLANTED_METRICS, seeds=seeds), near_definition=thesis.METRICS['near']['measures'],
             readings={'signals': thesis.reading_signals(formulas), 'detection': thesis.reading_detection(detection),
                       'table': thesis.reading_near_table(rows), 'figure': thesis.reading_near_figure(rows)})
 
@@ -220,7 +223,8 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
             request, 'placebo.html', 'placebo', t=thesis, view=view, chart=placebo.chart_points(view) if view else None,
             primary=thesis.METRICS[thesis.PLACEBO_PRIMARY], primary_value=thesis.primary_value_placebo(view),
             metric_rows=thesis.metric_rows(thesis.PLACEBO_METRICS), reading=thesis.reading_placebo(view),
-            p_text=thesis.placebo_p_text(view))
+            p_text=thesis.placebo_p_text(view),
+            feedback_reading=thesis.reading_feedback(placebo.read_feedback(placebo.walkforward_dir(app.state.results_root))))
 
     @app.get('/results/rq1', response_class=HTMLResponse)
     def rq1_page(request: Request):
@@ -231,12 +235,14 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
         touch = rq1.read_first_touch(folder())
         comparison = rq1.read_comparison(app.state.results_root)
         mark = BudgetPlan().phase_a
+        seeds = planted.seeds_per_cell(summary)
         expressions = {f['name']: f['expression'] for f in planted.read_formulas(folder())}
         return render(
             request, 'rq1.html', 'rq1', t=thesis, primary_rows=primary_rows, series=series, coverage=coverage,
             touch=touch, comparison=comparison, expressions=expressions, ic=rq1.PRIMARY_IC, mark=mark,
-            primary=thesis.METRICS[thesis.RQ1_PRIMARY], primary_value=thesis.primary_value_rq1(primary_rows),
-            metric_rows=thesis.metric_rows(thesis.RQ1_METRICS, thesis.RQ1_ROLE_OVERRIDES),
+            primary=thesis.metric_entry(thesis.RQ1_PRIMARY, seeds), primary_value=thesis.primary_value_rq1(primary_rows),
+            metric_rows=thesis.metric_rows(thesis.RQ1_METRICS, thesis.RQ1_ROLE_OVERRIDES, seeds=seeds),
+            design=thesis.rq1_design(seeds), feedback_reading=thesis.reading_feedback(rq1.read_feedback(folder())),
             chart={'series': series, 'mark': mark, 'labels': thesis.CONFIG_LABELS},
             budget_rq=thesis.RQ1_BUDGET_RQ.format(ic=rq1.PRIMARY_IC, mark=thesis.num(mark)),
             readings={'primary': thesis.reading_primary(primary_rows),

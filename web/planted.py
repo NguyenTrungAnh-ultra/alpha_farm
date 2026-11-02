@@ -149,6 +149,14 @@ def read_runs(folder: str) -> pd.DataFrame:
     return frame.dropna(subset=['ic', 'seed']).reset_index(drop=True)
 
 
+def seeds_per_cell(summary: pd.DataFrame, config: str = DETECTION_CONFIG) -> Optional[int]:
+    """Seeds behind one cell of summary.csv for `config` (the largest `n_runs`); None when there is no such cell."""
+    if summary.empty:
+        return None
+    part = summary[summary['config'] == config]
+    return None if part.empty else int(part['n_runs'].max())
+
+
 def present_values(runs: pd.DataFrame, column: str) -> List[float]:
     """Sorted distinct values of `column` in runs.csv."""
     if runs.empty or column not in runs.columns:

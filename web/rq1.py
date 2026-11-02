@@ -11,8 +11,9 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from strategy_workflows.RunRQ1 import PRIMARY_IC
-from strategy_workflows.SearchConfigs import SYSTEMS
-from web.planted import read_json, read_table, with_wilson
+from strategy_workflows.RunRQ1 import RUN_KEY
+from strategy_workflows.SearchConfigs import SYSTEMS, feedback_records, summarize_feedback
+from web.planted import RUNS_FILE, read_json, read_table, with_wilson
 
 PRIMARY_FILE = 'primary_tests.csv'
 TOUCH_FILE = 'first_touch.csv'
@@ -106,6 +107,15 @@ def read_coverage(folder: str) -> List[Dict]:
                      'smallest': None if smallest is None else str(smallest.get('name')),
                      'completions': None if smallest is None else int(smallest['completions'])})
     return rows
+
+
+def read_feedback(folder: str) -> Optional[Dict]:
+    """
+    Feedback-round statistics of the runs in runs.csv (`SearchConfigs.summarize_feedback`, the numbers `rq1 summary`
+    prints); None when runs.csv or its `feedback` column is missing.
+    """
+    frame = read_table(os.path.join(folder, RUNS_FILE), ('feedback',) + tuple(RUN_KEY))
+    return None if frame.empty else summarize_feedback(feedback_records(frame, RUN_KEY))
 
 
 COMPARISON_COLUMNS = ('config', 'n_days', 'sharpe_reference', 'sharpe_config', 'difference', 'ci_low', 'ci_high', 'rho')

@@ -8,6 +8,7 @@
 <div class="card">
   <p><b>{{ t.PLACEBO_QUESTION }}</b></p>
   <p>{{ t.PLACEBO_METHOD }}</p>
+  {% if feedback_reading %}<p class="reading">{{ feedback_reading }}</p>{% endif %}
 </div>
 
 <figure>

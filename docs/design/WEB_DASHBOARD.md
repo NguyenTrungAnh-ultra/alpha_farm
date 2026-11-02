@@ -143,18 +143,18 @@ Mục nào thiếu tệp kết quả hiện trạng thái chờ (chữ "chưa c�
 | Đường dẫn | Chương | Nội dung |
 |---|---|---|
 | `/` | Tổng quan | tên đề tài, câu hỏi chính, RQ1 / RQ2; bảng tiến độ: mỗi chương / mỗi bảng-hình một dòng (registry `CHAPTERS` / `ITEMS` trong `web/thesis.py`), trạng thái ✅ / 🔧 / chưa có |
-| `/method` | Phương pháp | sơ đồ luồng chính (Hình 3.1), cửa sổ walk-forward (Hình 3.2), Bảng 3.1 bộ blueprint RQ1 đóng băng (20 khung, số cách điền, độ phủ toán tử 16/19), Bảng 3.2 các cấu hình so sánh, Bảng 3.3 vòng phản hồi và mốc ngân sách, Bảng 3.4 kích thước không gian tìm kiếm (toàn ngữ pháp ≈ 1.9 × 10⁴¹ so với bộ ≈ 2.2 × 10¹⁴; tính bằng `GrammarSize`, không gõ cứng) |
+| `/method` | Phương pháp | sơ đồ luồng chính (Hình 3.1; vẽ vòng phản hồi: a1 giai đoạn A → a2 phản hồi LLM → a3 giai đoạn B → b → c → d, mũi tên vòng d → a1; trạng thái ba ô so sánh suy ra từ tệp kết quả, xem dưới), cửa sổ walk-forward (Hình 3.2), Bảng 3.1 bộ blueprint RQ1 đóng băng (20 khung, số cách điền, độ phủ toán tử 16/19), Bảng 3.2 các cấu hình so sánh, Bảng 3.3 vòng phản hồi và mốc ngân sách, Bảng 3.4 kích thước không gian tìm kiếm (toàn ngữ pháp ≈ 1.9 × 10⁴¹ so với bộ ≈ 2.2 × 10¹⁴; tính bằng `GrammarSize`, không gõ cứng) |
 | `/data` | Dữ liệu | VN30F1M 60m 2018-08 → 2025-12, số bar từng đoạn, ghi chú dữ liệu |
-| `/results/planted` | Kết quả: RQ2, kiểm soát dương | xem dưới |
+| `/results/planted` | Kết quả: bài cài tín hiệu (RQ2 kiểm soát dương; cũng là dữ liệu của phép so chính RQ1) | xem dưới |
 | `/results/placebo` | Kết quả: RQ2, kiểm soát âm | đọc `results/walkforward/llm_mcts/summary.csv`: phân bố Sharpe của K bộ placebo (chấm từng bộ, vạch Sharpe placebo lớn nhất), bảng từng bộ, câu đọc nói Sharpe thật phải vượt Sharpe placebo lớn nhất để p = 1/(K+1). p = (1 + số bộ có Sharpe ≥ thật) / (K + 1), tính từ dữ liệu; chưa có dòng `real` thì p hiện "chưa có, chờ lần chạy thật"; chưa có thư mục thì hiện trạng thái chờ |
 | `/results/rq1` | Kết quả: RQ1 | xem dưới |
 | `/results/walkforward` | Kết quả: chuỗi ngoài mẫu | chưa có kết quả (cần đóng băng rồi chạy thật) |
 | `/system` | Công cụ (ngoài luận văn) | tài nguyên máy, tiến độ lượt chạy đang chạy |
 
 **Trang `/results/planted`** (nguồn duy nhất: `results/planted_rq1/`, hằng `THESIS_PLANTED_DIR` trong `web/planted.py`):
-1. Đoạn mở: câu hỏi (quy trình có tìm lại một tín hiệu biết trước không → RQ2), cách làm trong ba câu (xáo lợi suất, cài A với IC biết trước, chạy đúng quy trình luận văn), định nghĩa "tìm lại gần".
+1. Đoạn mở: câu hỏi (quy trình có tìm lại một tín hiệu biết trước không → RQ2; cùng bài này đo phép so chính của RQ1), cách làm trong ba câu (xáo lợi suất, cài A với IC biết trước, chạy đúng quy trình luận văn), định nghĩa "tìm lại gần".
 2. Bảng 4.1: bốn tín hiệu A: loại (kinh điển / lạ), số toán tử, biểu thức, độ đông (tỷ lệ công thức ngẫu nhiên gần A) và p ADF, từ `planted_formulas.json`.
-3. Bảng 4.2 (chính): ngưỡng phát hiện theo A của LLM + MCTS ở ngân sách 100.000, từ `detection_thresholds.csv` = mức IC > 0 thấp nhất có p < 0.05 trong kiểm định chính xác Fisher một phía (`Statistics.fisher_p_greater`, `Statistics.detection_threshold`) so tỷ lệ tìm lại gần với IC 0; kèm số seed tìm lại gần theo IC. Không mức nào đạt thì ghi "chưa xác định".
+3. Bảng 4.2 (chính): ngưỡng phát hiện theo A của LLM + MCTS ở ngân sách 100.000, từ `detection_thresholds.csv` = mức IC > 0 thấp nhất có p < 0.05 trong kiểm định chính xác Fisher một phía (`Statistics.fisher_p_greater`, `Statistics.detection_threshold`) so tỷ lệ tìm lại gần với IC 0; kèm số seed tìm lại gần theo IC. Không mức nào đạt thì ghi "chưa xác định". Số seed mỗi ô trong phần đọc là `n_runs` lớn nhất của LLM + MCTS trong `summary.csv` (`planted.seeds_per_cell`), không gõ cứng.
 4. Bảng 4.3 (phụ): tỷ lệ tìm lại gần theo A × IC kèm khoảng Wilson 95% và p Fisher một phía so với IC 0 (tính lại từ số đếm của `summary.csv`); Hình 4.1 (phụ): cùng số liệu, mỗi A một ô, Wilson vẽ làm dải.
 5. Liên kết tới trang minh hoạ một bộ dữ liệu (chọn A, IC, seed; cần `runs.csv` và `calibration.json`).
 
@@ -165,6 +165,11 @@ Mục nào thiếu tệp kết quả hiện trạng thái chờ (chữ "chưa c�
 4. Bảng 4.5 (chẩn đoán): A trong hay ngoài vùng của bộ blueprint ban đầu và số cách điền của blueprint nhỏ nhất chứa A, từ `coverage.json`.
 5. Bảng 4.6 (phụ): trung vị số vòng và thời gian tới lần đầu chạm A theo cấu hình × A, kèm số lượt đã chạm / số lượt, từ `first_touch.csv`.
 6. Bảng 4.7 (phụ, mô tả): Sharpe ngoài mẫu từng cấu hình, chênh so với LLM + MCTS kèm khoảng tin cậy bootstrap và ρ, từ `comparison.csv`; không có p.
+7. Một dòng đọc sức khoẻ vòng phản hồi (đầu trang, dưới phần thiết kế): số lượt LLM + MCTS, số lượt quay về bộ blueprint ban đầu kèm lý do, số lượt phải hỏi lại. Tính bằng `SearchConfigs.summarize_feedback` / `feedback_records` trên cột `feedback` của `runs.csv` (cùng số mà `rq1 summary` in ra; `rq1.read_feedback`); thiếu tệp hoặc cột thì không hiện dòng. Số seed trong phần thiết kế cũng đọc từ `summary.csv`.
+
+**Trang `/results/placebo`** có cùng dòng sức khoẻ vòng phản hồi, tính trên các dòng `mode = placebo` của `results/walkforward/llm_mcts/runs.csv` (`placebo.read_feedback`, khoá `WalkForward.RUN_KEY`).
+
+**Trạng thái ô Hình 3.1:** ô tĩnh giữ trạng thái viết trong `NODES`; ba ô so sánh lấy từ cùng phép kiểm tệp của `availability()` (`pipeline.derived_states`): bài cài tín hiệu = Xong khi có `detection_thresholds.csv`; RQ1 = Đang làm khi có `primary_tests.csv` mà chưa có `comparison.csv`, Xong khi có cả hai; placebo = Đang làm khi có các bộ placebo, Xong khi có thêm dòng `real` (khoá `placebo_real`). Chưa có tệp nào thì Chưa làm.
 
 **Vai trò của chỉ số** (người dùng yêu cầu 2026-10-30):
 - Mỗi trang chương mở bằng ô **"Chỉ số chính"**: tên chỉ số trả lời trực tiếp câu hỏi của chương, nó đo gì, đọc thế nào, giá trị hiện tại (hoặc "chưa có").
