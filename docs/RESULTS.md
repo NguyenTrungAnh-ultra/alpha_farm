@@ -2,6 +2,34 @@
 
 Con số luận văn đang dùng, viết như hôm nay. Các lần chạy cũ và cách ra được số ở [log/](log/). Phương pháp ở `design/`.
 
+## Bài cài tín hiệu RQ1 (hệ thống có phản hồi, bộ RQ1)
+
+Phương pháp: [design/LLM_FEEDBACK](design/LLM_FEEDBACK.md#bài-cài-tín-hiệu-cho-rq1). Tệp: `results/planted_rq1/` (`runs.csv`, `checkpoints.csv`, `summary.csv`, `primary_tests.csv`, `detection_thresholds.csv`, `first_touch.csv`); lệnh `main.py rq1 summary`. 3 cấu hình × A1–A4 × IC 0 / 0.05 / 0.1 × 10 seed = 360 ô, 100.000 vòng mỗi ô. Ô LLM + MCTS chạy 2026-11-01 22:00 → 2026-11-02 12:35 sau khi sửa vòng phản hồi (`6719dc9`); 90 ô hỏng trước đó lưu ở `results/planted_rq1/broken_llm_20261101/`.
+
+**Vòng phản hồi (90 ô LLM + MCTS):** 3/90 rơi về bộ ban đầu (`context_length` 2, `all_rejected` 1); 37/90 cần thử lại, tổng 54 lần bị cắt.
+
+**Kiểm định chính** (LLM + MCTS so với MCTS không LLM, IC 0.1, gộp theo loại A, Fisher hai phía, Holm trên 4 phép): không phép nào có ý nghĩa.
+
+| Ngân sách | Loại A | LLM + MCTS | MCTS không LLM | p | p Holm |
+|---|---|---|---|---|---|
+| 50.000 | cổ điển (A1 + A2) | 6/20 | 2/20 | 0.235 | 0.940 |
+| 50.000 | lạ (A3 + A4) | 2/20 | 0/20 | 0.487 | 0.974 |
+| 100.000 | cổ điển | 7/20 | 3/20 | 0.273 | 0.940 |
+| 100.000 | lạ | 0/20 | 1/20 | 1.000 | 1.000 |
+
+**Tìm lại gần ở 100.000 vòng** (|Spearman| ≥ 0.7 trong top-5; mỗi ô /10; tìm ngẫu nhiên chỉ để tham khảo, ngoài kiểm định chính):
+
+| A | IC | LLM + MCTS | MCTS không LLM | Ngẫu nhiên |
+|---|---|---|---|---|
+| A1 | 0 / 0.05 / 0.1 | 0 / 1 / 2 | 0 / 0 / 2 | 0 / 0 / 4 |
+| A2 | 0 / 0.05 / 0.1 | 0 / 1 / **5** | 0 / 0 / 1 | 0 / 1 / 0 |
+| A3 | 0 / 0.05 / 0.1 | 0 / 1 / 0 | 0 / 0 / 1 | 0 / 0 / 3 |
+| A4 | 0 / 0.05 / 0.1 | 0 / 0 / 0 | 0 / 1 / 0 | 0 / 0 / 1 |
+
+- **Ngưỡng phát hiện của LLM + MCTS (RQ2):** chỉ A2 có ngưỡng, IC 0.1 (5/10 so với 0/10 ở IC 0, p = 0.016); A1, A3, A4 không có ngưỡng trong các mức đã chạy.
+- IC 0 không tìm nhầm lần nào ở cả ba cấu hình.
+- A4 là A duy nhất nằm trong vùng của bộ blueprint ban đầu, nhưng LLM + MCTS tìm lại gần 0/10 ở IC 0.1.
+
 ## Bài cài tín hiệu (hệ thống sinh một lần, bộ blueprint cũ)
 
 Phương pháp: [design/PLANTED_SIGNAL](design/PLANTED_SIGNAL.md). Tệp: `results/planted_window1/` (`runs.csv`, `oracle.csv`, `summary.csv`, `positions_vs_a.json`).

@@ -61,3 +61,7 @@ Lượt có phản hồi: số blueprint mới 1–10 (placebo: 42 lượt đủ
 - Placebo 133 lượt, 6 worker, `results/walkforward/llm_mcts/`, log `results/logs/placebo_llm_mcts_rerun.log`. Bản hỏng chuyển sang `results/walkforward/llm_mcts_broken_20261101/`.
 - 90 ô LLM + MCTS của RQ1, 4 worker, thư mục riêng `results/planted_rq1_llm/` (chép `calibration.json`, `planted_formulas.json`, `segments.json`, `coverage.json` từ `results/planted_rq1/`) để không ghi chung `runs.csv` với RQ1 thật đang chạy. Khi cả hai xong: bỏ 90 dòng `llm_mcts` hỏng khỏi `results/planted_rq1/` (giữ bản lưu) và ghép dòng mới vào.
 - Ước ≈ 14 giờ cho cả hai (suy đoán từ 10 lượt / 3.770 s; hàng đợi Ollama là nút thắt).
+
+## 2026-11-02 — 90 ô LLM + MCTS của RQ1 chạy lại xong
+
+22:00 → 12:35 (14,6 giờ, 4 worker, chung hàng đợi Ollama với placebo 6 worker). 3/90 rơi về (ước trước ≈ 5 %). Ghép vào `results/planted_rq1/`: bỏ 90 dòng `llm_mcts` cũ khỏi `runs.csv` và 600 dòng khỏi `checkpoints.csv`, nối dòng mới từ `results/planted_rq1_llm/`; bản trước khi ghép ở `results/planted_rq1/broken_llm_20261101/`. Số: [RESULTS](../RESULTS.md#bài-cài-tín-hiệu-rq1-hệ-thống-có-phản-hồi-bộ-rq1).
