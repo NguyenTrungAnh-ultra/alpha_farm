@@ -65,3 +65,7 @@ Lượt có phản hồi: số blueprint mới 1–10 (placebo: 42 lượt đủ
 ## 2026-11-02 — 90 ô LLM + MCTS của RQ1 chạy lại xong
 
 22:00 → 12:35 (14,6 giờ, 4 worker, chung hàng đợi Ollama với placebo 6 worker). 3/90 rơi về (ước trước ≈ 5 %). Ghép vào `results/planted_rq1/`: bỏ 90 dòng `llm_mcts` cũ khỏi `runs.csv` và 600 dòng khỏi `checkpoints.csv`, nối dòng mới từ `results/planted_rq1_llm/`; bản trước khi ghép ở `results/planted_rq1/broken_llm_20261101/`. Số: [RESULTS](../RESULTS.md#bài-cài-tín-hiệu-rq1-hệ-thống-có-phản-hồi-bộ-rq1).
+
+## 2026-11-02 — placebo chạy lại xong
+
+21:56 → 14:11 (16 giờ 15 phút; ước trước ≈ 14 giờ, chậm hơn vì chung hàng đợi Ollama với RQ1 tới 12:35). 8/133 lượt rơi về (ước trước ≈ 7/133). Số: [RESULTS](../RESULTS.md#placebo-walk-forward-hệ-thống-có-phản-hồi-bộ-rq1).

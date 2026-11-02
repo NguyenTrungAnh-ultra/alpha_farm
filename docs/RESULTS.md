@@ -56,6 +56,20 @@ Phương pháp: [design/PLANTED_SIGNAL](design/PLANTED_SIGNAL.md). Tệp: `resul
 | 2018-08 → 2019-12 | 1.738 | 2/5 | 1/5 | 3/5 |
 | 2018-08 → 2022-06 | 4.831 | 0/5 | 1/5 | 5/5 |
 
+## Placebo walk-forward (hệ thống có phản hồi, bộ RQ1)
+
+Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `results/walkforward/llm_mcts/` (`runs.csv` 133 dòng, `returns.csv`, `summary.csv`), log `results/logs/placebo_llm_mcts_rerun.log`. Chạy 2026-11-01 21:56 → 2026-11-02 14:11 sau khi sửa vòng phản hồi (`6719dc9`); bản hỏng trước đó ở `results/walkforward/llm_mcts_broken_20261101/`.
+
+**Thiết lập:** K = 19 bộ × 7 cửa sổ, MCTS seed 1, bộ blueprint `results/blueprint_sets/20261031_rq1/`, 20 blueprint × 2.500 vòng + một vòng phản hồi + 10 blueprint mới chia 50.000 vòng, reward `sharpe`; Sharpe năm trên 877 ngày ngoài mẫu (2022-07 → 2025-12).
+
+- Sharpe 19 bộ placebo: trung bình −0.15, độ lệch chuẩn 0.58, trung vị −0.38, từ −0.94 đến **1.04**; 7/19 dương. Trung bình không khác 0 (t ≈ −1.15).
+- **Mốc cho lần chạy thật:** p = 0.05 cần Sharpe thật > 1.04; > 0.74 (bộ thứ 2) cho p = 0.10.
+- Vòng phản hồi: 8/133 lượt rơi về bộ ban đầu (cả 8 do `context_length` sau 3 lần thử); 63/133 cần thử lại, tổng 89 lần bị cắt.
+- Lỗi chấm 10.6 %, 0 blueprint lỗi, 0 Sharpe NaN ⇒ K = 19 đủ.
+- Số lệnh mỗi cửa sổ 6 tháng: trung vị 48 (0–399), hệ thống sinh một lần 343.
+- Sharpe từng cửa sổ: độ lệch chuẩn 1.16–1.92 trong mỗi cửa sổ.
+- Thời gian: trung bình 2.612 s mỗi lượt; 16 giờ 15 phút với 6 lượt song song, chung hàng đợi Ollama với 90 ô RQ1 tới 12:35.
+
 ## Placebo walk-forward (hệ thống sinh một lần, bộ blueprint cũ)
 
 Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md#placebo). Tệp: `results/walkforward/oneshot_placebo/` (`runs.csv` 133 dòng, `returns.csv`, `summary.csv`, dòng `mode = placebo`), log `results/walkforward/placebo.log`.
