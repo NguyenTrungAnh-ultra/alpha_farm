@@ -1,0 +1,151 @@
+{
+  "formulas_path": "results/formula_sets/20261102_llm_only/formulas.json",
+  "formulas_sha256": "f69e8822c47a0bfb312a38ae8a8c4bc0ec12d9a885be222ccf097bf777388e5d",
+  "n_formulas": 100,
+  "formulas_generation_sha256": "1837ff5534a2ece4bbf11ae8e492a89657c5b87cfbb0e76bc71de36c4d85787e",
+  "llm_only_grid": {
+    "rolling_windows": [
+      2,
+      3,
+      5,
+      10
+    ],
+    "template_windows": [
+      2,
+      3,
+      5,
+      7,
+      10
+    ],
+    "sizes": {
+      "NORMALIZED": 25,
+      "RATIO": 25,
+      "BOOLEAN": 1
+    }
+  },
+  "tsmom_grid": {
+    "lookback_sessions": {
+      "day": 1,
+      "week": 5,
+      "month": 21
+    },
+    "selection": "validation_sharpe",
+    "bars_per_session": "median over the train segment",
+    "weighting": "none"
+  },
+  "reference_position_scale": 0.2,
+  "seeds_by_system": {
+    "llm_mcts": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "mcts_only": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "random": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "llm_only": [
+      1
+    ],
+    "buy_hold": [
+      1
+    ],
+    "tsmom": [
+      1
+    ]
+  },
+  "reward_mode": "sharpe",
+  "reward_weights": {
+    "calmar_weight": 0.6,
+    "ic_weight": 0.4,
+    "max_ic": 0.15,
+    "max_calmar": 3.0,
+    "max_sharpe": 3.0,
+    "burn_in": 15000,
+    "entropy_threshold": 0.15,
+    "patience": 5000
+  },
+  "windows": [
+    {
+      "search_start": "2018-08-13",
+      "train_end": "2021-06-30",
+      "search_end": "2022-06-30",
+      "eval_end": "2022-12-31"
+    },
+    {
+      "search_start": "2018-08-13",
+      "train_end": "2021-12-31",
+      "search_end": "2022-12-31",
+      "eval_end": "2023-06-30"
+    },
+    {
+      "search_start": "2018-08-13",
+      "train_end": "2022-06-30",
+      "search_end": "2023-06-30",
+      "eval_end": "2023-12-31"
+    },
+    {
+      "search_start": "2018-08-13",
+      "train_end": "2022-12-31",
+      "search_end": "2023-12-31",
+      "eval_end": "2024-06-30"
+    },
+    {
+      "search_start": "2018-08-13",
+      "train_end": "2023-06-30",
+      "search_end": "2024-06-30",
+      "eval_end": "2024-12-31"
+    },
+    {
+      "search_start": "2018-08-13",
+      "train_end": "2023-12-31",
+      "search_end": "2024-12-31",
+      "eval_end": "2025-06-30"
+    },
+    {
+      "search_start": "2018-08-13",
+      "train_end": "2024-06-30",
+      "search_end": "2025-06-30",
+      "eval_end": "2025-12-31"
+    }
+  ],
+  "blueprints_path": "results/blueprint_sets/20261031_rq1/blueprints.json",
+  "blueprints_sha256": "31e8c4c172c18026b92461e677291ac048eabc89596ba221414c97697bb17d7d",
+  "n_blueprints": 20,
+  "iterations": 5000,
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "timeframe": "60m",
+  "max_ranked": 100,
+  "top_k": 5,
+  "mcts_max_depth": 4,
+  "data_sha256": "04972097ec1118d9383363863c55d4b48a61c00a8e3142f07b8398310ed16602",
+  "budget_plan": {
+    "total": 100000,
+    "phase_a": 50000,
+    "chunk": 500,
+    "checkpoints": [],
+    "feedback_expressions": 10,
+    "feedback_blueprints": 10,
+    "feedback_variant": "anon_shapes"
+  },
+  "llm_model": "ollama-local",
+  "git_commit": "9d58d63962bbefb5dbec99277b2efd319f6e4564"
+}

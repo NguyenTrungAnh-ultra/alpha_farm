@@ -1,0 +1,55 @@
+{
+  "model": "qwen3.5:4b",
+  "n": 100,
+  "batch_size": 10,
+  "seed": 20261031,
+  "temperature": 0.3,
+  "timeframe": "60m",
+  "windows": [
+    2,
+    3,
+    5,
+    10
+  ],
+  "max_depth": 4,
+  "prompt_sha256": "4a0923c95b25cec4412cc440d18412f201dea314a94298e04dae6b25465c0645",
+  "formulas_sha256": "f69e8822c47a0bfb312a38ae8a8c4bc0ec12d9a885be222ccf097bf777388e5d",
+  "created": "2026-11-02T18:25:29",
+  "stats": {
+    "n_requested": 100,
+    "n_accepted": 100,
+    "ideas": 100,
+    "compiled": 96,
+    "with_slot": 0,
+    "example_copy_rejections": 0,
+    "duplicate_rejections": 2,
+    "rounds_used": 15,
+    "seconds": 3619.1433022022247,
+    "error": "",
+    "correction_error": "",
+    "rejections": {},
+    "rejections_after_correction": {},
+    "requests": 27,
+    "retries": 12,
+    "retry_errors": [
+      "context_length",
+      "context_length",
+      "context_length",
+      "context_length",
+      "context_length",
+      "context_length",
+      "context_length",
+      "context_length",
+      "context_length",
+      "context_length",
+      "context_length",
+      "context_length"
+    ],
+    "llm_seconds": 3619.1212503910065
+  },
+  "criteria": {
+    "open_slots": 0,
+    "duplicate_expressions": 0,
+    "windows_from_ladder": true
+  }
+}

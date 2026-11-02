@@ -1,0 +1,402 @@
+[
+    {
+        "name": "MeanReversionSignal",
+        "formula": "greater_than(ts_mean(pv_close, 5), ts_min(pv_open, 3))"
+    },
+    {
+        "name": "HighLowRange",
+        "formula": "sub(ts_max(pv_high, 10), ts_min(pv_low, 5))"
+    },
+    {
+        "name": "PriceMomentum",
+        "formula": "sub(pv_close, ts_mean(pv_open, 2))"
+    },
+    {
+        "name": "VolatilityBreakout",
+        "formula": "greater_than(sub(ts_max(pv_high, 3), ts_min(pv_low, 3)), ts_mean(pv_close, 10))"
+    },
+    {
+        "name": "VolumePriceSignal",
+        "formula": "mult(ts_mean(pv_close, 5), ts_zscore(pv_volume, 2))"
+    },
+    {
+        "name": "VolumeTrend",
+        "formula": "greater_than(ts_sum(pv_volume, 10), ts_mean(pv_volume, 3))"
+    },
+    {
+        "name": "ZScoreRatioSignal",
+        "formula": "greater_than(ts_zscore(pv_close, 5), ts_zscore(pv_open, 3))"
+    },
+    {
+        "name": "VolumeWeightedPrice",
+        "formula": "mult(ts_zscore(pv_close, 5), ts_mean(pv_volume, 2))"
+    },
+    {
+        "name": "OpenCloseGap",
+        "formula": "greater_than(pv_close, ts_max(pv_open, 3))"
+    },
+    {
+        "name": "RangeMeanCheck",
+        "formula": "less_than(sub(ts_max(pv_high, 5), ts_min(pv_low, 2)), ts_mean(pv_close, 3))"
+    },
+    {
+        "name": "CloseMeanSpread",
+        "formula": "sub(ts_mean(pv_close, 5), ts_mean(pv_open, 5))"
+    },
+    {
+        "name": "HighLowRange_2",
+        "formula": "sub(ts_max(pv_high, 3), ts_min(pv_low, 3))"
+    },
+    {
+        "name": "VolPriceWeighted",
+        "formula": "mult(ts_zscore(pv_volume, 5), ts_mean(pv_close, 3))"
+    },
+    {
+        "name": "OpenCloseTrend",
+        "formula": "greater_than(pv_close, ts_mean(pv_open, 10))"
+    },
+    {
+        "name": "IntradaySpread",
+        "formula": "sub(ts_max(pv_high, 5), ts_min(pv_low, 5))"
+    },
+    {
+        "name": "VolumeSumSignal",
+        "formula": "ts_sum(pv_volume, 5)"
+    },
+    {
+        "name": "ArgMaxSignal",
+        "formula": "greater_than(ts_argmax(pv_close, 5), ts_argmax(pv_open, 3))"
+    },
+    {
+        "name": "PriceVolCorr",
+        "formula": "greater_than(ts_corr(pv_close, pv_volume, 5), ts_mean(ts_corr(pv_close, pv_volume, 3), 5))"
+    },
+    {
+        "name": "CloseZScoreDiff",
+        "formula": "sub(ts_zscore(pv_close, 5), ts_mean(ts_zscore(pv_close, 3), 5))"
+    },
+    {
+        "name": "ZScoreDiffSignal",
+        "formula": "greater_than(ts_zscore(pv_close, 5), ts_mean(ts_zscore(pv_open, 3), 5))"
+    },
+    {
+        "name": "close_mean_vs_low_min",
+        "formula": "greater_than(ts_mean(pv_close, 10), ts_min(pv_low, 5))"
+    },
+    {
+        "name": "vol_momentum_mult",
+        "formula": "mult(ts_zscore(pv_close, 3), ts_sum(pv_volume, 5))"
+    },
+    {
+        "name": "range_expansion_sub",
+        "formula": "sub(ts_max(pv_high, 10), ts_min(pv_low, 2))"
+    },
+    {
+        "name": "open_close_mean_diff",
+        "formula": "greater_than(ts_mean(pv_close, 3), ts_mean(pv_open, 10))"
+    },
+    {
+        "name": "zscore_regime_check",
+        "formula": "less_than(ts_zscore(pv_close, 10), ts_max(ts_zscore(pv_high, 5), 2))"
+    },
+    {
+        "name": "high_vol_corr_signal",
+        "formula": "greater_than(ts_corr(pv_high, pv_volume, 3), ts_min(ts_corr(pv_low, pv_volume, 5), 2))"
+    },
+    {
+        "name": "argmax_extremes",
+        "formula": "greater_than(ts_argmax(pv_high, 10), ts_argmax(pv_low, 5))"
+    },
+    {
+        "name": "volume_rank_vs_price_rank",
+        "formula": "greater_than(ts_rank(pv_volume, 3), ts_mean(ts_rank(pv_close, 5), 2))"
+    },
+    {
+        "name": "multi_cond_logic_gate",
+        "formula": "and_(greater_than(ts_mean(pv_close, 5), ts_min(pv_low, 3)), greater_than(ts_sum(pv_volume, 3), ts_mean(pv_volume, 2)))"
+    },
+    {
+        "name": "composite_price_sub",
+        "formula": "sub(add(ts_mean(pv_close, 3), ts_mean(pv_open, 2)), ts_max(pv_high, 5))"
+    },
+    {
+        "name": "CloseBelowOpenMA",
+        "formula": "less_than(ts_mean(pv_close, 5), ts_mean(pv_open, 3))"
+    },
+    {
+        "name": "HighVolZScore",
+        "formula": "greater_than(ts_zscore(pv_high, 5), ts_max(ts_zscore(pv_low, 3), 2))"
+    },
+    {
+        "name": "PriceVolWeighted",
+        "formula": "mult(ts_mean(pv_close, 5), ts_zscore(pv_volume, 3))"
+    },
+    {
+        "name": "OpenCloseSpread",
+        "formula": "greater_than(sub(pv_close, pv_open), ts_max(pv_high, 3))"
+    },
+    {
+        "name": "RangeMeanReversion",
+        "formula": "greater_than(sub(ts_max(pv_high, 3), ts_min(pv_low, 10)), ts_mean(pv_close, 5))"
+    },
+    {
+        "name": "VolumeAccumulation",
+        "formula": "less_than(ts_sum(pv_volume, 10), ts_mean(pv_volume, 5))"
+    },
+    {
+        "name": "LowHighArgMin",
+        "formula": "greater_than(ts_argmin(pv_low, 5), ts_argmin(pv_high, 3))"
+    },
+    {
+        "name": "NoHighLowSpread",
+        "formula": "not_(greater_than(ts_max(pv_high, 5), ts_min(pv_low, 3)))"
+    },
+    {
+        "name": "VolWeightedClose",
+        "formula": "mult(ts_mean(pv_close, 10), ts_zscore(pv_volume, 5))"
+    },
+    {
+        "name": "RankMeanReversion",
+        "formula": "greater_than(ts_rank(pv_close, 5), ts_mean(ts_rank(pv_open, 3), 2))"
+    },
+    {
+        "name": "VolumeMeanDiff",
+        "formula": "sub(ts_sum(pv_volume, 5), ts_mean(pv_volume, 3))"
+    },
+    {
+        "name": "HighMeanBias",
+        "formula": "greater_than(ts_mean(pv_close, 3), ts_max(pv_high, 10))"
+    },
+    {
+        "name": "LowMeanCheck",
+        "formula": "less_than(ts_mean(pv_low, 5), ts_min(pv_open, 2))"
+    },
+    {
+        "name": "VolatilityWeightedMax",
+        "formula": "mult(ts_max(pv_high, 3), ts_zscore(pv_volume, 5))"
+    },
+    {
+        "name": "CloseSumPressure",
+        "formula": "greater_than(ts_sum(pv_close, 5), ts_mean(pv_open, 2))"
+    },
+    {
+        "name": "CloseMinDeviation",
+        "formula": "sub(ts_mean(pv_close, 5), ts_min(pv_open, 2))"
+    },
+    {
+        "name": "HighLowSpreadCheck",
+        "formula": "greater_than(ts_max(pv_high, 5), ts_min(pv_low, 2))"
+    },
+    {
+        "name": "HighLowRangeSub",
+        "formula": "sub(ts_max(pv_high, 5), ts_min(pv_low, 10))"
+    },
+    {
+        "name": "CloseMeanFloor",
+        "formula": "greater_than(ts_mean(pv_close, 10), ts_min(pv_open, 2))"
+    },
+    {
+        "name": "CloseSumCeiling",
+        "formula": "greater_than(ts_sum(pv_close, 5), ts_max(pv_open, 2))"
+    },
+    {
+        "name": "HighMeanBreakout",
+        "formula": "greater_than(sub(ts_max(pv_high, 5), ts_mean(pv_close, 3)), ts_min(pv_open, 2))"
+    },
+    {
+        "name": "VolZScoreMult",
+        "formula": "mult(ts_sum(pv_volume, 10), ts_zscore(pv_close, 5))"
+    },
+    {
+        "name": "OpenCloseCorrRank",
+        "formula": "greater_than(ts_corr(pv_open, pv_close, 5), ts_rank(pv_close, 3))"
+    },
+    {
+        "name": "HighCloseSubMin",
+        "formula": "greater_than(sub(ts_max(pv_high, 3), ts_mean(pv_close, 5)), ts_min(pv_open, 2))"
+    },
+    {
+        "name": "CloseArgMaxOpen",
+        "formula": "greater_than(ts_argmax(pv_close, 10), ts_argmax(pv_open, 5))"
+    },
+    {
+        "name": "VolZScoreMeanZScore",
+        "formula": "greater_than(ts_zscore(pv_volume, 10), ts_mean(ts_zscore(pv_close, 5), 3))"
+    },
+    {
+        "name": "NotPriceTrend",
+        "formula": "not_(greater_than(ts_mean(pv_close, 10), ts_min(pv_open, 2)))"
+    },
+    {
+        "name": "AndVolumePriceLogic",
+        "formula": "and_(greater_than(ts_max(pv_high, 5), ts_min(pv_open, 2)), greater_than(ts_sum(pv_close, 10), ts_mean(pv_close, 3)))"
+    },
+    {
+        "name": "OpenCloseCorrMean",
+        "formula": "greater_than(ts_corr(pv_open, pv_close, 10), ts_mean(ts_corr(pv_open, pv_close, 5), 3))"
+    },
+    {
+        "name": "MeanRankComparison",
+        "formula": "greater_than(ts_mean(pv_close, 5), ts_mean(pv_open, 3))"
+    },
+    {
+        "name": "HighLowZScoreDivergence",
+        "formula": "greater_than(ts_zscore(pv_high, 3), ts_mean(ts_zscore(pv_low, 5), 2))"
+    },
+    {
+        "name": "VolumeWeightedCloseMomentum",
+        "formula": "mult(ts_mean(pv_close, 2), ts_zscore(pv_volume, 10))"
+    },
+    {
+        "name": "VolumeMeanCross",
+        "formula": "greater_than(ts_sum(pv_volume, 3), ts_mean(pv_volume, 10))"
+    },
+    {
+        "name": "HighLowSpreadCompression",
+        "formula": "sub(ts_max(pv_high, 2), ts_min(pv_low, 5))"
+    },
+    {
+        "name": "TrendSpreadConfirmation",
+        "formula": "greater_than(sub(ts_max(pv_high, 2), ts_min(pv_low, 3)), ts_mean(pv_close, 10))"
+    },
+    {
+        "name": "LowHighArgminSignal",
+        "formula": "greater_than(ts_argmin(pv_low, 2), ts_argmin(pv_high, 10))"
+    },
+    {
+        "name": "VolumeMeanDecay",
+        "formula": "less_than(ts_sum(pv_volume, 3), ts_mean(pv_volume, 10))"
+    },
+    {
+        "name": "OpenCloseHighAction",
+        "formula": "greater_than(sub(pv_close, pv_open), ts_max(pv_high, 2))"
+    },
+    {
+        "name": "CloseVolumeCorrelation",
+        "formula": "mult(ts_mean(pv_close, 10), ts_zscore(pv_volume, 3))"
+    },
+    {
+        "name": "OpenCloseCorrelationRank",
+        "formula": "greater_than(ts_corr(pv_open, pv_close, 3), ts_rank(pv_open, 5))"
+    },
+    {
+        "name": "MeanOpenSpread",
+        "formula": "greater_than(ts_mean(pv_close, 2), ts_min(pv_open, 10))"
+    },
+    {
+        "name": "VolumeCloseCorrelation",
+        "formula": "greater_than(ts_corr(pv_close, pv_volume, 5), ts_mean(ts_corr(pv_close, pv_volume, 3), 10))"
+    },
+    {
+        "name": "HighLowRange_3",
+        "formula": "sub(ts_max(pv_high, 2), ts_min(pv_low, 10))"
+    },
+    {
+        "name": "VolumeZScore",
+        "formula": "less_than(ts_zscore(pv_volume, 5), ts_mean(ts_zscore(pv_volume, 3), 2))"
+    },
+    {
+        "name": "HighLowArgmax",
+        "formula": "greater_than(ts_argmax(pv_high, 3), ts_argmax(pv_low, 5))"
+    },
+    {
+        "name": "HighLowZScore",
+        "formula": "greater_than(ts_zscore(pv_high, 5), ts_min(ts_zscore(pv_low, 3), 2))"
+    },
+    {
+        "name": "RankVolumeMean",
+        "formula": "greater_than(ts_rank(pv_close, 10), ts_mean(ts_rank(pv_volume, 5), 2))"
+    },
+    {
+        "name": "CloseOpenMean",
+        "formula": "sub(ts_mean(pv_close, 10), ts_mean(pv_open, 5))"
+    },
+    {
+        "name": "VolumeZScoreMult",
+        "formula": "mult(ts_sum(pv_volume, 3), ts_zscore(pv_close, 5))"
+    },
+    {
+        "name": "PriceOpenMomentum",
+        "formula": "greater_than(sub(pv_close, pv_open), ts_max(pv_high, 5))"
+    },
+    {
+        "name": "VolumePriceDivergence",
+        "formula": "mult(ts_rank(pv_close, 5), ts_mean(pv_volume, 3))"
+    },
+    {
+        "name": "HighLowMeanReversion",
+        "formula": "greater_than(ts_mean(pv_high, 5), ts_min(pv_low, 10))"
+    },
+    {
+        "name": "OpenCloseMomentum",
+        "formula": "greater_than(ts_mean(pv_open, 3), ts_mean(pv_close, 2))"
+    },
+    {
+        "name": "OpenRankSignal",
+        "formula": "greater_than(ts_rank(pv_open, 5), ts_mean(ts_rank(pv_high, 3), 2))"
+    },
+    {
+        "name": "CorrelationFilter",
+        "formula": "greater_than(ts_corr(pv_high, pv_volume, 5), ts_mean(ts_corr(pv_low, pv_volume, 3), 10))"
+    },
+    {
+        "name": "ZScoreRegime",
+        "formula": "greater_than(ts_zscore(pv_volume, 5), ts_mean(ts_zscore(pv_open, 3), 2))"
+    },
+    {
+        "name": "HighMaxSignal",
+        "formula": "mult(ts_max(pv_high, 2), ts_zscore(pv_volume, 3))"
+    },
+    {
+        "name": "ArgmaxLogic",
+        "formula": "greater_than(ts_argmax(pv_high, 3), ts_argmax(pv_low, 10))"
+    },
+    {
+        "name": "NotLogic",
+        "formula": "not_(greater_than(ts_max(pv_high, 3), ts_min(pv_low, 2)))"
+    },
+    {
+        "name": "SumMeanLogic",
+        "formula": "greater_than(ts_sum(pv_close, 5), ts_mean(pv_open, 3))"
+    },
+    {
+        "name": "CloseZscorevsVolumeRank",
+        "formula": "greater_than(ts_zscore(pv_close, 5), ts_rank(pv_volume, 3))"
+    },
+    {
+        "name": "HighRankVolumeSum",
+        "formula": "mult(ts_rank(pv_high, 5), ts_sum(pv_volume, 3))"
+    },
+    {
+        "name": "HighLowRange_4",
+        "formula": "sub(ts_max(pv_high, 3), ts_min(pv_low, 2))"
+    },
+    {
+        "name": "CloseMeanvsOpenMax",
+        "formula": "greater_than(ts_mean(pv_close, 5), ts_max(pv_open, 10))"
+    },
+    {
+        "name": "HighZscorevsLowRank",
+        "formula": "greater_than(ts_zscore(pv_high, 5), ts_rank(pv_low, 3))"
+    },
+    {
+        "name": "PriceVolumeLogic",
+        "formula": "and_(greater_than(ts_max(pv_high, 5), ts_min(pv_open, 2)), greater_than(ts_sum(pv_volume, 5), ts_mean(pv_volume, 3)))"
+    },
+    {
+        "name": "LowRankCloseMax",
+        "formula": "mult(ts_rank(pv_low, 5), ts_max(pv_close, 10))"
+    },
+    {
+        "name": "NotRangeCondition",
+        "formula": "not_(greater_than(ts_min(pv_low, 5), ts_max(pv_high, 2)))"
+    },
+    {
+        "name": "OpenCloseCorrelation",
+        "formula": "greater_than(ts_corr(pv_open, pv_close, 3), ts_rank(pv_volume, 5))"
+    },
+    {
+        "name": "LowArgminvsHighArgmin",
+        "formula": "greater_than(ts_argmin(pv_low, 10), ts_argmin(pv_high, 2))"
+    }
+]
