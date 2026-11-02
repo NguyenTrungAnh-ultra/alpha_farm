@@ -633,8 +633,13 @@ def reading_placebo(view: Optional[Dict]) -> str:
             f"nhỏ nhất {_fmt(view['min'])}, lớn nhất {_fmt(view['max'])}. Muốn p = {view['min_p']:.2f} "
             f"(nhỏ nhất có thể với {view['k']} bộ), Sharpe lần chạy thật phải lớn hơn {_fmt(view['max'])}.")
     if view['real'] is None:
-        return text + ' Lần chạy thật chưa có nên p chưa tính được.'
-    return text + f" Sharpe lần chạy thật là {_fmt(view['real'])}, p = {view['p']:.3f}."
+        return text + ' Lần chạy thật (MCTS seed 1) chưa có nên p chưa tính được.'
+    text += (f" p so các bộ placebo với Sharpe của lần chạy thật chỉ ở MCTS seed 1 (cùng seed, cùng cách đo với các bộ placebo): "
+             f"{_fmt(view['real'])}, p = {view['p']:.3f}.")
+    if view.get('real_mean') is not None:
+        text += (f" Trung bình ngày của tất cả seed của lần chạy thật có Sharpe {_fmt(view['real_mean'])}; số này chỉ để mô tả, không có p "
+                 "(lấy trung bình nhiều seed làm chuỗi mượt hơn nên không so công bằng với placebo một seed).")
+    return text
 
 
 def reading_near_figure(rows: List[Dict]) -> str:

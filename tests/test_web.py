@@ -405,7 +405,8 @@ def write_walkforward(root, with_real=False, folder='llm_mcts'):
     rows = [{'mode': 'placebo', 'placebo_set': i + 1, 'n_days': 877, 'n_windows': 7, 'sharpe': v, 'p_value': np.nan}
             for i, v in enumerate(sharpes)]
     if with_real:
-        rows.append({'mode': 'real', 'placebo_set': 0, 'n_days': 877, 'n_windows': 7, 'sharpe': 0.5, 'p_value': np.nan})
+        rows.append({'mode': 'real_seed1', 'placebo_set': 0, 'n_days': 877, 'n_windows': 7, 'sharpe': 0.5, 'p_value': np.nan})
+        rows.append({'mode': 'real_mean', 'placebo_set': 0, 'n_days': 877, 'n_windows': 7, 'sharpe': 1.5, 'p_value': np.nan})
     pd.DataFrame(rows).to_csv(path / 'summary.csv', index=False)
 
 
@@ -429,11 +430,21 @@ def test_placebo_p_counts_sets_at_least_as_good_as_real(tmp_path):
     view = web_app.placebo.placebo_view(web_app.placebo.read_summary(str(tmp_path / 'walkforward' / 'llm_mcts')))
     assert view['p'] == pytest.approx(2 / 5)  # real 0.5: only the 1.0 set is at least as good
     assert view['mean'] == pytest.approx(0.175) and view['max'] == 1.0
-    assert 'p = 0.400' in thesis.reading_placebo(view)
+    text = thesis.reading_placebo(view)
+    assert 'p = 0.400' in text and 'seed 1' in text and 'chỉ để mô tả' in text
+    assert view['real'] == 0.5 and view['real_mean'] == 1.5   # p and the marker use seed 1, not the mean
+    chart = web_app.placebo.chart_points(view)
+    assert chart['real'] == 0.5
+
+
+def test_placebo_page_marks_seed_one_sharpe_as_real(tmp_path):
+    write_walkforward(tmp_path, with_real=True)
+    text = TestClient(web_app.create_app(str(tmp_path))).get('/results/placebo').text
+    assert 'p = 0.400' in text and '"real": 0.5' in text.replace('"real":0.5', '"real": 0.5') and '1.5' in text
 
 
 def test_placebo_p_counts_a_tie_as_at_least_as_good():
-    summary = pd.DataFrame({'mode': ['placebo', 'placebo', 'real'], 'placebo_set': [1, 2, 0], 'sharpe': [0.5, 0.1, 0.5]})
+    summary = pd.DataFrame({'mode': ['placebo', 'placebo', 'real_seed1'], 'placebo_set': [1, 2, 0], 'sharpe': [0.5, 0.1, 0.5]})
     assert web_app.placebo.placebo_view(summary)['p'] == pytest.approx(2 / 3)
 
 
@@ -669,7 +680,7 @@ def node_status(html, node_id):
 def write_walkforward_real(root):
     path = root / 'walkforward' / 'llm_mcts' / 'summary.csv'
     frame = pd.read_csv(path)
-    frame.loc[len(frame)] = {'mode': 'real', 'placebo_set': 0, 'n_days': 877, 'n_windows': 7, 'sharpe': 0.5,
+    frame.loc[len(frame)] = {'mode': 'real_seed1', 'placebo_set': 0, 'n_days': 877, 'n_windows': 7, 'sharpe': 0.5,
                              'p_value': np.nan}
     frame.to_csv(path, index=False)
 

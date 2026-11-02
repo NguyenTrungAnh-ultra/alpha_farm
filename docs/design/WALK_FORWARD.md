@@ -51,7 +51,7 @@ Cùng ngân sách 100.000 lượt chấm mỗi cửa sổ, cùng bước 2–4. 
 
 - Lặp toàn bộ walk-forward của LLM + MCTS trên K = 19 bộ placebo: hoán vị lợi suất trong từng đoạn (học, kiểm định, đánh giá xáo riêng), mỗi cửa sổ một bản hoán vị riêng, seed = 100000 + 100·k + w.
 - Một seed MCTS (seed 1) mỗi bộ. Bộ placebo có Sharpe NaN không tính vào K.
-- p = (1 + số bộ placebo có Sharpe ≥ lần thật) / (K + 1); nhỏ nhất 0.05.
+- p = (1 + số bộ placebo có Sharpe ≥ lần thật) / (K + 1); nhỏ nhất 0.05. "Lần thật" ở đây là chuỗi lợi suất thật của riêng MCTS seed 1 (cùng seed, cùng cách đo với bộ placebo; dòng `real_seed1` của `summary.csv`). Trung bình ngày của 5 seed (dòng `real_mean`) vẫn được báo cáo nhưng chỉ để mô tả, không có p, vì trung bình nhiều seed làm chuỗi mượt hơn (vol thấp, |Sharpe| cao hơn khi trung bình khác 0) nên thiên về lần thật so với placebo một seed. Thiếu seed 1 ở lần thật thì p để trống. So sánh giữa các cấu hình (`comparison.csv`) vẫn dùng trung bình 5 seed.
 
 ## Đóng băng
 

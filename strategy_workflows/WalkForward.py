@@ -84,6 +84,8 @@ DEFAULT_BLUEPRINT_COUNT = 20
 DEFAULT_SEEDS = [1, 2, 3, 4, 5]
 DEFAULT_PLACEBO_SETS = 19
 PLACEBO_MCTS_SEED = 1
+REAL_SEED1_MODE = 'real_seed1'   # summary.csv row of the real run at PLACEBO_MCTS_SEED; carries the p-value
+REAL_MEAN_MODE = 'real_mean'     # summary.csv row of the real run averaged over all seeds; descriptive
 PLACEBO_SEED_BASE = 100000
 FIRST_EVAL_START = '2022-07-01'
 N_WINDOWS = 7
@@ -575,19 +577,31 @@ def frozen_path(results_root: str) -> str:
 
 def summarize(returns: pd.DataFrame) -> pd.DataFrame:
     """
-    Sharpe of the concatenated evaluation returns: real = average over seeds per day, placebo =
-    each set separately. p-value on the real row = (1 + placebo Sharpes >= real) / (K + 1), ties
-    count as >=, NaN placebo Sharpes are not counted in K.
+    Sharpe of the concatenated evaluation returns. Rows: `real_seed1` = the real run of MCTS seed
+    `PLACEBO_MCTS_SEED` (the one seed every placebo set runs, so same measurement), `real_mean` =
+    average over all real seeds per day (descriptive: averaging lowers vol and favours the real run
+    against single-seed placebo sets), `placebo` = each set separately.
+    p-value on the `real_seed1` row = (1 + placebo Sharpes >= real) / (K + 1), ties count as >=,
+    NaN placebo Sharpes are not counted in K. Without seed-1 real returns there is no `real_seed1`
+    row and p stays NaN (no fallback to another seed); the reason is printed.
     """
     returns = returns.drop_duplicates(subset=['date', 'window', 'seed', 'mode', 'placebo_set'], keep='last')
     rows = []
     real_sharpe = float('nan')
     real = returns[returns['mode'] == 'real']
+    first = real[real['seed'] == PLACEBO_MCTS_SEED]
+    if not first.empty:
+        series = first.groupby('date')['return'].mean().sort_index()
+        real_sharpe = annualised_sharpe(series)
+        rows.append({'mode': REAL_SEED1_MODE, 'placebo_set': 0, 'n_days': len(series),
+                     'n_windows': int(first['window'].nunique()), 'sharpe': real_sharpe})
+    elif not real.empty:
+        print(f"[walkforward] No real returns for MCTS seed {PLACEBO_MCTS_SEED} (the placebo seed): "
+              f"p-value left NaN, real seeds present: {sorted(real['seed'].unique().tolist())}")
     if not real.empty:
         series = real.groupby('date')['return'].mean().sort_index()
-        real_sharpe = annualised_sharpe(series)
-        rows.append({'mode': 'real', 'placebo_set': 0, 'n_days': len(series),
-                     'n_windows': int(real['window'].nunique()), 'sharpe': real_sharpe})
+        rows.append({'mode': REAL_MEAN_MODE, 'placebo_set': 0, 'n_days': len(series),
+                     'n_windows': int(real['window'].nunique()), 'sharpe': annualised_sharpe(series)})
     placebo = returns[returns['mode'] == 'placebo']
     for k, part in placebo.groupby('placebo_set'):
         series = part.groupby('date')['return'].mean().sort_index()
@@ -595,9 +609,9 @@ def summarize(returns: pd.DataFrame) -> pd.DataFrame:
                      'n_windows': int(part['window'].nunique()), 'sharpe': annualised_sharpe(series)})
     frame = pd.DataFrame(rows, columns=['mode', 'placebo_set', 'n_days', 'n_windows', 'sharpe'])
     frame['p_value'] = np.nan
-    if not real.empty and not np.isnan(real_sharpe):
+    if not first.empty and not np.isnan(real_sharpe):
         sharpes = frame.loc[frame['mode'] == 'placebo', 'sharpe'].dropna()
-        frame.loc[frame['mode'] == 'real', 'p_value'] = (1 + int((sharpes >= real_sharpe).sum())) / (len(sharpes) + 1)
+        frame.loc[frame['mode'] == REAL_SEED1_MODE, 'p_value'] = (1 + int((sharpes >= real_sharpe).sum())) / (len(sharpes) + 1)
     return frame
 
 

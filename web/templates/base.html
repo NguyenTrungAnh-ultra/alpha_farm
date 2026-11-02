@@ -182,7 +182,7 @@ function placeboChart(canvasId, d, xTitle, yTitle) {
       borderColor: color, borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0 }; };
   var sets = [{ label: 'bộ placebo', data: d.points.map(function (p) { return { x: p[0], y: p[1] }; }),
       backgroundColor: COLORS[0], pointRadius: 5 }, line('Sharpe placebo lớn nhất', d.max, COLORS[1])];
-  if (d.real !== null) { sets.push(line('lần chạy thật', d.real, COLORS[4])); }
+  if (d.real !== null) { sets.push(line('lần chạy thật (seed 1)', d.real, COLORS[4])); }
   new Chart(el, { type: 'scatter', data: { datasets: sets }, options: { maintainAspectRatio: false, parsing: false, scales: {
     x: { type: 'linear', title: { display: true, text: xTitle } }, y: { title: { display: true, text: yTitle } } } } });
 }

@@ -253,18 +253,18 @@ def test_summary_sharpe_matches_hand_computation_and_p_value_counts_ties():
         return pd.DataFrame({'date': days, 'window': 1, 'seed': seed, 'mode': mode, 'placebo_set': k,
                              'return': values})
 
-    real_a, real_b = [0.01, -0.01, 0.02, 0.0], [0.03, -0.01, 0.0, 0.02]
-    tie = [0.02, -0.01, 0.01, 0.01]
+    real_a, real_b = [0.02, -0.01, 0.01, 0.01], [0.03, -0.01, 0.0, 0.02]
+    tie = real_a
     frames = [rows('real', 0, 1, real_a), rows('real', 0, 2, real_b),
               rows('placebo', 1, 1, tie), rows('placebo', 2, 1, [0.0, 0.0, 0.0, 0.0]),
               rows('placebo', 3, 1, [0.001, 0.002, -0.001, 0.0])]
     summary = wf.summarize(pd.concat(frames))
-    mean_series = np.array([0.02, -0.01, 0.01, 0.01])
-    expected = mean_series.mean() / mean_series.std(ddof=0) * np.sqrt(252)
-    real = summary[summary['mode'] == 'real'].iloc[0]
+    seed1 = np.array(real_a)
+    expected = seed1.mean() / seed1.std(ddof=0) * np.sqrt(252)
+    real = summary[summary['mode'] == wf.REAL_SEED1_MODE].iloc[0]
     assert real['sharpe'] == pytest.approx(expected)
     assert real['n_days'] == 4
-    # set 1 ties the real Sharpe (counts), set 2 is flat (NaN, excluded from K), set 3 is lower
+    # set 1 equals the seed-1 series (ties, counts), set 2 is flat (NaN, excluded from K), set 3 is lower
     assert real['p_value'] == pytest.approx((1 + 1) / (2 + 1))
     assert np.isnan(summary[summary['placebo_set'] == 2]['sharpe'].iloc[0])
 
@@ -277,7 +277,34 @@ def test_p_value_floor_is_one_over_k_plus_one():
         rows.append(pd.DataFrame({'date': days, 'window': 1, 'seed': 1, 'mode': 'placebo', 'placebo_set': k,
                                   'return': [0.01 * k, -0.01, 0.0]}))
     summary = wf.summarize(pd.concat(rows))
-    assert summary[summary['mode'] == 'real']['p_value'].iloc[0] == pytest.approx(1 / 4)
+    assert summary[summary['mode'] == wf.REAL_SEED1_MODE]['p_value'].iloc[0] == pytest.approx(1 / 4)
+
+
+def seed_returns(seed, values, mode='real', k=0):
+    days = pd.date_range('2024-01-01', periods=len(values)).strftime('%Y-%m-%d')
+    return pd.DataFrame({'date': days, 'window': 1, 'seed': seed, 'mode': mode, 'placebo_set': k, 'return': values})
+
+
+def test_p_value_uses_seed_one_only_and_mean_row_is_descriptive():
+    seed1 = [0.01, -0.01, 0.01, -0.01, 0.0, 0.01]
+    seed2 = [0.03, 0.02, 0.03, 0.02, 0.04, 0.03]            # lifts the mean series far above seed 1
+    placebo = [0.02, -0.01, 0.015, -0.005, 0.01, 0.0]       # Sharpe between the seed-1 and mean series
+    frames = [seed_returns(1, seed1), seed_returns(2, seed2), seed_returns(1, placebo, 'placebo', 1)]
+    summary = wf.summarize(pd.concat(frames))
+    first = summary[summary['mode'] == wf.REAL_SEED1_MODE].iloc[0]
+    mean = summary[summary['mode'] == wf.REAL_MEAN_MODE].iloc[0]
+    placebo_sharpe = summary[summary['mode'] == 'placebo']['sharpe'].iloc[0]
+    assert mean['sharpe'] > placebo_sharpe > first['sharpe']
+    assert first['p_value'] == pytest.approx(1.0)           # the mean row would give 1/2
+    assert np.isnan(mean['p_value']) and mean['n_days'] == 6
+
+
+def test_missing_seed_one_leaves_p_nan_and_says_why(capsys):
+    frames = [seed_returns(2, [0.01, -0.01, 0.02]), seed_returns(1, [0.0, 0.01, -0.01], 'placebo', 1)]
+    summary = wf.summarize(pd.concat(frames))
+    assert wf.REAL_SEED1_MODE not in set(summary['mode'])
+    assert summary['p_value'].isna().all() and wf.REAL_MEAN_MODE in set(summary['mode'])
+    assert 'seed 1' in capsys.readouterr().out
 
 
 @pytest.mark.slow

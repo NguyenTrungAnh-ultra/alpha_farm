@@ -11,12 +11,12 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from strategy_workflows.SearchConfigs import feedback_records, summarize_feedback
-from strategy_workflows.WalkForward import RUN_KEY
+from strategy_workflows.WalkForward import REAL_MEAN_MODE, REAL_SEED1_MODE, RUN_KEY
 
 WALKFORWARD_DIR = os.path.join('walkforward', 'llm_mcts')
 SUMMARY_FILE = 'summary.csv'
 PLACEBO_MODE = 'placebo'
-REAL_MODE = 'real'
+REAL_MODE = REAL_SEED1_MODE
 RUNS_FILE = 'runs.csv'
 
 
@@ -54,7 +54,8 @@ def read_feedback(folder: str) -> Optional[Dict]:
 def placebo_view(summary: pd.DataFrame) -> Optional[Dict]:
     """
     Placebo Sharpe distribution and the p-value. p is computed from the sets and the real Sharpe, not read
-    from the file, as (1 + #sets with Sharpe >= real) / (K + 1); None while there is no real run.
+    from the file, as (1 + #sets with Sharpe >= real) / (K + 1), where real is the Sharpe of the real run's
+    MCTS seed 1 (`real`); None while there is no such run. `real_mean` is the 5-seed daily mean, descriptive only.
     `min_p` is the smallest p reachable with K sets, and `needed` the real Sharpe that reaches it.
     """
     if summary.empty:
@@ -67,6 +68,8 @@ def placebo_view(summary: pd.DataFrame) -> Optional[Dict]:
     k = len(sharpes)
     real = summary[summary['mode'] == REAL_MODE]
     real_sharpe = float(real['sharpe'].iloc[0]) if not real.empty else None
+    mean_row = summary[summary['mode'] == REAL_MEAN_MODE]
+    real_mean = float(mean_row['sharpe'].iloc[0]) if not mean_row.empty else None
     p = None if real_sharpe is None else (1 + int((sharpes >= real_sharpe).sum())) / (k + 1)
     sets: List[Dict] = []
     for _, row in placebo.iterrows():
@@ -75,7 +78,7 @@ def placebo_view(summary: pd.DataFrame) -> Optional[Dict]:
                      'n_days': _int(row.get('n_days')), 'n_windows': _int(row.get('n_windows')),
                      'sharpe': float(row['sharpe'])})
     return {'sets': sets, 'k': k, 'mean': float(sharpes.mean()), 'sd': float(sharpes.std()) if k > 1 else float('nan'),
-            'min': float(sharpes.min()), 'max': float(sharpes.max()), 'real': real_sharpe, 'p': p,
+            'min': float(sharpes.min()), 'max': float(sharpes.max()), 'real': real_sharpe, 'real_mean': real_mean, 'p': p,
             'min_p': 1 / (k + 1)}
 
 

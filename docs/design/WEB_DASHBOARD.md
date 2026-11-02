@@ -146,7 +146,7 @@ Mục nào thiếu tệp kết quả hiện trạng thái chờ (chữ "chưa c�
 | `/method` | Phương pháp | sơ đồ luồng chính (Hình 3.1; vẽ vòng phản hồi: a1 giai đoạn A → a2 phản hồi LLM → a3 giai đoạn B → b → c → d, mũi tên vòng d → a1; trạng thái ba ô so sánh suy ra từ tệp kết quả, xem dưới), cửa sổ walk-forward (Hình 3.2), Bảng 3.1 bộ blueprint RQ1 đóng băng (20 khung, số cách điền, độ phủ toán tử 16/19), Bảng 3.2 các cấu hình so sánh, Bảng 3.3 vòng phản hồi và mốc ngân sách, Bảng 3.4 kích thước không gian tìm kiếm (toàn ngữ pháp ≈ 1.9 × 10⁴¹ so với bộ ≈ 2.2 × 10¹⁴; tính bằng `GrammarSize`, không gõ cứng) |
 | `/data` | Dữ liệu | VN30F1M 60m 2018-08 → 2025-12, số bar từng đoạn, ghi chú dữ liệu |
 | `/results/planted` | Kết quả: bài cài tín hiệu (RQ2 kiểm soát dương; cũng là dữ liệu của phép so chính RQ1) | xem dưới |
-| `/results/placebo` | Kết quả: RQ2, kiểm soát âm | đọc `results/walkforward/llm_mcts/summary.csv`: phân bố Sharpe của K bộ placebo (chấm từng bộ, vạch Sharpe placebo lớn nhất), bảng từng bộ, câu đọc nói Sharpe thật phải vượt Sharpe placebo lớn nhất để p = 1/(K+1). p = (1 + số bộ có Sharpe ≥ thật) / (K + 1), tính từ dữ liệu; chưa có dòng `real` thì p hiện "chưa có, chờ lần chạy thật"; chưa có thư mục thì hiện trạng thái chờ |
+| `/results/placebo` | Kết quả: RQ2, kiểm soát âm | đọc `results/walkforward/llm_mcts/summary.csv`: phân bố Sharpe của K bộ placebo (chấm từng bộ, vạch Sharpe placebo lớn nhất), bảng từng bộ, câu đọc nói Sharpe thật phải vượt Sharpe placebo lớn nhất để p = 1/(K+1). p = (1 + số bộ có Sharpe ≥ thật) / (K + 1), tính từ dữ liệu, "thật" = dòng `real_seed1` (MCTS seed 1, cùng cách đo với bộ placebo; vạch "lần chạy thật (seed 1)" trên biểu đồ); Sharpe trung bình 5 seed (dòng `real_mean`) hiện thêm trong câu đọc, ghi rõ chỉ mô tả, không có p; chưa có dòng `real_seed1` thì p hiện "chưa có, chờ lần chạy thật"; chưa có thư mục thì hiện trạng thái chờ |
 | `/results/rq1` | Kết quả: RQ1 | xem dưới |
 | `/results/walkforward` | Kết quả: chuỗi ngoài mẫu | chưa có kết quả (cần đóng băng rồi chạy thật) |
 | `/system` | Công cụ (ngoài luận văn) | tài nguyên máy, tiến độ lượt chạy đang chạy |
@@ -169,7 +169,7 @@ Mục nào thiếu tệp kết quả hiện trạng thái chờ (chữ "chưa c�
 
 **Trang `/results/placebo`** có cùng dòng sức khoẻ vòng phản hồi, tính trên các dòng `mode = placebo` của `results/walkforward/llm_mcts/runs.csv` (`placebo.read_feedback`, khoá `WalkForward.RUN_KEY`).
 
-**Trạng thái ô Hình 3.1:** ô tĩnh giữ trạng thái viết trong `NODES`; ba ô so sánh lấy từ cùng phép kiểm tệp của `availability()` (`pipeline.derived_states`): bài cài tín hiệu = Xong khi có `detection_thresholds.csv`; RQ1 = Đang làm khi có `primary_tests.csv` mà chưa có `comparison.csv`, Xong khi có cả hai; placebo = Đang làm khi có các bộ placebo, Xong khi có thêm dòng `real` (khoá `placebo_real`). Chưa có tệp nào thì Chưa làm.
+**Trạng thái ô Hình 3.1:** ô tĩnh giữ trạng thái viết trong `NODES`; ba ô so sánh lấy từ cùng phép kiểm tệp của `availability()` (`pipeline.derived_states`): bài cài tín hiệu = Xong khi có `detection_thresholds.csv`; RQ1 = Đang làm khi có `primary_tests.csv` mà chưa có `comparison.csv`, Xong khi có cả hai; placebo = Đang làm khi có các bộ placebo, Xong khi có thêm dòng `real_seed1` (khoá `placebo_real`). Chưa có tệp nào thì Chưa làm.
 
 **Vai trò của chỉ số** (người dùng yêu cầu 2026-10-30):
 - Mỗi trang chương mở bằng ô **"Chỉ số chính"**: tên chỉ số trả lời trực tiếp câu hỏi của chương, nó đo gì, đọc thế nào, giá trị hiện tại (hoặc "chưa có").

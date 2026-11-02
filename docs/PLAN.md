@@ -34,7 +34,6 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 - ⏸️ Số seed 5 cho lần chạy thật: Claude đề xuất theo proposal, chưa xác nhận riêng. (K = 19 đang chạy; muốn K = 39 thì chạy thêm bộ 20–39 sau, không phải chạy lại.)
 - ⏸️ Ngân sách placebo bằng lần thật nếu thời gian máy cho phép: Claude đề xuất.
 - ⏸️ Ghi số lệnh và Sharpe sau phí của A như một dòng mô tả tín hiệu cài trong kết quả bài cài tín hiệu.
-- ⏸️ p placebo của lần chạy thật: so Sharpe chuỗi thật seed 1 (cùng phép đo với placebo 1 seed) hay chuỗi trung bình 5 seed (code hiện tại)? Phải chốt trước khi chạy thật. Đề xuất của agent review: seed 1 là chính, trung bình 5 seed là phụ ([log](log/2026-11_LLM_FEEDBACK.md)).
 
 ## Nợ
 
