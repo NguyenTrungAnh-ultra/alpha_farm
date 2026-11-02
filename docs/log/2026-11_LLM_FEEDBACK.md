@@ -69,3 +69,19 @@ Lượt có phản hồi: số blueprint mới 1–10 (placebo: 42 lượt đủ
 ## 2026-11-02 — placebo chạy lại xong
 
 21:56 → 14:11 (16 giờ 15 phút; ước trước ≈ 14 giờ, chậm hơn vì chung hàng đợi Ollama với RQ1 tới 12:35). 8/133 lượt rơi về (ước trước ≈ 7/133). Số: [RESULTS](../RESULTS.md#placebo-walk-forward-hệ-thống-có-phản-hồi-bộ-rq1).
+
+## 2026-11-02 — review phương pháp trước khi đóng băng (agent Opus, chỉ đọc)
+
+Người dùng giữ thiết kế, nhờ review; giả thuyết của người dùng: phần lớn công sức đến từ MCTS. Claude kiểm lại 5 điểm trên tệp kết quả (đánh dấu ✔); phần còn lại là số agent tính, chưa kiểm lại.
+
+1. ✔ "A ngoài vùng blueprint" chỉ đúng về cấu trúc: `sub(?, ?)` (OpenCloseSpread) điền được A − hằng cho mọi A. Ô llm_mcts IC 0.1 A3 seed 10 có `(ts_argmin(volume, 10) - 2.0)` trong top-5 ở 10.000 vòng. `coverage.json`, dòng "A1, A2, A3 nằm ngoài vùng" ở RESULTS và Bảng 4.5 trên web đọc sai.
+2. ✔ Lợi thế ở A kinh điển nằm hết ở A2 và phụ thuộc ngưỡng 0.7. IC 0.1, 100.000 vòng, gộp A1 + A2: ngưỡng 0.7 llm_mcts 7 / mcts_only 3 / random 4 (trên 20); 0.8: 3 / 2 / 3; 0.9: 1 / 0 / 3. A2 của llm_mcts: 5/10 → 1/10 → 0/10.
+3. ✔ RQ1 chia đoạn theo mặc định `Segments()` (học 2018-08-13 → 2019-12-31, kiểm định tới 2020-06-30, đánh giá tới 2020-12-31), không phải cửa sổ 1 walk-forward như LLM_FEEDBACK ghi.
+4. ✔ `WalkForward.summarize`: chuỗi thật = trung bình 5 seed mỗi ngày, mỗi bộ placebo = 1 seed ⇒ hai phân phối không cùng phép đo. Ảnh hưởng lên p chưa đo.
+5. ✔ MCTS không LLM thu hẹp bảng xếp hạng: trung vị số biểu thức khác nhau 95 (10.000) → 30 (100.000); llm_mcts 96 → 86, random 96 → 97.
+6. Lần đầu chạm A đo theo khối 500 vòng; llm_mcts xoay vòng 20 blueprint nên không dùng được để nói "nhanh hơn".
+7. Nguồn top-5 cuối của llm_mcts (RQ1): 51 % chỉ từ blueprint ban đầu, 36 % chỉ từ blueprint phản hồi, 13 % cả hai. Vòng phản hồi đổi công thức được chọn, không tăng số lần tìm lại A (11 ô gần ở 50.000 → 10 ở 100.000).
+8. Placebo llm_mcts: top-5 gần như toàn NORMALIZED (661/665), hệ thống sinh một lần 319 NORMALIZED / 346 BOOLEAN; suy đoán đây là lý do số lệnh 343 → 48.
+9. Không thấy rò rỉ giữa các đoạn. Random tiêu ≈ 39 % ngân sách vào mẫu trùng mà vẫn ngang hai cấu hình kia.
+
+Kết luận của agent (chưa phải của luận văn): vòng phản hồi không thêm gì ròng; MCTS không hơn lấy mẫu ngẫu nhiên cùng ngữ pháp; khác biệt chủ yếu từ bộ blueprint ban đầu và bước chọn trên bảng xếp hạng / đoạn kiểm định.

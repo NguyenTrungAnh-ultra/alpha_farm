@@ -34,9 +34,11 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 - ⏸️ Số seed 5 cho lần chạy thật: Claude đề xuất theo proposal, chưa xác nhận riêng. (K = 19 đang chạy; muốn K = 39 thì chạy thêm bộ 20–39 sau, không phải chạy lại.)
 - ⏸️ Ngân sách placebo bằng lần thật nếu thời gian máy cho phép: Claude đề xuất.
 - ⏸️ Ghi số lệnh và Sharpe sau phí của A như một dòng mô tả tín hiệu cài trong kết quả bài cài tín hiệu.
+- ⏸️ p placebo của lần chạy thật: so Sharpe chuỗi thật seed 1 (cùng phép đo với placebo 1 seed) hay chuỗi trung bình 5 seed (code hiện tại)? Phải chốt trước khi chạy thật. Đề xuất của agent review: seed 1 là chính, trung bình 5 seed là phụ ([log](log/2026-11_LLM_FEEDBACK.md)).
 
 ## Nợ
 
+- Viết lại các câu RQ1 sai sau review 2026-11-02 ([log](log/2026-11_LLM_FEEDBACK.md)): "A ngoài vùng" (chỉ đúng về cấu trúc, `sub(?, ?)` điền được A − hằng), "chia đoạn như cửa sổ 1" (thật ra là `Segments()` mặc định), "LLM tới A sớm hơn" (lần đầu chạm đo theo khối 500 vòng); báo tìm lại gần ở ngưỡng 0.7 / 0.8 / 0.9. Áp cho RESULTS, LLM_FEEDBACK, PLANTED_SIGNAL và chữ trên web.
 
 - `criteria_report` của `main.py planted summary` vẫn in đạt / trượt theo tiêu chí cũ (IC 0.05 ≥ 3/5), trong khi bài này đã đổi sang báo ngưỡng phát hiện.
 - ≈ 7% lượt chấm lỗi (−10) — người dùng chốt 2026-10-30 để nguyên, ghi vào mục hạn chế (như nhau ở mọi cấu hình; sửa thì phải chạy lại mọi kết quả) vì biểu thức toàn hằng (`Input array/series must be 1D, got shape ()`); MCTS còn sinh `(0.1 + low)`. Cần lọc hằng theo nút cha. Sau mỗi lượt xem `MCTSEngine.error_summary()`.
