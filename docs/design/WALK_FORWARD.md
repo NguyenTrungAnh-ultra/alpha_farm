@@ -59,7 +59,7 @@ Cùng ngân sách 100.000 lượt chấm mỗi cửa sổ, cùng bước 2–4. 
 
 ## Bộ blueprint
 
-Bộ đóng băng: `results/blueprint_sets/20261029_212813/`. Tiêu chí bộ thật: 0 blueprint trùng nguyên văn ví dụ trong prompt; không hai blueprint cùng khung (so cấu trúc cây, bỏ qua tên trường điền sẵn); mọi blueprint có ≥ 1 `?` và biên dịch được; `qwen3.5:4b`, 20 blueprint. Số liệu của bộ: [RESULTS](../RESULTS.md#bộ-blueprint).
+Bộ đóng băng: `results/blueprint_sets/20261031_rq1/` (cùng bộ với placebo và bài cài tín hiệu RQ1; `20261029_212813/` là bộ của hệ thống sinh một lần, vẫn là mặc định `DEFAULT_BLUEPRINTS` trong code nên lệnh `freeze` / `real` phải truyền `--blueprints`). Tiêu chí bộ thật: 0 blueprint trùng nguyên văn ví dụ trong prompt; không hai blueprint cùng khung (so cấu trúc cây, bỏ qua tên trường điền sẵn); mọi blueprint có ≥ 1 `?` và biên dịch được; `qwen3.5:4b`, 20 blueprint. Số liệu của bộ: [RESULTS](../RESULTS.md#bộ-blueprint).
 
 ## Thời gian máy
 
