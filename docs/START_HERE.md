@@ -16,6 +16,8 @@ Tệp cổng của vault `docs/` (mở thư mục này bằng Obsidian, hoặc �
 | Vì sao ngày đó quyết thế, các lần chạy cũ, kết luận đã rút lại | [log/](log/) |
 | Proposal luận văn | `proposal/thesis_proposal/Thesis_Proposal.pdf` |
 | Luận văn (bản nháp) và cách build | `thesis/Thesis.pdf`, [thesis/CLAUDE.md](thesis/CLAUDE.md); web: `/thesis` |
+| Hướng dẫn LVTN của khoa (lịch, cấu trúc, chấm điểm, Turnitin) | [THESIS_GUIDE](THESIS_GUIDE.md) |
+| Đã đạt yêu cầu nào của hướng dẫn, hạn từng việc (web: `/guide`) | [THESIS_CHECKLIST](THESIS_CHECKLIST.md) |
 | Bài báo tham khảo | `references/` |
 | Tài liệu thời XNOQuant (không còn đúng) | [archive/README](archive/README.md) |
 

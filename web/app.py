@@ -14,6 +14,7 @@ Pages:
     /results/walkforward            chapter without results yet
     /thesis                         thesis PDF: embedded viewer, open and download links
     /thesis/pdf, /thesis/download   the two fixed PDFs (?version=main|nodsr), inline and as attachment
+    /guide                          thesis deadlines timeline, checklist and the department guide (read from docs on each request)
     /system, /api/system            machine resources (tool outside the thesis)
 """
 
@@ -21,7 +22,7 @@ import datetime
 import math
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Callable, Dict, Optional
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
@@ -35,7 +36,7 @@ from strategy_workflows.MCTSEngine import MCTSEngine, _FixedPositions, describe_
 from strategy_workflows.PlantedSignal import PlantedData, PlantedFormula, formula_from_dict
 from strategy_workflows.SearchConfigs import BudgetPlan
 from utilities.AppConfig import PROJECT_ROOT
-from web import charts, method, pipeline, placebo, planted, rq1, thesis
+from web import charts, guide, method, pipeline, placebo, planted, rq1, thesis
 from web.system import read_system
 
 TEMPLATES_DIR = Path(__file__).parent / 'templates'
@@ -48,6 +49,10 @@ def default_results_root() -> str:
 
 def default_thesis_dir() -> str:
     return os.path.join(PROJECT_ROOT, 'docs', 'thesis')
+
+
+def default_docs_dir() -> str:
+    return os.path.join(PROJECT_ROOT, 'docs')
 
 
 def format_number(value, digits: int = 3) -> str:
@@ -128,10 +133,13 @@ def _illustration_view(folder: str, name: str, strength: float, seed: int) -> Di
     return view
 
 
-def create_app(results_root: Optional[str] = None, thesis_dir: Optional[str] = None) -> FastAPI:
+def create_app(results_root: Optional[str] = None, thesis_dir: Optional[str] = None, docs_dir: Optional[str] = None,
+               today: Optional[Callable[[], datetime.date]] = None) -> FastAPI:
     app = FastAPI(title='Alpha Farm thesis web', docs_url=None, redoc_url=None, openapi_url=None)
     app.state.results_root = str(results_root or default_results_root())
     app.state.thesis_dir = str(thesis_dir or default_thesis_dir())
+    app.state.docs_dir = str(docs_dir or default_docs_dir())
+    app.state.today = today or guide.today_in_zone
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters['fmt'] = format_number
     templates.env.filters['inline_code'] = pipeline.format_text
@@ -298,6 +306,12 @@ def create_app(results_root: Optional[str] = None, thesis_dir: Optional[str] = N
     @app.get('/thesis/download')
     def thesis_download(version: str = 'main'):
         return pdf_response(version, 'attachment')
+
+    @app.get('/guide', response_class=HTMLResponse)
+    def guide_page(request: Request):
+        return render(request, 'guide.html', 'guide', t=thesis, view=guide.build_view(app.state.docs_dir, app.state.today),
+                      note=guide.format_note, due_label=guide.due_label, countdown=guide.countdown_text,
+                      overdue=guide.is_overdue)
 
     @app.get('/system', response_class=HTMLResponse)
     def system_page(request: Request):

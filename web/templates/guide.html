@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block title %}{{ t.GUIDE_TITLE }}{% endblock %}
+{% block content %}
+<style>
+.guide { --ok:#2a9d6f; --prog:#2a6fdb; --wait:#b26a00; --block:#8a4fc7; --todo:#8a94a3; --over:#c0392b; }
+@media (prefers-color-scheme: dark) { .guide { --ok:#4fc79a; --prog:#6aa0f5; --wait:#e0a040; --block:#b58ae0; --todo:#8a94a3; --over:#ff6b5a; } }
+.guide .st-done { --c:var(--ok); } .guide .st-progress { --c:var(--prog); } .guide .st-waiting { --c:var(--wait); }
+.guide .st-blocked { --c:var(--block); } .guide .st-todo { --c:var(--todo); }
+.guide .overdue { --c:var(--over); }
+.guide .headline { font-size:18px; font-weight:600; margin:0 0 4px; } .guide .headline.late { color:var(--over); }
+.guide svg { display:block; min-width:{{ view.timeline.width if view.timeline else 900 }}px; width:100%; height:auto; font-size:11px; }
+.guide svg text { fill:var(--text); } .guide svg .axis text { fill:var(--muted); }
+.guide svg .grid line { stroke:var(--line); } .guide svg .lane { fill:var(--bg); stroke:var(--line); }
+.guide svg .lane.sug { stroke-dasharray:4 3; }
+.guide svg .shape { fill:var(--c); stroke:var(--c); stroke-width:1.5; }
+.guide svg .sug .shape { fill-opacity:.2; stroke-dasharray:3 2; } .guide svg .st-todo .shape { fill-opacity:.25; }
+.guide svg g.item { cursor:pointer; outline:none; } .guide svg g.item:hover .shape, .guide svg g.item:focus .shape { stroke-width:3; }
+.guide svg g.item.overdue text { fill:var(--over); font-weight:600; }
+.guide svg .today line { stroke:var(--over); stroke-width:1.5; } .guide svg .today text { fill:var(--over); font-weight:600; }
+.guide .cbadge { display:inline-block; min-width:128px; font-size:12px; padding:0 8px; border-radius:10px; border:1px solid var(--c); color:var(--c); }
+.guide .cbadge.fill { background:var(--c); color:#fff; }
+.guide .crow { padding:6px 0; border-bottom:1px solid var(--line); display:grid; grid-template-columns:150px 1fr; gap:2px 12px; }
+.guide .crow .what { font-weight:600; } .guide .crow .meta, .guide .crow .note { grid-column:2; }
+.guide .crow.sug .what::after { content:" · đề xuất"; font-weight:400; color:var(--muted); font-size:12px; }
+.guide .crow .cd { font-variant-numeric:tabular-nums; } .guide .crow.overdue .cd { color:var(--over); font-weight:600; }
+.guide .warn { color:var(--warn); font-size:12px; }
+@media (max-width:560px) { .guide .crow { grid-template-columns:1fr; } .guide .crow .meta, .guide .crow .note { grid-column:1; } }
+.guide #guide-body table { display:block; overflow-x:auto; } .guide #guide-body th, .guide #guide-body td { white-space:normal; text-align:left; vertical-align:top; }
+.guide #guide-body a:not([href]) { color:inherit; } .guide #guide-body img { max-width:100%; }
+.guide #guide-body { overflow-wrap:anywhere; }
+.guide pre.raw { white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; }
+</style>
+<div class="guide">
+<h1>{{ t.GUIDE_TITLE }}</h1>
+<p class="muted">{{ t.GUIDE_INTRO }}</p>
+
+<div class="card" id="timeline-card">
+  <h2>{{ t.GUIDE_TIMELINE_TITLE }} <span class="muted small">· hôm nay <span class="js-today">{{ view.today_text }}</span> (giờ Việt Nam)</span></h2>
+  {% if not view.checklist_ready %}
+  <p class="muted">{{ t.GUIDE_CHECKLIST_WAITING }}</p>
+  {% else %}
+  <p class="headline" id="hl-next">
+    {%- if view.next -%}
+      {%- if view.next_left == 0 %}Hôm nay là hạn: {{ view.next.task }}
+      {%- else %}Còn {{ view.next_left }} ngày tới {{ view.next.task }} ({{ due_label(view.next) }}){% endif -%}
+    {%- else %}Không còn mốc khoa nào chưa xong.{% endif -%}
+  </p>
+  <p class="headline" id="hl-submit">
+    {%- if view.submission -%}
+      {%- if view.submission.status == 'done' %}Đã nộp file thesis.
+      {%- elif view.submission_left >= 0 %}Còn {{ view.submission_left }} ngày tới hạn nộp thesis ({{ due_label(view.submission) }}).
+      {%- else %}Đã quá hạn nộp thesis {{ -view.submission_left }} ngày.{% endif -%}
+    {%- endif -%}
+  </p>
+  <p class="small muted" id="hl-overdue">{% if view.overdue %}{{ view.overdue }} việc đã quá hạn mà chưa xong.{% endif %}</p>
+  {% if view.timeline %}
+  {% set tl = view.timeline %}
+  <div class="scroll">
+  <svg id="timeline" viewBox="0 0 {{ tl.width }} {{ tl.height }}" role="img" aria-label="{{ t.GUIDE_TIMELINE_TITLE }}"
+       data-start="{{ tl.start }}" data-end="{{ tl.end }}" data-x0="{{ tl.x0 }}" data-x1="{{ tl.x1 }}">
+    {% for lane in tl.lanes %}
+    <rect class="lane {% if lane.suggested %}sug{% endif %}" x="0" y="{{ lane.y }}" width="{{ tl.width }}" height="{{ lane.height }}" rx="6"/>
+    <text x="8" y="{{ lane.y + 16 }}" font-weight="600">{{ lane.name.split(' / ')[0] }}{% if ' / ' in lane.name %} /{% endif %}</text>
+    {% if ' / ' in lane.name %}<text x="8" y="{{ lane.y + 30 }}" font-weight="600">{{ lane.name.split(' / ')[1] }}</text>{% endif %}
+    {% endfor %}
+    <g class="grid axis">
+      {% for tick in tl.ticks %}
+      <line x1="{{ tick.x }}" y1="{{ 34 }}" x2="{{ tick.x }}" y2="{{ tl.height }}"/>
+      <text x="{{ tick.x + 3 }}" y="30">{{ tick.label }}</text>
+      {% endfor %}
+    </g>
+    <g class="today" id="today-line" {% if tl.today_x is none %}style="display:none"{% endif %}>
+      <line id="today-x" x1="{{ tl.today_x or 0 }}" y1="14" x2="{{ tl.today_x or 0 }}" y2="{{ tl.height }}"/>
+      <text id="today-label" x="{{ tl.today_x or 0 }}" y="10" text-anchor="middle">Hôm nay {{ view.today_text }}</text>
+    </g>
+    {% for item in tl['items'] %}
+    <g class="item st-{{ item.status }}{% if item.suggested %} sug{% endif %}{% if item.overdue %} overdue{% endif %}" tabindex="0"
+       data-due="{{ item.due }}" data-status="{{ item.status }}" data-tip="{{ item.tip }}">
+      <title>{{ item.tip }}{% if item.countdown %} · {{ item.countdown }}{% endif %}</title>
+      {% if item.kind == 'bar' %}<rect class="shape" x="{{ item.x }}" y="{{ item.y - 5 }}" width="{{ item.x1 - item.x }}" height="10" rx="3"/>
+      {% else %}<circle class="shape" cx="{{ item.x }}" cy="{{ item.y }}" r="6"/>{% endif %}
+      <text x="{{ item.label_x }}" y="{{ item.y + 4 }}" text-anchor="{{ item.anchor }}">{{ item.label }}</text>
+    </g>
+    {% endfor %}
+  </svg>
+  </div>
+  <p class="small" id="tip" aria-live="polite">&nbsp;</p>
+  <p class="small muted">Chấm = một mốc, thanh = một khoảng. Màu theo trạng thái:
+    <span class="st-done"><b style="color:var(--c)">xong</b></span> ·
+    <span class="st-progress"><b style="color:var(--c)">đang làm</b></span> ·
+    <span class="st-waiting"><b style="color:var(--c)">chờ bạn xác nhận</b></span> ·
+    <span class="st-blocked"><b style="color:var(--c)">bị chặn / rủi ro</b></span> ·
+    <span class="st-todo"><b style="color:var(--c)">chưa</b></span> ·
+    <span class="overdue"><b style="color:var(--c)">quá hạn</b></span>. {{ t.GUIDE_SUGGESTED_NOTE }}
+    <span id="today-outside" style="display:none">{{ t.GUIDE_TODAY_OUTSIDE }}</span></p>
+  {% else %}
+  <p class="muted">{{ t.GUIDE_NO_DATES }}</p>
+  {% endif %}
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>{{ t.GUIDE_CHECKLIST_TITLE }}</h2>
+  {% if not view.checklist_ready %}
+  <p class="muted">{{ t.GUIDE_CHECKLIST_WAITING }}</p>
+  {% else %}
+  <p class="small">{% for c in view.counts %}<span class="st-{{ c.key }}"><b style="color:var(--c)">{{ c.symbol }} {{ c.label }}: {{ c.count }}</b></span>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  {% if view.warnings %}
+  <details class="warn"><summary class="warn">{{ view.warnings|length }} cảnh báo khi đọc bảng kiểm</summary>
+    <ul>{% for w in view.warnings %}<li>{{ w }}</li>{% endfor %}</ul></details>
+  {% endif %}
+  {% for section in view.sections %}
+  <h3>{{ section.title }}{% if section.suggested %} <span class="muted small">(hạn đề xuất)</span>{% endif %}</h3>
+  {% if section.intro %}<p class="small muted">{{ section.intro }}</p>{% endif %}
+  {% for row in section.rows %}
+  <div class="crow st-{{ row.status }}{% if section.suggested %} sug{% endif %}{% if overdue(row, view.today) %} overdue{% endif %}"
+       {% if row.end %}data-due="{{ row.end.isoformat() }}" data-status="{{ row.status }}"{% endif %}>
+    <div><span class="cbadge{% if row.status != 'todo' %} fill{% endif %}">{{ t.GUIDE_STATUS_SYMBOLS[row.status] }} {{ t.GUIDE_STATUS_LABELS[row.status] }}</span></div>
+    <div class="what">{{ row.task }}</div>
+    <div class="meta small">
+      {% if row.start %}hạn {{ due_label(row) }} <span class="cd js-cd">{{ countdown(row, view.today) }}</span>{% else %}<span class="muted">không có hạn</span>{% endif %}
+      {% if row.warning %}<span class="warn"> · ⚠ {{ row.warning }}</span>{% endif %}
+    </div>
+    {% if row.note %}<div class="note small muted">{{ note(row.note) }}</div>{% endif %}
+  </div>
+  {% endfor %}
+  {% endfor %}
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>{{ t.GUIDE_GUIDE_TITLE }}</h2>
+  {% if view.guide is none %}
+  <p class="muted">{{ t.GUIDE_GUIDE_WAITING }}</p>
+  {% else %}
+  <div id="guide-body"></div>
+  <script type="application/json" id="guide-md">{{ view.guide|tojson }}</script>
+  {% endif %}
+</div>
+</div>
+
+<script type="application/json" id="guide-data">{{ {'official': view.official_rows, 'submission': view.submission_date, 'cdn_failed': t.GUIDE_CDN_FAILED}|tojson }}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js" integrity="sha384-QsSpx6a0USazT7nK7w8qXDgpSAPhFsb2XtpoLFQ5+X2yFN6hvCKnwEzN8M5FWaJb" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js" integrity="sha384-cwS6YdhLI7XS60eoDiC+egV0qHp8zI+Cms46R0nbn8JrmoAzV9uFL60etMZhAnSu" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+(function () {
+  var DATA = JSON.parse(document.getElementById('guide-data').textContent);
+  // Vietnam has no daylight saving: the local date is the UTC date shifted by seven hours.
+  var OFFSET_MS = 7 * 3600 * 1000, DAY_MS = 86400000;
+  function todayIso() { return new Date(Date.now() + OFFSET_MS).toISOString().slice(0, 10); }
+  function dayNumber(iso) { var p = iso.split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]) / DAY_MS; }
+  function fmt(iso) { var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+  function left(due, today) { return dayNumber(due) - dayNumber(today); }
+  function countdown(due, status, today) {
+    if (!due || status === 'done') { return ''; }
+    var n = left(due, today);
+    return n < 0 ? 'quá hạn ' + (-n) + ' ngày' : (n === 0 ? 'hôm nay' : 'còn ' + n + ' ngày');
+  }
+  function setText(id, text) { var el = document.getElementById(id); if (el) { el.textContent = text; } }
+  function nextOfficial(today) {
+    var best = null;
+    DATA.official.forEach(function (r, i) {
+      if (!r.end || r.status === 'done' || r.end < today) { return; }
+      var key = [r.end, r.start !== r.end ? 1 : 0, i];
+      if (!best || key[0] < best.key[0] || (key[0] === best.key[0] && (key[1] < best.key[1] || (key[1] === best.key[1] && key[2] < best.key[2])))) { best = { key: key, row: r }; }
+    });
+    return best && best.row;
+  }
+  function refresh() {
+    var today = todayIso();
+    Array.prototype.forEach.call(document.querySelectorAll('.js-today'), function (el) { el.textContent = fmt(today); });
+    var overdue = 0;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-due][data-status]'), function (el) {
+      var late = left(el.getAttribute('data-due'), today) < 0 && el.getAttribute('data-status') !== 'done';
+      el.classList.toggle('overdue', late);
+      var text = countdown(el.getAttribute('data-due'), el.getAttribute('data-status'), today);
+      var cd = el.querySelector('.js-cd'); if (cd) { cd.textContent = text; }
+      var title = el.querySelector('title');
+      if (title) { title.textContent = el.getAttribute('data-tip') + (text ? ' · ' + text : ''); }
+      if (late && el.classList.contains('crow')) { overdue += 1; }
+    });
+    setText('hl-overdue', overdue ? overdue + ' việc đã quá hạn mà chưa xong.' : '');
+    var next = nextOfficial(today), hl = document.getElementById('hl-next');
+    if (hl) {
+      var n = next ? left(next.end, today) : 0;
+      hl.textContent = !next ? 'Không còn mốc khoa nào chưa xong.' : (n === 0 ? 'Hôm nay là hạn: ' + next.task
+        : 'Còn ' + n + ' ngày tới ' + next.task + ' (' + (next.start !== next.end ? fmt(next.start) + ' → ' : '') + fmt(next.end) + ')');
+    }
+    var submit = DATA.official.filter(function (r) { return r.start === DATA.submission && r.end === DATA.submission; })[0];
+    if (submit && document.getElementById('hl-submit')) {
+      var m = left(DATA.submission, today);
+      setText('hl-submit', submit.status === 'done' ? 'Đã nộp file thesis.' : (m >= 0
+        ? 'Còn ' + m + ' ngày tới hạn nộp thesis (' + fmt(DATA.submission) + ').' : 'Đã quá hạn nộp thesis ' + (-m) + ' ngày.'));
+    }
+    var svg = document.getElementById('timeline');
+    if (svg) {
+      var a = dayNumber(svg.getAttribute('data-start')), b = dayNumber(svg.getAttribute('data-end'));
+      var x0 = +svg.getAttribute('data-x0'), x1 = +svg.getAttribute('data-x1'), d = dayNumber(today);
+      var line = document.getElementById('today-line'), inside = d >= a && d <= b;
+      line.style.display = inside ? '' : 'none';
+      setText('today-label', 'Hôm nay ' + fmt(today));
+      document.getElementById('today-outside').style.display = inside ? 'none' : '';
+      if (inside) {
+        var x = x0 + (d - a) / (b - a) * (x1 - x0);
+        ['today-x'].forEach(function (id) { var el = document.getElementById(id); el.setAttribute('x1', x); el.setAttribute('x2', x); });
+        document.getElementById('today-label').setAttribute('x', x);
+      }
+    }
+  }
+  refresh();
+  setInterval(refresh, 3600 * 1000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { refresh(); } });
+  (function scheduleMidnight() {
+    var now = Date.now() + OFFSET_MS;
+    var wait = (Math.floor(now / DAY_MS) + 1) * DAY_MS - now + 1000;
+    setTimeout(function () { refresh(); scheduleMidnight(); }, wait);
+  })();
+
+  // Tap or keyboard focus shows the item text below the timeline (a <title> tooltip needs a mouse).
+  var tip = document.getElementById('tip');
+  Array.prototype.forEach.call(document.querySelectorAll('#timeline g.item'), function (g) {
+    var show = function () {
+      var cd = g.querySelector('title').textContent;
+      tip.textContent = cd;
+    };
+    g.addEventListener('click', show); g.addEventListener('focus', show);
+  });
+
+  var holder = document.getElementById('guide-md'), box = document.getElementById('guide-body');
+  if (holder && box) {
+    var markdown = JSON.parse(holder.textContent);
+    if (window.marked && window.DOMPurify) {
+      DOMPurify.addHook('afterSanitizeAttributes', function (node) {
+        if (node.tagName !== 'A' || !node.hasAttribute('href')) { return; }
+        var href = node.getAttribute('href');
+        if (/^https?:\/\//i.test(href)) { node.setAttribute('target', '_blank'); node.setAttribute('rel', 'noopener noreferrer'); }
+        else if (!/^(#|mailto:)/i.test(href)) { node.removeAttribute('href'); }
+      });
+      box.innerHTML = DOMPurify.sanitize(marked.parse(markdown, { mangle: false, headerIds: false }));
+    } else {
+      var note = document.createElement('p'); note.className = 'muted'; note.textContent = DATA.cdn_failed;
+      var pre = document.createElement('pre'); pre.className = 'raw'; pre.textContent = markdown;
+      box.appendChild(note); box.appendChild(pre);
+    }
+  }
+})();
+</script>
+{% endblock %}

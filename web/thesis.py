@@ -672,3 +672,26 @@ def format_size(size: int) -> str:
     if size >= 1024 * 1024:
         return f"{size / (1024 * 1024):.1f} MB"
     return f"{size / 1024:.0f} KB" if size >= 1024 else f"{size} B"
+
+
+# Guide page (/guide): texts of the timeline, checklist and department guide.
+GUIDE_TITLE = 'Hướng dẫn LVTN'
+GUIDE_INTRO = ('Mốc của khoa, danh sách việc đã làm và hướng dẫn của bộ môn. Ngày hôm nay tính theo giờ Việt Nam và '
+               'tự cập nhật mỗi ngày, kể cả khi trang để mở.')
+GUIDE_TIMELINE_TITLE = 'Dòng thời gian'
+GUIDE_CHECKLIST_TITLE = 'Bảng kiểm'
+GUIDE_GUIDE_TITLE = 'Hướng dẫn của khoa'
+GUIDE_CHECKLIST_WAITING = 'Chưa có bảng kiểm, nên chưa vẽ được dòng thời gian và danh sách việc.'
+GUIDE_GUIDE_WAITING = 'Chưa có tài liệu hướng dẫn của khoa.'
+GUIDE_NO_DATES = 'Bảng kiểm chưa có dòng nào có ngày, nên chưa vẽ dòng thời gian.'
+GUIDE_CDN_FAILED = 'Không nạp được bộ hiển thị markdown từ CDN; dưới đây là bản văn bản gốc.'
+GUIDE_SUGGESTED_NOTE = 'Hạn "đề xuất" là hạn Claude gợi ý, chưa phải hạn của khoa.'
+GUIDE_TODAY_OUTSIDE = 'Hôm nay nằm ngoài khoảng thời gian đang vẽ.'
+
+# Sections whose deadlines are suggestions; the first section of the checklist holds the department's own.
+GUIDE_SUGGESTED_SECTIONS = ('Trước khi nộp', 'Bảo vệ')
+THESIS_SUBMISSION_DATE = '2027-01-20'
+GUIDE_LANE_LABELS = ('Mốc khoa', 'Nghiên cứu', 'Trước khi nộp / Bảo vệ')
+GUIDE_STATUS_LABELS = {'done': 'xong', 'progress': 'đang làm', 'waiting': 'chờ bạn xác nhận',
+                       'blocked': 'bị chặn / rủi ro', 'todo': 'chưa'}
+GUIDE_STATUS_SYMBOLS = {'done': '✅', 'progress': '🔧', 'waiting': '⏸️', 'blocked': '⛔', 'todo': '○'}

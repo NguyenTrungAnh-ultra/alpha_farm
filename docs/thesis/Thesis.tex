@@ -37,6 +37,7 @@
 
 \usepackage{tikz}
 \usetikzlibrary{calc,positioning,arrows.meta}
+\usepackage{qrcode}
 
 \newcolumntype{L}{>{\raggedright\arraybackslash}X}
 \newcommand{\code}[1]{\texttt{#1}}
@@ -854,7 +855,10 @@ Yu, S., Xue, H., Ao, X., Pan, F., He, J., Tu, D., \& He, Q. (2023). Generating s
 \label{app:code}
 
 The source code, the frozen configuration and all result files are available at
-\begin{center}\url{https://github.com/NguyenTrungAnh-ultra/alpha_farm}\end{center}
+\begin{center}
+\qrcode[height=3cm]{https://github.com/NguyenTrungAnh-ultra/alpha_farm}\\[2mm]
+\url{https://github.com/NguyenTrungAnh-ultra/alpha_farm}
+\end{center}
 The real walk-forward run used code at commit \code{9d58d63}; its freeze file is \code{results/walkforward/frozen.json}. With Python 3.12 and a local Ollama server serving \code{qwen3.5:4b}, the main results are reproduced by:
 
 \begin{center}
