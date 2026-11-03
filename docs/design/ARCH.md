@@ -178,6 +178,8 @@ Chỉ dùng ở walk-forward thật (`main.py walkforward ... --system llm_only|
 `ts_mean, ts_sum, ts_max, ts_min, ts_rank, ts_zscore, ts_argmax, ts_argmin, ts_corr`, viết bằng `sliding_window_view`. Đã kiểm: kết quả trên chuỗi đầy đủ và chuỗi cắt bớt trùng nhau tuyệt đối (không nhìn trước). `benchmark_primitives.py` so khớp pandas trong sai số 1e-5; `ts_argmax` / `ts_argmin` nhanh hơn pandas khoảng 13–15 lần.
 Chưa có toán tử trễ / sai phân (`ts_delay`, `ts_delta`).
 
+`deflated_sharpe.py` (tệp độc lập, không sửa mã walk-forward): Deflated Sharpe Ratio (Bailey & López de Prado 2014) cho lần chạy walk-forward thật. Mỗi chuỗi lợi suất ngày `mode == 'real'` theo (hệ thống, seed) là một lượt thử (18 chuỗi; placebo không tính). Sharpe ngày (ddof 0, khớp `annualised_sharpe`; ngày × √252 trùng cột năm) cho `probabilistic_sharpe(returns, benchmark)` (độ lệch, độ nhọn thô, kỳ vọng 3 = chuẩn) và `expected_max_sharpe` (SR0 từ phương sai ddof 1 giữa các lượt thử; N = 1 thì SR0 = 0). Ghi `results/walkforward/dsr.csv`; chạy `.venv/Scripts/python.exe deflated_sharpe.py`. Test: `tests/test_deflated_sharpe.py`.
+
 ## 7. Nguồn gốc ý tưởng thiết kế
 
 | Ý | Nguồn |

@@ -76,6 +76,7 @@ Phương pháp: [design/WALK_FORWARD](design/WALK_FORWARD.md). Tệp: `results/w
 - Sharpe trung bình theo cửa sổ (1 → 7): LLM + MCTS 1.01 / −0.17 / −0.02 / −0.07 / 0.79 / −1.03 / 1.05; MCTS không LLM 0.73 / −1.12 / 0.05 / −0.12 / 1.05 / −1.24 / 1.20; tìm ngẫu nhiên 1.15 / −0.01 / 0.15 / −0.06 / −0.54 / −0.73 / 0.39; mua và giữ −1.43 / 1.02 / 0.04 / 1.30 / 0.68 / 0.84 / 2.45.
 - Số lệnh lần thật LLM + MCTS 509, placebo 48 (chưa giải thích).
 - Vòng phản hồi lần thật: 2/35 rơi về (`context_length`), 17/35 cần thử lại. Lỗi chấm 10.6 % (MCTS không LLM 8.2 %).
+- **DSR (phụ, tuỳ chọn; [cách tính](design/WALK_FORWARD.md#dsr-phụ-tuỳ-chọn)):** N = 18 chuỗi thật, SR0 = 0.89 (năm). Không chuỗi nào có DSR ≥ 0.95. Cao nhất: LLM không tìm 0.65 (PSR so 0 là 0.98), MCTS không LLM seed 4 0.58, tìm ngẫu nhiên seed 3 0.54; LLM + MCTS seed 1 0.35. Lợi suất ngày đuôi dày (độ nhọn 6.8–41). Tệp `results/walkforward/dsr.csv`.
 
 ## Placebo walk-forward (hệ thống có phản hồi, bộ RQ1)
 

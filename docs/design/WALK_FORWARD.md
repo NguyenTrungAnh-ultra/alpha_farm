@@ -53,6 +53,16 @@ Cùng ngân sách 100.000 lượt chấm mỗi cửa sổ, cùng bước 2–4. 
 - Một seed MCTS (seed 1) mỗi bộ. Bộ placebo có Sharpe NaN không tính vào K.
 - p = (1 + số bộ placebo có Sharpe ≥ lần thật) / (K + 1); nhỏ nhất 0.05. "Lần thật" ở đây là chuỗi lợi suất thật của riêng MCTS seed 1 (cùng seed, cùng cách đo với bộ placebo; dòng `real_seed1` của `summary.csv`). Trung bình ngày của 5 seed (dòng `real_mean`) vẫn được báo cáo nhưng chỉ để mô tả, không có p, vì trung bình nhiều seed làm chuỗi mượt hơn (vol thấp, |Sharpe| cao hơn khi trung bình khác 0) nên thiên về lần thật so với placebo một seed. Thiếu seed 1 ở lần thật thì p để trống. So sánh giữa các cấu hình (`comparison.csv`) vẫn dùng trung bình 5 seed.
 
+## DSR (phụ, tuỳ chọn)
+
+Kiểm định chính của RQ2 là placebo; SPA không làm (quyết định ở [DECISIONS](../DECISIONS.md#walk-forward)). DSR (Bailey & López de Prado 2014) chỉ tính cho các chuỗi thật ngoài mẫu: mỗi (cấu hình, seed) một lần thử, N = 18; SR0 = Sharpe lớn nhất kỳ vọng của N lần thử vô hiệu theo phương sai Sharpe giữa các lần thử; DSR = PSR(SR0), Sharpe tính theo ngày, có độ lệch và độ nhọn. Lệnh: `.venv/Scripts/python.exe deflated_sharpe.py` → `results/walkforward/dsr.csv`. Số ở [RESULTS](../RESULTS.md#walk-forward-thật-đóng-băng-bfe7faf).
+
+Hạn chế: 18 lần thử không độc lập (10 chuỗi của hai cấu hình MCTS chung bộ blueprint; ba cấu hình chỉ một chuỗi), nên N và phương sai chỉ là xấp xỉ.
+
+Hai cách viết trong luận văn (chọn một):
+- **Không DSR:** "Placebo chạy lại toàn bộ quy trình tìm kiếm trên dữ liệu không có tín hiệu, nên đã tính tới mọi lần thử bên trong quy trình; vì vậy luận văn dùng placebo thay cho các hiệu chỉnh đa kiểm định như SPA hay DSR. Cấu hình LLM không tìm (Sharpe 1.10) không có placebo, nên chỉ được báo để mô tả."
+- **Có DSR:** câu trên, thêm: "Với 18 chuỗi ngoài mẫu của sáu cấu hình, Sharpe lớn nhất kỳ vọng khi không có tín hiệu là 0.89 (năm); không chuỗi nào có DSR ≥ 0.95, kể cả LLM không tìm (DSR 0.65)."
+
 ## Đóng băng
 
 `main.py walkforward freeze --formulas <formulas.json>` ghi `results/walkforward/frozen.json`: reward + `REWARD_WEIGHTS`, bảng cửa sổ, tệp blueprint (sha256), bộ công thức của LLM không tìm (đường dẫn, sha256, sha256 bản ghi sinh) và lưới tham số khuôn của nó, lưới TSMOM (số phiên, luật chọn), cỡ vị thế tham chiếu, ngân sách, mô hình LLM, seed từng cấu hình, khung, `MAX_RANKED`, `TOP_K`, commit git, dấu vân tay dữ liệu. `real` từ chối chạy nếu bất kỳ trường nào khác bản đóng băng, hoặc `git diff --name-only <commit đóng băng>` trên `main.py`, `core_engine/`, `strategy_workflows/`, `utilities/` không rỗng. Vì thế mọi code (kể cả cấu hình so sánh) phải xong trước khi đóng băng.
@@ -77,4 +87,4 @@ Bộ đóng băng: `results/blueprint_sets/20261031_rq1/` (cùng bộ với plac
 
 ## Ngoài phạm vi
 
-SPA / DSR (Tháng 4), khung phút, kiểm tra rò rỉ qua trọng số LLM (nợ ở [PLAN](../PLAN.md#nợ)).
+SPA, khung phút, kiểm tra rò rỉ qua trọng số LLM (nợ ở [PLAN](../PLAN.md#nợ)).

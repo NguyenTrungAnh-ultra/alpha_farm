@@ -24,7 +24,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 | 10 | Đóng băng (`results/walkforward/frozen.json`) | ✅ | 2026-11-02, code ở `9d58d63`, commit `bfe7faf`: bộ blueprint `20261031_rq1` (sha `31e8c4c1…`), bộ 100 công thức LLM không tìm `results/formula_sets/20261102_llm_only/` (sinh 17:25 → 18:25), p placebo trên seed 1 | [WALK_FORWARD](design/WALK_FORWARD.md#đóng-băng) |
 | 11 | Chạy thật một lần, chuỗi lợi suất ngoài mẫu 2022-07 → 2025-12 | ✅ 2026-11-02 | 6 cấu hình xong 22:12; LLM + MCTS Sharpe seed 1 = 0.68, p placebo = 0.15; mọi CI chênh với cấu hình khác chứa 0; LLM không tìm 1.10 ([RESULTS](RESULTS.md#walk-forward-thật-đóng-băng-bfe7faf)) | [WALK_FORWARD](design/WALK_FORWARD.md) |
 | 12 | Đo lại ước thời gian walk-forward sau tăng tốc | 🔧 | placebo đo được 1.612 s/lượt (ước cũ 14 giờ ⇒ thật 6 giờ 10 phút với 10 lượt song song); các phần khác chưa ước lại | [WALK_FORWARD](design/WALK_FORWARD.md#thời-gian-máy) |
-| 13 | SPA / DSR | chưa | Tháng 4 của proposal | |
+| 13 | SPA / DSR | ✅ 2026-11-03 | placebo thay SPA / DSR; DSR phụ cho 18 chuỗi thật: không chuỗi nào ≥ 0.95, LLM không tìm 0.65; luận văn có thể bỏ (câu hai bản ở WALK_FORWARD) | [WALK_FORWARD](design/WALK_FORWARD.md#dsr-phụ-tuỳ-chọn) |
 | 14 | Web điều khiển và theo dõi | 🔧 | W1, W3b (web luận văn, 2026-10-30; trang placebo và ngưỡng Fisher 2026-10-31) xong; W2, W3–W6 còn | [WEB_DASHBOARD](design/WEB_DASHBOARD.md) |
 
 ## Câu chưa ai trả lời

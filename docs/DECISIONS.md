@@ -59,6 +59,7 @@ Mỗi quyết định một dòng, bản hiện hành: đổi ý thì sửa đú
 | Đoạn kiểm định 12 tháng ngay trước đoạn đánh giá | 2026-10-30 | người dùng (đề xuất của Claude) | bài cài tín hiệu cửa sổ 1 đã chạy với cách chia này |
 | Placebo: K = 19, mỗi bộ MCTS seed 1, bộ có Sharpe NaN không tính vào K | 2026-10-30 | người dùng (đề xuất của Claude) | K = 19 là nhỏ nhất cho p = 0.05; bỏ bộ NaN làm p thận trọng hơn |
 | p placebo so Sharpe chuỗi thật MCTS seed 1 (cùng seed, cùng phép đo với placebo); Sharpe trung bình 5 seed báo kèm, không tính p | 2026-11-02 | người dùng (đề xuất của agent review) | trung bình 5 danh mục làm chuỗi mượt hơn một danh mục, lợi cho lần thật so với placebo 1 seed; chạy placebo 5 seed tốn thêm ≈ 64 giờ |
+| Placebo thay SPA / DSR làm kiểm định chính của RQ2; DSR chỉ tính cho 18 chuỗi thật ngoài mẫu (N = 18), là phần phụ tuỳ chọn: luận văn có thể bỏ, khi đó dùng câu bản "không DSR" ở WALK_FORWARD | 2026-11-03 | người dùng (đề xuất của Claude) | placebo chạy lại cả quy trình nên đã tính mọi lần thử; DSR chỉ thêm thông tin cho LLM không tìm (Sharpe 1.10, không có placebo) |
 | Để nguyên ≈ 7% lượt chấm lỗi do biểu thức toàn hằng, ghi vào mục hạn chế | 2026-10-30 | người dùng | như nhau ở mọi cấu hình; sửa thì phải chạy lại mọi kết quả |
 | Bài cài tín hiệu: cả ba mức IC đủ 10 seed | 2026-10-30 | người dùng | đồng số seed, tránh chạy thêm chỉ ở ô có kết quả lạ |
 | Thứ tự: placebo → cấu hình so sánh → đóng băng → chạy thật một lần | 2026-10-29 | người dùng | thử đường ống trước khi chạm dữ liệu thật |
