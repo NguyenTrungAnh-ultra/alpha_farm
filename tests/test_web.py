@@ -124,7 +124,7 @@ def client(results):
 
 
 ALL_PAGES = ['/', '/data', '/method', '/results/planted', '/results/planted/illustration', '/results/placebo',
-             '/results/rq1', '/results/walkforward', '/system']
+             '/results/rq1', '/results/walkforward', '/thesis', '/system']
 CHAPTER_PAGES = ['/results/planted', '/results/placebo', '/results/rq1', '/results/walkforward']
 
 
@@ -786,3 +786,62 @@ def test_placebo_page_reads_feedback_health_of_placebo_runs_only(tmp_path):
     assert 'all_rejected' not in text
     pd.DataFrame([{'mode': 'placebo', 'placebo_set': 1, 'window': 1, 'seed': 1}]).to_csv(folder / 'runs.csv', index=False)
     assert 'Vòng phản hồi của' not in TestClient(web_app.create_app(str(tmp_path))).get('/results/placebo').text
+
+
+FAKE_PDF = b'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n'
+
+
+@pytest.fixture
+def thesis_dir(tmp_path):
+    folder = tmp_path / 'thesis_pdfs'
+    folder.mkdir()
+    (folder / 'Thesis.pdf').write_bytes(FAKE_PDF)
+    (folder / 'Thesis_noDSR.pdf').write_bytes(FAKE_PDF + b'x')
+    return folder
+
+
+def test_thesis_page_lists_both_files_and_embeds_the_main_one(tmp_path, thesis_dir):
+    page = TestClient(web_app.create_app(str(tmp_path), thesis_dir=str(thesis_dir))).get('/thesis')
+    assert page.status_code == 200
+    assert 'Mở toàn màn hình' in page.text and 'Tải về' in page.text
+    assert '/thesis/download?version=nodsr' in page.text and '<object data="/thesis/pdf?version=main' in page.text
+    assert 'chưa có bản PDF' not in page.text
+
+
+def test_thesis_page_without_the_files_shows_waiting_state(tmp_path):
+    page = TestClient(web_app.create_app(str(tmp_path), thesis_dir=str(tmp_path / 'none'))).get('/thesis')
+    assert page.status_code == 200 and page.text.count('chưa có bản PDF') == 2
+    assert '<object' not in page.text
+
+
+def test_thesis_pdf_is_inline_and_not_cached(tmp_path, thesis_dir):
+    client = TestClient(web_app.create_app(str(tmp_path), thesis_dir=str(thesis_dir)))
+    for url, body in (('/thesis/pdf', FAKE_PDF), ('/thesis/pdf?version=main', FAKE_PDF),
+                      ('/thesis/pdf?version=nodsr', FAKE_PDF + b'x')):
+        response = client.get(url)
+        assert response.status_code == 200 and response.content == body
+        assert response.headers['content-type'] == 'application/pdf'
+        assert response.headers['content-disposition'].startswith('inline')
+        assert response.headers['cache-control'] == 'no-cache'
+
+
+@pytest.mark.parametrize('version,name', [('main', 'NguyenTrungAnh_Thesis.pdf'),
+                                          ('nodsr', 'NguyenTrungAnh_Thesis_noDSR.pdf')])
+def test_thesis_download_is_an_attachment_with_fixed_name(tmp_path, thesis_dir, version, name):
+    client = TestClient(web_app.create_app(str(tmp_path), thesis_dir=str(thesis_dir)))
+    response = client.get('/thesis/download', params={'version': version})
+    assert response.status_code == 200 and response.headers['content-type'] == 'application/pdf'
+    disposition = response.headers['content-disposition']
+    assert disposition.startswith('attachment') and name in disposition
+    assert response.headers['cache-control'] == 'no-cache'
+
+
+@pytest.mark.parametrize('url', ['/thesis/pdf?version=other', '/thesis/download?version=../../etc/passwd',
+                                 '/thesis/pdf?version=Thesis.pdf'])
+def test_thesis_unknown_version_gives_404(tmp_path, thesis_dir, url):
+    assert TestClient(web_app.create_app(str(tmp_path), thesis_dir=str(thesis_dir))).get(url).status_code == 404
+
+
+@pytest.mark.parametrize('url', ['/thesis/pdf', '/thesis/download?version=nodsr'])
+def test_thesis_missing_file_gives_404(tmp_path, url):
+    assert TestClient(web_app.create_app(str(tmp_path), thesis_dir=str(tmp_path / 'none'))).get(url).status_code == 404

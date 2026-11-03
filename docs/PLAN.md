@@ -26,6 +26,7 @@ Khung nghiên cứu: `proposal/thesis_proposal/Thesis_Proposal.pdf` (chương 2.
 | 12 | Đo lại ước thời gian walk-forward sau tăng tốc | 🔧 | placebo đo được 1.612 s/lượt (ước cũ 14 giờ ⇒ thật 6 giờ 10 phút với 10 lượt song song); các phần khác chưa ước lại | [WALK_FORWARD](design/WALK_FORWARD.md#thời-gian-máy) |
 | 13 | SPA / DSR | ✅ 2026-11-03 | placebo thay SPA / DSR; DSR phụ cho 18 chuỗi thật: không chuỗi nào ≥ 0.95, LLM không tìm 0.65; luận văn có thể bỏ (câu hai bản ở WALK_FORWARD) | [WALK_FORWARD](design/WALK_FORWARD.md#dsr-phụ-tuỳ-chọn) |
 | 14 | Web điều khiển và theo dõi | 🔧 | W1, W3b (web luận văn, 2026-10-30; trang placebo và ngưỡng Fisher 2026-10-31) xong; W2, W3–W6 còn | [WEB_DASHBOARD](design/WEB_DASHBOARD.md) |
+| 15 | Viết luận văn (bản nháp đủ chương) | 🔧 | 2026-11-03: `docs/thesis/Thesis.pdf` (49 trang, có DSR) và `Thesis_noDSR.pdf` (48 trang), tiếng Anh, theo mẫu khoa; chờ người dùng đọc, sửa, thầy duyệt; ngày bìa "November 2026" là tạm; ô chữ ký để trống | [thesis/CLAUDE.md](thesis/CLAUDE.md) |
 
 ## Câu chưa ai trả lời
 

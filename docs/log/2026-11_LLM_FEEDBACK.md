@@ -93,3 +93,7 @@ Kết luận của agent (chưa phải của luận văn): vòng phản hồi kh
 ## 2026-11-02 — walk-forward thật xong cả 6 cấu hình
 
 Năm cấu hình còn lại xong 22:12 (MCTS không LLM 18:26 → 20:52, tìm ngẫu nhiên → 22:12, ba cấu hình tham chiếu vài giây). Mọi CI chênh Sharpe chứa 0; LLM không tìm cao nhất (1.10). Số: [RESULTS](../RESULTS.md#walk-forward-thật-đóng-băng-bfe7faf).
+
+## 2026-11-03 — bản nháp luận văn
+
+Viết `docs/thesis/Thesis.tex` (tiếng Anh, mẫu khoa) từ RESULTS / design; hình vẽ lại từ `results/` bằng `docs/thesis/make_figures.py` (số kiểm khớp RESULTS). Các câu RQ1 sai sau review (A ngoài vùng, chia đoạn như cửa sổ 1, LLM tới A sớm hơn) viết theo bản đúng trong luận văn; tài liệu RESULTS / LLM_FEEDBACK / PLANTED_SIGNAL / web vẫn chưa sửa (nợ). Trích dẫn mới kiểm trên arXiv / danh mục thư viện: Glasserman & Lin, Lopez-Lira & Tang, Politis & Romano, Holm, Ledoit & Wolf (bản Memmel 2003 chỉ thấy qua trích dẫn thứ cấp nên không dùng). Web có trang `/thesis` xem và tải PDF.

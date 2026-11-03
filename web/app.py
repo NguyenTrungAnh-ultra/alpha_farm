@@ -12,9 +12,12 @@ Pages:
     /results/placebo                placebo walk-forward (RQ2, negative control)
     /results/rq1                    role of the LLM (RQ1): primary tests, budget curves, coverage, first touch
     /results/walkforward            chapter without results yet
+    /thesis                         thesis PDF: embedded viewer, open and download links
+    /thesis/pdf, /thesis/download   the two fixed PDFs (?version=main|nodsr), inline and as attachment
     /system, /api/system            machine resources (tool outside the thesis)
 """
 
+import datetime
 import math
 import os
 from pathlib import Path
@@ -22,7 +25,7 @@ from typing import Dict, Optional
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from core_engine.BacktestEngine import AlphaBacktestEngine
@@ -41,6 +44,10 @@ THESIS_REWARD_MODE = 'sharpe'
 
 def default_results_root() -> str:
     return os.path.join(PROJECT_ROOT, 'results')
+
+
+def default_thesis_dir() -> str:
+    return os.path.join(PROJECT_ROOT, 'docs', 'thesis')
 
 
 def format_number(value, digits: int = 3) -> str:
@@ -121,9 +128,10 @@ def _illustration_view(folder: str, name: str, strength: float, seed: int) -> Di
     return view
 
 
-def create_app(results_root: Optional[str] = None) -> FastAPI:
+def create_app(results_root: Optional[str] = None, thesis_dir: Optional[str] = None) -> FastAPI:
     app = FastAPI(title='Alpha Farm thesis web', docs_url=None, redoc_url=None, openapi_url=None)
     app.state.results_root = str(results_root or default_results_root())
+    app.state.thesis_dir = str(thesis_dir or default_thesis_dir())
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters['fmt'] = format_number
     templates.env.filters['inline_code'] = pipeline.format_text
@@ -261,6 +269,35 @@ def create_app(results_root: Optional[str] = None) -> FastAPI:
 
     for key in thesis.PENDING_CHAPTERS:
         add_pending_page(key)
+
+    def pdf_response(version: str, disposition: str) -> FileResponse:
+        """One of the two fixed PDFs; an unknown version or a missing file is a 404 (no user-supplied path)."""
+        entry = thesis.PDF_VERSIONS.get(version)
+        path = os.path.join(app.state.thesis_dir, entry['file']) if entry else ''
+        if not entry or not os.path.isfile(path):
+            raise HTTPException(status_code=404, detail='Chưa có bản PDF này.')
+        return FileResponse(path, media_type='application/pdf', content_disposition_type=disposition,
+                            filename=entry['download'], headers={'Cache-Control': 'no-cache'})
+
+    @app.get('/thesis', response_class=HTMLResponse)
+    def thesis_page(request: Request):
+        files = []
+        for version, entry in thesis.PDF_VERSIONS.items():
+            path = os.path.join(app.state.thesis_dir, entry['file'])
+            info = os.stat(path) if os.path.isfile(path) else None
+            modified = datetime.datetime.fromtimestamp(info.st_mtime).strftime('%Y-%m-%d %H:%M') if info else None
+            files.append({'version': version, 'label': entry['label'], 'ready': info is not None, 'modified': modified,
+                          'size': thesis.format_size(info.st_size) if info else None,
+                          'stamp': int(info.st_mtime) if info else 0})
+        return render(request, 'thesis_pdf.html', 'thesis', t=thesis, files=files)
+
+    @app.get('/thesis/pdf')
+    def thesis_pdf(version: str = 'main'):
+        return pdf_response(version, 'inline')
+
+    @app.get('/thesis/download')
+    def thesis_download(version: str = 'main'):
+        return pdf_response(version, 'attachment')
 
     @app.get('/system', response_class=HTMLResponse)
     def system_page(request: Request):

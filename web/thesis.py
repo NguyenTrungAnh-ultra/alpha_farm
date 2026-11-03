@@ -653,3 +653,22 @@ def reading_near_figure(rows: List[Dict]) -> str:
         parts.append(f"{a}: {first['near_count']}/{first['n_runs']} ở IC {_ic(first['ic'])} → "
                      f"{last['near_count']}/{last['n_runs']} ở IC {_ic(last['ic'])}")
     return 'Đọc: ' + '; '.join(parts) + '.'
+
+
+# Thesis PDF page: the two fixed files, keyed by the `version` query value.
+PDF_VERSIONS = {
+    'main': {'file': 'Thesis.pdf', 'download': 'NguyenTrungAnh_Thesis.pdf', 'label': 'Bản chính'},
+    'nodsr': {'file': 'Thesis_noDSR.pdf', 'download': 'NguyenTrungAnh_Thesis_noDSR.pdf', 'label': 'Bản không DSR'},
+}
+THESIS_PDF_TITLE = 'Luận văn (PDF)'
+THESIS_PDF_INTRO = ('Bản PDF của luận văn, đọc ngay trong trình duyệt hoặc tải về. Trên điện thoại, khung nhúng thường chỉ '
+                    'hiện một trang hoặc không hiện gì: dùng "Mở toàn màn hình".')
+THESIS_PDF_WAITING = 'chưa có bản PDF'
+THESIS_PDF_NODSR_NOTE = 'Bản không DSR là bản không có mục Deflated Sharpe Ratio (phần bổ sung tuỳ chọn).'
+
+
+def format_size(size: int) -> str:
+    """Size text; 1 MB = 1024 * 1024 bytes."""
+    if size >= 1024 * 1024:
+        return f"{size / (1024 * 1024):.1f} MB"
+    return f"{size / 1024:.0f} KB" if size >= 1024 else f"{size} B"

@@ -149,6 +149,9 @@ Mục nào thiếu tệp kết quả hiện trạng thái chờ (chữ "chưa c�
 | `/results/placebo` | Kết quả: RQ2, kiểm soát âm | đọc `results/walkforward/llm_mcts/summary.csv`: phân bố Sharpe của K bộ placebo (chấm từng bộ, vạch Sharpe placebo lớn nhất), bảng từng bộ, câu đọc nói Sharpe thật phải vượt Sharpe placebo lớn nhất để p = 1/(K+1). p = (1 + số bộ có Sharpe ≥ thật) / (K + 1), tính từ dữ liệu, "thật" = dòng `real_seed1` (MCTS seed 1, cùng cách đo với bộ placebo; vạch "lần chạy thật (seed 1)" trên biểu đồ); Sharpe trung bình 5 seed (dòng `real_mean`) hiện thêm trong câu đọc, ghi rõ chỉ mô tả, không có p; chưa có dòng `real_seed1` thì p hiện "chưa có, chờ lần chạy thật"; chưa có thư mục thì hiện trạng thái chờ |
 | `/results/rq1` | Kết quả: RQ1 | xem dưới |
 | `/results/walkforward` | Kết quả: chuỗi ngoài mẫu | chưa có kết quả (cần đóng băng rồi chạy thật) |
+| `/thesis` | Luận văn (PDF) | kích thước và giờ sửa của hai tệp `docs/thesis/Thesis.pdf` (bản chính) và `docs/thesis/Thesis_noDSR.pdf` (bản không DSR), khung `<object>` nhúng bản chính (85vh), nút "Mở toàn màn hình" (tab mới, cách chắc chắn trên điện thoại) và "Tải về"; thiếu tệp thì hiện "chưa có bản PDF". Thư mục lấy từ `app.state.thesis_dir` (tham số `thesis_dir` của `create_app`, mặc định `docs/thesis/`) |
+| `/thesis/pdf?version=main\|nodsr` | (tệp) | `FileResponse`, `application/pdf`, `Content-Disposition: inline`, `Cache-Control: no-cache` |
+| `/thesis/download?version=main\|nodsr` | (tệp) | như trên nhưng `attachment`, tên `NguyenTrungAnh_Thesis.pdf` / `NguyenTrungAnh_Thesis_noDSR.pdf`. Chỉ hai tệp cố định qua từ điển `thesis.PDF_VERSIONS`; `version` lạ hoặc tệp thiếu → 404, không nhận đường dẫn từ người dùng |
 | `/system` | Công cụ (ngoài luận văn) | tài nguyên máy, tiến độ lượt chạy đang chạy |
 
 **Trang `/results/planted`** (nguồn duy nhất: `results/planted_rq1/`, hằng `THESIS_PLANTED_DIR` trong `web/planted.py`):

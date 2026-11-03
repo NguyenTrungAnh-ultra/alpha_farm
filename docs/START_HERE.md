@@ -15,6 +15,7 @@ Tệp cổng của vault `docs/` (mở thư mục này bằng Obsidian, hoặc �
 | Công trình liên quan (LLM trong đầu tư, tìm alpha) | [design/RELATED_WORK](design/RELATED_WORK.md) |
 | Vì sao ngày đó quyết thế, các lần chạy cũ, kết luận đã rút lại | [log/](log/) |
 | Proposal luận văn | `proposal/thesis_proposal/Thesis_Proposal.pdf` |
+| Luận văn (bản nháp) và cách build | `thesis/Thesis.pdf`, [thesis/CLAUDE.md](thesis/CLAUDE.md); web: `/thesis` |
 | Bài báo tham khảo | `references/` |
 | Tài liệu thời XNOQuant (không còn đúng) | [archive/README](archive/README.md) |
 

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ t.THESIS_PDF_TITLE }}{% endblock %}
+{% block content %}
+<h1>{{ t.THESIS_PDF_TITLE }}</h1>
+<p class="muted">{{ t.THESIS_PDF_INTRO }}</p>
+{% for f in files %}
+<div class="card {% if not f.ready %}pending{% endif %}">
+  <b>{{ f.label }}</b>
+  {% if f.ready %}
+  <span class="muted small"> · {{ f.size }} · cập nhật {{ f.modified }}</span>
+  <p style="margin:8px 0 0">
+    <a href="/thesis/pdf?version={{ f.version }}&v={{ f.stamp }}" target="_blank" rel="noopener">Mở toàn màn hình</a> ·
+    <a href="/thesis/download?version={{ f.version }}">Tải về</a>
+  </p>
+  {% else %}
+  <span class="muted small"> · {{ t.THESIS_PDF_WAITING }}</span>
+  {% endif %}
+</div>
+{% endfor %}
+<p class="muted small">{{ t.THESIS_PDF_NODSR_NOTE }}</p>
+{% if files[0].ready %}
+<object data="/thesis/pdf?version=main&v={{ files[0].stamp }}" type="application/pdf" style="width:100%;height:85vh;border:1px solid var(--line);border-radius:8px">
+  <p class="muted">Trình duyệt không nhúng được PDF: dùng "Mở toàn màn hình" hoặc "Tải về" ở trên.</p>
+</object>
+{% endif %}
+{% endblock %}
